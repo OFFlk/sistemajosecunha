@@ -138,120 +138,48 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 
 .hidden{ display:none !important; }
 
-/* ── Card de Scans do Livro de Atas ── */
-#cardScansAtas {
-  border: 2px dashed var(--brand-border, #ddd6fe);
-  border-radius: var(--radius, 14px);
-  background: var(--card-bg);
-  padding: 20px;
-  margin-bottom: 16px;
-  transition: border-color 0.2s;
+
+/* ── Scans do Livro de Atas ── */
+.scans-wrap { display:none; margin-bottom:16px; }
+.scans-drop {
+  border:2px dashed var(--brand-border,#ddd6fe);
+  border-radius:12px;
+  padding:20px;
+  text-align:center;
+  cursor:pointer;
+  background:var(--field-bg,#fff);
+  transition:border-color .15s,background .15s;
+  position:relative;
+  margin-bottom:12px;
 }
-#cardScansAtas:has(.scan-item) {
-  border-style: solid;
+.scans-drop:hover,.scans-drop.drag-over{
+  border-color:var(--brand,#7c3aed);
+  background:var(--brand-faded,#f5f3ff);
 }
-.scans-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 16px;
+.scans-drop input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
 }
-.scans-header h3 {
-  margin: 0;
-  font-size: 15px;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.scans-drop-txt{ font-size:13px;color:var(--muted); }
+.scans-drop-txt strong{ color:var(--brand,#7c3aed); }
+.scans-lista{ display:flex;flex-direction:column;gap:8px; }
+.scans-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--line,#ede9fe);
+  border-radius:10px;
+  background:var(--field-bg,#fff);
+  font-size:13px;
 }
-.scans-badge {
-  font-size: 11px;
-  font-weight: 700;
-  background: var(--brand-faded, #f5f3ff);
-  color: var(--brand, #7c3aed);
-  border-radius: 99px;
-  padding: 2px 9px;
+.scans-item-info{ flex:1;min-width:0; }
+.scans-item-nome{
+  font-weight:700;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.scans-optional {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 600;
-  margin-left: 4px;
-}
-.scans-drop-zone {
-  border: 1.5px dashed var(--field-border, #ddd6fe);
-  border-radius: 10px;
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  background: var(--field-bg, #fff);
-  margin-bottom: 14px;
-  position: relative;
-}
-.scans-drop-zone:hover,
-.scans-drop-zone.drag-over {
-  border-color: var(--brand, #7c3aed);
-  background: var(--brand-faded, #f5f3ff);
-}
-.scans-drop-zone input[type="file"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-}
-.scans-drop-icon { font-size: 28px; margin-bottom: 6px; }
-.scans-drop-text { font-size: 13px; color: var(--muted); }
-.scans-drop-text strong { color: var(--brand, #7c3aed); }
-.scans-uploading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-.scans-spinner {
-  width: 16px; height: 16px;
-  border: 2px solid var(--brand-faded, #ddd6fe);
-  border-top-color: var(--brand, #7c3aed);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.scans-list { display: flex; flex-direction: column; gap: 8px; }
-.scan-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--line, #ede9fe);
-  border-radius: 10px;
-  background: var(--field-bg, #fff);
-  font-size: 13px;
-}
-.scan-item-icon { font-size: 20px; flex-shrink: 0; }
-.scan-item-info { flex: 1; min-width: 0; }
-.scan-item-name {
-  font-weight: 700;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.scan-item-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
-.scan-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.scans-empty {
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-  padding: 6px 0 2px;
-}
+.scans-item-meta{ font-size:11px;color:var(--muted);margin-top:1px; }
+.scans-item-actions{ display:flex;gap:6px;flex-shrink:0; }
+.scans-status{ font-size:13px;color:var(--muted);margin-bottom:8px;min-height:18px; }
+.scans-status.ok { color:#16a34a; }
+.scans-status.err{ color:#dc2626; }
 
 </style>
 <script src="../db.firebase.js"></script>
@@ -318,36 +246,25 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
   </div>
 
 
-  <!-- ── Card de Scans do Livro de Atas (oculto até clicar Continuar ou ao editar) ── -->
-  <div id="cardScansAtas" class="hidden">
-    <div class="scans-header">
-      <h3>
-        📄 Scans do Livro de Atas
-        <span class="scans-optional">— opcional</span>
-      </h3>
-      <span class="scans-badge" id="scansBadge">0 arquivo(s)</span>
-    </div>
+  <!-- ═══════════════════════════════════════
+       SCANS DO LIVRO DE ATAS
+  ═══════════════════════════════════════ -->
+  <div class="card scans-wrap" id="scansWrap">
+    <h3 style="margin-top:0;">📄 Scans do Livro de Atas <span style="font-size:13px;font-weight:400;color:var(--muted);">— opcional</span></h3>
+    <div class="scans-status" id="scansStatus"></div>
 
-    <!-- Zona de upload -->
-    <div class="scans-drop-zone" id="scansDropZone">
-      <input type="file" id="scansInput" accept="image/*,application/pdf" multiple>
-      <div class="scans-drop-icon">📁</div>
-      <div class="scans-drop-text">
+    <!-- Drop zone -->
+    <div class="scans-drop" id="scansDropZone">
+      <input type="file" id="scansFileInput" accept="image/*,application/pdf" multiple>
+      <div style="font-size:28px;margin-bottom:6px;">📁</div>
+      <div class="scans-drop-txt">
         <strong>Clique para selecionar</strong> ou arraste aqui<br>
-        PDF ou imagem (JPG, PNG) — scan do livro físico
+        PDF ou imagem (JPG, PNG)
       </div>
     </div>
 
-    <!-- Progresso de upload -->
-    <div class="scans-uploading hidden" id="scansUploading">
-      <div class="scans-spinner"></div>
-      <span id="scansUploadingText">Enviando...</span>
-    </div>
-
-    <!-- Lista de arquivos -->
-    <div class="scans-list" id="scansList">
-      <div class="scans-empty" id="scansEmpty">Nenhum scan enviado ainda.</div>
-    </div>
+    <!-- Lista de arquivos (fila + existentes) -->
+    <div class="scans-lista" id="scansLista"></div>
   </div>
 
   <div class="card">
@@ -358,7 +275,7 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 
     <div class="actions">
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
-      <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarCardScans()" style="display:none">Continuar →</button>
+      <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarScans()" style="display:none">Continuar →</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
       <button class="btn btn-primary" onclick="exportarPDF()">Exportar PDF</button>
     </div>
@@ -1692,13 +1609,9 @@ async function salvarNoBanco() {
 
   alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
 
-  // ── Scans: registra o ID disponível e libera o card ──
-  turmaIdSalvo = idFinal;
-  if (!modoEdicao) {
-    mostrarCardScans();
-    const btnC = $('btnContinuarScans');
-    if (btnC) btnC.style.display = 'none';
-  }
+  // ── Scans: libera o card e dispara upload da fila ──
+  if (window.initScans) window.initScans(idFinal);
+  if (window.uploadScansQueue) await window.uploadScansQueue();
 }
 
 /* =========================
@@ -1749,278 +1662,183 @@ document.addEventListener("DOMContentLoaded", async () => {
 </script>
 
 
-<script>
-/* =========================
-   Scans do Livro de Atas (Cloudinary)
-========================= */
+<script id="atas-scans-js">
+(function(){
+  const API_UPLOAD = '/api/atas-upload';
+  const API_LIST   = '/api/atas-list';
+  const API_DELETE = '/api/atas-delete';
+  const MAX_MB     = 15;
 
-// ID da turma disponível para o módulo de scans após o save
-let turmaIdSalvo = '';
+  let _fila    = [];
+  let _turmaId = null;
 
-const ATAS_API_LIST   = '/.netlify/functions/atas-list';
-const ATAS_API_UPLOAD = '/.netlify/functions/atas-upload';
-const ATAS_API_DELETE = '/.netlify/functions/atas-delete';
+  function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
+  function fmtData(iso){ return iso ? new Date(iso).toLocaleDateString('pt-BR') : ''; }
 
-/** Mesmo slug usado no backend */
-function slugTurmaId(turmaId) {
-  return String(turmaId)
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9_\-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
-}
-
-function iconeArquivo(mimeType) {
-  if ((mimeType || '').startsWith('image/')) return '🖼️';
-  if (mimeType === 'application/pdf') return '📄';
-  return '📎';
-}
-
-function formatarData(iso) {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
-  } catch { return iso; }
-}
-
-/* Mostra o card de scans e carrega arquivos se já tiver turmaId */
-function mostrarCardScans() {
-  const card = $('cardScansAtas');
-  if (!card) return;
-  card.classList.remove('hidden');
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-  // Se editando, carrega lista do Cloudinary
-  if (modoEdicao && idTurmaEditando) {
-    carregarScans(idTurmaEditando);
-    return;
+  function setStatus(kind, text){
+    const el = document.getElementById('scansStatus');
+    if(!el) return;
+    el.className = 'scans-status' + (kind ? ' '+kind : '');
+    el.textContent = text;
+    if(kind==='ok') setTimeout(()=>{ el.className='scans-status'; el.textContent=''; }, 4000);
   }
-  // Se já salvou nesta sessão, carrega normalmente
-  if (turmaIdSalvo) {
-    carregarScans(turmaIdSalvo);
-    return;
+
+  function renderFila(){
+    const lista = document.getElementById('scansLista');
+    if(!lista) return;
+    lista.querySelectorAll('.scan-pendente').forEach(el => el.remove());
+    _fila.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'scans-item scan-pendente';
+      div.innerHTML =
+        `<span style="font-size:20px">${iconForMime(item.mimeType)}</span>`+
+        '<div class="scans-item-info">'+
+          `<div class="scans-item-nome">${escHtml(item.fileName)}</div>`+
+          `<div class="scans-item-meta">Aguardando envio…</div>`+
+        '</div>'+
+        `<button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px" data-idx="${idx}" title="Remover">✕</button>`;
+      div.querySelector('button').addEventListener('click', ()=>{
+        _fila.splice(idx, 1);
+        renderFila();
+      });
+      lista.insertBefore(div, lista.querySelector('.scan-existente'));
+    });
   }
-  // Ainda não salvou: avisa no card (não bloqueia)
-  const empty = $('scansEmpty');
-  if (empty) empty.textContent = 'Salve a turma primeiro, depois envie os scans aqui.';
-}
 
-/* Atualiza badge com contagem */
-function atualizarBadgeScans(n) {
-  const badge = $('scansBadge');
-  if (badge) badge.textContent = `${n} arquivo(s)`;
-}
-
-/* Carrega lista de scans do Cloudinary para a turma */
-async function carregarScans(turmaId) {
-  const lista = $('scansList');
-  const empty = $('scansEmpty');
-  if (!lista) return;
-
-  // Limpa itens anteriores (mantém o empty)
-  Array.from(lista.querySelectorAll('.scan-item')).forEach(el => el.remove());
-  if (empty) empty.style.display = 'block';
-  atualizarBadgeScans(0);
-
-  try {
-    const res  = await fetch(`${ATAS_API_LIST}?turmaId=${encodeURIComponent(turmaId)}`);
-    const data = await res.json();
-    const files = data.files || [];
-
-    atualizarBadgeScans(files.length);
-    if (empty) empty.style.display = files.length ? 'none' : 'block';
-
-    files.forEach(f => adicionarScanNaLista(f));
-
-  } catch (err) {
-    console.error('[scans] erro ao carregar:', err);
+  async function adicionarArquivos(files){
+    for(const f of Array.from(files)){
+      if(f.size > MAX_MB * 1024 * 1024){
+        setStatus('err', `❌ "${f.name}" excede ${MAX_MB} MB e foi ignorado.`);
+        continue;
+      }
+      const base64 = await new Promise((res,rej)=>{
+        const r = new FileReader();
+        r.onload  = e => res(e.target.result.split(',')[1]);
+        r.onerror = rej;
+        r.readAsDataURL(f);
+      });
+      _fila.push({ fileName: f.name, mimeType: f.type||'application/octet-stream', base64 });
+    }
+    // Mostra o card se ainda estava oculto
+    mostrarScans();
+    renderFila();
   }
-}
 
-/* Renderiza um item de scan na lista */
-function adicionarScanNaLista(file) {
-  const lista = $('scansList');
-  const empty = $('scansEmpty');
-  if (!lista) return;
+  async function uploadItem(item){
+    try{
+      const resp = await fetch(API_UPLOAD, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ turmaId: _turmaId, fileName: item.fileName, mimeType: item.mimeType, fileBase64: item.base64 }),
+      });
+      if(!resp.ok){ const d=await resp.json(); throw new Error(d.error||'Erro no servidor'); }
+      const data = await resp.json();
+      return { ok:true, data };
+    }catch(err){
+      return { ok:false, name:item.fileName, error:err.message };
+    }
+  }
 
-  if (empty) empty.style.display = 'none';
+  window.uploadScansQueue = async function(){
+    if(!_fila.length || !_turmaId) return;
+    setStatus('loading', `⏳ Enviando ${_fila.length} arquivo(s)…`);
+    const erros = [];
+    const enviados = [];
+    for(const item of _fila){
+      const res = await uploadItem(item);
+      if(res.ok) enviados.push(res.data);
+      else erros.push(item.fileName+': '+res.error);
+    }
+    _fila = [];
+    document.getElementById('scansLista')?.querySelectorAll('.scan-pendente').forEach(el=>el.remove());
+    enviados.forEach(f => _renderExistente(f));
+    if(erros.length) setStatus('err', `⚠️ Falha: ${erros.join(' | ')}`);
+    else if(enviados.length) setStatus('ok', '✅ Scans enviados!');
+  };
 
-  const div = document.createElement('div');
-  div.className = 'scan-item';
-  div.dataset.fileId = file.fileId;
+  window.initScans = function(turmaId){
+    if(!turmaId) return;
+    _turmaId = String(turmaId);
+    mostrarScans();
+    _carregarScans();
+    // Oculta o botão Continuar (turma já salva)
+    const btn = document.getElementById('btnContinuarScans');
+    if(btn) btn.style.display = 'none';
+  };
 
-  // Para PDFs salvos como imagem no Cloudinary: gera URL de visualização em PDF
-  const viewUrl = (file.isPdf || file.fileName?.toLowerCase().endsWith('.pdf'))
-    ? file.webViewLink.replace('/upload/', '/upload/fl_attachment:false/')
-    : file.webViewLink;
+  async function _carregarScans(){
+    if(!_turmaId) return;
+    const lista = document.getElementById('scansLista');
+    if(!lista) return;
+    lista.querySelectorAll('.scan-existente').forEach(el=>el.remove());
+    try{
+      const resp = await fetch(`${API_LIST}?turmaId=${encodeURIComponent(_turmaId)}`);
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error);
+      (data.files||[]).forEach(f => _renderExistente(f));
+    }catch(err){ console.warn('[scans] Erro ao carregar:', err.message); }
+  }
 
-  div.innerHTML = `
-    <span class="scan-item-icon">${iconeArquivo(file.mimeType)}</span>
-    <div class="scan-item-info">
-      <div class="scan-item-name" title="${file.fileName}">${file.fileName}</div>
-      <div class="scan-item-meta">Enviado em ${formatarData(file.createdAt)}</div>
-    </div>
-    <div class="scan-item-actions">
-      <a href="${viewUrl}" target="_blank" class="btn btn-secondary btn-edit btn-mini">Abrir</a>
-      <button class="btn btn-danger-outline btn-edit btn-mini" onclick="deletarScan('${file.fileId}','${file.mimeType}',this)">Excluir</button>
-    </div>
-  `;
+  function _renderExistente(f){
+    const lista = document.getElementById('scansLista');
+    if(!lista) return;
+    const wrap = document.getElementById('scansWrap');
+    if(wrap) wrap.style.display = '';
+    const div = document.createElement('div');
+    div.className = 'scans-item scan-existente';
+    div.innerHTML =
+      `<span style="font-size:20px">${iconForMime(f.mimeType)}</span>`+
+      '<div class="scans-item-info">'+
+        `<div class="scans-item-nome">${escHtml(f.fileName)}</div>`+
+        `<div class="scans-item-meta">${fmtData(f.createdAt)}</div>`+
+      '</div>'+
+      '<div class="scans-item-actions">'+
+        `<a href="${f.webViewLink}" target="_blank" rel="noopener" style="padding:4px 10px;border-radius:8px;font-size:12px;font-weight:800;border:1px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;">👁️ Ver</a>`+
+        `<button class="btn btn-danger-outline btn-mini" data-fileid="${escHtml(f.fileId)}" data-restype="${escHtml(f.resourceType||'image')}" data-name="${escHtml(f.fileName)}" title="Excluir">🗑️</button>`+
+      '</div>';
+    div.querySelector('[data-fileid]').addEventListener('click', async function(){
+      if(!confirm(`Excluir "${this.dataset.name}"? Não pode ser desfeito.`)) return;
+      setStatus('loading','⏳ Removendo…');
+      try{
+        const r = await fetch(API_DELETE,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:this.dataset.fileid,resourceType:this.dataset.restype||'image'})});
+        const d = await r.json();
+        if(!r.ok) throw new Error(d.error);
+        this.closest('.scans-item').remove();
+        setStatus('ok','✅ Removido.');
+      }catch(e){ setStatus('err','❌ Erro: '+e.message); }
+    });
+    lista.appendChild(div);
+  }
 
-  lista.insertBefore(div, lista.firstChild);
+  // Mostra o card de scans
+  window.mostrarScans = function(){
+    const wrap = document.getElementById('scansWrap');
+    if(wrap){ wrap.style.display=''; wrap.scrollIntoView({behavior:'smooth',block:'start'}); }
+  };
 
-  // Atualiza badge
-  const total = lista.querySelectorAll('.scan-item').length;
-  atualizarBadgeScans(total);
-}
+  // Eventos de seleção/drop
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const input   = document.getElementById('scansFileInput');
+    const dropZone = document.getElementById('scansDropZone');
+    if(input) input.addEventListener('change', ()=> adicionarArquivos(input.files));
+    if(dropZone){
+      dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag-over'); });
+      dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); adicionarArquivos(e.dataTransfer.files); });
+    }
 
-/* Upload de um arquivo */
-async function uploadScan(file, turmaId) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const base64 = e.target.result.split(',')[1];
-        const isPdf  = (file.type === 'application/pdf') ||
-                       file.name.toLowerCase().endsWith('.pdf');
-        const res = await fetch(ATAS_API_UPLOAD, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            turmaId,
-            fileName:   file.name,
-            // PDFs sobem como image/pdf para o Cloudinary converter em imagem
-            mimeType:   isPdf ? 'image/pdf' : (file.type || 'application/octet-stream'),
-            fileBase64: base64,
-            isPdf,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Erro no upload');
-        resolve(data);
-      } catch(err) { reject(err); }
-    };
-    reader.onerror = () => reject(new Error('Erro ao ler o arquivo'));
-    reader.readAsDataURL(file);
+    // Modo edição: carrega scans automaticamente
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    if(editId){
+      window.initScans(editId);
+    } else {
+      // Modo criação: mostra botão Continuar
+      const btn = document.getElementById('btnContinuarScans');
+      if(btn) btn.style.display = '';
+    }
   });
-}
-
-/* Excluir scan */
-async function deletarScan(fileId, mimeType, btn) {
-  if (!confirm('Excluir este scan? A ação não pode ser desfeita.')) return;
-  btn.disabled = true;
-  btn.textContent = '...';
-  try {
-    const res = await fetch(ATAS_API_DELETE, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileId, mimeType }),
-    });
-    if (!res.ok) throw new Error('Erro ao excluir');
-
-    // Remove da lista
-    const item = btn.closest('.scan-item');
-    if (item) item.remove();
-
-    const lista = $('scansList');
-    const total = lista ? lista.querySelectorAll('.scan-item').length : 0;
-    atualizarBadgeScans(total);
-    if (total === 0) {
-      const empty = $('scansEmpty');
-      if (empty) empty.style.display = 'block';
-    }
-  } catch(err) {
-    btn.disabled = false;
-    btn.textContent = 'Excluir';
-    alert('Erro ao excluir o arquivo. Tente novamente.');
-    console.error('[scans] deletar:', err);
-  }
-}
-
-/* Processa seleção/drop de arquivos */
-async function processarArquivosScans(files, turmaId) {
-  if (!files || files.length === 0) return;
-  if (!turmaId) {
-    alert('Salve a turma antes de enviar os scans.');
-    return;
-  }
-
-  const uploading = $('scansUploading');
-  const uploadText = $('scansUploadingText');
-  const input = $('scansInput');
-
-  if (uploading) uploading.classList.remove('hidden');
-
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    if (uploadText) uploadText.textContent = `Enviando ${i + 1} de ${files.length}: ${f.name}`;
-    try {
-      const result = await uploadScan(f, turmaId);
-      adicionarScanNaLista(result);
-    } catch (err) {
-      alert(`Erro ao enviar "${f.name}": ${err.message}`);
-      console.error('[scans] upload:', err);
-    }
-  }
-
-  if (uploading) uploading.classList.add('hidden');
-  if (input) input.value = ''; // limpa para permitir re-upload do mesmo arquivo
-}
-
-/* Resolve o turmaId atual (edição ou recém-salva) */
-function getTurmaIdAtual() {
-  if (modoEdicao && idTurmaEditando) return idTurmaEditando;
-  if (turmaIdSalvo) return turmaIdSalvo;
-  return null; // ainda não salvo — processarArquivosScans vai avisar
-}
-
-/* Inicializa eventos do card de scans */
-function iniciarCardScans() {
-  const input   = $('scansInput');
-  const dropZone = $('scansDropZone');
-
-  if (input) {
-    input.addEventListener('change', () => {
-      const turmaId = getTurmaIdAtual();
-      processarArquivosScans(Array.from(input.files), turmaId);
-    });
-  }
-
-  if (dropZone) {
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('drag-over');
-    });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('drag-over');
-      const turmaId = getTurmaIdAtual();
-      processarArquivosScans(Array.from(e.dataTransfer.files), turmaId);
-    });
-  }
-}
-
-/* Hook no DOMContentLoaded — inicializa eventos e mostra card se editando */
-document.addEventListener('DOMContentLoaded', () => {
-  iniciarCardScans();
-});
-
-/* Hook para mostrar botão "Continuar" e mostrar card automaticamente ao editar */
-const _carregarTurmaOriginal = carregarTurmaParaEdicao;
-// Sobrescreve para ativar o card de scans ao entrar em modo edição
-window.addEventListener('load', () => {
-  const id = getQueryParam('edit');
-  if (id) {
-    mostrarCardScans();
-    // Oculta o botão Continuar (não faz sentido em modo edição)
-    const btnContinuar = $('btnContinuarScans');
-    if (btnContinuar) btnContinuar.style.display = 'none';
-  } else {
-    // Modo criação: exibe o botão Continuar nas actions
-    const btnContinuar = $('btnContinuarScans');
-    if (btnContinuar) btnContinuar.style.display = '';
-  }
-});
+})();
 </script>
 
 <script src="../header-logic.js"></script>
