@@ -1,0 +1,318 @@
+/* ================================================
+   admin.css — Página de administração
+   Compatível com base.css / header.css / hub.css
+   Cores de destaque via theme-colors.js:
+     light → --brand, --brand-hover, --brand-faded,
+             --brand-border, --brand-text
+     dark  → --brand-d, --brand-hover-d, --brand-faded-d,
+             --brand-border-d, --brand-text-d
+   ================================================ */
+
+/* ── Variáveis locais — mapeiam o tema ativo ── */
+:root {
+  --a-brand:        var(--brand);
+  --a-brand-hover:  var(--brand-hover);
+  --a-brand-faded:  var(--brand-faded);
+  --a-brand-border: var(--brand-border);
+  --a-brand-text:   var(--brand-text);
+  --a-ring:         color-mix(in srgb, var(--brand) 30%, transparent);
+
+  /* neutros light */
+  --a-card-bg:      #ffffff;
+  --a-card-border:  #e2e8f0;
+  --a-card-shadow:  0 2px 12px rgba(0,0,0,.06);
+
+  --a-input-bg:     #f8fafc;
+  --a-input-border: #e2e8f0;
+  --a-label:        #475569;
+  --a-text:         #1e293b;
+  --a-muted:        #64748b;
+  --a-divider:      #e2e8f0;
+
+  --a-warn-bg:      #fefce8;
+  --a-warn-border:  #fde68a;
+  --a-warn-text:    #854d0e;
+
+  --a-success:      #16a34a;
+
+  --a-radius:       14px;
+  --a-radius-sm:    8px;
+}
+
+[data-theme="dark"] {
+  --a-brand:        var(--brand-d);
+  --a-brand-hover:  var(--brand-hover-d);
+  --a-brand-faded:  var(--brand-faded-d);
+  --a-brand-border: var(--brand-border-d);
+  --a-brand-text:   var(--brand-text-d);
+  --a-ring:         color-mix(in srgb, var(--brand-d) 30%, transparent);
+
+  /* neutros dark */
+  --a-card-bg:      #1e293b;
+  --a-card-border:  #334155;
+  --a-card-shadow:  0 2px 12px rgba(0,0,0,.30);
+
+  --a-input-bg:     #0f172a;
+  --a-input-border: #334155;
+  --a-label:        #94a3b8;
+  --a-text:         #e2e8f0;
+  --a-muted:        #94a3b8;
+  --a-divider:      #334155;
+
+  --a-warn-bg:      rgba(133,77,14,.18);
+  --a-warn-border:  #92400e;
+  --a-warn-text:    #fcd34d;
+
+  --a-success:      #4ade80;
+}
+
+/* ── Container principal ── */
+.container {
+  max-width: 860px;
+  margin: 2rem auto;
+  padding: 0 1.25rem 3rem;
+  font-family: 'Nunito', sans-serif;
+}
+
+/* ── Card de configuração (Ano letivo ativo) ── */
+.config-card {
+  background: var(--a-card-bg);
+  border: 1px solid var(--a-card-border);
+  border-radius: var(--a-radius);
+  box-shadow: var(--a-card-shadow);
+  padding: 1.5rem 1.75rem;
+}
+
+.config-card h3 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--a-brand-text);
+  margin: 0 0 .5rem;
+  letter-spacing: -.01em;
+}
+
+.config-card .desc {
+  font-size: .875rem;
+  color: var(--a-muted);
+  margin: 0 0 1.25rem;
+  line-height: 1.55;
+}
+
+/* ── Layout inline dos campos ── */
+.field-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.25rem 2rem;
+}
+
+.field-inline > div {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.field-inline label {
+  font-family: 'Nunito', sans-serif;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--a-label);
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+/* Valor do ano atual */
+.field-inline b {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.75rem !important;
+  font-weight: 800;
+  color: var(--a-brand-text);
+  line-height: 1;
+}
+
+/* Input de ano */
+.field-inline input[type="number"] {
+  font-family: 'Nunito', sans-serif;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--a-text);
+  background: var(--a-input-bg);
+  border: 1.5px solid var(--a-input-border);
+  border-radius: var(--a-radius-sm);
+  padding: .55rem .875rem;
+  width: 110px;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+}
+
+.field-inline input[type="number"]::-webkit-inner-spin-button,
+.field-inline input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+.field-inline input[type="number"]:hover {
+  border-color: var(--a-brand-border);
+}
+
+.field-inline input[type="number"]:focus {
+  border-color: var(--a-brand);
+  background: var(--a-brand-faded);
+  box-shadow: 0 0 0 3px var(--a-ring);
+}
+
+/* Botão salvar */
+.btn-save {
+  font-family: 'Nunito', sans-serif;
+  font-size: .875rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: var(--a-brand);
+  border: none;
+  border-radius: var(--a-radius-sm);
+  padding: .55rem 1.1rem;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px var(--a-ring);
+  transition: background .18s, transform .12s, box-shadow .18s;
+  user-select: none;
+}
+
+.btn-save:hover {
+  background: var(--a-brand-hover);
+  box-shadow: 0 4px 14px var(--a-ring);
+  transform: translateY(-1px);
+}
+
+.btn-save:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px var(--a-ring);
+}
+
+.btn-save:focus-visible {
+  outline: 3px solid var(--a-ring);
+  outline-offset: 2px;
+}
+
+/* Mensagem de sucesso do ano ativo */
+#msgAnoAtivo {
+  font-family: 'Nunito', sans-serif;
+  font-size: .8125rem !important;
+  font-weight: 700;
+  color: var(--a-success) !important;
+}
+
+/* ── Card de status do banco ── */
+.status-card {
+  background: var(--a-card-bg);
+  border: 1px solid var(--a-card-border);
+  border-radius: var(--a-radius);
+  box-shadow: var(--a-card-shadow);
+  padding: 1.5rem 1.75rem;
+}
+
+.status-card h3 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--a-brand-text);
+  margin: 0 0 1rem;
+  letter-spacing: -.01em;
+}
+
+/* Linhas de metadados */
+.meta-line {
+  font-family: 'Nunito', sans-serif;
+  font-size: .875rem;
+  color: var(--a-text);
+  line-height: 1.6;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--a-divider);
+}
+
+.meta-line:last-child {
+  border-bottom: none;
+}
+
+.meta-line b {
+  color: var(--a-brand-text);
+  font-weight: 700;
+}
+
+.meta-line code {
+  font-size: .8em;
+  background: var(--a-input-bg);
+  border: 1px solid var(--a-input-border);
+  border-radius: 4px;
+  padding: .1em .4em;
+  color: var(--a-muted);
+}
+
+/* Caixa de aviso */
+.warn-box {
+  font-family: 'Nunito', sans-serif;
+  font-size: .875rem;
+  background: var(--a-warn-bg);
+  border: 1.5px solid var(--a-warn-border);
+  border-radius: var(--a-radius-sm);
+  color: var(--a-warn-text);
+  padding: .75rem 1rem;
+  margin: .75rem 0;
+  line-height: 1.55;
+}
+
+.warn-box b {
+  font-weight: 800;
+}
+
+/* ── Footer ── */
+footer {
+  font-family: 'Nunito', sans-serif;
+  font-size: .8125rem;
+  color: var(--a-muted);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: 2rem 1rem 1.5rem;
+}
+
+.l-fdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--a-brand);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ── Responsivo ── */
+@media (max-width: 560px) {
+  .container {
+    margin: 1rem auto;
+    padding: 0 .75rem 2rem;
+  }
+
+  .config-card,
+  .status-card {
+    padding: 1.125rem 1rem;
+    border-radius: 10px;
+  }
+
+  .field-inline {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .field-inline input[type="number"] {
+    width: 100%;
+  }
+
+  .btn-save {
+    width: 100%;
+    text-align: center;
+  }
+}

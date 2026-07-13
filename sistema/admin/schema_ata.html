@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
+<script>
+(function(){
+  const t = localStorage.getItem('ui_theme_v1') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<!-- CSS específico desta página -->
+<style>
+  /* ── Variáveis locais ── */
+  :root {
+    --card:    #ffffff;
+    --radius:  14px;
+    --shadow:  0 4px 20px rgba(0,0,0,0.06);
+    --chip:    var(--brand-faded, #f5f3ff);
+    --chipText: var(--brand-text, #6d28d9);
+  }
+  html[data-theme="dark"] {
+    --card:    #131c2e;
+    --shadow:  0 4px 24px rgba(0,0,0,0.4);
+    --chip:    var(--brand-faded-d, rgba(124,58,237,0.28));
+    --chipText: var(--brand-text-d, #c4b5fd);
+  }
+
+  /* ── Layout ── */
+  .container { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; }
+  .card { background: var(--card); border: 1px solid var(--border, #ddd6fe); border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); margin-bottom: 18px; transition: background 0.3s, border-color 0.3s; }
+
+  h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
+  h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
+  .muted { color: var(--muted, #6b7280); }
+
+  .warn { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.30); padding: 12px 14px; border-radius: 10px; font-size: 13px; }
+  .ok   { background: rgba(22,163,74,.10);  border: 1px solid rgba(22,163,74,.30);  padding: 12px 14px; border-radius: 10px; font-size: 13px; }
+
+  /* ── Form ── */
+  label { display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px; }
+  input, select, textarea {
+    width: 100%; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border, #ddd6fe);
+    background: var(--card); color: var(--text, #1e1b4b);
+    outline: none; font-family: 'Nunito', system-ui, sans-serif; font-size: 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  html[data-theme="dark"] input,
+  html[data-theme="dark"] select,
+  html[data-theme="dark"] textarea { background: #0a1426; border-color: #1e2540; }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--brand, #7c3aed);
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  @media (max-width: 540px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ── Botões ── */
+  .btn-gray{background:var(--brand-faded,rgba(124,58,237,0.12));border:1px solid var(--brand,#7c3aed);color:var(--brand,#7c3aed);}
+  html[data-theme="dark"] .btn-gray{background:var(--brand-faded-d,rgba(124,58,237,0.28));border-color:var(--brand-border-d,#7c3aed);color:var(--brand-text-d,#c4b5fd);}
+  .btn-gray:hover{background:var(--brand-faded,#f5f3ff);border-color:var(--brand-border,#ddd6fe);color:var(--brand-text,#6d28d9);}
+  html[data-theme="dark"] .btn-gray:hover{background:var(--brand-d,#a78bfa);border-color:var(--brand-d,#a78bfa);color:#ffffff;}
+
+  /* ── Tabela ── */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; overflow: hidden; border-radius: 10px; border: 1px solid var(--border, #ddd6fe); }
+  th, td { padding: 10px; border-bottom: 1px solid var(--border, #ddd6fe); text-align: center; font-size: 13px; }
+  th { background: var(--chip); font-weight: 800; font-size: 12px; color: var(--muted, #6b7280); }
+  tr:last-child td { border-bottom: none; }
+</style>
+
+<title>Admin - Edição de Ata e Schema</title>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+  <div class="card">
+    <div class="warn">
+      <b>Importante:</b> Alterações aqui <b>não</b> alteram turmas já salvas no banco local.
+      Elas só valem para <b>novas turmas</b> (ou quando você clicar em "Resetar padrão").
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Configuração atual</h3>
+    <div id="resumo" class="muted"></div>
+
+    <div style="margin-top:12px;" class="grid">
+      <div style="grid-column: 1 / -1;">
+        <label><b>Schema salvo</b></label>
+        <select id="schemaSelect"></select>
+
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-primary" type="button" onclick="novoSchema()">Novo schema</button>
+          <button class="btn btn-outline" type="button" onclick="duplicarSchema()">Duplicar</button>
+          <button class="btn btn-danger" type="button" onclick="excluirSchema()">Excluir</button>
+        </div>
+        <div class="muted" style="margin-top:6px;">
+          Dica: crie schemas diferentes (ex: Fundamental 1, Fundamental 2) e escolha o padrão que o Cadastro usará.
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="salvarConfig()">Salvar configuração</button>
+      <button class="btn btn-danger" onclick="resetarPadrao()">Resetar padrão do arquivo</button>
+    </div>
+
+    <div id="msg" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Regras gerais</h3>
+    <div class="grid">
+      <div>
+        <label><b>Coluna "Série" ativa?</b></label>
+        <select id="flagSerie" onchange="onToggleSerie()">
+          <option value="1">Sim (exige série e mostra selects)</option>
+          <option value="0">Não (remove série e some selects)</option>
+        </select>
+        <div class="muted" style="margin-top:6px;">
+          Regra automática: se desativar, o cadastro não exigirá série.
+        </div>
+      </div>
+
+      <div>
+        <label><b>Mostrar "Resultado Final"?</b></label>
+        <select id="flagResultado">
+          <option value="1">Sim</option>
+          <option value="0">Não</option>
+        </select>
+      </div>
+
+      <div>
+        <label><b>Ordenar alunos por</b></label>
+        <select id="ordenacao">
+          <option value="nome">Nome (A-Z)</option>
+          <option value="numero">Número (ordem de cadastro)</option>
+        </select>
+      </div>
+
+      <div>
+        <label><b>Nome do schema</b></label>
+        <input id="schemaNome" placeholder="Ex: Padrão 2026" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Colunas de notas (matérias)</h3>
+    <div class="muted">
+      Aqui você adiciona/remove matérias como Inglês. Cada coluna tem um <b>id</b> (chave) e um <b>rótulo</b>.
+    </div>
+
+    <div style="margin-top:12px;" class="grid">
+      <div>
+        <label>Chave (id) *</label>
+        <input id="novaKey" placeholder="ex: ingles" />
+      </div>
+      <div>
+        <label>Rótulo *</label>
+        <input id="novoLabel" placeholder="ex: Inglês / Língua Estrangeira" />
+      </div>
+      <div>
+        <label>Tipo</label>
+        <select id="novoTipo">
+          <option value="nota">Nota</option>
+          <option value="texto">Texto</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button class="btn btn-primary" style="width:100%;" onclick="adicionarColuna()">+ Adicionar coluna</button>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Ativa</th>
+          <th>Chave (id)</th>
+          <th>Rótulo</th>
+          <th>Tipo</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="colsTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Lógica específica desta página -->
+<script>
+/* =========================
+   Storage keys
+========================= */
+const SCHEMAS_KEY = "turmasSchemas_v1";
+const ACTIVE_SCHEMA_ID_KEY = "turmasSchemaActiveId_v1";
+
+/* =========================
+   Default schema
+========================= */
+function getDefaultConfig() {
+  return {
+    version: 1,
+    nome: "Padrão (arquivo original)",
+    serieAtiva: true,
+    resultadoAtivo: true,
+    ordenarPor: "nome",
+    colunas: [
+      { key:"port",  label:"Português",        type:"nota", enabled:true },
+      { key:"fis",   label:"Ed. Física",       type:"nota", enabled:true },
+      { key:"arte",  label:"Arte",             type:"nota", enabled:true },
+      { key:"mat",   label:"Matemática",       type:"nota", enabled:true },
+      { key:"hist",  label:"História",         type:"nota", enabled:true },
+      { key:"geo",   label:"Geografia",        type:"nota", enabled:true },
+      { key:"cien",  label:"Ciências",         type:"nota", enabled:true },
+      { key:"relig", label:"Ensino Religioso", type:"nota", enabled:true },
+      { key:"ing",   label:"Língua Inglesa",   type:"nota", enabled:true }
+    ]
+  };
+}
+
+/* =========================
+   Load / Save
+========================= */
+function uid() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+
+function loadSchemas() {
+  try {
+    const raw = localStorage.getItem(SCHEMAS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.map(normalizeConfig) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSchemas(arr) {
+  const normalized = arr.map(normalizeConfig);
+  localStorage.setItem(SCHEMAS_KEY, JSON.stringify(normalized));
+  try {
+    if (window.DB && window.DB.schemas && window.Auth && window.Auth.getSession())
+      window.DB.schemas.saveAll(normalized).catch(e => console.warn('Firestore schemas:', e));
+  } catch(_) {}
+}
+
+function getActiveSchemaId() {
+  return localStorage.getItem(ACTIVE_SCHEMA_ID_KEY) || "";
+}
+function setActiveSchemaId(id) {
+  localStorage.setItem(ACTIVE_SCHEMA_ID_KEY, id);
+}
+
+function ensureAtLeastOneSchema() {
+  let schemas = loadSchemas();
+  let activeId = getActiveSchemaId();
+
+  if (!schemas.length) {
+    const def = getDefaultConfig();
+    def.id = uid();
+    def.nome = def.nome || "Padrão (arquivo original)";
+    schemas = [def];
+    saveSchemas(schemas);
+    setActiveSchemaId(def.id);
+    return { schemas, activeId: def.id };
+  }
+
+  if (!activeId || !schemas.some(s => s.id === activeId)) {
+    activeId = schemas[0].id;
+    setActiveSchemaId(activeId);
+  }
+
+  return { schemas, activeId };
+}
+
+function normalizeConfig(cfg) {
+  const def = getDefaultConfig();
+  const out = {
+    id: String(cfg?.id || cfg?.schemaId || "").trim(),
+    version: 1,
+    nome: String(cfg?.nome ?? def.nome),
+    serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
+    resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+    ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
+    colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+  };
+
+  if (!out.id) out.id = uid();
+
+  out.colunas = out.colunas
+    .map(c => ({
+      key: String(c?.key ?? "").trim().toLowerCase(),
+      label: String(c?.label ?? "").trim(),
+      type: (c?.type === "texto") ? "texto" : "nota",
+      enabled: c?.enabled !== false
+    }))
+    .filter(c => c.key && c.label);
+
+  const seen = new Set();
+  out.colunas = out.colunas.filter(c => {
+    if (seen.has(c.key)) return false;
+    seen.add(c.key);
+    return true;
+  });
+
+  return out;
+}
+
+/* =========================
+   UI render
+========================= */
+let SCHEMAS = [];
+let ACTIVE_ID = "";
+let CONFIG = null;
+
+function renderSchemaSelect() {
+  const sel = document.getElementById("schemaSelect");
+  if (!sel) return;
+
+  sel.innerHTML = SCHEMAS.map(s => {
+    const isActive = s.id === ACTIVE_ID;
+    const label = isActive ? `${s.nome} (padrão)` : s.nome;
+    return `<option value="${escapeAttr(s.id)}" ${s.id === CONFIG.id ? "selected" : ""}>${escapeHtml(label)}</option>`;
+  }).join("");
+
+  sel.onchange = () => onSelectSchema(sel.value);
+}
+
+function onSelectSchema(id) {
+  const found = SCHEMAS.find(s => s.id === id);
+  if (!found) return;
+
+  CONFIG = found;
+  ACTIVE_ID = id;
+  setActiveSchemaId(id);
+
+  renderSchemaSelect();
+  render();
+  showMsg("✅ Schema padrão selecionado. (Cadastro usará este por padrão)", "ok");
+}
+
+function render() {
+  document.getElementById("schemaNome").value = CONFIG.nome || "";
+  document.getElementById("flagSerie").value = CONFIG.serieAtiva ? "1" : "0";
+  document.getElementById("flagResultado").value = CONFIG.resultadoAtivo ? "1" : "0";
+  document.getElementById("ordenacao").value = CONFIG.ordenarPor || "nome";
+
+  const resumo = document.getElementById("resumo");
+  const colAtivas = CONFIG.colunas.filter(c => c.enabled).length;
+  resumo.innerHTML = `
+    <b>Schema:</b> ${escapeHtml(CONFIG.nome)} |
+    <b>Série:</b> ${CONFIG.serieAtiva ? "ATIVA" : "DESATIVADA"} |
+    <b>Resultado:</b> ${CONFIG.resultadoAtivo ? "ATIVO" : "DESATIVADO"} |
+    <b>Colunas ativas:</b> ${colAtivas}
+  `;
+
+  const tb = document.getElementById("colsTbody");
+  tb.innerHTML = "";
+
+  renderSchemaSelect();
+
+  CONFIG.colunas.forEach((c, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" ${c.enabled ? "checked" : ""} onchange="toggleEnabled(${idx}, this.checked)" />
+      </td>
+      <td><input value="${escapeAttr(c.key)}" onchange="editKey(${idx}, this.value)" /></td>
+      <td><input value="${escapeAttr(c.label)}" onchange="editLabel(${idx}, this.value)" /></td>
+      <td>
+        <select onchange="editType(${idx}, this.value)">
+          <option value="nota" ${c.type==="nota"?"selected":""}>Nota</option>
+          <option value="texto" ${c.type==="texto"?"selected":""}>Texto</option>
+        </select>
+      </td>
+      <td style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-gray" onclick="moveUp(${idx})">&#8593;</button>
+        <button class="btn btn-gray" onclick="moveDown(${idx})">&#8595;</button>
+        <button class="btn btn-danger" onclick="removeCol(${idx})">Remover</button>
+      </td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+function showMsg(html, kind="ok") {
+  const el = document.getElementById("msg");
+  el.className = kind === "ok" ? "ok" : "warn";
+  el.innerHTML = html;
+}
+
+function onToggleSerie() {
+  CONFIG.serieAtiva = document.getElementById("flagSerie").value === "1";
+  render();
+}
+
+function salvarConfig() {
+  CONFIG.nome = document.getElementById("schemaNome").value.trim() || CONFIG.nome;
+  CONFIG.serieAtiva = document.getElementById("flagSerie").value === "1";
+  CONFIG.resultadoAtivo = document.getElementById("flagResultado").value === "1";
+  CONFIG.ordenarPor = document.getElementById("ordenacao").value === "numero" ? "numero" : "nome";
+
+  CONFIG = normalizeConfig(CONFIG);
+
+  const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
+  if (idx >= 0) SCHEMAS[idx] = CONFIG;
+  else SCHEMAS.push(CONFIG);
+
+  saveSchemas(SCHEMAS);
+  showMsg("✅ Schema atualizado e salvo. (Vale para turmas novas)", "ok");
+  renderSchemaSelect();
+  render();
+}
+
+function resetarPadrao() {
+  if (!confirm("Resetar ESTE schema para o padrão do arquivo original? Isso vale para turmas novas.")) return;
+
+  const def = getDefaultConfig();
+  def.id = CONFIG.id;
+  def.nome = CONFIG.nome || def.nome;
+
+  CONFIG = normalizeConfig(def);
+
+  const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
+  if (idx >= 0) SCHEMAS[idx] = CONFIG;
+  saveSchemas(SCHEMAS);
+
+  showMsg("✅ Schema resetado para o padrão do arquivo original.", "ok");
+  renderSchemaSelect();
+  render();
+}
+
+function novoSchema() {
+  const nome = prompt("Nome do novo schema:", "Novo schema");
+  if (!nome) return;
+
+  const def = getDefaultConfig();
+  def.id = uid();
+  def.nome = nome.trim();
+
+  SCHEMAS.push(normalizeConfig(def));
+  saveSchemas(SCHEMAS);
+
+  ACTIVE_ID = def.id;
+  setActiveSchemaId(ACTIVE_ID);
+  CONFIG = SCHEMAS.find(s => s.id === ACTIVE_ID);
+
+  renderSchemaSelect();
+  render();
+  showMsg("✅ Novo schema criado e selecionado como padrão.", "ok");
+}
+
+function duplicarSchema() {
+  const nome = prompt("Nome do schema duplicado:", (CONFIG.nome || "Cópia") + " (cópia)");
+  if (!nome) return;
+
+  const copy = normalizeConfig({ ...CONFIG, id: uid(), nome: nome.trim() });
+
+  SCHEMAS.push(copy);
+  saveSchemas(SCHEMAS);
+
+  ACTIVE_ID = copy.id;
+  setActiveSchemaId(ACTIVE_ID);
+  CONFIG = copy;
+
+  renderSchemaSelect();
+  render();
+  showMsg("✅ Schema duplicado e selecionado como padrão.", "ok");
+}
+
+function excluirSchema() {
+  if (SCHEMAS.length <= 1) {
+    showMsg("⚠️ Você precisa ter pelo menos 1 schema.", "warn");
+    return;
+  }
+  if (!confirm(`Excluir o schema "${CONFIG.nome}"?`)) return;
+
+  SCHEMAS = SCHEMAS.filter(s => s.id !== CONFIG.id);
+  saveSchemas(SCHEMAS);
+
+  ACTIVE_ID = SCHEMAS[0].id;
+  setActiveSchemaId(ACTIVE_ID);
+  CONFIG = SCHEMAS[0];
+
+  renderSchemaSelect();
+  render();
+  showMsg("✅ Schema excluído.", "ok");
+}
+
+/* =========================
+   Column operations
+========================= */
+function adicionarColuna() {
+  const key = document.getElementById("novaKey").value.trim().toLowerCase();
+  const label = document.getElementById("novoLabel").value.trim();
+  const type = document.getElementById("novoTipo").value;
+
+  if (!key || !label) { showMsg("⚠️ Informe a chave (id) e o rótulo.", "warn"); return; }
+  if (!/^[a-z0-9_]+$/.test(key)) { showMsg("⚠️ A chave deve usar apenas letras minúsculas, números e underscore.", "warn"); return; }
+  if (CONFIG.colunas.some(c => c.key === key)) { showMsg("⚠️ Já existe uma coluna com essa chave.", "warn"); return; }
+
+  CONFIG.colunas.push({ key, label, type: (type==="texto"?"texto":"nota"), enabled:true });
+  document.getElementById("novaKey").value = "";
+  document.getElementById("novoLabel").value = "";
+  document.getElementById("novoTipo").value = "nota";
+
+  render();
+  showMsg("✅ Coluna adicionada. Clique em “Salvar configuração” para aplicar.", "ok");
+}
+
+function toggleEnabled(i, val) { CONFIG.colunas[i].enabled = !!val; render(); }
+
+function editKey(i, val) {
+  val = String(val||"").trim().toLowerCase();
+  if (!val) return;
+  if (!/^[a-z0-9_]+$/.test(val)) { showMsg("⚠️ Chave inválida.", "warn"); render(); return; }
+  const dup = CONFIG.colunas.some((c, idx) => idx !== i && c.key === val);
+  if (dup) { showMsg("⚠️ Já existe outra coluna com essa chave.", "warn"); render(); return; }
+  CONFIG.colunas[i].key = val;
+  render();
+}
+
+function editLabel(i, val) { val = String(val||"").trim(); if (!val) return; CONFIG.colunas[i].label = val; render(); }
+function editType(i, val)  { CONFIG.colunas[i].type = (val==="texto") ? "texto" : "nota"; render(); }
+
+function removeCol(i) {
+  if (!confirm("Remover essa coluna do schema? (não afeta turmas já salvas)")) return;
+  CONFIG.colunas.splice(i, 1);
+  render();
+}
+
+function moveUp(i) {
+  if (i <= 0) return;
+  [CONFIG.colunas[i-1], CONFIG.colunas[i]] = [CONFIG.colunas[i], CONFIG.colunas[i-1]];
+  render();
+}
+
+function moveDown(i) {
+  if (i >= CONFIG.colunas.length - 1) return;
+  [CONFIG.colunas[i+1], CONFIG.colunas[i]] = [CONFIG.colunas[i], CONFIG.colunas[i+1]];
+  render();
+}
+
+/* =========================
+   Escape helpers
+========================= */
+function escapeHtml(s) {
+  return String(s??"")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;")
+    .replaceAll(">","&gt;").replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+function escapeAttr(s) { return escapeHtml(s).replaceAll('"',"&quot;"); }
+
+/* =========================
+   Boot
+========================= */
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await new Promise(res => {
+      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, { once: true });
+    });
+    const dados = await window.DB.loadAll();
+    if (dados.schemas && dados.schemas.length)
+      localStorage.setItem(SCHEMAS_KEY, JSON.stringify(dados.schemas));
+  } catch(e) { console.warn('schema_ata Firestore pré-carga:', e); }
+
+  const init = ensureAtLeastOneSchema();
+  SCHEMAS = init.schemas;
+  ACTIVE_ID = init.activeId;
+  CONFIG = SCHEMAS.find(s => s.id === ACTIVE_ID) || SCHEMAS[0];
+
+  renderSchemaSelect();
+  render();
+});
+</script>
+
+<!-- header-logic: monta header, tema, chip e auth guard -->
+<script src="../header-logic.js"></script>
+
+<!-- Guard de role: apenas admin acessa esta página -->
+<script>
+document.addEventListener('auth:ready', function () {
+  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+  if (role !== 'admin') {
+    window.location.replace('../index.html');
+  }
+});
+</script>
+
+</body>
+</html>

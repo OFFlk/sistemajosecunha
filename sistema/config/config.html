@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/hub.css">
+
+<title>Configurações • Menu</title>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+  <div class="l-section">
+    <div class="l-slabel">// ferramentas</div>
+    <div class="l-sline"></div>
+  </div>
+  <div class="grid grid-config">
+
+    <a class="card" href="schema_ata.html">
+      <div class="card-icon">🧩</div>
+      <div class="card-title">Edição de ata e schema</div>
+      <div class="card-footer">
+        <div class="card-desc">Configure colunas, regras e o schema padrão para cadastro de novas turmas.</div>
+      </div>
+    </a>
+
+    <a class="card" href="idaluno.html">
+      <div class="card-icon">🆔</div>
+      <div class="card-title">Configuração de IDs</div>
+      <div class="card-footer">
+        <div class="card-desc">Gere e atualize IDs automáticos, revise duplicatas e gere IDs do sistema.</div>
+      </div>
+    </a>
+
+  </div>
+</div>
+
+<footer>
+  <div class="l-fdot"></div>
+  sistema interno de gestão escolar · desenvolvido sob medida
+</footer>
+
+<!-- header-logic: monta header, tema, chip e auth guard -->
+<script src="../header-logic.js"></script>
+
+<!-- Guard de role: apenas admin acessa esta pasta -->
+<script>
+document.addEventListener('auth:ready', function () {
+  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+  if (role !== 'admin') {
+    window.location.replace('../index.html');
+  }
+});
+</script>
+
+</body>
+</html>

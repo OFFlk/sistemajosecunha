@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<script>
+(function(){
+  const t = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  document.documentElement.setAttribute('data-theme', (t === 'dark' || t === 'light') ? t : 'light');
+})();
+</script>
+
+<script src="../auth.firebase.js"></script>
+<!-- página exclusiva de ADMIN -->
+<script>window.Auth && Auth.requireRole('admin');</script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+
+<title>Gestão de Dados · Ano Ativo</title>
+<style>
+:root {
+  --card:    #ffffff;
+  --radius:  14px;
+  --shadow:  0 4px 20px rgba(0,0,0,0.06);
+  --danger:  #b91c1c;
+  --danger2: #991b1b;
+  --ok-bg:   rgba(22,163,74,.10);
+  --ok-bd:   rgba(22,163,74,.30);
+  --warn-bg: rgba(245,158,11,.10);
+  --warn-bd: rgba(245,158,11,.30);
+  --chip:    var(--brand-faded, #f5f3ff);
+  --chipTxt: var(--brand-text,  #6d28d9);
+}
+html[data-theme="dark"] {
+  --card:    #131c2e;
+  --shadow:  0 4px 24px rgba(0,0,0,0.4);
+  --chip:    var(--brand-faded-d, rgba(124,58,237,0.28));
+  --chipTxt: var(--brand-text-d,  #c4b5fd);
+}
+
+.container { max-width:1060px; margin:0 auto; padding:36px 24px 60px; position:relative; z-index:1; }
+
+.card {
+  background:var(--card); border:1px solid var(--border,#ddd6fe);
+  border-radius:var(--radius); padding:22px 26px;
+  box-shadow:var(--shadow); margin-bottom:18px;
+  transition:background .3s, border-color .3s;
+}
+h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
+.muted { color:var(--muted,#6b7280); font-size:13px; }
+
+.btn {
+  appearance:none; border:1px solid transparent; border-radius:10px;
+  padding:9px 16px; font-size:14px; font-weight:800; cursor:pointer;
+  display:inline-flex; align-items:center; gap:7px;
+  font-family:'Nunito',system-ui,sans-serif;
+  transition:background .18s, border-color .18s, transform .06s;
+  user-select:none; white-space:nowrap; text-decoration:none;
+}
+.btn:active { transform:translateY(1px); }
+.btn:disabled { opacity:.45; cursor:not-allowed; transform:none; pointer-events:none; }
+.btn-primary { background:var(--brand,#7c3aed); border-color:var(--brand,#7c3aed); color:#fff; }
+.btn-primary:hover:not(:disabled) { background:var(--brand-hover,#6d28d9); }
+.btn-danger  { background:var(--danger); border-color:var(--danger); color:#fff; }
+.btn-danger:hover:not(:disabled)  { background:var(--danger2); }
+.btn-outline { background:transparent; border-color:var(--brand,#7c3aed); color:var(--brand,#7c3aed); }
+.btn-outline:hover:not(:disabled) { background:var(--chip); }
+.btn-gray    { background:var(--chip); border-color:var(--border,#ddd6fe); color:var(--chipTxt); }
+.btn-gray:hover:not(:disabled)    { background:var(--brand,#7c3aed); color:#fff; }
+.row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+
+.badge {
+  display:inline-flex; align-items:center; padding:2px 9px; border-radius:999px;
+  background:var(--chip); border:1px solid var(--border,#ddd6fe);
+  font-size:11px; color:var(--chipTxt); font-weight:700;
+}
+.badge.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
+.badge.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
+.badge.danger { background:rgba(185,28,28,.10); border-color:rgba(185,28,28,.30); color:var(--danger); }
+
+.console {
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12px; background:var(--chip); border:1px solid var(--border,#ddd6fe);
+  padding:14px; border-radius:10px; white-space:pre-wrap;
+  color:var(--text,#1e1b4b); min-height:48px; max-height:280px;
+  overflow-y:auto; margin-top:12px;
+}
+
+.stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+.stat-box { flex:1; min-width:120px; background:var(--chip); border:1px solid var(--border,#ddd6fe); border-radius:10px; padding:12px 16px; text-align:center; }
+.stat-num { font-size:26px; font-weight:800; color:var(--brand,#7c3aed); line-height:1; }
+.stat-lbl { font-size:12px; color:var(--muted,#6b7280); margin-top:4px; }
+
+#avisoReadonly {
+  display:none; align-items:center; gap:8px;
+  background:var(--warn-bg); color:#92400e;
+  border:1px solid var(--warn-bd); border-radius:8px;
+  padding:10px 14px; font-size:13px; font-weight:700; margin-bottom:16px;
+}
+html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
+
+.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
+.sec-header:hover h3 { color:var(--brand,#7c3aed); }
+.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; }
+.sec-toggle.collapsed { transform:rotate(-90deg); }
+.sec-body.collapsed { display:none; }
+
+/* ── Migração ── */
+.migr-item {
+  display:flex; align-items:center; gap:10px;
+  padding:9px 14px; border-radius:8px;
+  border:1px solid var(--border,#ddd6fe);
+  background:var(--card); margin-bottom:6px; font-size:13px;
+}
+.migr-item.ok     { border-color:var(--ok-bd);   background:var(--ok-bg); }
+.migr-item.warn   { border-color:var(--warn-bd); background:var(--warn-bg); }
+.migr-item.danger { border-color:rgba(185,28,28,.30); background:rgba(185,28,28,.06); }
+
+/* ── Barra de progresso ── */
+.progress-wrap { background:var(--border,#ddd6fe); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
+.progress-bar  { background:var(--brand,#7c3aed); height:100%; border-radius:999px; transition:width .3s; width:0%; }
+</style>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+
+  <div id="avisoReadonly">
+    <span style="font-size:16px;">🔒</span>
+    Somente administradores podem modificar os dados. Você está em modo de visualização.
+  </div>
+
+  <!-- ── ESTATÍSTICAS ── -->
+  <div class="card">
+    <h3 style="margin-top:0;">📊 Visão geral — módulo de ano ativo</h3>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas (nova coleção)</div></div>
+      <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos cadastrados</div></div>
+      <div class="stat-box"><div class="stat-num" id="statMatriculas">—</div><div class="stat-lbl">Matrículas</div></div>
+      <div class="stat-box"><div class="stat-num" id="statLegado">—</div><div class="stat-lbl">Turmas legadas (coleção antiga)</div></div>
+    </div>
+    <div class="row-btns" style="margin-top:14px;">
+      <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
+    </div>
+    <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
+  </div>
+
+  <!-- ── MIGRAÇÃO ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secMigrar')">
+      <h3 style="margin-top:0;">🚚 Migrar turmas para a nova coleção</h3>
+      <span class="sec-toggle" id="togSecMigrar">▼</span>
+    </div>
+    <div class="sec-body" id="secMigrar">
+      <p class="muted">
+        Move as turmas do ano-ativo que ainda estão na coleção <b>turmas</b> (legada, compartilhada)
+        para a coleção exclusiva <b>anoAtivoTurmas</b>. Após a migração, os documentos originais
+        são removidos da coleção antiga. <b>Faça um backup antes de prosseguir.</b>
+      </p>
+
+      <div class="row-btns">
+        <button class="btn btn-gray"    id="btnAnalisar"  onclick="analisarMigracao()">🔍 Analisar</button>
+        <button class="btn btn-primary" id="btnMigrar"    onclick="executarMigracao()" disabled>🚚 Migrar agora</button>
+      </div>
+
+      <div id="migrPreview" style="display:none; margin-top:14px;">
+        <b id="migrResumo" style="display:block; margin-bottom:10px;"></b>
+        <div id="migrLista"></div>
+        <div class="progress-wrap" id="migrProgressWrap" style="display:none;">
+          <div class="progress-bar" id="migrProgressBar"></div>
+        </div>
+      </div>
+
+      <div class="console" id="logMigrar" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── MIGRAÇÃO DE ALUNOS E MATRÍCULAS ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secMigrarAlunos')">
+      <h3 style="margin-top:0;">👥 Migrar alunos e matrículas para as novas coleções</h3>
+      <span class="sec-toggle" id="togSecMigrarAlunos">▼</span>
+    </div>
+    <div class="sec-body" id="secMigrarAlunos">
+      <p class="muted">
+        Copia os alunos e matrículas da coleção legada (<b>alunos</b> / <b>matriculas</b>) para as
+        coleções exclusivas do ano-ativo (<b>anoAtivoAlunos</b> / <b>anoAtivoMatriculas</b>).
+        São copiados apenas registros vinculados às turmas já presentes em <b>anoAtivoTurmas</b>.
+        Os documentos originais <b>não são removidos</b> da coleção legada (operação segura).
+      </p>
+
+      <div class="row-btns">
+        <button class="btn btn-gray"    id="btnAnalisarAlunos"  onclick="analisarMigracaoAlunos()">🔍 Analisar</button>
+        <button class="btn btn-primary" id="btnMigrarAlunos"    onclick="executarMigracaoAlunos()" disabled>👥 Migrar alunos e matrículas</button>
+      </div>
+
+      <div id="migrAlunosPreview" style="display:none; margin-top:14px;">
+        <b id="migrAlunosResumo" style="display:block; margin-bottom:10px;"></b>
+        <div id="migrAlunosLista"></div>
+        <div class="progress-wrap" id="migrAlunosProgressWrap" style="display:none;">
+          <div class="progress-bar" id="migrAlunosProgressBar"></div>
+        </div>
+      </div>
+
+      <div class="console" id="logMigrarAlunos" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── EXPORTAR ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secExport')">
+      <h3 style="margin-top:0;">💾 Exportar backup</h3>
+      <span class="sec-toggle" id="togSecExport">▼</span>
+    </div>
+    <div class="sec-body" id="secExport">
+      <p class="muted">
+        Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON.
+        Inclui tanto a coleção nova (<b>anoAtivoTurmas</b>) quanto as turmas legadas ainda
+        em <b>turmas</b> que pertencem ao ano-ativo, para garantir que nada se perca.
+      </p>
+      <div class="row-btns">
+        <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── IMPORTAR JSON ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secImport')">
+      <h3 style="margin-top:0;">📥 Importar backup JSON</h3>
+      <span class="sec-toggle" id="togSecImport">▼</span>
+    </div>
+    <div class="sec-body" id="secImport">
+      <p class="muted">
+        Restaura um backup gerado por esta página. Os dados são inseridos na coleção
+        <b>anoAtivoTurmas</b>. Documentos com o mesmo ID são atualizados; novos são adicionados.
+      </p>
+      <div class="row-btns">
+        <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
+          📂 Carregar JSON de backup
+          <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
+        </label>
+      </div>
+      <div class="console" id="logImport" style="display:none;"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../header-logic.js"></script>
+
+<script>
+/* =============================================
+   CONTROLE DE ACESSO
+============================================= */
+let IS_ADMIN = false;
+
+document.addEventListener('auth:ready', function () {
+  const session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  const role = session ? String(session.role || '').trim().toLowerCase() : '';
+  IS_ADMIN = (role === 'admin');
+
+  if (!IS_ADMIN) {
+    document.getElementById('avisoReadonly').style.display = 'flex';
+    [
+      'btnAnalisar', 'btnMigrar',
+      'btnAnalisarAlunos', 'btnMigrarAlunos',
+      'btnExportJSON', 'lblImportJSON'
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
+    });
+    window.executarMigracao       = () => {};
+    window.executarMigracaoAlunos = () => {};
+    window.analisarMigracao       = () => {};
+    window.analisarMigracaoAlunos = () => {};
+    window.exportarJSON           = () => {};
+    window.importarJSON           = () => {};
+  }
+
+  inicializar();
+});
+
+/* =============================================
+   AGUARDAR AUTH
+============================================= */
+function waitAuth() {
+  return new Promise(res => {
+    if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+    document.addEventListener('auth:ready', res, { once: true });
+  });
+}
+
+/* =============================================
+   IDENTIFICAR TURMA DO ANO-ATIVO
+   (inverso do ehTurmaDeAtas do gerir-dados.html)
+============================================= */
+function ehTurmaDeAnoAtivo(t) {
+  const origem = String(t.origemArquivo || '').trim();
+  const aba    = String(t.aba || '').trim().toUpperCase();
+  // Turmas de atas têm origemArquivo (nome do xlsx) ou aba com nome de planilha
+  if (origem && origem !== '—') return false;
+  if (aba && !['MANUAL','CADASTRO',''].includes(aba)) return false;
+  return true;
+}
+
+/* =============================================
+   INIT
+============================================= */
+function logEl(msg, id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent  += (el.textContent ? '\n' : '') + msg;
+}
+function clearLogEl(id) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+
+async function inicializar() {
+  clearLogEl('logGeral');
+  logEl('Carregando dados do Firestore...', 'logGeral');
+  await waitAuth();
+
+  try {
+    const [novas, alunos, mats, legadas] = await Promise.all([
+      window.DB.anoAtivoTurmas.list(),
+      window.DB.anoAtivoAlunos.list(),
+      window.DB.anoAtivoMatriculas.list(),
+      window.DB.turmas.list(),
+    ]);
+
+    const legadasAnoAtivo = legadas.filter(ehTurmaDeAnoAtivo);
+
+    document.getElementById('statTurmas').textContent    = novas.length;
+    document.getElementById('statAlunos').textContent    = alunos.length;
+    document.getElementById('statMatriculas').textContent = mats.length;
+    document.getElementById('statLegado').textContent    = legadasAnoAtivo.length;
+
+    if (legadasAnoAtivo.length > 0) {
+      logEl(`⚠️ ${legadasAnoAtivo.length} turma(s) do ano-ativo ainda na coleção legada. Use "Migrar" para movê-las.`, 'logGeral');
+    } else {
+      logEl('✅ Nenhuma turma legada encontrada. Migração já concluída ou não necessária.', 'logGeral');
+    }
+
+    logEl('✅ Pronto.', 'logGeral');
+  } catch(e) {
+    logEl('❌ Erro ao carregar dados: ' + e.message, 'logGeral');
+  }
+}
+
+async function recarregar() {
+  clearLogEl('logGeral');
+  await inicializar();
+}
+
+/* =============================================
+   UI HELPERS
+============================================= */
+function toggleSec(id) {
+  const body = document.getElementById(id);
+  const tog  = document.getElementById('togSec' + id.replace('sec','').replace(/^./,c=>c.toUpperCase()));
+  if (!body) return;
+  const col = body.classList.toggle('collapsed');
+  if (tog) tog.classList.toggle('collapsed', col);
+}
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _baixar(conteudo, nome, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo], { type:tipo }));
+  a.download = nome; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function _hoje() { return new Date().toISOString().slice(0,10); }
+
+/* =============================================
+   MIGRAÇÃO
+============================================= */
+let _turmasParaMigrar = [];
+
+async function analisarMigracao() {
+  if (!IS_ADMIN) return;
+  clearLogEl('logMigrar');
+  document.getElementById('migrPreview').style.display = 'none';
+  document.getElementById('btnMigrar').disabled = true;
+
+  const btnAn = document.getElementById('btnAnalisar');
+  btnAn.disabled = true; btnAn.textContent = 'Analisando...';
+
+  try {
+    await waitAuth();
+    const todas = await window.DB.turmas.list();
+    _turmasParaMigrar = todas.filter(ehTurmaDeAnoAtivo);
+
+    // Verifica quais já existem na coleção nova (por id)
+    const jaExistem = await window.DB.anoAtivoTurmas.list();
+    const idsNovos  = new Set(jaExistem.map(t => t._id || t.id || t.turmaId));
+
+    const novas      = _turmasParaMigrar.filter(t => !idsNovos.has(t._id || t.id || t.turmaId));
+    const duplicadas = _turmasParaMigrar.filter(t =>  idsNovos.has(t._id || t.id || t.turmaId));
+
+    document.getElementById('migrPreview').style.display = 'block';
+    document.getElementById('migrResumo').textContent =
+      `${_turmasParaMigrar.length} turma(s) legada(s) encontrada(s) — ${novas.length} nova(s) · ${duplicadas.length} já existente(s) na coleção nova`;
+
+    const lista = document.getElementById('migrLista');
+    lista.innerHTML = '';
+
+    for (const t of novas) {
+      const div = document.createElement('div');
+      div.className = 'migr-item ok';
+      div.innerHTML = `<span class="badge ok">MOVER</span> <b>${esc(t.nome||t.id||'?')}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')}`;
+      lista.appendChild(div);
+    }
+
+    for (const t of duplicadas) {
+      const div = document.createElement('div');
+      div.className = 'migr-item warn';
+      div.innerHTML = `<span class="badge warn">JÁ EXISTE</span> <b>${esc(t.nome||t.id||'?')}</b> — será ignorada (não duplicada)`;
+      lista.appendChild(div);
+    }
+
+    if (!_turmasParaMigrar.length) {
+      lista.innerHTML = '<div class="migr-item"><span class="muted">Nenhuma turma do ano-ativo encontrada na coleção legada.</span></div>';
+    }
+
+    logEl(`Análise concluída: ${_turmasParaMigrar.length} turma(s) para migrar.`, 'logMigrar');
+    if (_turmasParaMigrar.length > 0) document.getElementById('btnMigrar').disabled = false;
+
+  } catch(e) {
+    logEl('❌ Erro na análise: ' + e.message, 'logMigrar');
+  } finally {
+    btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
+  }
+}
+
+async function executarMigracao() {
+  if (!IS_ADMIN || !_turmasParaMigrar.length) return;
+
+  if (!confirm(
+    `Migrar ${_turmasParaMigrar.length} turma(s) de "turmas" → "anoAtivoTurmas" e removê-las da coleção antiga?\n\nEsta ação não pode ser desfeita. Faça um backup antes.`
+  )) return;
+
+  const btnMig = document.getElementById('btnMigrar');
+  const btnAn  = document.getElementById('btnAnalisar');
+  btnMig.disabled = true; btnMig.textContent = 'Migrando...';
+  btnAn.disabled  = true;
+
+  const wrap = document.getElementById('migrProgressWrap');
+  const bar  = document.getElementById('migrProgressBar');
+  wrap.style.display = 'block'; bar.style.width = '0%';
+
+  clearLogEl('logMigrar');
+  logEl(`Iniciando migração de ${_turmasParaMigrar.length} turma(s)...`, 'logMigrar');
+
+  let ok = 0, erros = 0;
+
+  for (let i = 0; i < _turmasParaMigrar.length; i++) {
+    const t = _turmasParaMigrar[i];
+    const fid = t._id || t.id || t.turmaId;
+    const nome = t.nome || fid || '?';
+
+    try {
+      // 1. Salva na coleção nova
+      const { _id, ...dados } = t;
+      await window.DB.anoAtivoTurmas.save({ _id: fid, ...dados });
+
+      // 2. Remove da coleção legada
+      await window.DB.turmas.remove(fid);
+
+      logEl(`  ✅ "${nome}" migrada.`, 'logMigrar');
+      ok++;
+    } catch(e) {
+      logEl(`  ❌ "${nome}" — erro: ${e.message}`, 'logMigrar');
+      erros++;
+    }
+
+    bar.style.width = Math.round(((i + 1) / _turmasParaMigrar.length) * 100) + '%';
+  }
+
+  logEl('', 'logMigrar');
+  logEl(`Migração concluída: ${ok} turma(s) migrada(s) · ${erros} erro(s).`, 'logMigrar');
+
+  _turmasParaMigrar = [];
+  document.getElementById('btnMigrar').disabled = true;
+  btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
+  btnMig.textContent = '🚚 Migrar agora';
+
+  // Atualiza stats
+  await inicializar();
+}
+
+/* =============================================
+   MIGRAÇÃO DE ALUNOS E MATRÍCULAS
+============================================= */
+let _alunosParaMigrar     = [];
+let _matriculasParaMigrar = [];
+
+async function analisarMigracaoAlunos() {
+  if (!IS_ADMIN) return;
+  clearLogEl('logMigrarAlunos');
+  document.getElementById('migrAlunosPreview').style.display = 'none';
+  document.getElementById('btnMigrarAlunos').disabled = true;
+  _alunosParaMigrar = [];
+  _matriculasParaMigrar = [];
+
+  const btnAn = document.getElementById('btnAnalisarAlunos');
+  btnAn.disabled = true; btnAn.textContent = 'Analisando...';
+
+  try {
+    await waitAuth();
+
+    // Carrega tudo em paralelo
+    const [turmasNovas, alunosLeg, matsLeg, alunosNovos, matsNovas] = await Promise.all([
+      window.DB.anoAtivoTurmas.list(),
+      window.DB.alunos.list(),
+      window.DB.matriculas.list(),
+      window.DB.anoAtivoAlunos.list(),
+      window.DB.anoAtivoMatriculas.list(),
+    ]);
+
+    // IDs das turmas já na nova coleção — só migramos vínculos dessas turmas
+    const turmaIdsNovos = new Set(turmasNovas.map(t => t.turmaId || t._id || t.id).filter(Boolean));
+
+    if (turmaIdsNovos.size === 0) {
+      logEl('⚠️ Nenhuma turma encontrada em anoAtivoTurmas. Migre as turmas primeiro.', 'logMigrarAlunos');
+      btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
+      return;
+    }
+
+    // Matrículas legadas vinculadas às turmas do ano-ativo
+    const matsVinculadas = matsLeg.filter(m => {
+      const tid = m.turmaId || m.turma || '';
+      return turmaIdsNovos.has(tid);
+    });
+
+    // alunoIds que aparecem nessas matrículas
+    const alunoIdsNecessarios = new Set(matsVinculadas.map(m => m.alunoId || m.aluno).filter(Boolean));
+
+    // Alunos legados que precisamos migrar
+    const alunosVinculados = alunosLeg.filter(a => {
+      const aid = a.alunoId || a._id || a.id || '';
+      return alunoIdsNecessarios.has(aid);
+    });
+
+    // Filtra o que já existe nas novas coleções (evita duplicar)
+    const alunoIdsJaExistem = new Set(alunosNovos.map(a => a.alunoId || a._id || a.id).filter(Boolean));
+    const matKeysJaExistem  = new Set(matsNovas.map(m => `${m.turmaId}|${m.alunoId}`));
+
+    _alunosParaMigrar     = alunosVinculados.filter(a => !alunoIdsJaExistem.has(a.alunoId || a._id || a.id));
+    _matriculasParaMigrar = matsVinculadas.filter(m => !matKeysJaExistem.has(`${m.turmaId||m.turma}|${m.alunoId||m.aluno}`));
+
+    const jaExistemAlunos = alunosVinculados.length - _alunosParaMigrar.length;
+    const jaExistemMats   = matsVinculadas.length   - _matriculasParaMigrar.length;
+
+    document.getElementById('migrAlunosPreview').style.display = 'block';
+    document.getElementById('migrAlunosResumo').textContent =
+      `${alunosVinculados.length} aluno(s) e ${matsVinculadas.length} matrícula(s) vinculados às turmas do ano-ativo — ` +
+      `${_alunosParaMigrar.length} aluno(s) novo(s) · ${jaExistemAlunos} já existente(s) | ` +
+      `${_matriculasParaMigrar.length} matrícula(s) nova(s) · ${jaExistemMats} já existente(s)`;
+
+    const lista = document.getElementById('migrAlunosLista');
+    lista.innerHTML = '';
+
+    // Exibe resumo por turma
+    const countPorTurma = {};
+    matsVinculadas.forEach(m => {
+      const tid = m.turmaId || m.turma || '?';
+      countPorTurma[tid] = (countPorTurma[tid] || 0) + 1;
+    });
+    turmasNovas.forEach(t => {
+      const tid = t.turmaId || t._id || t.id;
+      const qty = countPorTurma[tid] || 0;
+      if (qty === 0) return;
+      const div = document.createElement('div');
+      div.className = 'migr-item ok';
+      div.innerHTML = `<span class="badge ok">COPIAR</span> <b>${esc(t.nome||tid)}</b> — ${qty} matrícula(s)`;
+      lista.appendChild(div);
+    });
+
+    if (_alunosParaMigrar.length === 0 && _matriculasParaMigrar.length === 0) {
+      lista.innerHTML = '<div class="migr-item ok"><span class="badge ok">✅</span> Todos os alunos e matrículas já estão nas novas coleções!</div>';
+    }
+
+    logEl(`Análise: ${_alunosParaMigrar.length} aluno(s) e ${_matriculasParaMigrar.length} matrícula(s) para copiar.`, 'logMigrarAlunos');
+    if (_alunosParaMigrar.length > 0 || _matriculasParaMigrar.length > 0) {
+      document.getElementById('btnMigrarAlunos').disabled = false;
+    }
+
+  } catch(e) {
+    logEl('❌ Erro na análise: ' + e.message, 'logMigrarAlunos');
+  } finally {
+    btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
+  }
+}
+
+async function executarMigracaoAlunos() {
+  if (!IS_ADMIN) return;
+  if (!_alunosParaMigrar.length && !_matriculasParaMigrar.length) return;
+
+  if (!confirm(
+    `Copiar ${_alunosParaMigrar.length} aluno(s) e ${_matriculasParaMigrar.length} matrícula(s) para as novas coleções?\n\nOs dados originais NÃO serão removidos. Esta operação é segura.`
+  )) return;
+
+  const btnMig = document.getElementById('btnMigrarAlunos');
+  const btnAn  = document.getElementById('btnAnalisarAlunos');
+  btnMig.disabled = true; btnMig.textContent = 'Migrando...';
+  btnAn.disabled  = true;
+
+  const wrap = document.getElementById('migrAlunosProgressWrap');
+  const bar  = document.getElementById('migrAlunosProgressBar');
+  wrap.style.display = 'block'; bar.style.width = '0%';
+
+  clearLogEl('logMigrarAlunos');
+
+  const total = _alunosParaMigrar.length + _matriculasParaMigrar.length;
+  let feito = 0;
+
+  try {
+    // --- Copia alunos em lote ---
+    if (_alunosParaMigrar.length) {
+      logEl(`Copiando ${_alunosParaMigrar.length} aluno(s)...`, 'logMigrarAlunos');
+      await window.DB.anoAtivoAlunos.saveAll(_alunosParaMigrar);
+      feito += _alunosParaMigrar.length;
+      bar.style.width = Math.round((feito / total) * 100) + '%';
+      logEl(`  ✅ ${_alunosParaMigrar.length} aluno(s) copiados.`, 'logMigrarAlunos');
+    }
+
+    // --- Copia matrículas em lote ---
+    if (_matriculasParaMigrar.length) {
+      logEl(`Copiando ${_matriculasParaMigrar.length} matrícula(s)...`, 'logMigrarAlunos');
+      await window.DB.anoAtivoMatriculas.saveAll(_matriculasParaMigrar);
+      feito += _matriculasParaMigrar.length;
+      bar.style.width = '100%';
+      logEl(`  ✅ ${_matriculasParaMigrar.length} matrícula(s) copiadas.`, 'logMigrarAlunos');
+    }
+
+    logEl('', 'logMigrarAlunos');
+    logEl('🎉 Migração concluída! Alunos e matrículas agora estão nas novas coleções.', 'logMigrarAlunos');
+
+    _alunosParaMigrar = [];
+    _matriculasParaMigrar = [];
+    document.getElementById('btnMigrarAlunos').disabled = true;
+
+    // Atualiza stats
+    await inicializar();
+
+  } catch(e) {
+    logEl('❌ Erro durante a migração: ' + e.message, 'logMigrarAlunos');
+  } finally {
+    btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
+    btnMig.textContent = '👥 Migrar alunos e matrículas';
+  }
+}
+
+
+async function exportarJSON() {
+  if (!IS_ADMIN) return;
+
+  const btnExp = document.getElementById('btnExportJSON');
+  btnExp.disabled = true; btnExp.textContent = 'Exportando...';
+
+  try {
+    await waitAuth();
+    const [turmasDB, alunosDB, matriculasDB, legadas] = await Promise.all([
+      window.DB.anoAtivoTurmas.list(),
+      window.DB.anoAtivoAlunos.list(),
+      window.DB.anoAtivoMatriculas.list(),
+      window.DB.turmas.list(),
+    ]);
+
+    // Inclui legadas do ano-ativo no backup para não perder nada
+    const legadasAnoAtivo = legadas.filter(ehTurmaDeAnoAtivo);
+
+    const payload = {
+      exportadoEm: new Date().toISOString(),
+      versao: 1,
+      modulo: 'ano-ativo',
+      turmasDB,
+      turmasLegadasDB: legadasAnoAtivo,
+      alunosDB,
+      matriculasDB,
+    };
+
+    _baixar(
+      JSON.stringify(payload, null, 2),
+      `backup-ano-ativo-${_hoje()}.json`,
+      'application/json'
+    );
+
+    logEl(`✅ JSON exportado: ${turmasDB.length} turma(s) + ${legadasAnoAtivo.length} legada(s).`, 'logGeral');
+  } catch(e) {
+    logEl('❌ Erro ao exportar: ' + e.message, 'logGeral');
+  } finally {
+    btnExp.disabled = false; btnExp.textContent = '⬇ Exportar JSON';
+  }
+}
+
+/* =============================================
+   IMPORTAR JSON
+============================================= */
+async function importarJSON(event) {
+  if (!IS_ADMIN) return;
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  clearLogEl('logImport');
+  const reader = new FileReader();
+
+  reader.onload = async () => {
+    const lblImp = document.getElementById('lblImportJSON');
+    if (lblImp) { lblImp.style.pointerEvents = 'none'; lblImp.style.opacity = '0.5'; }
+
+    try {
+      const dump = JSON.parse(reader.result);
+
+      // Valida que é um backup do ano-ativo
+      if (!Array.isArray(dump.turmasDB)) {
+        logEl('❌ JSON inválido: campo turmasDB ausente.', 'logImport'); return;
+      }
+      if (dump.modulo && dump.modulo !== 'ano-ativo') {
+        logEl('⚠️ Atenção: este backup parece ser de outro módulo ("' + dump.modulo + '"). Continuando mesmo assim...', 'logImport');
+      }
+
+      await waitAuth();
+
+      const turmas     = dump.turmasDB     || [];
+      const alunos     = dump.alunosDB     || [];
+      const matriculas = dump.matriculasDB || [];
+
+      logEl(`Importando: ${turmas.length} turma(s) · ${alunos.length} aluno(s) · ${matriculas.length} matrícula(s)...`, 'logImport');
+
+      // Salva em lotes nas coleções novas
+      if (turmas.length)     await window.DB.anoAtivoTurmas.saveAll(turmas);
+      if (alunos.length)     await window.DB.anoAtivoAlunos.saveAll(alunos);
+      if (matriculas.length) await window.DB.anoAtivoMatriculas.saveAll(matriculas);
+
+      logEl(`✅ Importação concluída.`, 'logImport');
+      logEl(`  Turmas: ${turmas.length} · Alunos: ${alunos.length} · Matrículas: ${matriculas.length}`, 'logImport');
+
+      await inicializar();
+
+    } catch(e) {
+      logEl('❌ Erro ao importar: ' + e.message, 'logImport');
+    } finally {
+      if (lblImp) { lblImp.style.pointerEvents = ''; lblImp.style.opacity = ''; }
+      event.target.value = '';
+    }
+  };
+
+  reader.readAsText(file);
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<script>
+(function(){
+  const t = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  document.documentElement.setAttribute('data-theme', (t === 'dark' || t === 'light') ? t : 'light');
+})();
+</script>
+
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
+<script src="../theme-colors.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<title>Gestão de Dados · Atas</title>
+<style>
+/* ── Oculta até auth confirmar role ── */
+body { visibility: hidden; }
+
+/* ── Variáveis exclusivas desta página ── */
+:root {
+  --ok-bg:   rgba(22,163,74,.10);
+  --ok-bd:   rgba(22,163,74,.30);
+  --warn-bg: rgba(245,158,11,.10);
+  --warn-bd: rgba(245,158,11,.30);
+}
+
+/* ── Container desta página ── */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 24px 60px;
+}
+
+/* ── Card com background sólido ── */
+.card { background: #ffffff; }
+html[data-theme="dark"] .card { background: #131c2e; }
+
+/* ── Stats ── */
+.stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+.stat-box {
+  flex:1; min-width:120px;
+  background:var(--chip-bg); border:1px solid var(--line);
+  border-radius:10px; padding:12px 16px; text-align:center;
+}
+.stat-num { font-size:26px; font-weight:800; color:var(--brand-600); line-height:1; }
+.stat-lbl { font-size:12px; color:var(--muted); margin-top:4px; }
+
+/* ── Seção colapsável ── */
+.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
+.sec-header:hover h3 { color:var(--brand-600); }
+.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; }
+.sec-toggle.collapsed { transform:rotate(-90deg); }
+.sec-body.collapsed { display:none; }
+
+/* ── Checkbox na cor do sistema ── */
+input[type="checkbox"] {
+  width:15px; height:15px;
+  accent-color: var(--brand-600);
+  cursor:pointer;
+}
+
+/* ── Lista de abas XLSX ── */
+.aba-list { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-top:12px; }
+.aba-item { display:grid; grid-template-columns:20px 1fr; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); }
+.aba-item:last-child { border-bottom:none; }
+
+/* ── Merge preview ── */
+.merge-item { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-radius:8px; border:1px solid var(--line); background:var(--bg); margin-bottom:6px; font-size:13px; }
+.merge-item.nova     { border-color:var(--ok-bd);   background:var(--ok-bg); }
+.merge-item.igual    { opacity:.65; }
+.merge-item.suspeita { border-color:var(--warn-bd); background:var(--warn-bg); }
+
+/* ── Badge colorido (extensão dos globais) ── */
+.badge.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
+.badge.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
+html[data-theme="dark"] .badge.warn { color:#fbbf24; }
+html[data-theme="dark"] .badge.ok   { color:#86efac; }
+
+/* ── Botão danger desta página ── */
+.btn-danger { background:var(--danger-500,#b91c1c); border-color:var(--danger-500,#b91c1c); color:#fff; }
+.btn-danger:hover:not(:disabled) { background:var(--danger-600,#991b1b); border-color:var(--danger-600,#991b1b); }
+
+/* ── row-btns ── */
+.row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+</style>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+
+  <!-- ── ESTATÍSTICAS ── -->
+  <div class="card">
+    <h3 style="margin-top:0;">📊 Visão geral — módulo de atas</h3>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas</div></div>
+      <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos no banco</div></div>
+      <div class="stat-box"><div class="stat-num" id="statAlunosDB">—</div><div class="stat-lbl">Identidades (alunosDB)</div></div>
+      <div class="stat-box"><div class="stat-num" id="statSemId">—</div><div class="stat-lbl">Alunos sem ID</div></div>
+    </div>
+    <div class="row-btns" style="margin-top:14px;">
+      <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
+    </div>
+    <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
+  </div>
+
+  <!-- ── IMPORTAR XLSX ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secXLSX')">
+      <h3 style="margin-top:0;">📊 Importar XLSX de atas</h3>
+      <span class="sec-toggle" id="togSecXLSX">▼</span>
+    </div>
+    <div class="sec-body" id="secXLSX">
+      <p class="muted">
+        Importe planilhas Excel. Cada aba vira uma turma. O importador detecta automaticamente
+        ano letivo, turno e série. Turmas com o mesmo ID são substituídas; novas são adicionadas.
+      </p>
+      <div class="row-btns">
+        <label class="btn btn-primary" id="lblXLSX" style="cursor:pointer;">
+          📂 Escolher Excel (.xlsx)
+          <input type="file" id="fileXlsx" accept=".xlsx,.xls" style="display:none" onchange="carregarXLSX(event)">
+        </label>
+        <button class="btn btn-gray"    id="btnSelTodas" onclick="selecionarAbas(true)"  disabled>Selecionar todas</button>
+        <button class="btn btn-gray"    id="btnDesTodas" onclick="selecionarAbas(false)" disabled>Desmarcar todas</button>
+        <button class="btn btn-primary" id="btnImportar" onclick="importarSelecionadas()" disabled>Importar selecionadas</button>
+      </div>
+      <div class="aba-list" id="listaAbas" style="display:none;"></div>
+      <div class="summary"  id="saidaXLSX" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── IMPORTAR JSON (merge) ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secJSON')">
+      <h3 style="margin-top:0;">📥 Importar backup JSON (merge)</h3>
+      <span class="sec-toggle" id="togSecJSON">▼</span>
+    </div>
+    <div class="sec-body" id="secJSON">
+      <p class="muted">
+        Importe um JSON gerado por esta página. O sistema conserva o que for idêntico,
+        adiciona o que for novo e avisa turmas suspeitas (mesma série e ano).
+      </p>
+      <div class="row-btns">
+        <label class="btn btn-outline" id="lblJSON" style="cursor:pointer;">
+          📂 Carregar JSON de backup
+          <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="analisarJSON(event)">
+        </label>
+      </div>
+      <div id="mergePreview" style="display:none; margin-top:14px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+          <b id="mergeResumo"></b>
+          <button class="btn btn-primary" id="btnAplicarMerge" onclick="aplicarMerge()">✅ Aplicar merge</button>
+          <button class="btn btn-gray" onclick="cancelarMerge()">✖ Cancelar</button>
+        </div>
+        <div id="mergeLista"></div>
+      </div>
+      <div class="console" id="logJSON" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── EXPORTAR ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secExport')">
+      <h3 style="margin-top:0;">💾 Exportar backup</h3>
+      <span class="sec-toggle" id="togSecExport">▼</span>
+    </div>
+    <div class="sec-body" id="secExport">
+      <p class="muted">Exporta turmasDB + alunosDB do módulo de atas. Faça backup antes de qualquer limpeza.</p>
+      <div class="row-btns">
+        <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+        <button class="btn btn-outline" id="btnExportCSV"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── APAGAR TURMAS ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secApagar')">
+      <h3 style="margin-top:0;">🗑️ Apagar turmas</h3>
+      <span class="sec-toggle" id="togSecApagar">▼</span>
+    </div>
+    <div class="sec-body" id="secApagar">
+      <p class="muted">Selecione as turmas a remover. Os bancos auxiliares (atasDB, matriculasDB, turmasMetaDB) são reconstruídos automaticamente.</p>
+      <div class="row-btns" style="margin-bottom:10px;">
+        <button class="btn btn-gray"   onclick="selecionarTodasTurmas(true)">Marcar todas</button>
+        <button class="btn btn-gray"   onclick="selecionarTodasTurmas(false)">Desmarcar todas</button>
+        <button class="btn btn-danger" id="btnApagarSel" onclick="apagarSelecionadas()" disabled>🗑 Apagar selecionadas</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;"><input type="checkbox" id="chkTodas" onchange="selecionarTodasTurmas(this.checked)"></th>
+              <th>Aba / nome</th>
+              <th>Ano</th>
+              <th>Turno</th>
+              <th>Série</th>
+              <th class="center">Alunos</th>
+              <th>Arquivo de origem</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTurmas">
+            <tr><td colspan="7" class="muted" style="padding:18px;text-align:center;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="console" id="logApagar" style="display:none;"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../header-logic.js"></script>
+
+<script>
+/* =============================================
+   CONTROLE DE ACESSO — somente admin
+   Não-admins são redirecionados antes de
+   qualquer dado ser carregado ou exibido.
+============================================= */
+let IS_ADMIN = false;
+
+document.addEventListener('auth:ready', function () {
+  const session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  const role = session ? String(session.role || '').trim().toLowerCase() : '';
+  IS_ADMIN = (role === 'admin');
+
+  if (!IS_ADMIN) {
+    // Redireciona imediatamente — não exibe nada da página
+    window.location.replace('../index.html');
+    return;
+  }
+
+  // Revela a página só para admins
+  document.body.style.visibility = 'visible';
+  inicializar();
+});
+
+/* =============================================
+   DB HELPERS
+============================================= */
+function __schoolId() {
+  try {
+    if (window.Auth?.getSession) {
+      const s = window.Auth.getSession();
+      const sid = String(s?.schoolId || '').trim();
+      if (!sid) return 'SEM_ESCOLA';
+      if (sid.toUpperCase() !== 'ADMIN') return sid;
+      return String(localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
+    }
+  } catch(_) {}
+  return 'SEM_ESCOLA';
+}
+function dbKey(base)  { return `schools:${__schoolId()}:${base}`; }
+function dbRead(base, fallback) {
+  try { const r = localStorage.getItem(dbKey(base)); return r ? JSON.parse(r) : fallback; } catch { return fallback; }
+}
+function dbWrite(base, val) {
+  localStorage.setItem(dbKey(base), JSON.stringify(val));
+  try {
+    if (!window.DB || !window.Auth?.getSession()) return;
+    const map = { turmasDB:'turmas', alunosDB:'alunos', atasDB:'atas', matriculasDB:'matriculas' };
+    const col = map[base];
+    if (col && window.DB[col]) {
+      // Para turmasDB: cada turma tem seu array de alunos/notas — usa saveAllFull para
+      // garantir que o documento inteiro é sobrescrito (sem merge), preservando o campo alunos.
+      if (base === 'turmasDB') {
+        _saveAllFull('turmas', val).catch(e => console.warn('Firestore turmasDB:', e));
+      } else {
+        window.DB[col].saveAll(val).catch(e => console.warn('Firestore ' + base + ':', e));
+      }
+    }
+  } catch(_) {}
+}
+
+/**
+ * Salva array de turmas no Firestore fazendo SET completo (sem merge),
+ * garantindo que o campo `alunos` seja sempre sobrescrito por inteiro.
+ * Usa turmaId (ou _id) como ID do documento — igual ao saveAll do db.firebase.js.
+ */
+async function _saveAllFull(colName, arr) {
+  if (!window.DB || !window.Auth) return;
+  await new Promise(res => {
+    if (window.Auth.db) return res();
+    document.addEventListener('auth:ready', res, { once: true });
+  });
+  const schoolId = window.Auth.getActiveSchoolId();
+  if (!schoolId) return;
+  const db = window.Auth.db;
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+  // Lotes de 400 (limite Firestore é 500 por batch)
+  for (let i = 0; i < arr.length; i += 400) {
+    const batch = db.batch();
+    arr.slice(i, i + 400).forEach(obj => {
+      const { _id, ...data } = obj;
+      data.updatedAt = ts;
+      // ID do documento: prioriza _id explícito, depois turmaId, depois id
+      const docId = _id || obj.turmaId || obj.id || null;
+      if (!docId) { console.warn('[_saveAllFull] objeto sem ID ignorado:', obj); return; }
+      const ref = db.collection('schools').doc(schoolId).collection(colName).doc(String(docId));
+      // SET sem merge: sobrescreve o documento inteiro, incluindo o array `alunos`
+      batch.set(ref, data);
+    });
+    await batch.commit();
+  }
+}
+
+function lerTurmasDB()     { return dbRead('turmasDB', []); }
+function salvarTurmasDB(v) { dbWrite('turmasDB', v || []); }
+function lerAlunosDB()     { return dbRead('alunosDB', []); }
+
+function idAtaFrom(tid)      { return 'ATA|' + tid; }
+function idMatFrom(tid, aid) { return 'MAT|' + tid + '|' + aid; }
+
+function reconstruirAuxiliares(turmas) {
+  const atas = [], mats = [], metas = [];
+  for (const t of (turmas || [])) {
+    const turmaId = String(t?.id || t?.turmaId || '').trim();
+    if (!turmaId) continue;
+    const ataId = idAtaFrom(turmaId);
+    // _id explícito garante que saveAll use o ID correto no Firestore
+    atas.push({ _id:ataId, id:ataId, turmaId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
+    metas.push({ _id:turmaId, turmaId, ataId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      alunos:Array.isArray(t.alunos)?t.alunos.length:0 });
+    for (const a of (t.alunos || [])) {
+      const alunoId = String(a?.alunoId || '').trim();
+      if (!alunoId) continue;
+      const matId = idMatFrom(turmaId, alunoId);
+      mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
+        nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
+        resultado:String(a.resultado||'').trim()||'Não informado' });
+    }
+  }
+  dbWrite('atasDB',       atas);
+  dbWrite('matriculasDB', mats);
+  dbWrite('turmasMetaDB', metas);
+  return { atas, mats, metas };
+}
+
+/* =============================================
+   INIT
+============================================= */
+function logEl(msg, id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent  += (el.textContent ? '\n' : '') + msg;
+}
+function clearLogEl(id) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+}
+
+// Turmas do ano-ativo não têm origemArquivo nem aba preenchida com nome de planilha
+function ehTurmaDeAtas(t) {
+  const origem = String(t.origemArquivo || '').trim();
+  const aba    = String(t.aba || '').trim().toUpperCase();
+  // Turmas de atas sempre têm origemArquivo (nome do xlsx) ou aba não-genérica
+  if (origem && origem !== '—') return true;
+  if (aba && !['MANUAL','CADASTRO',''].includes(aba)) return true;
+  return false;
+}
+
+async function inicializar() {
+  clearLogEl('logGeral');
+  logEl('Carregando dados do Firestore...', 'logGeral');
+
+  try { await window.Identidade.pronto; } catch(_) {}
+
+  // Sincroniza com Firestore e filtra apenas turmas de atas
+  try {
+    await new Promise(res => {
+      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, { once: true });
+    });
+    if (window.DB && window.DB.turmas) {
+      const todasFirestore = await window.DB.turmas.list();
+      const apenasAtas = todasFirestore.filter(ehTurmaDeAtas);
+      // Sobrescreve localStorage apenas com turmas de atas
+      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(apenasAtas));
+      logEl(`Firestore: ${todasFirestore.length} turma(s) total → ${apenasAtas.length} de atas (${todasFirestore.length - apenasAtas.length} do ano-ativo ignoradas)`, 'logGeral');
+    }
+  } catch(e) {
+    logEl('⚠️ Sem conexão com Firestore — usando cache local.', 'logGeral');
+  }
+
+  atualizarStats();
+  renderTabelaTurmas();
+  logEl('✅ Pronto.', 'logGeral');
+}
+
+function atualizarStats() {
+  const turmas = lerTurmasDB(), alunosDB = lerAlunosDB();
+  let totalAlunos = 0, semId = 0;
+  for (const t of turmas) for (const a of (t.alunos||[])) { totalAlunos++; if (!String(a.alunoId||'').trim()) semId++; }
+  document.getElementById('statTurmas').textContent   = turmas.length;
+  document.getElementById('statAlunos').textContent   = totalAlunos;
+  document.getElementById('statAlunosDB').textContent = alunosDB.length;
+  document.getElementById('statSemId').textContent    = semId;
+  if (semId > 0) logEl(`⚠️ ${semId} aluno(s) sem alunoId — use a página de IDs (config) para corrigir.`, 'logGeral');
+}
+
+async function recarregar() {
+  clearLogEl('logGeral');
+  logEl('Recarregando...', 'logGeral');
+  try { await window.Identidade.recarregarDoFirebase(); } catch(_) {}
+  try {
+    if (window.DB && window.DB.turmas) {
+      // Limpa o cache interno do db.firebase.js (a chave é o nome da coleção)
+      try { delete window.DB.turmas._cache; } catch(_) {} // compat
+      // O cache real fica em _cache['turmas'] dentro do db.firebase.js — não acessível diretamente;
+      // basta chamar list() que ele já verifica o timestamp.
+      const todasFirestore = await window.DB.turmas.list();
+      const apenasAtas = todasFirestore.filter(ehTurmaDeAtas);
+      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(apenasAtas));
+      logEl(`Firestore: ${todasFirestore.length} turma(s) → ${apenasAtas.length} de atas`, 'logGeral');
+    }
+  } catch(e) {
+    logEl('⚠️ Sem conexão com Firestore — usando cache local.', 'logGeral');
+  }
+  atualizarStats();
+  renderTabelaTurmas();
+  logEl('✅ Recarregado.', 'logGeral');
+}
+
+/* =============================================
+   UI HELPERS
+============================================= */
+function toggleSec(id) {
+  const body = document.getElementById(id);
+  const tog  = document.getElementById('togSec' + id.replace('sec','').replace(/^./,c=>c.toUpperCase()));
+  if (!body) return;
+  const col = body.classList.toggle('collapsed');
+  if (tog) tog.classList.toggle('collapsed', col);
+}
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _baixar(conteudo, nome, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo], { type:tipo }));
+  a.download = nome; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function _hoje() { return new Date().toISOString().slice(0,10); }
+
+/* =============================================
+   TABELA DE TURMAS
+============================================= */
+function renderTabelaTurmas() {
+  const turmas = lerTurmasDB();
+  const tbody  = document.getElementById('tbodyTurmas');
+  if (!turmas.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:18px;text-align:center;">Nenhuma turma no banco.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = turmas.map((t, i) => {
+    const alunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
+    const semId  = Array.isArray(t.alunos) ? t.alunos.filter(a => !String(a.alunoId||'').trim()).length : 0;
+    const badge  = semId ? `<span class="badge warn">${semId} sem ID</span>` : '';
+    const origem = (t.origemArquivo||'').replace(/^.+[/\\]/,'') || '—';
+    return `
+      <tr>
+        <td class="center"><input type="checkbox" class="chk-turma" data-idx="${i}" onchange="onCheckTurma()"></td>
+        <td><b>${esc(t.aba||t.id||'—')}</b> ${badge}</td>
+        <td>${esc(t.anoLetivo||'—')}</td>
+        <td>${esc(t.turno||'—')}</td>
+        <td>${esc(t.serieTexto||'—')}</td>
+        <td class="center">${alunos}</td>
+        <td class="muted" style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(t.origemArquivo||'')}">${esc(origem)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function onCheckTurma() {
+  const sel   = document.querySelectorAll('.chk-turma:checked').length;
+  const total = document.querySelectorAll('.chk-turma').length;
+  const btnAp = document.getElementById('btnApagarSel');
+  const chkT  = document.getElementById('chkTodas');
+  if (btnAp && IS_ADMIN) btnAp.disabled = (sel === 0);
+  if (chkT) chkT.checked = (sel === total && total > 0);
+}
+
+function selecionarTodasTurmas(val) {
+  document.querySelectorAll('.chk-turma').forEach(c => c.checked = !!val);
+  const chkT = document.getElementById('chkTodas');
+  if (chkT) chkT.checked = !!val;
+  onCheckTurma();
+}
+
+/* =============================================
+   AUXILIAR LOCAL (sem sync Firestore)
+   Usado após delete para não recriar docs que acabamos de apagar.
+============================================= */
+function _reconstruirAuxLocalmente(turmas) {
+  const atas = [], mats = [], metas = [];
+  for (const t of (turmas || [])) {
+    const turmaId = String(t?.id || t?.turmaId || '').trim();
+    if (!turmaId) continue;
+    const ataId = idAtaFrom(turmaId);
+    atas.push({ _id:ataId, id:ataId, turmaId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
+    metas.push({ _id:turmaId, turmaId, ataId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      alunos:Array.isArray(t.alunos)?t.alunos.length:0 });
+    for (const a of (t.alunos || [])) {
+      const alunoId = String(a?.alunoId || '').trim();
+      if (!alunoId) continue;
+      const matId = idMatFrom(turmaId, alunoId);
+      mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
+        nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
+        resultado:String(a.resultado||'').trim()||'Não informado' });
+    }
+  }
+  // Salva apenas no localStorage (sem disparar sync com Firestore)
+  localStorage.setItem(dbKey('atasDB'),       JSON.stringify(atas));
+  localStorage.setItem(dbKey('matriculasDB'), JSON.stringify(mats));
+  localStorage.setItem(dbKey('turmasMetaDB'), JSON.stringify(metas));
+  return { atas, mats, metas };
+}
+
+/* =============================================
+   APAGAR TURMAS
+============================================= */
+async function apagarSelecionadas() {
+  if (!IS_ADMIN) return;
+  const checks  = [...document.querySelectorAll('.chk-turma:checked')];
+  if (!checks.length) return;
+  const indices = checks.map(c => Number(c.dataset.idx));
+  const turmas  = lerTurmasDB();
+  const aApagar = indices.map(i => turmas[i]).filter(Boolean);
+  const nomes   = aApagar.map(t => t.aba || t.id || '?');
+  if (!confirm(`Apagar ${aApagar.length} turma(s)?\n\n${nomes.join('\n')}\n\nEsta ação não pode ser desfeita.`)) return;
+
+  const btnAp = document.getElementById('btnApagarSel');
+  if (btnAp) { btnAp.disabled = true; btnAp.textContent = 'Apagando...'; }
+  clearLogEl('logApagar');
+
+  // 1. Deleta do Firestore — usa turmaId como ID do documento (igual ao saveAll)
+  //    e também tenta pelo _id caso exista, além de removeWhere como fallback
+  if (window.DB && window.DB.turmas) {
+    for (const t of aApagar) {
+      // O saveAll usa turmaId (ou id) como ID do documento no Firestore
+      const docIdPrimario = t.turmaId || t.id;
+      const docIdSecundario = t._id && t._id !== docIdPrimario ? t._id : null;
+      let removido = false;
+
+      // Tentativa 1: pelo turmaId (ID que o saveAll gravou como nome do documento)
+      if (docIdPrimario) {
+        try {
+          await window.DB.turmas.remove(docIdPrimario);
+          logEl(`  🗑 Firestore: removido "${t.aba || docIdPrimario}"`, 'logApagar');
+          removido = true;
+        } catch(e) {
+          logEl(`  ⚠️ Firestore (turmaId): "${docIdPrimario}": ${e.message}`, 'logApagar');
+        }
+      }
+
+      // Tentativa 2: pelo _id (caso a turma tenha sido salva com ID automático do Firestore)
+      if (!removido && docIdSecundario) {
+        try {
+          await window.DB.turmas.remove(docIdSecundario);
+          logEl(`  🗑 Firestore: removido por _id "${t.aba || docIdSecundario}"`, 'logApagar');
+          removido = true;
+        } catch(e) {
+          logEl(`  ⚠️ Firestore (_id): "${docIdSecundario}": ${e.message}`, 'logApagar');
+        }
+      }
+
+      // Tentativa 3: removeWhere pelo campo turmaId (fallback para documentos duplicados)
+      if (!removido && docIdPrimario) {
+        try {
+          await window.DB.turmas.removeWhere('turmaId', docIdPrimario);
+          logEl(`  🗑 Firestore: removeWhere turmaId="${docIdPrimario}"`, 'logApagar');
+          removido = true;
+        } catch(e) {
+          logEl(`  ⚠️ Firestore removeWhere falhou: ${e.message}`, 'logApagar');
+        }
+      }
+
+      // Também remove atas e matrículas associadas
+      if (docIdPrimario && window.DB.atas && window.DB.matriculas) {
+        try {
+          const ataId = idAtaFrom(docIdPrimario);
+          await window.DB.atas.remove(ataId).catch(()=>{});
+          await window.DB.atas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
+          await window.DB.matriculas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
+        } catch(e) {
+          logEl(`  ⚠️ Firestore: erro ao limpar atas/matrículas: ${e.message}`, 'logApagar');
+        }
+      }
+    }
+  }
+
+  // 2. Atualiza localStorage diretamente (sem reenviar ao Firestore)
+  const novas = turmas.filter((_,i) => !indices.includes(i));
+  localStorage.setItem(dbKey('turmasDB'), JSON.stringify(novas));
+  // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
+  const aux = _reconstruirAuxLocalmente(novas);
+
+  logEl(`✅ ${aApagar.length} turma(s) removida(s).`, 'logApagar');
+  logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`, 'logApagar');
+  nomes.forEach(n => logEl(`  ✖ ${n}`, 'logApagar'));
+
+  // 3. Garbage collection de identidades órfãs
+  logEl('', 'logApagar');
+  logEl('🔍 Verificando identidades órfãs...', 'logApagar');
+  try {
+    const apagados = await _limparIdentidadesOrfas(aApagar, novas);
+    if (apagados > 0) logEl(`🧹 ${apagados} identidade(s) órfã(s) removida(s) do banco.`, 'logApagar');
+    else              logEl('✅ Nenhuma identidade órfã encontrada.', 'logApagar');
+  } catch(e) {
+    logEl(`⚠️ Erro ao limpar identidades: ${e.message}`, 'logApagar');
+  }
+
+  renderTabelaTurmas();
+  atualizarStats();
+  document.getElementById('chkTodas').checked = false;
+  if (btnAp) { btnAp.disabled = false; btnAp.textContent = '\u{1F5D1} Apagar selecionadas'; }
+}
+
+/**
+ * Garbage collection de identidades (coleção `alunos` / alunosDB).
+ * Remove apenas IDs que NÃO aparecem em nenhuma turma de atas restante
+ * E NÃO aparecem em anoAtivoMatriculas (módulo de ano-ativo).
+ *
+ * @param {Array} turmasApagadas  — turmas que acabaram de ser removidas
+ * @param {Array} turmasRestantes — turmas de atas que ainda existem no banco
+ * @returns {number} quantidade de identidades removidas
+ */
+async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
+  if (!window.DB || !window.DB.alunos) return 0;
+
+  // Coleta IDs dos alunos das turmas apagadas
+  const idsApagados = new Set();
+  for (const t of turmasApagadas)
+    for (const a of (t.alunos || []))
+      if (String(a.alunoId || '').trim()) idsApagados.add(String(a.alunoId).trim());
+
+  if (!idsApagados.size) return 0;
+
+  // Coleta IDs que ainda existem nas turmas de atas restantes
+  const idsEmAtas = new Set();
+  for (const t of turmasRestantes)
+    for (const a of (t.alunos || []))
+      if (String(a.alunoId || '').trim()) idsEmAtas.add(String(a.alunoId).trim());
+
+  // Coleta IDs que existem no módulo de ano-ativo (anoAtivoMatriculas)
+  const idsEmAnoAtivo = new Set();
+  try {
+    const mats = await window.DB.anoAtivoMatriculas.list();
+    for (const m of mats)
+      if (String(m.alunoId || '').trim()) idsEmAnoAtivo.add(String(m.alunoId).trim());
+  } catch(e) {
+    console.warn('[GC] Não foi possível checar anoAtivoMatriculas:', e.message);
+    // Se não conseguiu verificar o ano-ativo, aborta por segurança (não apaga nada)
+    logEl('⚠️ Não foi possível verificar o módulo de ano-ativo. Identidades preservadas por segurança.', 'logApagar');
+    return 0;
+  }
+
+  // Órfãos = estavam nas turmas apagadas, mas não aparecem em nenhum dos dois módulos
+  const idsOrfaos = [...idsApagados].filter(id => !idsEmAtas.has(id) && !idsEmAnoAtivo.has(id));
+
+  if (!idsOrfaos.length) return 0;
+
+  logEl(`  Candidatos a remoção: ${idsOrfaos.length} ID(s)`, 'logApagar');
+
+  // Remove do Firestore (coleção `alunos`) e do localStorage
+  let removidos = 0;
+  for (const alunoId of idsOrfaos) {
+    try {
+      // Tenta pelo _id direto (alunoId geralmente É o ID do documento)
+      await window.DB.alunos.remove(alunoId).catch(async () => {
+        // Fallback: busca pelo campo alunoId
+        await window.DB.alunos.removeWhere('alunoId', alunoId).catch(() => {});
+      });
+      removidos++;
+    } catch(e) {
+      console.warn('[GC] Erro ao remover identidade', alunoId, e.message);
+    }
+  }
+
+  // Atualiza localStorage do alunosDB removendo os órfãos
+  const alunosLocal = lerAlunosDB().filter(a => !idsOrfaos.includes(String(a.alunoId || a._id || '').trim()));
+  localStorage.setItem(dbKey('alunosDB'), JSON.stringify(alunosLocal));
+
+  return removidos;
+}
+
+/* =============================================
+   EXPORTAR
+============================================= */
+function exportarJSON() {
+  if (!IS_ADMIN) return;
+  _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:1, turmasDB:lerTurmasDB(), alunosDB:lerAlunosDB() }, null, 2),
+    `backup-atas-${_hoje()}.json`, 'application/json');
+  logEl('✅ JSON exportado.', 'logGeral');
+}
+
+function exportarCSV() {
+  if (!IS_ADMIN) return;
+  const linhas = [['turmaId','aba','anoLetivo','turno','serieTexto','origemArquivo','totalAlunos']];
+  for (const t of lerTurmasDB())
+    linhas.push([t.id||t.turmaId||'', t.aba||'', t.anoLetivo||'', t.turno||'', t.serieTexto||'', t.origemArquivo||'', Array.isArray(t.alunos)?t.alunos.length:0]);
+  const csv = linhas.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  _baixar('\uFEFF'+csv, `turmas-atas-${_hoje()}.csv`, 'text/csv;charset=utf-8;');
+  logEl('✅ CSV exportado.', 'logGeral');
+}
+
+/* =============================================
+   IMPORTAR XLSX — parsing completo (portado do importar.html)
+============================================= */
+let _workbook    = null;
+let _nomeArquivo = '';
+let _abasInfo    = [];
+
+function normalizarTxt(v) { return String(v??'').trim().toUpperCase().replace(/\s+/g,' '); }
+function isVazio(v)        { return v===null||v===undefined||String(v).trim()===''; }
+
+function toNotaSistema(v) {
+  if (isVazio(v)) return '--';
+  const s = String(v).trim().toUpperCase();
+  if (s==='-'||s==='--') return '--';
+  if (['CSA','CPA','CNA','CPLA','CPRA'].includes(s)) return s;
+  const n = Number(s.replace(',','.'));
+  return !Number.isNaN(n) ? n.toFixed(1).replace('.',',') : '--';
+}
+
+function toResultado(v) {
+  const s = normalizarTxt(v);
+  if (['AP','REP','DEST','TRA','FAL','AND'].includes(s)) return s;
+  if (s==='S') return 'S'; if (s==='P') return 'P';
+  if (s.includes('SATISF')) return 'S'; if (s.includes('PARCIAL')) return 'P';
+  return 'Não informado';
+}
+
+function linhaTemLegenda(row)  { return (row||[]).map(v=>normalizarTxt(v)).join(' ').includes('LEGENDA'); }
+function linhaPareceRodape(row){ const j=(row||[]).map(v=>normalizarTxt(v)).join(' '); return j.includes('APROVADO')||j.includes('REPROVADO')||j.includes('DESISTENTE')||j.includes('TRANSFERIDO')||j.includes('FALECIDO')||j.includes('EM ANDAMENTO'); }
+function isNumeroValido(v)     { return !isVazio(v)&&/^[0-9]+$/.test(String(v).trim()); }
+
+function detectarModoAvaliacao(matriz, rHead, colMap) {
+  const colsNotas = Object.entries(colMap).filter(([_,f])=>['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(f)).map(([c])=>Number(c));
+  const desSet = new Set(['CSA','CPA','CNA','CPLA','CPRA']);
+  for (let r=rHead+1; r<matriz.length; r++) {
+    const row=matriz[r]||[];
+    if (linhaTemLegenda(row)||linhaPareceRodape(row)) break;
+    for (const c of colsNotas) if (desSet.has(String(row[c]??'').trim().toUpperCase())) return 'desempenho';
+  }
+  return 'numerico';
+}
+
+function acharLinhaCabecalho(matriz) {
+  for (let r=0; r<matriz.length; r++) {
+    const j=(matriz[r]||[]).map(normalizarTxt).join(' | ');
+    if ((j.includes('Nº')||j.includes('N°')||j.includes('NO')||j.includes('N '))&&j.includes('NOME')&&j.includes('RESULTADO')) return r;
+  }
+  return -1;
+}
+
+function mapearColunas(rowCab) {
+  const map={};
+  for (let c=0; c<rowCab.length; c++) {
+    const t=normalizarTxt(rowCab[c]);
+    if (t==='Nº'||t==='N°'||t==='NO'||t==='N') map[c]='num';
+    else if (t.includes('NOME')) map[c]='nome';
+    else if (t==='ANO'||t.includes('SÉRIE')||t.includes('SERIE')) map[c]='serieAluno';
+    else if (t.includes('PORT'))  map[c]='port';
+    else if (t.includes('MAT'))   map[c]='mat';
+    else if (t.includes('HIST'))  map[c]='hist';
+    else if (t.includes('GEO'))   map[c]='geo';
+    else if (t.includes('CIÊN')||t.includes('CIEN')) map[c]='cien';
+    else if (t.includes('FÍS')||t.includes('FIS'))   map[c]='fis';
+    else if (t.includes('ARTE'))  map[c]='arte';
+    else if (t.includes('RELIG')) map[c]='relig';
+    else if (t.includes('INGL')||t==='ING'||t.includes('LÍNGUA INGLESA')||t.includes('LINGUA INGLESA')) map[c]='ing';
+    else if (t.includes('RESULT')) map[c]='resultado';
+  }
+  return map;
+}
+
+function serieTextoParaLista(serieTexto) {
+  const s=normalizarTxt(serieTexto).replace(/\./g,'');
+  if (!s) return [];
+  const partes=s.split(/\s+E\s+|\/|,|;|\+|-|–/).map(p=>p.trim()).filter(Boolean);
+  const temAno=s.includes(' ANO'), temSerie=s.includes(' SERIE')||s.includes(' SÉRIE');
+  const out=[];
+  for (let p of partes) {
+    if (!p.includes('ANO')&&!p.includes('SERIE')&&!p.includes('SÉRIE')) { if(temAno) p+=' ANO'; else if(temSerie) p+=' SÉRIE'; }
+    out.push(p.toLowerCase().replace(/\s+/g,' ').replace(' ano','º ano').replace(' série','ª série').replace(' serie','ª série'));
+  }
+  return [...new Set(out)];
+}
+
+function extrairAnoSerieTurnoDaAba(abaName) {
+  const s=normalizarTxt(abaName);
+  const mAno=s.match(/\b(19|20)\d{2}\b/);
+  const anoLetivo=mAno?mAno[0]:'';
+  let turno='';
+  if (/\bVESP\b|\bVESPERTIN\b/.test(s)) turno='VESPERTINO';
+  else if (/\bMAT\b|\bMATUTIN\b/.test(s)) turno='MATUTINO';
+  else if (/\bNOT\b|\bNOTURN\b/.test(s)) turno='NOTURNO';
+  let serieTexto='';
+  const mEixo=s.match(/\bEIXO\s*[1-3]\b/); if(mEixo) serieTexto=mEixo[0].replace(/\s+/g,' ').toUpperCase();
+  const mAlfa=s.match(/\bALFABETIZACAO\b|\bALFABETIZAÇÃO\b/); if(!serieTexto&&mAlfa) serieTexto='Alfabetização';
+  const mOrd=s.match(/\b([1-9])\s*(º|ª)\b/); if(!serieTexto&&mOrd) serieTexto=`${mOrd[1]}${mOrd[2]}`;
+  const mMultiAno=s.match(/\b[1-9]\s*º\s*(E\s*[1-9]\s*º)+\s*ANO\b/); if(!serieTexto&&mMultiAno) serieTexto=mMultiAno[0];
+  const mMultiSerie=s.match(/\b[1-8]\s*ª\s*(E\s*[1-8]\s*ª)+\s*S(É|E)RIE\b/); if(!serieTexto&&mMultiSerie) serieTexto=mMultiSerie[0];
+  return { anoLetivo, turno, serieTexto };
+}
+
+function extrairInfoCabecalho(matriz, rHead, abaName) {
+  const info={ anoLetivo:'', turno:'', serieTexto:'', seriesTurma:[] };
+  const maxR=Math.min(rHead,35);
+
+  function pegaAbaixo(r, c, tipo) {
+    const rowB=matriz[r+1]||[];
+    for (let dc=0; dc<=6; dc++) {
+      const s=String(rowB[c+dc]??'').trim(); if(!s) continue;
+      if (tipo==='ANO'   && /^(19|20)\d{2}$/.test(s)) return s;
+      if (tipo==='TURNO' && ['MATUTINO','VESPERTINO','NOTURNO'].includes(normalizarTxt(s))) return normalizarTxt(s);
+      if (tipo==='SERIE' && normalizarTxt(s)!=='--') return s;
+    }
+    return '';
+  }
+
+  for (let r=0; r<maxR; r++) {
+    const row=matriz[r]||[];
+    for (let c=0; c<row.length; c++) {
+      const cell=normalizarTxt(row[c]);
+      if (!info.anoLetivo  && (cell==='ANO'||cell.startsWith('ANO')))                                              { const v=pegaAbaixo(r,c,'ANO');   if(v) info.anoLetivo=v; }
+      if (!info.serieTexto && (cell==='SERIE'||cell==='SÉRIE'||cell.includes('SERIE')||cell.includes('SÉRIE')))    { const v=pegaAbaixo(r,c,'SERIE'); if(v) info.serieTexto=v; }
+      if (!info.turno      && (cell==='TURNO'||cell.includes('TURNO')))                                            { const v=pegaAbaixo(r,c,'TURNO'); if(v) info.turno=v; }
+    }
+  }
+  const fb=extrairAnoSerieTurnoDaAba(abaName);
+  if (!info.anoLetivo)  info.anoLetivo =fb.anoLetivo;
+  if (!info.turno)      info.turno     =fb.turno;
+  if (!info.serieTexto) info.serieTexto=fb.serieTexto;
+  if (info.serieTexto)  info.seriesTurma=serieTextoParaLista(info.serieTexto);
+  return info;
+}
+
+function montarIdTurma({anoLetivo,turno,serieTexto,aba}) {
+  return `${(anoLetivo||'SEM-ANO').trim()}|${(turno||'SEM-TURNO').trim()}|${(serieTexto||'SEM-SERIE').trim()}|${(aba||'SEM-ABA').trim()}`;
+}
+
+/* ─── UI do importador ─── */
+function carregarXLSX(event) {
+  const file=event.target.files?.[0]; if(!file) return;
+  _nomeArquivo=file.name;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    _workbook=XLSX.read(new Uint8Array(reader.result),{type:'array'});
+    _abasInfo=_workbook.SheetNames.map(n=>({name:n,checked:true}));
+    renderListaAbas();
+    if (IS_ADMIN) {
+      ['btnSelTodas','btnDesTodas','btnImportar'].forEach(id=>{
+        const el=document.getElementById(id); if(el) el.disabled=false;
+      });
+    }
+    const saida=document.getElementById('saidaXLSX');
+    saida.style.display='block';
+    saida.textContent=`Arquivo: ${_nomeArquivo}\nAbas encontradas: ${_workbook.SheetNames.length}\nSelecione as abas e clique em "Importar selecionadas".`;
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value='';
+}
+
+function renderListaAbas() {
+  const lista=document.getElementById('listaAbas');
+  lista.style.display=_abasInfo.length?'block':'none';
+  lista.innerHTML=_abasInfo.map((aba,idx)=>`
+    <div class="aba-item">
+      <input type="checkbox" ${aba.checked?'checked':''} onchange="toggleAba(${idx},this.checked)">
+      <div>
+        <b>${esc(aba.name)}</b>
+        <span class="badge" style="margin-left:6px;">aba</span>
+        <div class="muted" style="font-size:12px;margin-top:2px;">Será salva como turma separada.</div>
+      </div>
+    </div>`).join('');
+}
+
+function selecionarAbas(val) { _abasInfo=_abasInfo.map(a=>({...a,checked:!!val})); renderListaAbas(); }
+function toggleAba(idx,val)  { _abasInfo[idx].checked=val; }
+
+async function importarSelecionadas() {
+  if (!IS_ADMIN || !_workbook) return;
+  const selecionadas=_abasInfo.filter(a=>a.checked).map(a=>a.name);
+  if (!selecionadas.length) { alert('Selecione pelo menos uma aba.'); return; }
+  if (!window.Identidade)   { alert('Módulo de identidade não carregado. Recarregue a página.'); return; }
+
+  const btnImp=document.getElementById('btnImportar');
+  if (btnImp) { btnImp.disabled=true; btnImp.textContent='Importando...'; }
+  const saida=document.getElementById('saidaXLSX');
+  saida.style.display='block';
+  saida.textContent='⏳ Aguardando catálogo de alunos...';
+
+  try {
+    const turmasDB=lerTurmasDB();
+    const todasLinhas=[], abasValidas=[], log=[];
+
+    for (const abaName of selecionadas) {
+      const ws=_workbook.Sheets[abaName];
+      const matriz=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const rHead=acharLinhaCabecalho(matriz);
+      if (rHead===-1) { log.push(`❌ Aba "${abaName}": cabeçalho não encontrado. Ignorada.`); continue; }
+
+      const info=extrairInfoCabecalho(matriz,rHead,abaName);
+      const colMap=mapearColunas(matriz[rHead]);
+      const modoAvaliacao=detectarModoAvaliacao(matriz,rHead,colMap);
+      const cNome=Object.keys(colMap).find(k=>colMap[k]==='nome');
+      const cNum =Object.keys(colMap).find(k=>colMap[k]==='num');
+      const linhasDaAba=[];
+
+      for (let r=rHead+1; r<matriz.length; r++) {
+        const row=matriz[r]||[];
+        if (linhaTemLegenda(row)||linhaPareceRodape(row)) break;
+        const nome=cNome!==undefined?String(row[Number(cNome)]).trim():'';
+        if (!nome) continue;
+        if (cNum!==undefined&&!isNumeroValido(row[Number(cNum)])) continue;
+        linhasDaAba.push({row,nomeAluno:nome,colMap,modoAvaliacao});
+      }
+
+      todasLinhas.push(...linhasDaAba);
+      abasValidas.push({abaName,info,colMap,modoAvaliacao,linhas:linhasDaAba});
+    }
+
+    // ← await correto (esse era o bug original do importar.html)
+    const candidatos=todasLinhas.map(l=>({nomeOficial:l.nomeAluno,nome:l.nomeAluno}));
+    const resultadosBatch=await window.Identidade.findOrCreateBatch(candidatos);
+
+    let batchIdx=0, idsCriados=0, totalAlunos=0, totalTurmas=0;
+
+    for (const {abaName,info,colMap,modoAvaliacao,linhas} of abasValidas) {
+      const novos=[];
+      for (const {row,nomeAluno} of linhas) {
+        const res=resultadosBatch[batchIdx++]; if(!res) continue;
+        const {alunoId,isNew}=res; if(isNew) idsCriados++;
+        const aluno={nome:nomeAluno,serie:'',alunoId,port:'--',mat:'--',hist:'--',geo:'--',cien:'--',fis:'--',arte:'--',relig:'--',ing:'--',resultado:'Não informado'};
+        for (const [cStr,field] of Object.entries(colMap)) {
+          const v=row[Number(cStr)];
+          if (field==='serieAluno') aluno.serie=String(v||'').trim();
+          else if (field==='resultado') aluno.resultado=toResultado(v);
+          else if (['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(field)) aluno[field]=toNotaSistema(v);
+        }
+        novos.push(aluno);
+      }
+
+      const id=montarIdTurma({anoLetivo:info.anoLetivo,turno:info.turno,serieTexto:info.serieTexto,aba:abaName});
+      const turma={
+        id, turmaId:id, origemArquivo:_nomeArquivo, aba:abaName,
+        anoLetivo:info.anoLetivo||'', turno:info.turno||'',
+        seriesTurma:info.seriesTurma||[], serieTexto:info.serieTexto||'',
+        alunos:novos, criadoEm:new Date().toISOString(),
+      };
+
+      const idx=turmasDB.findIndex(t=>t.id===turma.id);
+      if (idx>=0) turmasDB[idx]=turma; else turmasDB.push(turma);
+
+      totalTurmas++; totalAlunos+=novos.length;
+      const badge=(info.anoLetivo?'ANO OK':'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
+      log.push(`✅ "${abaName}": ${novos.length} aluno(s) (${badge})`);
+    }
+
+    salvarTurmasDB(turmasDB);
+    // Usa versão local: salvarTurmasDB já enviou turmas ao Firestore;
+    // reconstruirAuxiliares enviaria atas/mats também, mas aqui só precisamos do localStorage.
+    const aux=_reconstruirAuxLocalmente(turmasDB);
+
+    log.push('');
+    log.push(`TOTAL: ${totalTurmas} turma(s) • ${totalAlunos} aluno(s)`);
+    log.push(`IDs novos criados: ${idsCriados} (${totalAlunos-idsCriados} já existiam)`);
+    log.push(`Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`);
+    saida.textContent=log.join('\n');
+    renderTabelaTurmas();
+    atualizarStats();
+
+  } catch(err) {
+    console.error('[gerir-dados] Erro XLSX:', err);
+    saida.textContent='❌ Erro inesperado: '+(err.message||err);
+  } finally {
+    if (btnImp) { btnImp.disabled=false; btnImp.textContent='Importar selecionadas'; }
+  }
+}
+
+/* =============================================
+   IMPORTAR JSON — MERGE
+============================================= */
+let _pendingMerge=null;
+
+function analisarJSON(event) {
+  const file=event.target.files?.[0]; if(!file) return;
+  clearLogEl('logJSON');
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try {
+      const dump=JSON.parse(reader.result);
+      if (!Array.isArray(dump.turmasDB)) { logEl('❌ JSON inválido: campo turmasDB ausente.','logJSON'); return; }
+      _analisarMerge(dump.turmasDB);
+    } catch(e) { logEl('❌ Erro ao ler JSON: '+e.message,'logJSON'); }
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
+
+function _analisarMerge(turmasEntrada) {
+  const turmasAtuais=lerTurmasDB();
+  const mapaAtual=new Map(turmasAtuais.map(t=>[t.id||t.turmaId,t]));
+  const novas=[], iguais=[], suspeitas=[];
+
+  for (const t of turmasEntrada) {
+    const id=t.id||t.turmaId; if(!id) continue;
+    if (mapaAtual.has(id)) { iguais.push(t); continue; }
+    const chave=`${t.anoLetivo||''}|${t.serieTexto||''}`;
+    const parecidas=turmasAtuais.filter(x=>`${x.anoLetivo||''}|${x.serieTexto||''}`===chave&&chave!=='|');
+    if (parecidas.length) suspeitas.push({nova:t,parecidaCom:parecidas}); else novas.push(t);
+  }
+
+  _pendingMerge={novas,iguais,suspeitas};
+  _renderMergePreview();
+}
+
+function _renderMergePreview() {
+  if (!_pendingMerge) return;
+  const {novas,iguais,suspeitas}=_pendingMerge;
+  document.getElementById('mergePreview').style.display='block';
+  document.getElementById('mergeResumo').textContent=`${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s)`;
+
+  const lista=document.getElementById('mergeLista'); lista.innerHTML='';
+
+  for (const t of novas) {
+    const div=document.createElement('div'); div.className='merge-item nova';
+    div.innerHTML=`<span class="badge ok">NOVA</span> <b>${esc(t.aba||t.id)}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')} · ${esc(t.serieTexto||'?')} <span class="muted">(${(t.alunos||[]).length} alunos)</span>`;
+    lista.appendChild(div);
+  }
+
+  for (let i=0; i<suspeitas.length; i++) {
+    const {nova,parecidaCom}=suspeitas[i];
+    const div=document.createElement('div'); div.className='merge-item suspeita';
+    div.innerHTML=`
+      <input type="checkbox" id="chkSus${i}" checked style="flex-shrink:0;margin-top:2px;">
+      <div>
+        <span class="badge warn">SUSPEITA</span>
+        <b style="margin-left:6px;">${esc(nova.aba||nova.id)}</b> — ${esc(nova.anoLetivo||'?')} · ${esc(nova.serieTexto||'?')}
+        <span class="muted">(${(nova.alunos||[]).length} alunos)</span><br>
+        <span class="muted" style="font-size:11px;">⚠️ Parecida com: ${parecidaCom.map(x=>esc(x.aba||x.id)).join(', ')}</span>
+      </div>`;
+    lista.appendChild(div);
+  }
+
+  for (const t of iguais) {
+    const div=document.createElement('div'); div.className='merge-item igual';
+    div.innerHTML=`<span class="badge">IDÊNTICA</span> <b>${esc(t.aba||t.id)}</b> — será ignorada`;
+    lista.appendChild(div);
+  }
+}
+
+async function aplicarMerge() {
+  if (!IS_ADMIN||!_pendingMerge) return;
+  const {novas,suspeitas}=_pendingMerge;
+  const suspeitasIncluir=suspeitas.filter((_,i)=>document.getElementById(`chkSus${i}`)?.checked).map(s=>s.nova);
+  const paraAdicionar=[...novas,...suspeitasIncluir];
+  clearLogEl('logJSON');
+  if (!paraAdicionar.length) { logEl('ℹ️ Nenhuma turma nova para adicionar.','logJSON'); cancelarMerge(); return; }
+  logEl(`Adicionando ${paraAdicionar.length} turma(s)...`,'logJSON');
+  const turmasFinais=[...lerTurmasDB(),...paraAdicionar];
+  salvarTurmasDB(turmasFinais);
+  const aux=_reconstruirAuxLocalmente(turmasFinais);
+  logEl(`✅ Merge aplicado: +${paraAdicionar.length} turma(s).`,'logJSON');
+  logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
+  paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
+  cancelarMerge();
+  renderTabelaTurmas();
+  atualizarStats();
+}
+
+function cancelarMerge() {
+  _pendingMerge=null;
+  document.getElementById('mergePreview').style.display='none';
+  document.getElementById('mergeLista').innerHTML='';
+}
+</script>
+
+</body>
+</html>

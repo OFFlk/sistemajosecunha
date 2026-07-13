@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!-- PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<title>Histórico por Aluno</title>
+<style>
+/* ===== Variáveis do sistema ===== */
+:root{
+  --bg:           #f4f3ff;
+  --card:         #ffffff;
+  --ink:          #1e1b4b;
+  --text:         #1e1b4b;
+  --muted:        #6b7280;
+  --line:         var(--brand-border, #ddd6fe);
+  --border:       var(--brand-border, #ddd6fe);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  --radius:       14px;
+  --danger:       #b91c1c;
+  --danger2:      #991b1b;
+  --chip:         var(--brand-faded, #f5f3ff);
+  --chipText:     var(--brand-text, #6d28d9);
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border, #ddd6fe);
+  --chip-bg:      var(--brand-faded);
+  --chip-border:  var(--brand-border);
+  --chip-color:   var(--brand-text);
+  --chip-name:    #4b5563;
+  --mark-bg:      var(--brand-faded);
+  --sub-color:    var(--brand-text);
+  --school-bg:    var(--brand-faded);
+  --school-color: var(--brand-text);
+}
+html[data-theme="dark"]{
+  --bg:           #0a0e1a;
+  --card:         #131c2e;
+  --ink:          #e2e8f0;
+  --text:         #e2e8f0;
+  --muted:        #94a3b8;
+  --line:         #1e2540;
+  --border:       #2a3a5c;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+  --chip:         var(--brand-faded-d, rgba(124,58,237,0.28));
+  --chipText:     var(--brand-text-d, #c4b5fd);
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
+  --chip-bg:      var(--brand-faded-d);
+  --chip-border:  var(--brand-border-d);
+  --chip-color:   var(--brand-text-d);
+  --chip-name:    var(--brand-text-d);
+  --mark-bg:      var(--brand-faded-d);
+  --sub-color:    var(--brand-text-d);
+  --school-bg:    var(--brand-faded-d);
+  --school-color: var(--brand-text-d);
+}
+*, *::before, *::after{ box-sizing:border-box; }
+body{
+  margin:0;
+  font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+html[data-theme="dark"] body{
+  background:
+    radial-gradient(ellipse 800px 400px at 20% 0%, rgba(124,58,237,0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 600px 400px at 80% 60%, rgba(59,130,246,0.06) 0%, transparent 70%),
+    var(--bg);
+}
+
+/* ===== Header padrão ===== */
+.l-bar { height: 2px; background: linear-gradient(90deg, var(--brand, #7c3aed), #3b82f6, #06b6d4); position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
+.app-header { position: sticky; top: 2px; z-index: 99; width: 100%; background: #ffffff; border-bottom: 1px solid var(--brand-border, #ddd6fe); transition: background 0.3s, border-color 0.3s; }
+html[data-theme="dark"] .app-header { background: #0c1120; border-color: #1e2540; }
+.app-header-inner { width: 100%; padding: 0 36px; height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mark { width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); border: 1px solid var(--brand-border, #ddd6fe); font-weight: 800; font-size: 20px; transition: all 0.3s; }
+.brand-title { font-weight: 800; font-size: 16px; color: #1e1b4b; letter-spacing: -0.2px; font-family: 'Nunito', sans-serif; transition: color 0.3s; }
+html[data-theme="dark"] .brand-title { color: #e2e8f0; }
+.brand-sub { font-size: 13px; color: var(--brand-text, #6d28d9); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50vw; font-family: 'Nunito', sans-serif; }
+html[data-theme="dark"] .brand-sub { color: var(--brand-text-d, #c4b5fd); }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; justify-content: flex-end; }
+@media(max-width:640px){ .header-actions{ flex-wrap: wrap; } .brand{ min-width: 0; } }
+.theme-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--brand-border, #ddd6fe); background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s, color 0.18s, border-color 0.18s; }
+html[data-theme="dark"] .theme-toggle { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+.theme-toggle:hover { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
+.theme-toggle-compact { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; border: 1px solid var(--brand-border, #ddd6fe); background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 15px; cursor: pointer; font-family: 'Nunito', sans-serif; transition: background 0.18s, color 0.18s, border-color 0.18s; }
+html[data-theme="dark"] .theme-toggle-compact { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+.theme-toggle-compact:hover { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
+.btn-back { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; border: 1px solid var(--brand-border, #ddd6fe); text-decoration: none; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: border-color 0.18s, box-shadow 0.18s; }
+html[data-theme="dark"] .btn-back { border-color: var(--brand-border-d, #7c3aed); }
+.btn-back:hover { border-color: var(--brand, #7c3aed); box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
+.btn-back .b-icon { padding: 8px 10px; background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; border-right: 1px solid var(--brand-border, #ddd6fe); display: flex; align-items: center; }
+html[data-theme="dark"] .btn-back .b-icon { background: var(--brand-faded-d, rgba(124,58,237,0.28)); color: var(--brand-text-d, #c4b5fd); border-color: var(--brand-border-d, #7c3aed); }
+.btn-back .b-label { padding: 8px 13px; color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; display: flex; align-items: center; }
+html[data-theme="dark"] .btn-back .b-label { color: var(--brand-text-d, #c4b5fd); }
+.btn-home { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; border: 1px solid var(--brand, #7c3aed); background: var(--brand, #7c3aed); text-decoration: none; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s, border-color 0.18s; }
+html[data-theme="dark"] .btn-home { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
+.btn-home:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
+html[data-theme="dark"] .btn-home:hover { background: var(--brand-hover-d, #6d28d9); }
+.btn-home .b-icon { padding: 8px 10px; background: rgba(0,0,0,0.15); color: #fff; font-size: 13px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; }
+.btn-home .b-label { padding: 8px 13px; color: #fff; font-size: 13px; font-weight: 800; display: flex; align-items: center; }
+
+/* ===== Layout ===== */
+.container{ max-width:1100px; margin:22px auto 48px; padding:0 18px; }
+.top-actions{ display:flex; gap:10px; justify-content:flex-end; margin-bottom:14px; flex-wrap:wrap; }
+
+/* ===== Botões (body) ===== */
+.btn, a.btn, button.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px; border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card); color: var(--ink);
+  cursor: pointer; font-weight: 700; font-size: 14px;
+  font-family: 'Nunito', sans-serif;
+  text-decoration: none; white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+}
+html[data-theme="dark"] .btn { background: var(--card); border-color: var(--border); color: var(--ink); }
+/* btn-primary — especificidade reforçada para não ser sobrescrito pelo .btn base */
+.btn.btn-primary,
+a.btn.btn-primary,
+button.btn-primary,
+button.btn.btn-primary {
+  background: var(--brand, #7c3aed);
+  border-color: var(--brand, #7c3aed);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+.btn.btn-primary:hover,
+button.btn-primary:hover,
+button.btn.btn-primary:hover {
+  background: var(--brand-hover, #6d28d9);
+  border-color: var(--brand-hover, #6d28d9);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
+}
+html[data-theme="dark"] .btn.btn-primary,
+html[data-theme="dark"] button.btn-primary,
+html[data-theme="dark"] button.btn.btn-primary {
+  background: var(--brand-d, #7c3aed);
+  border-color: var(--brand-d, #7c3aed);
+}
+html[data-theme="dark"] .btn.btn-primary:hover,
+html[data-theme="dark"] button.btn-primary:hover {
+  background: var(--brand-hover-d, #6d28d9);
+  border-color: var(--brand-hover-d, #6d28d9);
+}
+.btn-gray { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn-gray:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+
+/* Botão editar na tabela */
+.btn-edit {
+  padding: 5px 10px; font-size: 12px; border-radius: 8px; font-weight: 700;
+  background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--chip-color);
+  cursor: pointer; white-space: nowrap; font-family: 'Nunito', sans-serif;
+}
+.btn-edit:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); }
+
+/* Botões de ação de série (outline brand) */
+.btn-serie {
+  padding: 8px 12px; font-size: 13px; font-weight: 700; border-radius: 10px;
+  background: transparent; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--brand, #7c3aed); color: var(--brand, #7c3aed);
+  font-family: 'Nunito', sans-serif; transition: background 0.18s;
+}
+html[data-theme="dark"] .btn-serie { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
+.btn-serie:hover { background: var(--brand-faded, #f5f3ff); }
+
+/* ===== Card ===== */
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:20px;
+  margin-bottom:16px;
+}
+
+
+/* ===== Formulário ===== */
+.row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
+@media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
+@media(max-width:540px){ .row{grid-template-columns:1fr;} }
+.campo{ display:flex; flex-direction:column; min-width:0; }
+label{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block; }
+input, select {
+  padding: 10px 12px; font-size: 14px; width: 100%;
+  border: 1px solid var(--field-border); border-radius: 10px;
+  background: var(--field-bg); color: var(--ink);
+  outline: none; font-family: 'Nunito', sans-serif;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+html[data-theme="dark"] input, html[data-theme="dark"] select {
+  background: var(--field-bg); color: var(--ink); border-color: var(--field-border);
+}
+.form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
+.actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
+
+/* ===== Tabela ===== */
+.table-wrap{ overflow-x:auto; padding-bottom:6px; border:1px solid var(--line); border-radius:14px; margin-top:14px; }
+table{ width:max-content; min-width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+th, td{ border:1px solid var(--line); padding:6px; text-align:center; vertical-align:middle; }
+th{ background:var(--chip-bg); font-weight:700; text-align:left; color:var(--muted); }
+html[data-theme="dark"] table{ color:var(--ink); }
+html[data-theme="dark"] th{ background:var(--chip-bg); color:var(--muted); border-color:var(--border); }
+html[data-theme="dark"] td{ background:var(--field-bg); color:var(--ink); border-color:var(--border); }
+html[data-theme="dark"] tbody tr:hover td{ background:var(--chip-bg); }
+th.th-vertical{ width:34px; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; padding:10px 4px; font-size:12px; line-height:1; }
+th.th-num{ width:42px; }
+th.th-nome{ width:220px; }
+td.col-nome{ text-align:left; padding-left:8px; word-break:break-word; }
+th.th-nota, td.col-nota{ width:42px; font-size:11px; }
+
+
+
+.hidden{ display:none !important; }
+
+/* ===== Contexto (usuário + escola) no header ===== */
+.header-context { display: flex; gap: 8px; align-items: center; margin-right: 4px; flex-wrap: wrap; }
+.ctx-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--chip-bg); font-size: 13px; color: var(--chip-name); max-width: 280px; transition: all 0.3s; }
+.ctx-chip .avatar { width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; background: var(--mark-bg); border: 1px solid var(--chip-border); flex: 0 0 auto; overflow: hidden; font-size: 12px; }
+.ctx-chip .text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+.ctx-chip .name { font-weight: 700; font-size: 13px; color: var(--chip-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-chip .sub  { font-size: 11px; color: var(--sub-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.school-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--school-bg); color: var(--school-color); font-weight: 700; font-size: 13px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.3s; }
+.school-pill select { border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--school-color); border-radius: 6px; padding: 4px 8px; font-weight: 700; font-size: 12px; outline: none; width: 100%; min-width: 0; max-width: 100%; font-family: 'Nunito', sans-serif; }
+.ctx-chip.ctx-clickable { cursor: pointer; user-select: none; position: relative; }
+.ctx-chip.ctx-clickable:focus { outline: 2px solid rgba(0,0,0,0.15); outline-offset: 2px; }
+.ctx-menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 200px; padding: 6px; border-radius: 12px; border: 1px solid var(--chip-border); background: var(--card); backdrop-filter: blur(8px); box-shadow: 0 14px 28px rgba(0,0,0,0.14); display: none; z-index: 80; }
+html[data-theme="dark"] .ctx-menu { background: #0f1829; border-color: #1e2540; }
+.ctx-menu.open { display: block; }
+.ctx-menu .menu-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; cursor: pointer; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--ink); margin-bottom: 4px; transition: filter 0.15s; }
+.ctx-menu .menu-btn:last-child { margin-bottom: 0; }
+.ctx-menu .menu-btn:hover { filter: brightness(0.95); }
+.ctx-menu .menu-btn.danger { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
+html[data-theme="dark"] .ctx-menu .menu-btn.danger { color: #fca5a5; }
+
+
+
+.hidden{ display:none !important; }
+/* ===== Complementos específicos: Histórico por Aluno ===== */
+.split{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; align-items:start;}
+@media (max-width: 980px){ .split{grid-template-columns:1fr;} }
+
+.muted{color:var(--muted); font-size:13px;}
+.pill{display:inline-block; padding:3px 8px; border-radius:999px; background:var(--chip-bg); font-size:12px; margin-left:8px; border:1px solid var(--chip-border); color:var(--chip-color);}
+.list{border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--card);}
+.item{display:grid; grid-template-columns: 1fr 220px; gap:10px; align-items:center; padding:12px; border-top:1px solid var(--border);}
+.item:first-child{border-top:none;}
+.item .title{font-weight:800; min-width:0; font-size:14px;}
+.item .sub{color:var(--muted); font-size:13px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.item .right{display:flex; gap:8px; justify-content:flex-end; flex-wrap:nowrap; align-items:center;}
+.item .right .btn{width:90px; padding:8px 0; justify-content:center; text-align:center;}
+.details-title{display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
+.details-title h3{margin:0;}
+.timeline{margin-top:10px; border-top:1px solid var(--border);}
+.trow{display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); align-items:center;}
+.tleft{min-width:0;}
+.tleft b{display:block;}
+.tleft .muted{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.tright{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
+.tright .btn{padding:8px 12px; font-size:13px;}
+.hint{background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.28); padding:12px; border-radius:10px; font-size:13px; color:var(--ink);}
+.badge{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; border:1px solid var(--border); background:var(--chip-bg); color:var(--chip-color);}
+.badge.ok{background:rgba(22,163,74,.12); border-color:rgba(22,163,74,.25); color:#16a34a;}
+.badge.bad{background:rgba(185,28,28,.12); border-color:rgba(185,28,28,.25); color:#b91c1c;}
+.badge.star{background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.25); color:#b45309;}
+.badge.info{background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.25); color:#2563eb;}
+.badge.mut{background:rgba(148,163,184,.12); border-color:rgba(148,163,184,.25); color:var(--muted);}
+html[data-theme="dark"] .badge.ok{ color:#4ade80; }
+html[data-theme="dark"] .badge.bad{ color:#fca5a5; }
+html[data-theme="dark"] .badge.star{ color:#fbbf24; }
+html[data-theme="dark"] .badge.info{ color:#93c5fd; }
+</style>
+</head>
+<body>
+<body>
+<div class="l-bar"></div>
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="brand">
+      <div class="mark">📜</div>
+      <div>
+        <div class="brand-title">Histórico por aluno</div>
+        <div class="brand-sub">// pesquise um aluno e visualize o histórico consolidado</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="header-context" id="headerContext"></div>
+      <button class="theme-toggle" id="themeToggle" type="button">
+        <span id="themeIcon">🌙</span><span id="themeText">Escuro</span>
+      </button>
+      <button class="theme-toggle-compact" id="themeToggleCompact" type="button">
+        <span id="themeIconCompact">🌙</span>
+      </button>
+      <a class="btn-back" href="atas.html">
+        <span class="b-icon">◀︎</span><span class="b-label">Atas</span>
+      </a>
+      <a class="btn-home" href="../index.html">
+        <span class="b-icon">🏠</span><span class="b-label">Início</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+<div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+      <h2 style="margin:0;">Buscar aluno</h2>
+      <a class="btn" href="pesquisa-ata.html">🔎 Pesquisar por turma</a>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin-top:10px;">
+      <div style="flex:1; min-width:200px;">
+        <label>Nome do aluno</label>
+        <input id="q" placeholder='Ex: "José da Silva" ou apenas "jose"' />
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding-bottom:2px;">
+        <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:13px; white-space:nowrap;">
+          <input type="checkbox" id="parcial" checked />
+          Buscar por parte do nome
+        </label>
+        <button class="btn btn-primary" type="button" onclick="buscar()">Pesquisar</button>
+        <button class="btn btn-gray" type="button" onclick="limpar()">Limpar</button>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:10px;" id="dbInfo"></div>
+  </div>
+
+  <div class="split">
+    <div class="card">
+      <div class="details-title">
+        <h3>Resultados</h3>
+        <span class="muted" id="count"></span>
+      </div>
+      <div id="lista" class="list" style="margin-top:10px;">
+        <div style="padding:12px;" class="hint">
+          Dica: a pesquisa procura nos nomes salvos dentro de cada turma do <b>turmasDB</b>.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="details-title">
+        <h3>Detalhes do aluno</h3>
+        <button class="btn btn-primary" type="button" onclick="exportarHistoricoSelecionado()" id="btnExportarSel" disabled>Exportar</button>
+      </div>
+      <div id="detalhes" class="muted" style="margin-top:10px;">
+        Selecione um aluno na lista para ver o histórico.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   Helpers / DB
+========================= */
+const $ = (id) => document.getElementById(id);
+/* =========================
+   DB por escola (Namespacing)
+========================= */
+const DB = (() => {
+  function readJSON(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch{ return fallback; }
+  }
+  function writeJSON(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  function getSession(){
+    try{
+      if (window.Auth && typeof window.Auth.getSession === "function"){
+        return window.Auth.getSession();
+      }
+    }catch{}
+    return readJSON("auth_session_v2", null);
+  }
+  function getActiveSchoolId(){
+    const sess = getSession() || {};
+    const sid = String(sess.schoolId || "").trim() || "SEM_ESCOLA";
+    if (sid === "ADMIN"){
+      const active = String(localStorage.getItem("admin_active_school_v1") || "").trim();
+      return active || "ADMIN";
+    }
+    return sid;
+  }
+  function key(base){
+    return `schools:${getActiveSchoolId()}:${base}`;
+  }
+  function migrateIfNeeded(base, fallback){
+    const scopedKey = key(base);
+    if (localStorage.getItem(scopedKey) == null){
+      const legacy = localStorage.getItem(base);
+      if (legacy != null){
+        localStorage.setItem(scopedKey, legacy);
+      } else if (fallback !== undefined){
+        writeJSON(scopedKey, fallback);
+      }
+    }
+    return scopedKey;
+  }
+  function read(base, fallback){
+    const k = migrateIfNeeded(base, fallback);
+    return readJSON(k, fallback);
+  }
+  function write(base, value){
+    const k = key(base);
+    writeJSON(k, value);
+  }
+  return { key, read, write, getActiveSchoolId };
+})();
+
+
+function normNome(s){
+  return String(s || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function escapeHtml(s){
+  return String(s||"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function lerTurmasDB(){
+  return DB.read("turmasDB", []);
+}
+
+function lerAlunosDB(){
+  return DB.read("alunosDB", []);
+}
+
+function lerAliasesDB(){
+  // aceita objeto { aliasKey: alunoId } ou lista legado
+  return DB.read("alunosAliasesDB", {});
+}
+
+function carregarEscola(){
+  return DB.read("dadosEscola", {});
+}
+
+function formatarListaBonita(arr){
+  if (!arr || arr.length === 0) return "";
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return `${arr[0]} e ${arr[1]}`;
+  return `${arr.slice(0, -1).join(", ")} e ${arr[arr.length - 1]}`;
+}
+
+function extrairAno(t){
+  const a = String(t?.anoLetivo || "").trim();
+  if (a) return a;
+  const id = String(t?.id || "");
+  const p = id.split("|");
+  return (p[0] || "").trim();
+}
+
+function tituloTurma(t){
+  const ano = extrairAno(t);
+  const turno = String(t?.turno || "").trim();
+  const serieTxt = String(t?.serieTexto || "").trim() || (Array.isArray(t?.seriesTurma) ? formatarListaBonita(t.seriesTurma) : "");
+  const arq = String(t?.origemArquivo || t?.arquivo || "").trim();
+  const base = `${serieTxt || "Série"} ${ano ? ano : ""}`.trim();
+  const extras = [turno, arq ? `Arquivo: ${arq}` : ""].filter(Boolean).join(" • ");
+  return { base, extras };
+}
+
+/* =========================
+   Índice de alunos
+========================= */
+let INDEX = [];
+let SELECTED_KEY = "";
+
+
+const RESULT_META = {
+  "AP":   { icon:"✅", label:"AP",   cls:"ok" },
+  "REP":  { icon:"❌", label:"REP",  cls:"bad" },
+  "DEST": { icon:"⭐", label:"DEST", cls:"star" },
+  "TRA":  { icon:"🔁", label:"TRA",  cls:"info" },
+  "FAL":  { icon:"🚫", label:"FAL",  cls:"bad" },
+  "AND":  { icon:"⏳", label:"AND",  cls:"info" },
+  "Não informado": { icon:"•", label:"NI", cls:"mut" }
+};
+
+function badgeResultado(res){
+  const meta = RESULT_META[String(res||"Não informado")] || { icon:"•", label:String(res||"NI"), cls:"mut" };
+  return `<span class="badge ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span>`;
+}
+
+function renderAusencia(de, ate){
+  return `<div class="trow">
+    <div class="tleft">
+      <b>— Ausente ${escapeHtml(String(de))}–${escapeHtml(String(ate))} —</b>
+      <div class="muted">Sem registros encontrados nesse intervalo</div>
+    </div>
+    <div class="tright"></div>
+  </div>`;
+}
+
+
+
+
+function construirIndex(){
+  const turmas = lerTurmasDB();
+  // Usa Identidade.lerTodos() — enxerga alunos de AMBOS os módulos (atas + ano-ativo)
+  // Fallback para lerAlunosDB() se o módulo não estiver carregado ainda
+  const alunosDB = window.Identidade ? window.Identidade.lerTodos() : lerAlunosDB();
+
+  // aliasMap: normNome(nomeOficial) -> alunoId
+  // Construído direto do catálogo unificado — sem depender do alunosAliasesDB
+  const aliasMap = new Map();
+  (alunosDB || []).forEach(r => {
+    const id   = String(r?.alunoId || r?.id || "").trim();
+    const nome = String(r?.nomeOficial || r?.nome || "").trim();
+    if (id && nome) aliasMap.set(normNome(nome), id);
+  });
+
+  // 2) nomeOficial por alunoId (do catálogo)
+  const nomeOficial = new Map();
+  (alunosDB || []).forEach(r => {
+    const id = String(r?.alunoId || r?.id || "").trim();
+    const nome = String(r?.nomeOficial || r?.nome || "").trim();
+    if (id && nome && !nomeOficial.has(id)) nomeOficial.set(id, nome);
+  });
+
+  // 3) cria entradas base a partir do catálogo unificado
+  const map = new Map(); // groupKey -> item
+  (alunosDB || []).forEach(r => {
+    const alunoId = String(r?.id || r?.alunoId || "").trim();
+    if (!alunoId) return;
+    const display = String(r?.nomeOficial || r?.nome || "").trim() || alunoId;
+    const nomeKey = normNome(display);
+    const groupKey = `ID:${alunoId}`;
+    map.set(groupKey, {
+      key: groupKey,
+      alunoId,
+      nomeKey,
+      nomes: new Set([display]),
+      display,
+      ocorrencias: []
+    });
+  });
+
+  // helper para garantir uma entrada (ID ou nome)
+  function ensureEntry({ alunoId, nomeRaw }){
+    const id = String(alunoId || "").trim();
+    const nome = String(nomeRaw || "").trim();
+    const nomeKey = normNome(nome);
+    const groupKey = id ? `ID:${id}` : `NM:${nomeKey}`;
+    if (!map.has(groupKey)){
+      const display = id ? (nomeOficial.get(id) || nome || id) : (nome || "(sem nome)");
+      map.set(groupKey, {
+        key: groupKey,
+        alunoId: id,
+        nomeKey: id ? normNome(nomeOficial.get(id) || nome || id) : nomeKey,
+        nomes: new Set(nome ? [nome] : []),
+        display,
+        ocorrencias: []
+      });
+    } else if (nome){
+      map.get(groupKey).nomes.add(nome);
+      // mantém display mais completo quando não há nome oficial
+      const it = map.get(groupKey);
+      if (!it.alunoId && nome.length > String(it.display||"").length) it.display = nome;
+    }
+    return map.get(groupKey);
+  }
+
+  // 4) indexa ocorrências varrendo turmasDB (onde estão as notas)
+  for (const t of (turmas || [])){
+    const ano = extrairAno(t);
+    const turno = String(t?.turno || "").trim();
+    const serieTurma = String(t?.serieTexto || "").trim() || (Array.isArray(t?.seriesTurma) ? formatarListaBonita(t.seriesTurma) : "");
+    const alunos = Array.isArray(t?.alunos) ? t.alunos : [];
+
+    for (const a of alunos){
+      const nomeRaw = String(a?.nome || "").trim();
+      if (!nomeRaw) continue;
+
+      const nomeKey = normNome(nomeRaw);
+      const alunoId = String(a?.alunoId || aliasMap.get(nomeKey) || "").trim();
+
+      const it = ensureEntry({ alunoId, nomeRaw });
+
+      it.ocorrencias.push({
+        turmaId: t.id,
+        ano: ano || "",
+        turno: turno || "",
+        serie: String(a?.serie || "").trim() || serieTurma || "",
+        resultado: String(a?.resultado || "Não informado"),
+        nomeRaw,
+        nomeKey,
+        alunoId: alunoId || it.alunoId || "",
+        turma: t
+      });
+    }
+  }
+
+  // 5) materializa e calcula min/max anos (p/ timeline)
+  INDEX = Array.from(map.values()).map(it => {
+    const anosNum = (it.ocorrencias || [])
+      .map(o => parseInt(String(o.ano||"0"),10))
+      .filter(n => !isNaN(n) && n > 0);
+    const minAno = anosNum.length ? Math.min(...anosNum) : null;
+    const maxAno = anosNum.length ? Math.max(...anosNum) : null;
+    return { ...it, minAno, maxAno, qtd: (it.ocorrencias||[]).length };
+  });
+
+  INDEX.sort((a,b)=> String(a.display).localeCompare(String(b.display),'pt-BR'));
+
+  // meta no topo
+  $("dbInfo").textContent =
+    `Sistema: turmasDB=${(turmas||[]).length} • alunos (unificados)=${(alunosDB||[]).length} • escola=${DB.getActiveSchoolId()} • alunos indexados=${INDEX.length}`;
+
+  // dica inicial
+  if (!INDEX.length){
+    $("lista").innerHTML = `<div style="padding:12px;" class="hint">
+      Nenhum aluno encontrado nos bancos locais (<b>alunosDB</b>/<b>turmasDB</b>) neste domínio.<br/>
+      Dica: abra pelo <b>mesmo localhost</b> onde você importou os dados.
+    </div>`;
+  }
+}
+
+
+function limpar(){
+  $("q").value = "";
+  $("lista").innerHTML = `<div style="padding:12px;" class="hint">Digite um nome e clique em <b>Pesquisar</b>.</div>`;
+  $("count").textContent = "";
+  SELECTED_KEY = "";
+  $("detalhes").innerHTML = `<span class="muted">Selecione um aluno na lista para ver o histórico.</span>`;
+  $("btnExportarSel").disabled = true;
+}
+
+function buscar(){
+  const termoRaw = $("q").value;
+  const termo = normNome(termoRaw);
+  const parcial = $("parcial").checked;
+
+  if (!termo){
+    alert("Digite o nome ou ID do aluno.");
+    return;
+  }
+
+  function alunoMatches(a){
+    const toks = [];
+    toks.push(normNome(a.display || ""));
+    toks.push(String(a.alunoId || "").trim().toLowerCase());
+    toks.push(String(a.nomeKey || "").trim());
+
+    // inclui variações de nome encontradas nas turmas
+    if (a.nomes && typeof a.nomes.forEach === "function"){
+      try { a.nomes.forEach(n => toks.push(normNome(n))); } catch {}
+    }
+
+    // remove vazios
+    const clean = toks.filter(Boolean);
+
+    if (parcial){
+      return clean.some(t => t.includes(termo));
+    }
+    // exato: bate pelo nome normalizado OU pelo ID
+    return clean.some(t => t === termo) || String(a.alunoId||"").trim().toLowerCase() === termo;
+  }
+
+  const res = INDEX.filter(alunoMatches);
+
+  $("count").textContent = `${res.length} resultado(s)`;
+
+  if (!res.length){
+    $("lista").innerHTML = `<div style="padding:12px;" class="hint">Nenhum aluno encontrado para <b>${escapeHtml(termoRaw)}</b>.</div>`;
+    return;
+  }
+
+  $("lista").innerHTML = res.map(a => {
+    const faixa = (a.minAno && a.maxAno) ? `${a.minAno}–${a.maxAno}` : "—";
+    const idBadge = a.alunoId ? `<span class="pill">${escapeHtml(a.alunoId)}</span>` : ``;
+    return `
+      <div class="item" onclick="selecionarAluno('${a.key}')">
+        <div>
+          <div class="title">${escapeHtml(a.display)} ${idBadge} <span class="pill">${faixa}</span> <span class="pill">${a.qtd} registro(s)</span></div>
+          <div class="sub">Clique para abrir o histórico • Você pode exportar em PDF</div>
+        </div>
+        <div class="right">
+          <button class="btn btn-gray" type="button" onclick="event.stopPropagation(); selecionarAluno('${a.key}')">Abrir</button>
+          <button class="btn btn-primary" type="button" onclick="event.stopPropagation(); selecionarAluno('${a.key}'); exportarHistoricoSelecionado();">Exportar</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+
+
+function selecionarAluno(key){
+  const aluno = INDEX.find(a => a.key === key);
+  if (!aluno) return;
+
+  SELECTED_KEY = key;
+  $("btnExportarSel").disabled = false;
+
+  // ordena ocorrências por ano
+  const occ = aluno.ocorrencias.slice().sort((x,y)=>{
+    const ax = parseInt(String(x.ano||"0"),10) || 0;
+    const ay = parseInt(String(y.ano||"0"),10) || 0;
+    if (ax !== ay) return ax - ay;
+    return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
+  });
+
+  const faixa = (aluno.minAno && aluno.maxAno) ? `${aluno.minAno}–${aluno.maxAno}` : "—";
+
+  // monta timeline e inclui "lacunas" (ausência) quando fizer sentido (anos numéricos)
+  const anos = occ.map(o => parseInt(String(o.ano||"0"),10)).filter(n => !isNaN(n) && n>0).sort((a,b)=>a-b);
+  const lacunas = [];
+  if (anos.length >= 2){
+    let prev = anos[0];
+    for (let i=1;i<anos.length;i++){
+      const cur = anos[i];
+      if (cur - prev > 1) lacunas.push([prev+1, cur-1]);
+      prev = cur;
+    }
+  }
+
+  // cria um set para saber quais anos existem
+  const anosSet = new Set(anos);
+
+  const rows = [];
+  // percorre do menor ao maior ano para inserir lacunas no meio
+  const minA = anos.length ? Math.min(...anos) : null;
+  const maxA = anos.length ? Math.max(...anos) : null;
+
+  if (minA && maxA){
+    for (let a=minA; a<=maxA; a++){
+      if (!anosSet.has(a)){
+        // só cria blocos compactos (a..b)
+        const l = lacunas.find(([x,y])=>a>=x && a<=y);
+        if (l && a===l[0]) rows.push({ tipo:"ausencia", de:l[0], ate:l[1] });
+        continue;
+      }
+      // adiciona todas ocorrências desse ano
+      occ.filter(o => parseInt(String(o.ano||"0"),10)===a).forEach(o => rows.push({ tipo:"oc", o }));
+    }
+  } else {
+    // sem anos numéricos, só lista
+    occ.forEach(o => rows.push({ tipo:"oc", o }));
+  }
+
+  $("detalhes").innerHTML = `
+    <div>
+      <div style="font-size:18px; font-weight:900;">${escapeHtml(aluno.display)}</div>
+      <div class="muted">Período: <b>${faixa}</b> • Registros: <b>${aluno.qtd}</b></div>
+      <div class="timeline">
+        ${rows.map(r => {
+          if (r.tipo === "ausencia") return renderAusencia(r.de, r.ate);
+          const o = r.o;
+          const t = o.turma;
+          const tt = tituloTurma(t);
+
+          const badge = badgeResultado(o.resultado);
+          const encontrado = (o.nomeRaw && normNome(o.nomeRaw) !== normNome(aluno.display))
+            ? `<span class="pill">encontrado: ${escapeHtml(o.nomeRaw)}</span>`
+            : ``;
+
+          return `
+            <div class="trow">
+              <div class="tleft">
+                <b>${escapeHtml(o.ano || "?")} — ${escapeHtml(o.serie || "?")} — ${escapeHtml(o.turno || "?")} ${badge}</b>
+                <div class="muted">${escapeHtml(tt.base)}${tt.extras ? " • " + escapeHtml(tt.extras) : ""} ${encontrado}</div>
+              </div>
+              <div class="tright">
+                <button class="btn btn-gray" type="button" onclick="abrirTurmaTabela('${escapeHtml(t.id)}')">Ver turma</button>
+                <button class="btn btn-primary" type="button" onclick="exportarOcorrencia('${escapeHtml(t.id)}','${escapeHtml(aluno.key)}')">Exportar ano</button>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      <div class="muted" style="margin-top:10px;">
+        “Ver turma” abre a tabela completa da turma no <b>Cadastro de Turma</b>.
+      </div>
+    </div>
+  `;
+}
+
+
+function abrirTurmaTabela(id){
+  // abre a turma no cadastro (tabela completa)
+  window.location.href = `cadastro-turma.html?edit=${encodeURIComponent(id)}`;
+}
+
+/* =========================
+   Exportação PDF do histórico (CONSOLIDADO)
+   - Um único PDF com CABEÇALHO apenas na 1ª página
+   - Uma única TABELA com várias linhas (um ano por linha)
+   - Adiciona coluna "ANO" dentro da tabela (antes do Nº / Nome)
+   - Tabela ponta-a-ponta com colunas ajustadas automaticamente
+   - Colunas são a UNIÃO dos schemas das turmas encontradas (faltantes viram "--")
+========================= */
+function exportarHistoricoSelecionado(){
+  if (!SELECTED_KEY) { alert("Selecione um aluno antes de exportar."); return; }
+  const aluno = INDEX.find(a => a.key === SELECTED_KEY);
+  if (!aluno) return;
+  exportarHistoricoAlunoPDF(aluno);
+}
+
+function exportarOcorrencia(turmaId, alunoKey){
+  const aluno = INDEX.find(a => a.key === alunoKey);
+  if (!aluno) return;
+
+  const occ = aluno.ocorrencias.filter(o => o.turmaId === turmaId);
+  if (!occ.length) { alert("Ocorrência não encontrada."); return; }
+
+  exportarHistoricoAlunoPDF(aluno, [occ[0]]);
+}
+
+function exportarHistoricoAlunoPDF(aluno, somenteOcc=null){
+  if (!window.jspdf || !window.jspdf.jsPDF) { alert("jsPDF não carregou."); return; }
+  if (typeof window.jspdf?.jsPDF !== "function") { alert("jsPDF não carregou."); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("l","mm","a4");
+
+  const escola = carregarEscola();
+  const occ = (somenteOcc && somenteOcc.length) ? somenteOcc : aluno.ocorrencias.slice().sort((x,y)=>{
+    const ax = parseInt(String(x.ano||"0"),10) || 0;
+    const ay = parseInt(String(y.ano||"0"),10) || 0;
+    if (ax !== ay) return ax - ay;
+    return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
+  });
+
+  // Cabeçalho (só uma vez)
+  desenharCabecalhoHistorico(doc, escola, aluno.display);
+
+  // Tabela consolidada
+  gerarTabelaHistoricoConsolidado(doc, aluno, occ);
+
+  const safe = aluno.display.replace(/[^\w\d]+/g,"_").slice(0,40) || "aluno";
+  doc.save(`historico_${safe}.pdf`);
+}
+
+function desenharCabecalhoHistorico(doc, escola, nomeAluno){
+  const nomeEscola = (escola?.nome || "Nome da Escola").toString();
+  const endereco = (escola?.endereco || "").toString();
+  const escudo = escola?.escudo || "";
+
+  let y = 18;
+  const centerX = doc.internal.pageSize.getWidth() / 2;
+
+  if (escudo) {
+    try { doc.addImage(escudo, "PNG", 12, 10, 26, 26); } catch {}
+  }
+
+  doc.setFont("Times","Bold");
+  doc.setFontSize(16);
+  doc.text(nomeEscola, centerX, y, {align:"center"});
+
+  doc.setFont("Times","Normal");
+  doc.setFontSize(11);
+  doc.text(endereco, centerX, y+7, {align:"center"});
+
+  doc.setFont("Times","Bold");
+  doc.setFontSize(14);
+  doc.text("ATA DE RESULTADOS FINAIS", centerX, y+18, {align:"center"});
+
+  doc.setFont("Times","Normal");
+  doc.setFontSize(13);
+  doc.text(`Histórico do aluno - ${nomeAluno}`, centerX, y+28, {align:"center"});
+}
+
+function mergeSchemaColumns(occList){
+  // Retorna lista única de colunas (subjects) mantendo ordem de primeira aparição
+  const seen = new Set();
+  const out = [];
+  const fallback = [
+    { key:"port",  label:"port" },
+    { key:"mat",   label:"mat" },
+    { key:"hist",  label:"hist" },
+    { key:"geo",   label:"geo" },
+    { key:"cien",  label:"cien" },
+    { key:"fis",   label:"fis" },
+    { key:"arte",  label:"arte" },
+    { key:"relig", label:"relig" },
+  ];
+
+  for (const o of occList){
+    const t = o.turma;
+    const schema = t?.schemaSnapshot || null;
+    const cols = (schema && Array.isArray(schema.colunas))
+      ? schema.colunas.filter(c => c && c.enabled !== false).map(c => ({ key: c.key, label: (c.label||c.key||"").toString() }))
+      : fallback;
+
+    for (const c of cols){
+      const k = String(c.key || "").trim();
+      if (!k) continue;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({ key: k, label: String(c.label || k).trim() });
+    }
+  }
+  return out;
+}
+
+function gerarTabelaHistoricoConsolidado(doc, aluno, occList){
+  // Determina se alguma turma desativa série/resultado; aqui a gente inclui por utilidade no histórico:
+  // - Série: sempre (ajuda a leitura)
+  // - Resultado final: inclui se existir em qualquer ocorrência
+  let resultadoExiste = false;
+  for (const o of occList){
+    const t = o.turma;
+    const schema = t?.schemaSnapshot || null;
+    const resultadoAtivo = schema ? (schema.resultadoAtivo !== false) : true;
+    if (resultadoAtivo) { resultadoExiste = true; break; }
+  }
+
+  const colsMaterias = mergeSchemaColumns(occList);
+
+  const head = ["ANO", "Nº", "NOME DO ALUNO", "SÉRIE"]
+    .concat(colsMaterias.map(c => (c.label || c.key || "").toString().toUpperCase()))
+    .concat(resultadoExiste ? ["RESULTADO FINAL"] : []);
+
+  // constrói as linhas (1 linha por ocorrência/ano)
+  const body = occList.map(o => {
+    const t = o.turma;
+    const alunos = Array.isArray(t?.alunos) ? t.alunos : [];
+
+    // match do aluno: 1) exato pela chave 2) contém (para casos de nomes inconsistentes)
+    // tenta localizar o aluno dentro da turma:
+    // 1) se existir alunoId, casa por alunoId
+    // 2) senão, casa por nome normalizado (comportamento antigo)
+    const keyNome = aluno.nomeKey || (String(aluno.key||"").startsWith("NM:") ? String(aluno.key).slice(3) : "");
+    const alvo = alunos.find(a => aluno.alunoId && String(a?.alunoId||"").trim() === String(aluno.alunoId||"").trim())
+      || alunos.find(a => keyNome && normNome(a?.nome) === keyNome)
+      || alunos.find(a => keyNome && normNome(a?.nome).includes(keyNome))
+      || null;
+    const idx = alvo ? (alunos.indexOf(alvo) + 1) : "";
+
+    const ano = String(o.ano || extrairAno(t) || "").trim();
+    const nome = alvo?.nome ? String(alvo.nome) : aluno.display;
+    const serie = String(alvo?.serie || o.serie || "").trim();
+
+    const row = [ano, String(idx || ""), nome, serie];
+
+    colsMaterias.forEach(c => {
+      row.push(String(alvo?.[c.key] ?? "--"));
+    });
+
+    if (resultadoExiste){
+      row.push(String(alvo?.resultado ?? "Não informado"));
+    }
+
+    return row;
+  });
+
+  // Layout: tabela ponta-a-ponta (margem pequena p/ impressão)
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 10;
+  const usableW = pageW - margin * 2;
+
+  // larguras fixas para Ano/Nº/Nome/Série; resto divide igualmente
+  const wAno = 18;
+  const wNum = 10;
+  const wNome = 70;
+  const wSerie = 18;
+
+  const fixed = wAno + wNum + wNome + wSerie;
+  const restCols = Math.max(1, head.length - 4);
+  const wRest = Math.max(8, (usableW - fixed) / restCols);
+
+  const colStyles = {};
+  colStyles[0] = { cellWidth: wAno, halign: "center" };
+  colStyles[1] = { cellWidth: wNum, halign: "center" };
+  colStyles[2] = { cellWidth: wNome, halign: "left" };
+  colStyles[3] = { cellWidth: wSerie, halign: "center" };
+  for (let c = 4; c < head.length; c++) colStyles[c] = { cellWidth: wRest, halign: "center" };
+
+  // startY abaixo do cabeçalho
+  const startY = 18 + 30 + 20; // alinhado com o header que desenhamos
+  doc.autoTable({
+    startY,
+    theme: "grid",
+    tableWidth: usableW,
+    margin: { left: margin, right: margin },
+    head: [head],
+    body,
+    styles: { font: "Times", fontSize: 10, halign: "center", valign: "middle" },
+    headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: "bold" },
+    columnStyles: colStyles
+  });
+}
+
+
+/* =========================
+   Boot
+========================= */
+document.addEventListener("DOMContentLoaded", async () => {
+  // Pré-carrega dados do Firestore no localStorage antes de construir o índice
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+    const dados = await window.DB.loadAll();
+    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
+    if(sid){
+      const pre = (k)=>`schools:${sid}:${k}`;
+      if(dados.turmasDB)   localStorage.setItem(pre('turmasDB'),   JSON.stringify(dados.turmasDB));
+      if(dados.alunosDB)   localStorage.setItem(pre('alunosDB'),   JSON.stringify(dados.alunosDB));
+      if(dados.matriculas) localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
+      if(dados.dadosEscola && Object.keys(dados.dadosEscola).length)
+        localStorage.setItem(pre('dadosEscola'), JSON.stringify(dados.dadosEscola));
+    }
+  }catch(e){ console.warn('historico-aluno: Firestore pré-carga:', e); }
+
+  construirIndex();
+
+  // Enter no input dispara busca
+  $("q").addEventListener("keydown", (ev)=>{
+    if (ev.key === "Enter"){ ev.preventDefault(); buscar(); }
+  });
+});
+</script>
+
+<script>
+(function(){
+  function applyTheme(theme){
+    const t = (theme === 'dark') ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('ui_theme_v1', t);
+    if (window.ThemeColors) ThemeColors.apply(ThemeColors.get());
+    const emoji = (t === 'dark') ? '☀️' : '🌙';
+    const label = (t === 'dark') ? 'Claro' : 'Escuro';
+    ['themeIcon','themeIconCompact'].forEach(function(id){ const el=document.getElementById(id); if(el) el.textContent=emoji; });
+    const text = document.getElementById('themeText'); if(text) text.textContent=label;
+  }
+  function init(){
+    const btn  = document.getElementById('themeToggle');
+    const btnC = document.getElementById('themeToggleCompact');
+    if (!btn) return;
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+    const compact = !!document.querySelector('.btn-back') && !!document.querySelector('.btn-home');
+    btn.style.display  = compact ? 'none' : 'inline-flex';
+    if (btnC) btnC.style.display = compact ? 'inline-flex' : 'none';
+    function toggle(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); }
+    btn.addEventListener('click', toggle);
+    if (btnC) btnC.addEventListener('click', toggle);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
+
+<!-- =============================================
+     SCRIPT 2 — Chip de usuário + chip de escola
+     Renderiza após o Firebase resolver (auth:ready)
+     e re-renderiza se a sessão mudar.
+============================================= -->
+<script>
+(function(){
+  function safeParse(json, fallback){
+    try{ const v = JSON.parse(json); return (v == null ? fallback : v); }catch(_){ return fallback; }
+  }
+
+  function getSession(){
+    if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
+    return safeParse(localStorage.getItem('auth_session_v2') || 'null', null);
+  }
+
+  function listSchools(){
+    if (window.Auth && typeof Auth.listSchools === 'function') return Auth.listSchools() || [];
+    return safeParse(localStorage.getItem('auth_schools_v1') || '[]', []);
+  }
+
+  function getActiveSchoolId(session){
+    if (!session) return null;
+    const sid = (session.schoolId || '').toString();
+    if (sid.toUpperCase() !== 'ADMIN') return sid;
+    return (localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
+  }
+
+  function renderHeaderContext(){
+    const host = document.getElementById('headerContext');
+    if (!host) return;
+
+    const s = getSession();
+    host.innerHTML = '';
+    if (!s) return;
+
+    const email    = (s.email || '').toString();
+    const name     = (s.name || s.displayName || '').toString() || (email ? email.split('@')[0] : 'Usuário');
+    const role     = (s.role || '').toString();
+    const schoolId = (s.schoolId || '').toString();
+
+    /* ── Chip do usuário (clicável com dropdown) ── */
+    const user = document.createElement('div');
+    user.className = 'ctx-chip ctx-clickable';
+    user.setAttribute('role','button');
+    user.setAttribute('tabindex','0');
+    user.setAttribute('aria-haspopup','true');
+    user.setAttribute('aria-expanded','false');
+    const photoURL = s.photoURL || null;
+    user.innerHTML = `
+      <div class="avatar" id="userAvatar">${photoURL ? `<img src="${photoURL}" style="width:100%;height:100%;border-radius:999px;object-fit:cover;" onerror="this.parentElement.textContent='👤'">` : '👤'}</div>
+      <div class="text">
+        <div class="name"></div>
+        <div class="sub"></div>
+      </div>
+      <div class="ctx-menu" id="userMenu">
+        <button type="button" class="btn menu-btn" id="btnPerfil">👤 Meu perfil</button>
+        <button type="button" class="btn menu-btn danger" id="btnLogout">🚪 Sair</button>
+      </div>
+    `;
+    user.querySelector('.name').textContent = name;
+    user.querySelector('.sub').textContent  = email || (role ? role : '');
+
+    const menu      = user.querySelector('#userMenu');
+    const btnLogout = user.querySelector('#btnLogout');
+
+    function closeMenu(){
+      menu.classList.remove('open');
+      user.setAttribute('aria-expanded','false');
+    }
+    function toggleMenu(){
+      const open = menu.classList.toggle('open');
+      user.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    user.addEventListener('click', function(ev){
+      if (ev.target && (ev.target.id === 'btnLogout' || ev.target.closest('.ctx-menu'))) return;
+      ev.stopPropagation();
+      toggleMenu();
+    });
+    user.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleMenu(); }
+      if (ev.key === 'Escape') closeMenu();
+    });
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeMenu(); });
+
+    const btnPerfil = user.querySelector('#btnPerfil');
+    if (btnPerfil) btnPerfil.addEventListener('click', function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      window.location.href = '/perfil.html';
+    });
+
+    btnLogout.addEventListener('click', function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      try{
+        if (window.Auth && typeof Auth.logout === 'function') Auth.logout();
+        else {
+          localStorage.removeItem('auth_session_v2');
+          localStorage.removeItem('auth_return_to_v2');
+        }
+      }catch(_){}
+      window.location.href = '/login.html';
+    });
+
+    host.appendChild(user);
+
+    /* ── Chip da escola ── */
+    const schools   = listSchools();
+    const effective = getActiveSchoolId(s);
+    const matched   = schools.find(x => (x && (x.schoolId||'').toString() === effective))
+                   || schools.find(x => (x && (x.id||'').toString()       === effective));
+    const schoolName = matched ? (matched.displayName || matched.name || matched.nome || '').toString().trim() : '';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'school-pill';
+
+    const label = document.createElement('span');
+    label.textContent = '◈';
+    wrap.appendChild(label);
+
+    /* Admin global → select para trocar escola ativa */
+    if (schoolId.toUpperCase() === 'ADMIN' && Array.isArray(schools) && schools.length){
+      const sel = document.createElement('select');
+      // Opção "Todas as escolas"
+      const optAll = document.createElement('option');
+      optAll.value = 'ADMIN';
+      optAll.textContent = 'Todas as escolas (ADMIN)';
+      sel.appendChild(optAll);
+
+      const seen = new Set();
+      schools
+        .map(x => ({ schoolId:(x.schoolId||x.id||'').toString(), name:(x.displayName||x.name||x.nome||'').toString() }))
+        .filter(o => o.schoolId && o.schoolId !== 'ADMIN' && !seen.has(o.schoolId) && seen.add(o.schoolId))
+        .sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'))
+        .forEach(o => {
+          const opt = document.createElement('option');
+          opt.value       = o.schoolId;
+          opt.textContent = o.name || o.schoolId;
+          sel.appendChild(opt);
+        });
+
+      sel.value = effective;
+      sel.addEventListener('change', function(){
+        if (sel.value === 'ADMIN') localStorage.removeItem('admin_active_school_v1');
+        else localStorage.setItem('admin_active_school_v1', sel.value);
+        location.reload();
+      });
+      wrap.appendChild(sel);
+    } else {
+      const span = document.createElement('span');
+      span.textContent = schoolName || schoolId;
+      wrap.appendChild(span);
+    }
+
+    host.appendChild(wrap);
+  }
+
+  function boot(){
+    try{ renderHeaderContext(); }catch(e){ console.warn('headerContext:', e); }
+  }
+
+  // Renderiza imediatamente (cache do localStorage)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  // ✅ Re-renderiza quando Firebase resolver o perfil (dados frescos do Firestore)
+  document.addEventListener('auth:ready', boot);
+  // ✅ Re-renderiza se a sessão mudar (logout em outra aba, troca de usuário)
+  document.addEventListener('auth:sessionChanged', boot);
+
+})();
+</script>
+</body>
+</html>

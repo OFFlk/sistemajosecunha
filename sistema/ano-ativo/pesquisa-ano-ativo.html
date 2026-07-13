@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<!-- CSS exclusivo desta página -->
+<style>
+/* ── Variáveis que esta página sobrescreve ── */
+:root {
+  --card-bg:             #ffffff;
+  --card-border:         var(--brand-border, #ddd6fe);
+  --field-bg:            #ffffff;
+  --field-border:        var(--brand-border, #ddd6fe);
+  --shadow:              0 4px 20px rgba(0,0,0,0.06);
+  --danger:              #b91c1c;
+  --chip-neutral-bg:     #f3f4f6;
+  --chip-neutral-border: #d1d5db;
+  --chip-neutral-color:  #4b5563;
+}
+html[data-theme="dark"] {
+  --card-bg:             #131c2e;
+  --card-border:         #2a3a5c;
+  --field-bg:            #0a1426;
+  --field-border:        #1e2540;
+  --shadow:              0 4px 24px rgba(0,0,0,0.4);
+  --chip-neutral-bg:     rgba(148,163,184,0.15);
+  --chip-neutral-border: rgba(148,163,184,0.3);
+  --chip-neutral-color:  #cbd5e1;
+}
+
+/* ── Layout ── */
+.wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+h1      { font-size: 26px; margin: 0 0 4px; font-weight: 800; }
+.sub    { color: var(--muted); font-size: 13px; margin: 0; }
+
+/* ── Grids ── */
+.grid  { display: grid; grid-template-columns: 220px 1fr 200px; gap: 14px; align-items: start; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media(max-width:980px){ .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr !important; } }
+@media(max-width:640px){ .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+/* ── Misc ── */
+.statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.chips      { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip       { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-bg); background: var(--chip-bg); color: var(--chip-color); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
+.divider    { height: 1px; background: var(--line); margin: 14px 0; }
+.right-col  { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.stack      { display: flex; flex-direction: column; }
+.help       { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 14px; }
+.loading    { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* ── Split (dois painéis lado a lado) ── */
+.split         { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.panel         { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; min-height: 200px; transition: background 0.3s, border-color 0.3s; }
+.panel-head    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.panel h2      { font-size: 17px; margin: 0; font-weight: 800; }
+.count         { background: var(--chip-bg); border: 1px solid var(--line); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--chip-color); font-weight: 700; }
+.panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
+.check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 700; cursor: pointer; }
+.list          { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── Items ── */
+.item        { border: 1px solid var(--card-border); border-radius: 10px; padding: 14px; background: var(--card-bg); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; transition: background 0.3s, border-color 0.3s; }
+.item .left  { min-width: 0; flex: 1; }
+.item .right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.item .title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 800; font-size: 14px; }
+.item .meta  { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* ── Badge neutro e separador ── */
+.badge-neutral  { background: var(--chip-neutral-bg); color: var(--chip-neutral-color); border-color: var(--chip-neutral-border); }
+.separator-line { border: none; border-top: 1px solid rgba(148,163,184,0.3); margin: 8px 0; }
+html[data-theme="dark"] .separator-line { border-top-color: rgba(148,163,184,0.2); }
+
+/* ── Aperfeiçoamentos gerais do .btn nesta página ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s, opacity 0.18s;
+  white-space: nowrap;
+}
+.btn:active { opacity: 0.85; }
+
+/* .btn base (sem modificador) — modo claro */
+.btn:not(.primary):not(.ghost):not(.secondary):not(.danger) {
+  background: var(--chip-bg);
+  border-color: var(--card-border);
+  color: var(--chip-color);
+}
+.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):hover {
+  background: var(--brand-faded);
+  border-color: var(--brand-hover);
+  color: var(--brand-text);
+}
+
+/* .btn base — modo escuro */
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger) {
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.25);
+  color: #cbd5e1;
+}
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger):hover {
+  background: var(--brand-faded-d);
+  border-color: var(--brand-border-d);
+  color: var(--brand-text-d);
+}
+
+/* .btn.primary — modo escuro */
+html[data-theme="dark"] .btn.primary {
+  background: var(--brand-d);
+  border-color: var(--brand-d);
+  color: #fff;
+}
+html[data-theme="dark"] .btn.primary:hover {
+  background: var(--brand-hover-d);
+  border-color: var(--brand-hover-d);
+}
+
+/* ── Variantes de botão não cobertas pelo components.css ── */
+.btn.ghost           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
+.btn.ghost:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
+html[data-theme="dark"] .btn.ghost       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
+html[data-theme="dark"] .btn.ghost:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
+
+.btn.secondary       { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
+.btn.secondary:hover { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
+html[data-theme="dark"] .btn.secondary       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
+html[data-theme="dark"] .btn.secondary:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
+
+.btn.danger          { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
+.btn.danger:hover    { background: rgba(185,28,28,0.18); border-color: rgba(185,28,28,0.55); }
+html[data-theme="dark"] .btn.danger       { background: rgba(185,28,28,0.15); border-color: rgba(239,68,68,0.40); color: #fca5a5; }
+html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); border-color: rgba(239,68,68,0.65); }
+
+.btn.small           { padding: 6px 11px; font-size: 12px; }
+
+/* ── Botão Editar ── */
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--card-border);
+  background: var(--chip-bg);
+  color: var(--chip-color);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  font-family: 'Nunito', sans-serif;
+  white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.btn-edit:hover {
+  background: var(--brand);
+  border-color: var(--brand-hover);
+  color: #fff;
+}
+html[data-theme="dark"] .btn-edit {
+  background: var(--brand-faded-d);
+  border-color: var(--brand-border-d);
+  color: var(--brand-text-d);
+}
+html[data-theme="dark"] .btn-edit:hover {
+  background: var(--brand-d);
+  border-color: var(--brand-hover-d);
+  color: #fff;
+}
+
+/* ── Actions row ── */
+.actions     { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.actions .btn { border-radius: 10px; padding: 10px 16px; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; }
+
+/* ── Checkbox ── */
+.check              { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
+.check input        { cursor: pointer; accent-color: var(--brand); }
+.check-all input    { cursor: pointer; accent-color: var(--brand); }
+.item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); }
+
+/* ── Ordenação ── */
+.sort-control        { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--chip-bg); border: 1px solid var(--card-border); border-radius: 10px; }
+.sort-control label  { font-size: 13px; font-weight: 700; color: var(--chip-color); white-space: nowrap; }
+.sort-control select { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--field-border); background: var(--field-bg); color: var(--ink); font-size: 13px; font-family: 'Nunito', sans-serif; cursor: pointer; outline: none; transition: border-color 0.18s; }
+.sort-control select:focus { border-color: var(--brand); }
+.sort-control button { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--chip-bg); color: var(--chip-color); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; transition: all 0.18s; }
+.sort-control button:hover { background: var(--brand); border-color: var(--brand-hover); color: #fff; }
+html[data-theme="dark"] .sort-control { background: rgba(148,163,184,0.07); border-color: rgba(148,163,184,0.18); }
+html[data-theme="dark"] .sort-control button { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
+html[data-theme="dark"] .sort-control button:hover { background: var(--brand-d); border-color: var(--brand-hover-d); color: #fff; }
+
+/* ── Modal ── */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
+.modal          { width: min(1100px, 96vw); max-height: 86vh; overflow: auto; background: var(--card-bg); border-radius: 14px; border: 1px solid var(--card-border); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
+.modal-head     { position: sticky; top: 0; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border); }
+.modal-head h3  { margin: 0; font-size: 16px; font-weight: 800; }
+.modal-body     { padding: 14px; }
+
+/* ── Toast ── */
+#toastGerarAta           { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #0f172a; color: #f8fafc; border-radius: 16px; padding: 16px 20px 14px; box-shadow: 0 8px 32px rgba(0,0,0,.35); max-width: 320px; display: none; flex-direction: column; gap: 6px; font-size: 13px; }
+#toastGerarAta.visible   { display: flex; animation: slideUpToast .25s ease; }
+@keyframes slideUpToast  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+#toastGerarAta .toast-title { font-weight: 800; font-size: 14px; }
+#toastGerarAta .toast-sub   { color: #94a3b8; line-height: 1.4; font-size: 12px; }
+#toastGerarAta .toast-btn   { display: inline-block; background: var(--brand); color: #fff; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; text-decoration: none; text-align: center; border: none; cursor: pointer; margin-top: 2px; align-self: flex-start; }
+#toastGerarAta .toast-close { position: absolute; top: 10px; right: 12px; background: transparent; border: none; color: #94a3b8; font-size: 16px; cursor: pointer; line-height: 1; }
+html[data-theme="dark"] #toastGerarAta { background: #0f172a; border: 1px solid rgba(148,163,184,0.20); box-shadow: 0 8px 32px rgba(0,0,0,.55); }
+
+/* ── Chips de turma ── */
+.turma-chips     { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.turma-chips-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.badge-prof      { white-space: normal; word-break: break-word; max-width: 100%; }
+
+/* ── Badge integral ── */
+.badge-integral { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+html[data-theme="dark"] .badge-integral { background: rgba(52,211,153,0.18); border-color: #34d399; color: #6ee7b7; }
+
+/* ── Avisos ── */
+.warn { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); font-size: 14px; }
+.ok   { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #16a34a; font-size: 14px; }
+html[data-theme="dark"] .ok { color: #4ade80; }
+
+/* ── Aviso amarelo do modal — dark mode ── */
+html[data-theme="dark"] #modalGerarAtaAviso {
+  background: rgba(251,191,36,0.12) !important;
+  border-color: rgba(251,191,36,0.30) !important;
+  color: #fcd34d !important;
+}
+
+/* ── Modal gerar ata — dark mode (inline styles override) ── */
+html[data-theme="dark"] #modalGerarAta > div {
+  background: var(--card-bg, #131c2e) !important;
+  border-color: var(--card-border, #2a3a5c) !important;
+}
+html[data-theme="dark"] #modalGerarAta select {
+  background: var(--field-bg, #0a1426) !important;
+  color: var(--ink) !important;
+  border-color: var(--field-border, #1e2540) !important;
+}
+html[data-theme="dark"] #modalGerarAtaCancelar {
+  background: rgba(148,163,184,0.10) !important;
+  border-color: rgba(148,163,184,0.25) !important;
+  color: #cbd5e1 !important;
+}
+html[data-theme="dark"] #modalGerarAtaCancelar:hover {
+  background: rgba(148,163,184,0.18) !important;
+}
+</style>
+
+<title>Ano Ativo • Pesquisa e Lista</title>
+</head>
+<body>
+
+<script>window.Auth && window.Auth.requireAuth();</script>
+
+<!-- Header via fetch -->
+<div id="header-placeholder"></div>
+
+<div class="wrap">
+
+  <div class="card">
+    <!-- Linha 1: ano + busca + pesquisar -->
+    <div class="grid">
+      <div class="field stack">
+        <label for="selAno">Ano letivo</label>
+        <select id="selAno"></select>
+        <div class="help" id="helpAno">Por padrão, usa o ano ativo detectado.</div>
+      </div>
+
+      <div class="field stack">
+        <label for="inpBusca">Buscar aluno (nome ou ID)</label>
+        <div style="display:flex;gap:8px;align-items:stretch;">
+          <input id="inpBusca" type="text" placeholder="Ex.: 000, Maria, ALU-000123..." style="flex:1;"/>
+          <button class="btn primary" id="btnAtualizar" style="white-space:nowrap;flex-shrink:0;">🔍 Pesquisar</button>
+        </div>
+        <div class="help">&nbsp;</div>
+      </div>
+
+      <div class="right-col" style="justify-content:flex-end;padding-top:22px;">
+        <div class="pill">ano ativo: <b id="lblAnoAtivo">—</b></div>
+      </div>
+    </div>
+
+    <!-- Linha 2: filtros de série + turno + status -->
+    <div style="margin-top:10px;">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="field" style="flex:1;min-width:160px;margin:0;">
+          <label for="selSerieAdd">Filtrar por série</label>
+          <select id="selSerieAdd">
+            <option value="">(selecione)</option>
+          </select>
+        </div>
+        <button class="btn primary" id="btnAddSerie" style="flex-shrink:0;white-space:nowrap;">+ Adicionar</button>
+        <button class="btn ghost" id="btnLimparSeries" style="flex-shrink:0;white-space:nowrap;">Limpar</button>
+        <div class="field" style="min-width:160px;margin:0;">
+          <label for="selTurno">Filtrar por turno</label>
+          <select id="selTurno">
+            <option value="">Todos os turnos</option>
+            <option value="MATUTINO">🌤️ Matutino</option>
+            <option value="VESPERTINO">☀️ Vespertino</option>
+            <option value="NOTURNO">🌙 Noturno</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:160px;margin:0;">
+          <label for="selModelo">Filtrar por modelo</label>
+          <select id="selModelo">
+            <option value="">Todos</option>
+            <option value="REGULAR">Regular</option>
+            <option value="INTEGRAL">📚 Integral</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:160px;margin:0;">
+          <label for="selStatus">Filtrar por status</label>
+          <select id="selStatus">
+            <option value="">Todos os status</option>
+            <option value="ATIVO" selected>ATIVO</option>
+            <option value="INATIVO">INATIVO</option>
+            <option value="APROVADO">APROVADO</option>
+            <option value="REPROVADO">REPROVADO</option>
+            <option value="TRANSFERIDO">TRANSFERIDO</option>
+            <option value="DESISTENTE">DESISTENTE</option>
+            <option value="FALECIDO">FALECIDO</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- radio modoFiltro oculto mas mantido para não quebrar o JS -->
+      <div style="display:none">
+        <input type="radio" name="modoFiltro" value="ambos" id="modoAmbos">
+        <input type="radio" name="modoFiltro" value="turma" id="modoTurma" checked>
+        <input type="radio" name="modoFiltro" value="serie" id="modoSerie">
+      </div>
+
+      <div class="chips" id="chipsSeries"></div>
+
+      <div class="statusline">
+        <div id="lblDb" class="muted">Carregando banco...</div>
+        <div class="muted" id="lblInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Turmas + Alunos lado a lado -->
+  <div class="split">
+    <div class="panel">
+      <div class="panel-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <h2>Turmas</h2><span class="count" id="countTurmas">0</span>
+        </div>
+        <div class="panel-actions">
+          <label class="check-all"><input type="checkbox" id="chkAllTurmas"> Todos</label>
+          <button class="btn" id="btnTurmasTabela">Abrir tabela</button>
+          <button class="btn primary" id="btnTurmasPdf">Exportar PDF</button>
+        </div>
+      </div>
+      <div class="sort-control" style="margin-bottom:10px;">
+        <label>Ordenar por:</label>
+        <select id="sortTurmaField">
+          <option value="serie">Série (pedagógico)</option>
+          <option value="nome">Nome</option>
+          <option value="alunos">Qtd. alunos</option>
+          <option value="turno">Turno</option>
+        </select>
+      </div>
+      <div class="list" id="listaTurmas"></div>
+      <div class="loading" id="loadingTurmas"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <h2>Alunos</h2><span class="count" id="countAlunos">0</span>
+        </div>
+        <div class="panel-actions">
+          <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
+          <button class="btn" id="btnAlunosTabela">Abrir tabela</button>
+          <div style="position:relative;display:inline-block;" id="wrapExportAlunos">
+            <button class="btn primary" id="btnAlunosPdf">Exportar PDF ▾</button>
+            <div id="dropExportAlunos" style="display:none;position:absolute;right:0;top:calc(100% + 6px);
+              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
+              box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:200px;padding:6px 0;
+              display:none;flex-direction:column;">
+              <button class="btn" id="btnExportLista" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📋 Lista de alunos</button>
+              <button class="btn" id="btnExportTurma" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">🏫 Separado por turma</button>
+              <button class="btn" id="btnExportSerie" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📚 Separado por série</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;margin:-4px 0 10px 0;">Marque alunos para exportar/abrir a tabela. O filtro "Buscar aluno" afeta esta lista.</div>
+
+      <!-- Controle de ordenação -->
+      <div class="sort-control">
+        <label>Ordenar por:</label>
+        <select id="sortField">
+          <option value="nome">Nome</option>
+          <option value="idade">Idade</option>
+          <option value="serie">Série</option>
+          <option value="mae">Nome da mãe</option>
+          <option value="pai">Nome do pai</option>
+        </select>
+        <button type="button" id="btnToggleSort" title="Alternar ordem">↑↓</button>
+      </div>
+
+      <div class="list" id="listaAlunos"></div>
+      <div class="loading" id="loadingAlunos"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Tabela</h3>
+      <button class="btn" id="btnFecharModal">Fechar</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- jsPDF + autoTable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+<!-- 1. header-logic (sempre primeiro) -->
+<script src="../header-logic.js"></script>
+
+<!-- 2. Lógica específica desta página -->
+<script>
+(function(){
+'use strict';
+
+/* =========================
+   Permissões
+========================= */
+const _session = (window.Auth && typeof Auth.getSession === 'function') ? Auth.getSession() : null;
+const _podeEditar = !!_session && _session.role === 'admin';
+
+/* =========================
+   Helpers de persistência
+========================= */
+function _salvarAnoAtivo(ano){
+  try{
+    if(window.DB?.escola && window.Auth?.getSession?.())
+      window.DB.escola.save({ configAnoAtivo: ano })
+        .catch(e=>console.warn('Firestore configAnoAtivo:', e));
+  }catch(e){}
+}
+
+/* =========================
+   Util
+========================= */
+function normSerie(s){
+  if(!s) return "";
+  let t = String(s).trim();
+  t = t.replace(/\s+/g,' ');
+  t = t.replace(/^EIXO\s*([12345])$/i, "EIXO $1");
+  t = t.replace(/^EIXO([12345])$/i, "EIXO $1");
+  return t.toUpperCase();
+}
+function normText(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();
+}
+function _turnoEmoji(t){
+  const m = { MATUTINO:'🌤️', VESPERTINO:'☀️', NOTURNO:'🌙', INTEGRAL:'📚' };
+  return m[(t||'').toUpperCase()] || '';
+}
+function _turnoFiltroAtual(){
+  const el = document.getElementById('selTurno');
+  return el ? (el.value || '') : '';
+}
+function _statusFiltroAtual(){
+  const el = document.getElementById('selStatus');
+  return el ? (el.value || '') : '';
+}
+function _modeloFiltroAtual(){
+  const el = document.getElementById('selModelo');
+  return el ? (el.value || '') : '';
+}
+function modoFiltroAtual(){
+  const el = document.querySelector('input[name="modoFiltro"]:checked');
+  return el ? el.value : "ambos";
+}
+function calcIdade(dataStr){
+  if(!dataStr) return "";
+  const s = String(dataStr).trim();
+  let d=null;
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const m2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m1){ d = new Date(+m1[3], +m1[2]-1, +m1[1]); }
+  else if(m2){ d = new Date(+m2[1], +m2[2]-1, +m2[3]); }
+  else { const tmp = new Date(s); if(!isNaN(tmp)) d = tmp; }
+  if(!d || isNaN(d)) return "";
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - d.getFullYear();
+  const m = hoje.getMonth() - d.getMonth();
+  if(m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--;
+  return (idade>=0 && idade<=130) ? String(idade) : "";
+}
+
+/* =========================
+   Estado
+========================= */
+let alunos = [];
+let turmas = [];
+let mats = [];
+let atasDB = [];
+let anoAtivo = "";
+let seriesSelecionadas = [];
+let __lastLoadAt = 0;
+const __MIN_REFRESH_MS = 5000;
+let currentSortField = 'nome';
+let currentSortOrder = 'asc';
+let alunosOrdenados = [];  // Lista ordenada para uso em tabela/export
+let currentTurmaSort = 'serie';  // critério de ordenação das turmas
+
+/* =========================
+   UI refs
+========================= */
+const selAno       = document.getElementById("selAno");
+const inpBusca     = document.getElementById("inpBusca");
+const selSerieAdd  = document.getElementById("selSerieAdd");
+const chipsSeries  = document.getElementById("chipsSeries");
+const lblDb        = document.getElementById("lblDb");
+const lblAnoAtivo  = document.getElementById("lblAnoAtivo");
+const lblInfo      = document.getElementById("lblInfo");
+const listaTurmas  = document.getElementById("listaTurmas");
+const listaAlunos  = document.getElementById("listaAlunos");
+const countTurmas  = document.getElementById("countTurmas");
+const countAlunos  = document.getElementById("countAlunos");
+const chkAllTurmas = document.getElementById("chkAllTurmas");
+const chkAllAlunos = document.getElementById("chkAllAlunos");
+const modalBackdrop = document.getElementById("modalBackdrop");
+const modalTitle    = document.getElementById("modalTitle");
+const modalBody     = document.getElementById("modalBody");
+const sortField     = document.getElementById("sortField");
+const btnToggleSort = document.getElementById("btnToggleSort");
+
+/* =========================
+   Carregar DB
+========================= */
+async function carregarDB(){
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+    const dados = await window.DB.loadAllAnoAtivo();
+    alunos = Array.isArray(dados.alunosDB)     ? dados.alunosDB     : [];
+    mats   = Array.isArray(dados.matriculasDB) ? dados.matriculasDB : [];
+    turmas = Array.isArray(dados.turmasDB)     ? dados.turmasDB     : [];
+    const atasData = await window.DB.atas.list();
+    atasDB = Array.isArray(atasData) ? atasData : [];
+    anoAtivo = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+  }catch(e){
+    console.warn('carregarDB Firestore:', e);
+    alunos=[]; turmas=[]; mats=[]; atasDB=[]; anoAtivo='';
+  }
+
+  alunos = alunos.map(a => {
+    const idadeRaw = (a.idade || a.IDADE || "").toString().trim();
+    const nasc     = (a.dataNascimento || a["DATA DE NASCIMENTO"] || a.nascimento || a.NASC || "").trim();
+    return {
+      ...a,
+      serie:          normSerie(a.serie || a.SERIE || a.series || a.seriesTurma),
+      nome:           (a.nome || a.NOME || "").trim(),
+      cpf:            (a.cpf || a.CPF || "").trim(),
+      dataNascimento: nasc,
+      mae:            (a.mae || a.MAE || a["MÃE"] || "").trim(),
+      pai:            (a.pai || a.PAI || "").trim(),
+      naturalidade:   (a.naturalidade || a.NATURALIDADE || "").trim(),
+      sexo:           (a.sexo || a.SEXO || "").trim(),
+      corRaca:        (a.corRaca || a["COR/RAÇA"] || a["COR OU RAÇA"] || a.cor || "").trim(),
+      alunoId:        (a.alunoId || a.ALUNOID || a.id || "").trim(),
+      idade:          idadeRaw || calcIdade(nasc), // calculado uma única vez no carregamento
+    };
+  });
+
+  turmas = turmas.map(t => ({
+    ...t,
+    turmaId:   (t.turmaId || t.id || t.ID || "").trim(),
+    anoLetivo: (t.anoLetivo || t.ano || t.ANO || "").toString().trim(),
+    serie:     normSerie(t.serie || t.SERIE || t.series || t.seriesTurma),
+    nome:      (t.nome || t.NOME || "").trim()
+  }));
+
+  mats = mats.map(m => ({
+    ...m,
+    turmaId:   (m.turmaId || m.turma || m.TURMAID || "").trim(),
+    alunoId:   (m.alunoId || m.aluno || m.ALUNOID || "").trim(),
+    anoLetivo: (m.anoLetivo || m.ano || m.ANO || "").toString().trim(),
+    serie:     normSerie(m.serie || m.SERIE || ""),
+    status:    (m.status || "ATIVO").toString().trim().toUpperCase()
+  }));
+
+  // Deduplicar matrículas
+  (function(){
+    const seen = new Map();
+    mats.forEach(m => {
+      const key = `${m.turmaId}|${m.alunoId}|${m.anoLetivo}`;
+      if(!seen.has(key)){ seen.set(key, m); }
+      else { const prev = seen.get(key); if(!prev.serie && m.serie) seen.set(key, m); }
+    });
+    mats = Array.from(seen.values());
+  })();
+
+  if(!anoAtivo){
+    const anos = new Set();
+    mats.forEach(m => m.anoLetivo && anos.add(m.anoLetivo));
+    const arr = Array.from(anos).sort();
+    anoAtivo = arr.length ? arr[arr.length-1] : "";
+    if(anoAtivo) _salvarAnoAtivo(anoAtivo);
+  }
+  lblAnoAtivo.textContent = anoAtivo || "—";
+
+  const anosSet = new Set();
+  mats.forEach(m => m.anoLetivo && anosSet.add(m.anoLetivo));
+  if(anoAtivo) anosSet.add(anoAtivo);
+  const anos = Array.from(anosSet).filter(Boolean).sort((a,b)=>Number(a)-Number(b));
+  selAno.innerHTML = "";
+  const optAuto = document.createElement("option");
+  optAuto.value = ""; optAuto.textContent = "(usar ano ativo)";
+  selAno.appendChild(optAuto);
+  anos.forEach(y=>{ const o=document.createElement("option"); o.value=y; o.textContent=y; selAno.appendChild(o); });
+  const _anoAtivoStr = String(anoAtivo || '').trim();
+  selAno.value = _anoAtivoStr;
+  if (_anoAtivoStr && selAno.value !== _anoAtivoStr) {
+    selAno.value = anos.length ? anos[anos.length - 1] : '';
+  }
+
+  const seriesSet = new Set();
+  function addSerie(s){
+    if(!s) return;
+    String(s).split(/[,;]+/).forEach(p => { const n = normSerie(p.trim()); if(n) seriesSet.add(n); });
+  }
+  turmas.forEach(t => { if(Array.isArray(t.series)) t.series.forEach(addSerie); else addSerie(t.serie); });
+  alunos.forEach(a => addSerie(a.serie));
+  mats.forEach(m => addSerie(m.serie));
+  if(Array.from(seriesSet).some(s => /^EIXO\s*[12345]$/.test(s))){
+    ["EIXO 1","EIXO 2","EIXO 3","EIXO 4","EIXO 5"].forEach(e => seriesSet.add(e));
+  }
+  const seriesOrdenadas = ordenarSeries(Array.from(seriesSet).filter(Boolean));
+  selSerieAdd.innerHTML = '<option value="">(selecione)</option>';
+  seriesOrdenadas.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; selSerieAdd.appendChild(o); });
+
+  lblDb.textContent = `DB Ano Ativo: turmas=${turmas.length} • alunos=${alunos.length} • matrículas=${mats.length}`;
+}
+
+function ordenarSeries(arr){
+  // Categorias pedagógicas em prioridade:
+  // 0 = Ed. Infantil  (G1-G5 / GRUPO 1-5)
+  // 1 = EF1           (1º ANO ao 5º ANO)
+  // 2 = EF2           (6º ANO ao 9º ANO)
+  // 3 = Ensino Médio  (1º EM ao 3º EM)
+  // 4 = EJA           (EIXO 1 ao EIXO 5)
+  // 5 = Especiais     (ALFABETIZAÇÃO, MULTI, SERIADA)
+  // 6 = Número genérico
+  // 9 = Outros
+  function key(s){
+    const t = s.toUpperCase().trim();
+    // Ed. Infantil: G1-G5, GRUPO 1-5
+    const mG = t.match(/^G(?:RUPO\s*)?([1-5])$/);
+    if(mG) return [0, Number(mG[1]), t];
+    // EF1: 1º ao 5º ANO
+    const mEF1 = t.match(/^([1-5])[º°O]?\s*ANO?$/);
+    if(mEF1) return [1, Number(mEF1[1]), t];
+    // EF2: 6º ao 9º ANO
+    const mEF2 = t.match(/^([6-9])[º°O]?\s*ANO?$/);
+    if(mEF2) return [2, Number(mEF2[1]), t];
+    // Ensino Médio: 1EM-3EM, 1º EM, etc.
+    const mEM = t.match(/^([1-3])[º°O]?\s*E\.?M\.?$/);
+    if(mEM) return [3, Number(mEM[1]), t];
+    // EJA: EIXO 1-5
+    const mEixo = t.match(/^EIXO\s*([1-5])$/);
+    if(mEixo) return [4, Number(mEixo[1]), t];
+    // Especiais
+    if(t === "ALFABETIZACAO" || t === "ALFABETIZAÇÃO") return [5, 0, t];
+    if(t === "MULTI")   return [5, 1, t];
+    if(t === "SERIADA") return [5, 2, t];
+    // Fallback numérico
+    const mN = t.match(/^(\d{1,2})/);
+    if(mN) return [6, Number(mN[1]), t];
+    return [9, 0, t];
+  }
+  return arr.slice().sort((a,b)=>{
+    const ka=key(a), kb=key(b);
+    for(let i=0;i<ka.length;i++){ if(ka[i]<kb[i]) return -1; if(ka[i]>kb[i]) return 1; }
+    return 0;
+  });
+}
+
+function _serieKeyDaTurma(t){
+  // Pega a primeira série da turma para usar na ordenação
+  const seriesArr = Array.isArray(t.series) && t.series.length ? t.series : (t.serie ? [t.serie] : []);
+  return seriesArr[0] || '';
+}
+
+function sortTurmas(lista){
+  const crit = currentTurmaSort;
+  return lista.slice().sort((a, b) => {
+    if(crit === 'serie'){
+      // Usa a lógica pedagógica de ordenarSeries
+      const sa = _serieKeyDaTurma(a), sb = _serieKeyDaTurma(b);
+      const sorted = ordenarSeries([sa, sb]);
+      if(sorted[0] !== sorted[1]) return sorted[0] === sa ? -1 : 1;
+      // Desempate pelo nome da turma
+      return normText(a.nome||'').localeCompare(normText(b.nome||''));
+    }
+    if(crit === 'nome'){
+      return normText(a.nome||'').localeCompare(normText(b.nome||''));
+    }
+    if(crit === 'alunos'){
+      const qa = mats.filter(m => m.turmaId === a.turmaId).length;
+      const qb = mats.filter(m => m.turmaId === b.turmaId).length;
+      return qb - qa; // maior primeiro
+    }
+    if(crit === 'turno'){
+      const order = ['MATUTINO','VESPERTINO','NOTURNO',''];
+      const ia = order.indexOf((a.turno||'').toUpperCase()); 
+      const ib = order.indexOf((b.turno||'').toUpperCase());
+      const va = ia < 0 ? 99 : ia, vb = ib < 0 ? 99 : ib;
+      if(va !== vb) return va - vb;
+      return normText(a.nome||'').localeCompare(normText(b.nome||''));
+    }
+    return 0;
+  });
+}
+
+/* =========================
+   Chips de séries
+========================= */
+function renderChips(){
+  chipsSeries.innerHTML = "";
+  seriesSelecionadas.forEach(s=>{
+    const chip = document.createElement("span");
+    chip.className="chip";
+    chip.innerHTML = `${s} <button title="Remover">×</button>`;
+    chip.querySelector("button").addEventListener("click", ()=>{
+      seriesSelecionadas = seriesSelecionadas.filter(x=>x!==s);
+      renderChips(); atualizarListas();
+    });
+    chipsSeries.appendChild(chip);
+  });
+}
+
+/* =========================
+   Filtragem
+========================= */
+function anoSelecionadoOuAtivo(){ return selAno.value || anoAtivo || ""; }
+
+function turmasFiltradas(){
+  const ano = anoSelecionadoOuAtivo();
+  const setSeries = new Set(seriesSelecionadas.map(s => normSerie(s)));
+  return turmas.filter(t=>{
+    if(!(!ano || String(t.anoLetivo) === String(ano))) return false;
+    if(setSeries.size === 0) return true;
+    const seriesDaTurma = new Set();
+    if(Array.isArray(t.series) && t.series.length){
+      t.series.forEach(s => { const n = normSerie(s); if(n) seriesDaTurma.add(n); });
+    } else if(t.serie){
+      String(t.serie).split(/[,;]+/).forEach(s => { const n = normSerie(s.trim()); if(n) seriesDaTurma.add(n); });
+    }
+    return [...setSeries].some(s => seriesDaTurma.has(s));
+  });
+}
+
+function _aplicarFiltrosComuns(list){
+  const turnoFiltro = _turnoFiltroAtual();
+  if(turnoFiltro) list = list.filter(a => (a._turno||'').toUpperCase() === turnoFiltro);
+  const modeloFiltro = _modeloFiltroAtual();
+  if(modeloFiltro) list = list.filter(a => (a._modelo||'REGULAR').toUpperCase() === modeloFiltro);
+  const statusFiltro = _statusFiltroAtual();
+  if(statusFiltro) list = list.filter(a => (a._status||'ATIVO') === statusFiltro);
+  const q = normText(inpBusca.value.trim());
+  if(q) list = list.filter(a=> normText(`${a.nome} ${a.alunoId} ${a.cpf} ${a.serie}`).includes(q));
+  return list;
+}
+
+function _buildMatsMap(ano){
+  // Map alunoId → matrícula preferencial do ano (ou qualquer matrícula como fallback)
+  const byAluno = new Map();
+  mats.forEach(m => {
+    const prev = byAluno.get(m.alunoId);
+    if(!prev){
+      byAluno.set(m.alunoId, m);
+    } else if(ano && String(m.anoLetivo) === String(ano) && String(prev.anoLetivo) !== String(ano)){
+      byAluno.set(m.alunoId, m); // prefere a matrícula do ano correto
+    }
+  });
+  return byAluno;
+}
+
+function _enriquecerComMeta(list){
+  const ano = anoSelecionadoOuAtivo();
+  const matsMap = _buildMatsMap(ano);
+  return list.map(a => {
+    const mat = matsMap.get(a.alunoId);
+    return {
+      ...a,
+      _turno:  (mat && mat.turno)  ? mat.turno.toUpperCase()  : (a.turno||''),
+      _status: (mat && mat.status) ? mat.status.toUpperCase() : (a.status||'ATIVO').toUpperCase(),
+      _modelo: (mat && mat.modelo) ? mat.modelo.toUpperCase() : 'REGULAR',
+    };
+  });
+}
+
+function alunosFiltradosPorTurmas(turmasScope){
+  const ano = anoSelecionadoOuAtivo();
+  const turmaIds = new Set(turmasScope.map(t=>t.turmaId));
+  let alunoIds = new Set();
+  if(mats.length){
+    mats.forEach(m=>{
+      if((!ano || String(m.anoLetivo) === String(ano)) && turmaIds.has(m.turmaId))
+        alunoIds.add(m.alunoId);
+    });
+  } else {
+    alunos.forEach(a=>{
+      if((!ano || String(a.anoLetivo||ano) === ano) && (turmaIds.size===0 || turmaIds.has(a.turmaId||"")))
+        alunoIds.add(a.alunoId);
+    });
+  }
+  let list = alunos.filter(a=>a.alunoId && alunoIds.has(a.alunoId));
+  list = list.map(a => {
+    if(a.serie) return a;
+    const mat = mats.find(m => m.alunoId === a.alunoId && turmaIds.has(m.turmaId) && (!ano || String(m.anoLetivo) === String(ano)))
+             || mats.find(m => m.alunoId === a.alunoId && turmaIds.has(m.turmaId));
+    return mat ? { ...a, serie: mat.serie || a.serie, turmaId: mat.turmaId || a.turmaId } : a;
+  });
+  const _seriesFiltroSet = new Set(seriesSelecionadas.map(s => normSerie(s)));
+  if(_seriesFiltroSet.size > 0) list = list.filter(a => _seriesFiltroSet.has(normSerie(a.serie)));
+  list = _enriquecerComMeta(list);
+  const _seen = new Set();
+  list = list.filter(a => { if(_seen.has(a.alunoId)) return false; _seen.add(a.alunoId); return true; });
+  return _aplicarFiltrosComuns(list);
+}
+
+function alunosFiltradosPorSeries(){
+  const ano = anoSelecionadoOuAtivo();
+  const seriesSel = seriesSelecionadasNorm();
+  let list = alunos.map(a => {
+    if(a.serie) return a;
+    const mat = mats.find(m => m.alunoId === a.alunoId && (!ano || String(m.anoLetivo) === String(ano)))
+             || mats.find(m => m.alunoId === a.alunoId);
+    return mat ? { ...a, serie: mat.serie || a.serie } : a;
+  });
+  if(ano){
+    const comMatNoAno = new Set(mats.filter(m => String(m.anoLetivo) === String(ano)).map(m => m.alunoId));
+    list = list.filter(a => String(a.anoLetivo||"") === String(ano) || comMatNoAno.has(a.alunoId));
+  }
+  if(seriesSel.size) list = list.filter(a=>seriesSel.has(normSerie(a.serie)));
+  list = _enriquecerComMeta(list);
+  const _seen = new Set();
+  list = list.filter(a => { if(_seen.has(a.alunoId)) return false; _seen.add(a.alunoId); return true; });
+  return _aplicarFiltrosComuns(list);
+}
+
+function seriesSelecionadasNorm(){ return new Set(seriesSelecionadas.map(s=>normSerie(s))); }
+
+function turmaIdsSelecionadasNoDOM(){
+  const ids = new Set();
+  document.querySelectorAll('.chkTurma').forEach(c=>{ if(c.checked) ids.add(c.dataset.turma); });
+  return ids;
+}
+
+/* =========================
+   Ordenação
+========================= */
+function sortAlunos(alunosList){
+  const field = currentSortField, order = currentSortOrder;
+  return alunosList.slice().sort((a, b) => {
+    let valA, valB;
+    if(field === 'idade'){
+      valA = parseInt(a.idade || calcIdade(a.dataNascimento) || '0');
+      valB = parseInt(b.idade || calcIdade(b.dataNascimento) || '0');
+      if(valA !== valB) return order === 'asc' ? valA - valB : valB - valA;
+    } else if(field === 'serie'){
+      const sa = a.serie || '', sb = b.serie || '';
+      if(sa !== sb){
+        const sorted = ordenarSeries([sa, sb]);
+        return order === 'asc' ? (sorted[0] === sa ? -1 : 1) : (sorted[0] === sa ? 1 : -1);
+      }
+      // mesma série: desempate alfabético por nome (sempre asc)
+    } else {
+      valA = normText(a[field] || ''); valB = normText(b[field] || '');
+      if(valA !== valB) return order === 'asc' ? (valA < valB ? -1 : 1) : (valA < valB ? 1 : -1);
+    }
+    // desempate final sempre alfabético por nome
+    return normText(a.nome || '').localeCompare(normText(b.nome || ''));
+  });
+}
+
+/* =========================
+   Render
+========================= */
+function atualizarListas(){
+  lblInfo.textContent = "";
+  const tScope = sortTurmas(turmasFiltradas());
+  listaTurmas.innerHTML = "";
+  countTurmas.textContent = tScope.length;
+  if(tScope.length===0){
+    listaTurmas.innerHTML = `<div class="muted">Nenhuma turma encontrada para os filtros.</div>`;
+  } else {
+    // Pré-calcular Map turmaId → mats para evitar filter() dentro do loop
+    const matsPorTurma = new Map();
+    mats.forEach(m => {
+      if(!matsPorTurma.has(m.turmaId)) matsPorTurma.set(m.turmaId, []);
+      matsPorTurma.get(m.turmaId).push(m);
+    });
+    // Pré-calcular Map turmaId → turmaOriginal
+    const turmasMap = new Map(turmas.map(t => [t.turmaId, t]));
+
+    tScope.forEach(t=>{
+      const el = document.createElement("div");
+      el.className="item";
+      const titulo = t.nome || `${t.serie || "Turma"} ${t.anoLetivo || ""}`.trim();
+      const matsT = matsPorTurma.get(t.turmaId) || [];
+      const qtdAlunos = matsT.length;
+      const turmaOriginal = turmasMap.get(t.turmaId) || t;
+      const seriesArr = Array.isArray(turmaOriginal.series) ? turmaOriginal.series : (t.serie ? [t.serie] : []);
+      const seriesTxt = seriesArr.join(", ") || t.serie || "—";
+      const profTxt   = turmaOriginal.professor || t.professor || "";
+      const qtdIntegral = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
+      const modeloBadge = qtdIntegral > 0 ? `<span class="badge badge-integral">📚 ${qtdIntegral} integral</span>` : '';
+      el.innerHTML = `
+        <div class="left" style="flex:1;min-width:0;">
+          <div class="title" style="font-size:14px;font-weight:800;">${titulo}</div>
+          <hr class="separator-line">
+          <div class="turma-chips">
+            <div class="turma-chips-row">
+              <span class="badge">👥 ${qtdAlunos} aluno(s)</span>
+              <span class="badge">📚 ${seriesTxt}</span>
+              ${modeloBadge}
+            </div>
+            ${profTxt ? `<div class="turma-chips-row"><span class="badge badge-neutral badge-prof">👩‍🏫 ${profTxt}</span></div>` : ""}
+            <div class="turma-chips-row"><span class="badge badge-neutral">ID: ${t.turmaId||"—"}</span></div>
+          </div>
+        </div>
+        <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+          <button type="button" class="btn small" onclick="gerarAtaDaTurma('${t.turmaId}')">📋 Gerar ata</button>
+          <label class="check-all"><input type="checkbox" class="chkTurma" data-turma="${t.turmaId}"> Selecionar</label>
+        </div>
+      `;
+      listaTurmas.appendChild(el);
+    });
+  }
+  bindTurmaSelectionHandlers();
+  _atualizarListaAlunos(tScope);
+  lblAnoAtivo.textContent = anoAtivo || "—";
+  const anoUso = anoSelecionadoOuAtivo();
+  lblInfo.textContent = anoUso ? `filtrando ano: ${anoUso}` : "filtrando: todos os anos";
+}
+
+function bindTurmaSelectionHandlers(){
+  document.querySelectorAll('.chkTurma').forEach(c=>{
+    c.addEventListener('change', ()=>{ syncCheckAllTurmas(); atualizarListaAlunos(); });
+  });
+  syncCheckAllTurmas();
+}
+
+function syncCheckAllTurmas(){
+  const chks = Array.from(document.querySelectorAll('.chkTurma'));
+  if(!chks.length){ chkAllTurmas.checked = false; chkAllTurmas.indeterminate = false; return; }
+  const checked = chks.filter(c=>c.checked).length;
+  chkAllTurmas.checked = checked === chks.length;
+  chkAllTurmas.indeterminate = checked > 0 && checked < chks.length;
+}
+
+function syncCheckAllAlunos(){
+  const chks = Array.from(document.querySelectorAll('.chkAluno'));
+  if(!chks.length){ chkAllAlunos.checked = false; chkAllAlunos.indeterminate = false; return; }
+  const checked = chks.filter(c=>c.checked).length;
+  chkAllAlunos.checked = checked === chks.length;
+  chkAllAlunos.indeterminate = checked > 0 && checked < chks.length;
+}
+
+function atualizarListaAlunos(){ _atualizarListaAlunos(); }
+function _atualizarListaAlunos(_tScope){
+  const tScope = _tScope || turmasFiltradas();
+  const turmaIdsMarcadas = turmaIdsSelecionadasNoDOM();
+  const tMarcadas = tScope.filter(t=>turmaIdsMarcadas.has(t.turmaId));
+  const modo = modoFiltroAtual();
+  let aScope = [];
+  if(modo === "turma"){
+    aScope = alunosFiltradosPorTurmas(tMarcadas.length ? tMarcadas : tScope);
+  } else if(modo === "serie"){
+    aScope = alunosFiltradosPorSeries();
+  } else {
+    const base = alunosFiltradosPorTurmas(tMarcadas.length ? tMarcadas : tScope);
+    const sset = seriesSelecionadasNorm();
+    aScope = sset.size ? base.filter(a=>sset.has(normSerie(a.serie))) : base;
+  }
+  aScope = sortAlunos(aScope);
+  alunosOrdenados = aScope;  // Salvar lista ordenada para tabela/export
+  listaAlunos.innerHTML = "";
+  countAlunos.textContent = aScope.length;
+  if(aScope.length===0){
+    listaAlunos.innerHTML = `<div class="muted">Nenhum aluno encontrado para os filtros.</div>`;
+  } else {
+    aScope.forEach(a=>{
+      const el=document.createElement("div");
+      el.className="item";
+      const nasc = a.dataNascimento || "—";
+      const idade = a.idade || calcIdade(a.dataNascimento) || "—";
+      const turnoDesc  = a._turno  ? `${_turnoEmoji(a._turno)} ${a._turno}` : "—";
+      const modeloDesc = a._modelo === 'INTEGRAL' ? '📚 Integral' : (a._modelo === 'REGULAR' ? 'Regular' : '—');
+
+      // Badge de completude
+      const camposNec = [a.nome, a.cpf, a.dataNascimento, a.mae, a.pai, a.naturalidadeCidade, a.naturalidadeUF, a.sexo, a._turno];
+      const camposComp = [a.rg, a.certidao, a.cep, a.obs];
+      const necFaltando  = camposNec.filter(v  => !v || !String(v).trim() || v === '--').length;
+      const compFaltando = camposComp.filter(v => !v || !String(v).trim()).length;
+      const badgeCompletude = necFaltando > 0
+        ? `<span class="badge" style="background:rgba(239,68,68,0.10);border-color:rgba(239,68,68,0.35);color:#b91c1c;">🔴 Dados obrigatórios faltando</span>`
+        : compFaltando > 0
+          ? `<span class="badge" style="background:rgba(234,179,8,0.10);border-color:rgba(234,179,8,0.40);color:#854d0e;">⚠️ Complementares pendentes</span>`
+          : `<span class="badge" style="background:rgba(22,163,74,0.10);border-color:rgba(22,163,74,0.30);color:#166534;">✅ Completo</span>`;
+
+      // NEE badges
+      const neeList = [];
+      if(a.tea)            neeList.push('TEA');
+      if(a.altasHabilidades) neeList.push('Altas hab.');
+      if(a.defFisica)      neeList.push('Def. física');
+      if(a.defIntelectual) neeList.push('Def. intelectual');
+      if(a.defVisual)      neeList.push(a.defVisualTipo   || 'Def. visual');
+      if(a.defAuditiva)    neeList.push(a.defAuditivaTipo || 'Def. auditiva');
+      if(a.tdah)           neeList.push('TDAH');
+      if(a.tpac)           neeList.push('TPAC');
+      if(a.dislexia)       neeList.push('Dislexia');
+      if(a.discalculia)    neeList.push('Discalculia');
+      if(a.disgrafia)      neeList.push('Disgrafia');
+      if(a.dislalia)       neeList.push('Dislalia');
+      const neeBadge = neeList.length > 0
+        ? `<span class="badge" style="background:rgba(124,58,237,0.10);border-color:rgba(124,58,237,0.30);color:#6d28d9;">♿ ${neeList.join(', ')}</span>`
+        : '';
+      el.innerHTML = `
+        <div class="left">
+          <div class="title" style="flex-direction:column;align-items:flex-start;gap:4px;">
+            <span style="font-weight:800;font-size:14px;">${a.nome || "Sem nome"}</span>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              <span class="badge">${a.alunoId || "—"}</span>
+              <span class="badge">📚 ${a.serie || "—"}</span>
+            </div>
+          </div>
+          <div class="meta" style="margin-top:6px;display:block;">
+            CPF: ${a.cpf||"—"} • Nasc: ${nasc} • Idade: ${idade}<br>
+            Turno: ${turnoDesc} • Modelo: ${modeloDesc}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+            ${badgeCompletude}
+            ${neeBadge}
+          </div>
+        </div>
+        <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+          ${_podeEditar
+            ? `<button class="btn-edit" type="button"
+            data-edit-aluno="${a.alunoId}"
+            data-edit-turma="${a.turmaId||''}"
+            data-edit-ano="${anoSelecionadoOuAtivo()}"
+            title="Editar dados do aluno">✏️ Editar</button>`
+            : `<div style="display:inline-flex;padding:6px 12px;font-size:12px;visibility:hidden;pointer-events:none;" aria-hidden="true">✏️ Editar</div>`}
+          <label class="check">
+            <input type="checkbox" class="chkAluno" data-aluno="${a.alunoId}" checked />
+            <span>Selecionar</span>
+          </label>
+        </div>
+      `;
+      listaAlunos.appendChild(el);
+    });
+  }
+  document.querySelectorAll(".chkAluno").forEach(c=>{ c.addEventListener("change", ()=>{ syncCheckAllAlunos(); }); });
+  syncCheckAllAlunos();
+  document.querySelectorAll("[data-edit-aluno]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.editAluno, turma = btn.dataset.editTurma||"", ano = btn.dataset.editAno||"";
+      if(!id) return;
+      let url = `cadastro-aluno-ativo.html?editar=${encodeURIComponent(id)}`;
+      if(turma) url += `&turmaId=${encodeURIComponent(turma)}`;
+      if(ano)   url += `&anoLetivo=${encodeURIComponent(ano)}`;
+      document.__pesquisaDestino = url;
+      location.href = url;
+    });
+  });
+}
+
+/* =========================
+   Selecionar todos
+========================= */
+function setAllCheckboxes(selector, checked){ document.querySelectorAll(selector).forEach(c=>{ c.checked = checked; }); }
+chkAllTurmas.addEventListener("change", ()=>{ setAllCheckboxes(".chkTurma", chkAllTurmas.checked); syncCheckAllTurmas(); atualizarListaAlunos(); });
+chkAllAlunos.addEventListener("change", ()=>{ setAllCheckboxes(".chkAluno", chkAllAlunos.checked); syncCheckAllAlunos(); });
+
+/* =========================
+   Modal
+========================= */
+function abrirModal(titulo, rows){ modalTitle.textContent = titulo; modalBody.innerHTML = rows; modalBackdrop.style.display = "flex"; }
+document.getElementById("btnFecharModal").addEventListener("click", ()=> modalBackdrop.style.display="none");
+modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) modalBackdrop.style.display="none"; });
+
+/* =========================
+   Enriquecer + Tabelas
+========================= */
+function enriquecerAlunos(lista){
+  const ano = anoSelecionadoOuAtivo();
+  return lista.map(a => {
+    const matMeta = mats.find(m => m.alunoId === a.alunoId && (!ano || String(m.anoLetivo) === String(ano))) || mats.find(m => m.alunoId === a.alunoId);
+    const matSerie = (!a.serie)
+      ? (mats.find(m => m.alunoId === a.alunoId && (!ano || String(m.anoLetivo) === String(ano))) || mats.find(m => m.alunoId === a.alunoId))
+      : null;
+    // turmaId: usa o da matrícula do ano correto se existir, senão mantém o que vier no objeto
+    const turmaIdResolvido = (matMeta && matMeta.turmaId) ? matMeta.turmaId : (a.turmaId || '');
+    const neeItens = [];
+    if(a.tea)              neeItens.push('TEA');
+    if(a.altasHabilidades) neeItens.push('Altas hab.');
+    if(a.defFisica)        neeItens.push('Def. física');
+    if(a.defIntelectual)   neeItens.push('Def. intelectual');
+    if(a.defVisual)        neeItens.push(a.defVisualTipo    || 'Def. visual');
+    if(a.defAuditiva)      neeItens.push(a.defAuditivaTipo  || 'Def. auditiva');
+    if(a.tdah)             neeItens.push('TDAH');
+    if(a.tpac)             neeItens.push('TPAC');
+    if(a.dislexia)         neeItens.push('Dislexia');
+    if(a.discalculia)      neeItens.push('Discalculia');
+    if(a.disgrafia)        neeItens.push('Disgrafia');
+    if(a.dislalia)         neeItens.push('Dislalia');
+
+    return {
+      ...a,
+      serie:      matSerie ? (matSerie.serie || a.serie) : a.serie,
+      turmaId:    turmaIdResolvido,
+      _turno:     (matMeta && matMeta.turno)  ? matMeta.turno.toUpperCase()  : (a.turno  || ''),
+      _status:    (matMeta && matMeta.status) ? matMeta.status.toUpperCase() : (a.status || 'ATIVO').toUpperCase(),
+      _modelo:    (matMeta && matMeta.modelo) ? matMeta.modelo.toUpperCase() : 'REGULAR',
+      _neeResumo: neeItens.join(', ') || '—',
+    };
+  });
+}
+
+const COLS = [
+  {key:"serie", label:"SÉRIE"}, {key:"nome", label:"NOME"}, {key:"cpf", label:"CPF"},
+  {key:"dataNascimento", label:"DATA DE NASCIMENTO"}, {key:"idade", label:"IDADE"},
+  {key:"mae", label:"MÃE"}, {key:"pai", label:"PAI"}, {key:"naturalidade", label:"NATURALIDADE"},
+  {key:"sexo", label:"SEXO"}, {key:"corRaca", label:"COR/RAÇA"},
+  {key:"_turno", label:"TURNO"}, {key:"_modelo", label:"MODELO"},
+  // Etapa 2
+  {key:"rg", label:"RG"}, {key:"certidao", label:"CERTIDÃO"},
+  {key:"zona", label:"ZONA"}, {key:"cep", label:"CEP"},
+  {key:"logradouro", label:"LOGRADOURO"}, {key:"endUF", label:"UF"},
+  {key:"cidade", label:"CIDADE"},
+  // NEE
+  {key:"_neeResumo", label:"NEE / TRANSTORNOS"},
+];
+const COLS_TURMAS = [
+  {key:"turmaId", label:"ID TURMA"}, {key:"nome", label:"NOME"}, {key:"series", label:"SÉRIE(S)"},
+  {key:"turno", label:"TURNO"}, {key:"professor", label:"PROFESSOR(A)"}, {key:"anoLetivo", label:"ANO LETIVO"},
+  {key:"_qtdAlunos", label:"QTD ALUNOS"}, {key:"_qtdIntegral", label:"INTEGRAL"}, {key:"_qtdRegular", label:"REGULAR"},
+];
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+
+function buildTurmasTableHtml(turmasList){
+  const ano = anoSelecionadoOuAtivo();
+  const headers = COLS_TURMAS.map(c=>`<th>${c.label}</th>`).join("");
+  const body = turmasList.map(t => {
+    const matsT = mats.filter(m => m.turmaId === t.turmaId && (!ano || String(m.anoLetivo) === String(ano)));
+    const qtd = matsT.length, qtdI = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
+    const seriesTxt = Array.isArray(t.series) ? t.series.join(", ") : (t.serie || "—");
+    const row = COLS_TURMAS.map(col => {
+      let v = col.key === "_qtdAlunos" ? qtd : col.key === "_qtdIntegral" ? qtdI : col.key === "_qtdRegular" ? qtd-qtdI : col.key === "series" ? seriesTxt : (t[col.key] ?? "");
+      return `<td>${escapeHtml(String(v))}</td>`;
+    }).join("");
+    return `<tr>${row}</tr>`;
+  }).join("");
+  return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function buildTableHtml(alunosList, metaTurma){
+  let header = "";
+  if(metaTurma){
+    const serTxt = Array.isArray(metaTurma.series) ? metaTurma.series.join(", ") : (metaTurma.serie || "");
+    const linhas = [
+      metaTurma.nome      ? `<b>Turma:</b> ${escapeHtml(metaTurma.nome)}`                      : "",
+      serTxt              ? `<b>Série(s):</b> ${escapeHtml(serTxt)}`                             : "",
+      metaTurma.anoLetivo ? `<b>Ano letivo:</b> ${escapeHtml(String(metaTurma.anoLetivo))}`      : "",
+      metaTurma.turno     ? `<b>Turno:</b> ${escapeHtml(metaTurma.turno)}`                       : "",
+      metaTurma.professor ? `<b>Professor(a):</b> ${escapeHtml(metaTurma.professor)}`            : "",
+    ].filter(Boolean);
+    header = `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--chip-bg);font-size:13px;line-height:1.8;">${linhas.join(" &nbsp;|&nbsp; ")}</div>`;
+  }
+  const headers = COLS.map(c=>`<th>${c.label}</th>`).join("");
+  const body = alunosList.map(a=>{
+    const row = COLS.map(c=>{
+      let v = a[c.key] ?? "";
+      if(c.key==="idade") v = v || calcIdade(a.dataNascimento) || "";
+      if(c.key==="corRaca" && !v) v = "Não declarada";
+      return `<td>${escapeHtml(String(v||""))}</td>`;
+    }).join("");
+    return `<tr>${row}</tr>`;
+  }).join("");
+  return `${header}<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+/* =========================
+   Export PDF — helpers
+========================= */
+
+// Ordena lista de alunos por série pedagógica e depois por nome
+function _ordenarAlunosPedagogico(lista){
+  return lista.slice().sort((a, b) => {
+    const sa = normSerie(a.serie) || '';
+    const sb = normSerie(b.serie) || '';
+    if(sa !== sb){
+      const ord = ordenarSeries([sa, sb]);
+      return ord[0] === sa ? -1 : 1;
+    }
+    return normText(a.nome||'').localeCompare(normText(b.nome||''));
+  });
+}
+
+// Carrega dados da escola (Firestore → localStorage fallback)
+async function _carregarDadosEscola(){
+  try{
+    if(window.DB && window.DB.escola && window.DB.escola.get){
+      const e = await window.DB.escola.get();
+      if(e && e.nome) return e;
+    }
+  }catch(_){}
+  try{
+    const schoolId = window.Auth?.getActiveSchoolId?.() || '';
+    const key = schoolId ? `schools:${schoolId}:dadosEscola` : 'dadosEscola';
+    const cached = localStorage.getItem(key);
+    if(cached) return JSON.parse(cached);
+  }catch(_){}
+  return null;
+}
+
+// Desenha cabeçalho institucional no topo do doc; retorna o Y final
+function _desenharCabecalhoEscola(doc, escola, titulo, pageWidth){
+  const L = 28, R = pageWidth - 28;
+  let y = 20;
+
+  // Escudo
+  let logoW = 0;
+  if(escola && escola.escudo){
+    try{
+      const imgW = 48, imgH = 48;
+      doc.addImage(escola.escudo, 'PNG', L, y, imgW, imgH);
+      logoW = imgW + 10;
+    }catch(_){}
+  }
+
+  const tx = L + logoW;
+  if(escola && escola.nome){
+    doc.setFontSize(13); doc.setFont(undefined,"bold"); doc.setTextColor(11,63,191);
+    doc.text(escola.nome.toUpperCase(), tx, y + 13);
+    doc.setFont(undefined,"normal"); doc.setTextColor(60);
+    let subY = y + 24;
+    const partes = [];
+    if(escola.endereco) partes.push(escola.endereco);
+    const cidade = [escola.cidade||escola.municipio, escola.uf||escola.UF].filter(Boolean).join('/');
+    if(cidade) partes.push(cidade);
+    if(escola.inep||escola.codigoInep) partes.push(`INEP: ${escola.inep||escola.codigoInep}`);
+    if(escola.email) partes.push(`E-mail: ${escola.email}`);
+    if(escola.telefone||escola.tel) partes.push(`Tel: ${escola.telefone||escola.tel}`);
+    if(partes.length){
+      doc.setFontSize(8);
+      const linha = doc.splitTextToSize(partes.join('  •  '), R - tx - 10);
+      doc.text(linha, tx, subY);
+      subY += linha.length * 10;
+    }
+    y = Math.max(y + 50, subY + 4);
+  } else {
+    y = y + (logoW ? 52 : 0);
+  }
+
+  // Linha separadora
+  doc.setDrawColor(11,63,191); doc.setLineWidth(1.2);
+  doc.line(L, y, R, y);
+  y += 8;
+
+  // Título do relatório
+  doc.setFontSize(11); doc.setFont(undefined,"bold"); doc.setTextColor(20);
+  doc.text(titulo, L, y + 8);
+  doc.setFont(undefined,"normal"); doc.setTextColor(0);
+  y += 18;
+
+  return y;
+}
+
+function _bodyAlunos(lista){
+  return lista.map(a => COLS.map(c => {
+    let v = a[c.key] ?? "";
+    if(c.key==="idade")   v = v || calcIdade(a.dataNascimento) || "";
+    if(c.key==="corRaca" && !v) v = "Não declarada";
+    return String(v||"");
+  }));
+}
+
+const _TABLE_STYLES = {
+  styles:     { fontSize: 8.5, cellPadding: {top:3,bottom:3,left:4,right:4}, overflow: 'linebreak', lineColor: [210,220,240], lineWidth: 0.3 },
+  headStyles: { fillColor: [11,63,191], textColor: 255, fontStyle: 'bold', fontSize: 8.5, cellPadding: {top:4,bottom:4,left:4,right:4} },
+  alternateRowStyles: { fillColor: [243,246,255] },
+  bodyStyles: { textColor: [30,30,50] },
+  columnStyles: {
+    0: { cellWidth: 60 },
+    1: { cellWidth: 107 },
+    2: { cellWidth: 82 },
+    3: { cellWidth: 82 },
+    4: { cellWidth: 35 },
+    5: { cellWidth: 97 },
+    6: { cellWidth: 97 },
+    7: { cellWidth: 66 },
+    8: { cellWidth: 35 },
+    9: { cellWidth: 47 },
+    10:{ cellWidth: 50 },
+    11:{ cellWidth: 44 },
+  },
+  margin: { left: 20, right: 20 },
+};
+
+// Monta nome de arquivo: [prefixo]_[escola]_[DD-MM-AAAA]
+function _buildFilename(prefixo, escola){
+  const hoje = new Date();
+  const d = String(hoje.getDate()).padStart(2,'0');
+  const m = String(hoje.getMonth()+1).padStart(2,'0');
+  const a = hoje.getFullYear();
+
+  // Usa exatamente a mesma lógica do header-logic.js: matched.displayName
+  function _getSchoolDisplayName(){
+    try{
+      const s = window.Auth?.getSession?.() || JSON.parse(localStorage.getItem('auth_session_v2')||'null');
+      if(!s) return null;
+      const schools = (window.Auth?.listSchools?.() || JSON.parse(localStorage.getItem('auth_schools_v1')||'[]'));
+      const effective = (s.schoolId||'').toString().toUpperCase() === 'ADMIN'
+        ? (localStorage.getItem('admin_active_school_v1')||'').trim() || 'ADMIN'
+        : (s.schoolId||'').toString();
+      const matched = schools.find(x => (x.schoolId||x.id||'').toString() === effective);
+      return matched ? (matched.displayName || matched.name || matched.nome || '').toString().trim() : null;
+    }catch(_){ return null; }
+  }
+
+  const rawName = _getSchoolDisplayName() || (escola && escola.nome) || '';
+  const nomeEscola = rawName
+    ? rawName.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .toUpperCase().replace(/[^\w\d]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,40)
+    : '';
+  const partes = [prefixo, nomeEscola, `${d}-${m}-${a}`].filter(Boolean);
+  return partes.join('_') + '.pdf';
+}
+
+function exportTurmasPdf(titulo, turmasList){
+  if(!turmasList.length){ alert("Nenhuma turma selecionada para exportar."); return; }
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  _carregarDadosEscola().then(escola => {
+    const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
+    const pw = doc.internal.pageSize.getWidth();
+    const startY = _desenharCabecalhoEscola(doc, escola, titulo, pw);
+    const ano = anoSelecionadoOuAtivo();
+    const head = [COLS_TURMAS.map(c => c.label)];
+    const body = turmasList.map(t => {
+      const matsT = mats.filter(m => m.turmaId === t.turmaId && (!ano || String(m.anoLetivo) === String(ano)));
+      const qtd = matsT.length, qtdI = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
+      const seriesTxt = Array.isArray(t.series) ? t.series.join(", ") : (t.serie || "—");
+      return COLS_TURMAS.map(col => {
+        if(col.key==="_qtdAlunos")  return String(qtd);
+        if(col.key==="_qtdIntegral") return String(qtdI);
+        if(col.key==="_qtdRegular")  return String(qtd-qtdI);
+        if(col.key==="series")       return seriesTxt;
+        return String(t[col.key] ?? "");
+      });
+    });
+    doc.autoTable({ head, body, startY, ..._TABLE_STYLES });
+    doc.save(_buildFilename('Turmas', escola));
+  });
+}
+
+// Export simples (lista plana)
+function exportPdf(titulo, alunosList){
+  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("Falha ao carregar jsPDF. Verifique sua conexão."); return; }
+  _carregarDadosEscola().then(escola => {
+    // Respeita a ordenação já aplicada na tela (currentSortField/currentSortOrder)
+    const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
+    const pw = doc.internal.pageSize.getWidth();
+    const startY = _desenharCabecalhoEscola(doc, escola, titulo, pw);
+    doc.autoTable({ head:[COLS.map(c=>c.label)], body:_bodyAlunos(alunosList), startY, ..._TABLE_STYLES });
+    doc.save(_buildFilename('Relacao', escola));
+  });
+}
+
+// Export separado por turma
+function exportPdfPorTurma(titulo, alunosList){
+  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  _carregarDadosEscola().then(escola => {
+    const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
+    const pw = doc.internal.pageSize.getWidth();
+
+    // Agrupar por turmaId
+    const grupos = [];
+    const idxTurma = new Map();
+    alunosList.forEach(a => {
+      const tid = a.turmaId || '__sem_turma__';
+      if(!idxTurma.has(tid)){ idxTurma.set(tid, grupos.length); grupos.push({ turmaId: tid, alunos: [] }); }
+      grupos[idxTurma.get(tid)].alunos.push(a);
+    });
+
+    // Ordenar grupos pela serie pedagogica da turma
+    grupos.sort((ga, gb) => {
+      const ta = turmas.find(t => t.turmaId === ga.turmaId);
+      const tb = turmas.find(t => t.turmaId === gb.turmaId);
+      const sa = ta ? (_serieKeyDaTurma(ta) || ga.alunos[0]?.serie || '') : (ga.alunos[0]?.serie || '');
+      const sb = tb ? (_serieKeyDaTurma(tb) || gb.alunos[0]?.serie || '') : (gb.alunos[0]?.serie || '');
+      const ord = ordenarSeries([sa, sb]);
+      if(ord[0] !== ord[1]) return ord[0] === sa ? -1 : 1;
+      const na = ta ? normText(ta.nome||'') : '';
+      const nb = tb ? normText(tb.nome||'') : '';
+      return na.localeCompare(nb);
+    });
+
+    grupos.forEach((g, i) => {
+      // Ordenar alunos do grupo: série pedagógica primeiro, depois nome alfabético
+      g.alunos.sort((a, b) => {
+        const sa = normSerie(a.serie)||'', sb = normSerie(b.serie)||'';
+        if(sa !== sb){ const ord = ordenarSeries([sa, sb]); return ord[0] === sa ? -1 : 1; }
+        return normText(a.nome||'').localeCompare(normText(b.nome||''));
+      });
+      if(i > 0) doc.addPage();
+
+      // Redesenha cabeçalho institucional em cada página
+      let y = _desenharCabecalhoEscola(doc, escola, titulo, pw);
+
+      const turma = turmas.find(t => t.turmaId === g.turmaId);
+      const nomeTurma = turma ? (turma.nome || `Turma ${turma.serie||''}`) : 'Sem turma';
+      const serTxt = turma ? (Array.isArray(turma.series) ? turma.series.join(', ') : (turma.serie||'')) : '';
+      const meta = [
+        serTxt            ? `Série(s): ${serTxt}`    : '',
+        turma?.anoLetivo  ? `Ano: ${turma.anoLetivo}` : '',
+        turma?.turno      ? `Turno: ${turma.turno}`   : '',
+        turma?.professor  ? `Prof.: ${turma.professor}` : '',
+        `${g.alunos.length} aluno(s)`,
+      ].filter(Boolean).join('   •   ');
+
+      // Bloco azul da seção de turma
+      const bX = 20, bW = pw - 40, bH = 28;
+      doc.setFillColor(11, 63, 191);
+      doc.roundedRect(bX, y, bW, bH, 3, 3, 'F');
+      doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(255);
+      doc.text(nomeTurma.toUpperCase(), bX + 10, y + 11);
+      doc.setFontSize(7.5); doc.setFont(undefined,'normal');
+      doc.text(meta, bX + 10, y + 22);
+      y += bH + 6;
+
+      doc.autoTable({ head:[COLS.map(c=>c.label)], body:_bodyAlunos(g.alunos), startY: y, ..._TABLE_STYLES });
+    });
+
+    doc.save(_buildFilename('Turma', escola));
+  });
+}
+
+// Export separado por série
+function exportPdfPorSerie(titulo, alunosList){
+  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  _carregarDadosEscola().then(escola => {
+    const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
+    const pw = doc.internal.pageSize.getWidth();
+
+    // Agrupar por série mantendo ordem pedagógica
+    const seriesVistas = [];
+    const idxSerie = new Map();
+    alunosList.forEach(a => {
+      const s = normSerie(a.serie) || 'SEM SÉRIE';
+      if(!idxSerie.has(s)){ idxSerie.set(s, seriesVistas.length); seriesVistas.push({ serie: s, alunos: [] }); }
+      seriesVistas[idxSerie.get(s)].alunos.push(a);
+    });
+    const seriesOrdenadas = ordenarSeries(seriesVistas.map(g=>g.serie));
+    const gruposOrdenados = seriesOrdenadas.map(s => seriesVistas[idxSerie.get(s)]);
+
+    gruposOrdenados.forEach((g, i) => {
+      // Ordenar alunos do grupo alfabeticamente por nome
+      g.alunos.sort((a, b) => normText(a.nome||'').localeCompare(normText(b.nome||'')));
+      if(i > 0) doc.addPage();
+
+      // Redesenha cabeçalho institucional em cada página
+      let y = _desenharCabecalhoEscola(doc, escola, titulo, pw);
+
+      // Bloco verde-azulado da seção de série
+      const bX = 20, bW = pw - 40, bH = 24;
+      doc.setFillColor(11, 63, 191);
+      doc.roundedRect(bX, y, bW, bH, 3, 3, 'F');
+      doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(255);
+      doc.text(`Série: ${g.serie}`, bX + 10, y + 10);
+      doc.setFontSize(7.5); doc.setFont(undefined,'normal');
+      doc.text(`${g.alunos.length} aluno(s)`, bX + 10, y + 19);
+      y += bH + 6;
+
+      doc.autoTable({ head:[COLS.map(c=>c.label)], body:_bodyAlunos(g.alunos), startY: y, ..._TABLE_STYLES });
+    });
+
+    doc.save(_buildFilename('Serie', escola));
+  });
+}
+
+/* =========================
+   Botões
+========================= */
+function alunosSelecionados(){
+  const ids = new Set();
+  document.querySelectorAll(".chkAluno").forEach(c=>{ if(c.checked) ids.add(c.dataset.aluno); });
+  // Usar a lista ordenada e filtrar pelos selecionados, mantendo a ordem
+  return enriquecerAlunos(alunosOrdenados.filter(a=>ids.has(a.alunoId)));
+}
+function turmasSelecionadas(){
+  const ids = new Set();
+  document.querySelectorAll(".chkTurma").forEach(c=>{ if(c.checked) ids.add(c.dataset.turma); });
+  return turmas.filter(t=>ids.has(t.turmaId));
+}
+
+let _jaFoiPesquisado = false;
+document.getElementById("btnAtualizar").addEventListener("click", ()=>{ _jaFoiPesquisado = true; atualizarListas(); });
+document.querySelectorAll('input[name="modoFiltro"]').forEach(r=>{ r.addEventListener("change", ()=>{ atualizarListaAlunos(); }); });
+document.getElementById("btnAddSerie").addEventListener("click", ()=>{
+  const v = normSerie(selSerieAdd.value); if(!v) return;
+  if(!seriesSelecionadas.includes(v)){ seriesSelecionadas.push(v); renderChips(); atualizarListas(); }
+  selSerieAdd.value = "";
+});
+document.getElementById("btnLimparSeries").addEventListener("click", ()=>{ seriesSelecionadas = []; renderChips(); atualizarListas(); });
+inpBusca.addEventListener("input", ()=>{ atualizarListaAlunos(); });
+selAno.addEventListener("change", ()=>{ _jaFoiPesquisado = true; atualizarListas(); });
+document.getElementById("selTurno").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("selModelo").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("selStatus").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+
+sortField.addEventListener("change", ()=>{ currentSortField = sortField.value; atualizarListaAlunos(); });
+btnToggleSort.addEventListener("click", ()=>{
+  currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+  btnToggleSort.textContent = currentSortOrder === 'asc' ? '↑↓' : '↓↑';
+  atualizarListaAlunos();
+});
+
+document.getElementById("sortTurmaField").addEventListener("change", (e)=>{
+  currentTurmaSort = e.target.value;
+  atualizarListas();
+});
+
+document.getElementById("btnTurmasTabela").addEventListener("click", ()=>{
+  const tSel = turmasSelecionadas(); if(!tSel.length){ alert("Selecione pelo menos uma turma."); return; }
+  abrirModal(`Tabela de Turmas • ${anoSelecionadoOuAtivo() || "todos os anos"}`, buildTurmasTableHtml(tSel));
+});
+document.getElementById("btnTurmasPdf").addEventListener("click", ()=>{
+  const tSel = turmasSelecionadas(); if(!tSel.length){ alert("Selecione pelo menos uma turma."); return; }
+  exportTurmasPdf(`Turmas Ano Ativo ${anoSelecionadoOuAtivo() || ""}`, tSel);
+});
+document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
+  const aSel = alunosSelecionados();
+  const ids = new Set(aSel.map(a => a.turmaId).filter(Boolean));
+  const meta = ids.size === 1 ? (turmas.find(x => x.turmaId === [...ids][0]) || null) : null;
+  abrirModal("Tabela • Alunos selecionados", buildTableHtml(aSel, meta));
+});
+// Dropdown de export de alunos
+(function(){
+  const btnPdf  = document.getElementById("btnAlunosPdf");
+  const drop    = document.getElementById("dropExportAlunos");
+  const wrap    = document.getElementById("wrapExportAlunos");
+
+  // Abre/fecha o dropdown
+  btnPdf.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    const aberto = drop.style.display !== "none";
+    drop.style.display = aberto ? "none" : "flex";
+  });
+
+  // Fecha ao clicar fora
+  document.addEventListener("click", ()=>{ drop.style.display = "none"; });
+  drop.addEventListener("click", (e)=>{ e.stopPropagation(); });
+
+  // Opção 1 — Lista simples
+  document.getElementById("btnExportLista").addEventListener("click", ()=>{
+    drop.style.display = "none";
+    const selA = alunosSelecionados();
+    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    exportPdf(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Relação de Alunos`, selA);
+  });
+
+  // Opção 2 — Separado por turma
+  document.getElementById("btnExportTurma").addEventListener("click", ()=>{
+    drop.style.display = "none";
+    const selA = alunosSelecionados();
+    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    exportPdfPorTurma(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Turma`, selA);
+  });
+
+  // Opção 3 — Separado por série
+  document.getElementById("btnExportSerie").addEventListener("click", ()=>{
+    drop.style.display = "none";
+    const selA = alunosSelecionados();
+    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    exportPdfPorSerie(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Série`, selA);
+  });
+})();
+
+/* =========================
+   Auto refresh
+========================= */
+async function maybeAutoRefresh(){
+  const now = Date.now();
+  if(now - __lastLoadAt < __MIN_REFRESH_MS) return;
+  __lastLoadAt = now;
+  
+  // Salvar estado das checkboxes de turma antes de recarregar
+  const turmasMarcadas = Array.from(document.querySelectorAll('.chkTurma:checked'))
+    .map(cb => cb.dataset.turma).filter(Boolean);
+  
+  await carregarDB(); renderChips();
+  if(_jaFoiPesquisado) {
+    atualizarListas();
+    // Restaurar checkboxes de turma após renderização
+    setTimeout(() => {
+      turmasMarcadas.forEach(turmaId => {
+        const cb = document.querySelector(`.chkTurma[data-turma="${turmaId}"]`);
+        if(cb){ cb.checked = true; }
+      });
+      if(turmasMarcadas.length){ syncCheckAllTurmas(); atualizarListaAlunos(); }
+    }, 100);
+  }
+}
+window.addEventListener("pageshow", ()=> maybeAutoRefresh());
+// focus removido: visibilitychange já cobre retorno de aba/janela
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") maybeAutoRefresh(); });
+
+/* =========================
+   Gerar ata
+========================= */
+function _lerTurmasAtas(){ return atasDB.slice(); }
+function _salvarTurmasAtas(lista){
+  atasDB = lista;
+  try{
+    if(window.DB?.turmas && window.Auth?.getSession?.())
+      window.DB.turmas.saveAll(lista).catch(e=>console.warn('Firestore turmasDB:', e));
+  }catch(e){ console.warn('_salvarTurmasAtas:', e); }
+}
+function _mostrarToast(title, sub, autoClose, ano){
+  const t = document.getElementById('toastGerarAta'); if(!t) return;
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastSub').textContent   = sub;
+  const link = document.getElementById('toastLink');
+  if(link){ const base = '../atas/pesquisa-ata.html'; link.href = ano ? `${base}?ano=${encodeURIComponent(ano)}` : base; }
+  t.classList.add('visible');
+  if(autoClose) setTimeout(()=> t.classList.remove('visible'), autoClose);
+}
+async function _lerSchemas(){
+  try{ return await window.DB.schemas.listRules(); }catch(e){ console.warn('Erro ao carregar schemas:', e); return []; }
+}
+function _getActiveSchemaId(){ return localStorage.getItem('turmasSchemaActiveId_v1') || ''; }
+function _schemaPreviewText(schema){
+  if(!schema) return '';
+  return (schema.colunas||[]).filter(c=>c.enabled!==false).map(c=>c.label||c.key).join(' • ') || '(sem colunas)';
+}
+
+async function gerarAtaDaTurma(turmaId){
+  const turmaAA = turmas.find(t => t.turmaId === turmaId);
+  if(!turmaAA){ alert('Turma não encontrada.'); return; }
+  const matsDestaT = mats.filter(m => m.turmaId === turmaId);
+  const alunosDestaT = matsDestaT.map(m => {
+    const alu = alunos.find(a => (a.alunoId||a.id) === m.alunoId) || {};
+    return { nome: alu.nomeOficial || alu.nome || m.nomeRaw || '', alunoId: m.alunoId || '', serie: m.serie || (Array.isArray(turmaAA.series) ? turmaAA.series[0] : '') || '', resultado: '' };
+  }).filter(a => a.nome);
+  const ataId = (turmaAA.turmaId || turmaId).replace(/-AATIVO$/, '') + '-AATIVO';
+  const atasDBLocal = _lerTurmasAtas();
+  const idxExist = atasDBLocal.findIndex(t => (t.turmaId||t.id) === ataId);
+  const ataExist = idxExist >= 0 ? atasDBLocal[idxExist] : null;
+  const qtdNotas = ataExist ? (ataExist.alunos||[]).filter(a => Object.values(a).some(v => v && v !== '' && v !== a.nome && v !== a.alunoId && v !== a.serie)).length : 0;
+  const schemas = await _lerSchemas();
+  const activeId = ataExist?.schemaId || _getActiveSchemaId();
+  const sel = document.getElementById('modalSchemaSelect');
+  sel.innerHTML = '<option value="">(usar colunas padrão — sem schema)</option>';
+  schemas.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id || s.nome || ''; opt.textContent = s.nome + (s.id === activeId ? ' ⭐ padrão' : '');
+    if(s.id === activeId) opt.selected = true; sel.appendChild(opt);
+  });
+  function atualizarPreview(){
+    const s = schemas.find(x => (x.id||x.nome) === sel.value);
+    document.getElementById('modalSchemaPreview').textContent = s ? 'Colunas: ' + _schemaPreviewText(s) : 'Sem schema — usará as colunas padrão do sistema.';
+  }
+  sel.onchange = atualizarPreview; atualizarPreview();
+  const series = Array.isArray(turmaAA.series) ? turmaAA.series : (turmaAA.serie ? [turmaAA.serie] : []);
+  const serieTexto = series.join(' e ') || turmaAA.nome || '—';
+  document.getElementById('modalGerarAtaTitulo').textContent = `📋 Gerar ata — ${turmaAA.nome || serieTexto} (${turmaAA.anoLetivo||'—'})`;
+  document.getElementById('modalGerarAtaSub').textContent = `${alunosDestaT.length} aluno(s) serão incluídos.`;
+  const aviso = document.getElementById('modalGerarAtaAviso');
+  if(ataExist){
+    aviso.style.display = 'block';
+    aviso.textContent = qtdNotas ? `⚠️ Esta turma já tem uma ata (${ataId}). ${qtdNotas} aluno(s) têm notas — serão preservadas.` : `Esta turma já tem uma ata (${ataId}). Ela será atualizada com a lista atual de alunos.`;
+    if(ataExist.schemaId){ const opt = [...sel.options].find(o => o.value === ataExist.schemaId); if(opt){ sel.value = ataExist.schemaId; atualizarPreview(); } }
+    document.getElementById('modalGerarAtaConfirmar').textContent = '📋 Atualizar ata';
+  } else {
+    aviso.style.display = 'none';
+    document.getElementById('modalGerarAtaConfirmar').textContent = '📋 Gerar ata';
+  }
+  const modal = document.getElementById('modalGerarAta');
+  modal.style.display = 'flex';
+  document.getElementById('modalGerarAtaCancelar').onclick = () => { modal.style.display='none'; };
+  modal.onclick = (e) => { if(e.target === modal) modal.style.display='none'; };
+  document.getElementById('modalGerarAtaConfirmar').onclick = () => {
+    modal.style.display = 'none';
+    const schemaId = sel.value, schema = schemas.find(s => (s.id||s.nome) === schemaId) || null;
+    _executarGerarAta(turmaAA, alunosDestaT, ataId, serieTexto, series, atasDBLocal, idxExist, ataExist, qtdNotas, schemaId, schema);
+  };
+}
+
+function _executarGerarAta(turmaAA, alunosDestaT, ataId, serieTexto, series, atasDBArr, idxExist, ataExist, qtdNotas, schemaId, schema){
+  const ataObj = {
+    id: ataId, turmaId: ataId, aba: '', anoLetivo: String(turmaAA.anoLetivo || ''),
+    turno: turmaAA.turno || '', nome: turmaAA.nome || serieTexto, serie: serieTexto,
+    serieTexto, professor: turmaAA.professor || '', series, origem: 'ano-ativo',
+    schemaId: schemaId || '', schemaSnapshot: schema || null, criadoEm: new Date().toISOString(), alunos: [],
+  };
+  if(ataExist){
+    const notasMap = {};
+    (ataExist.alunos||[]).forEach(a => { if(a.alunoId) notasMap[a.alunoId] = a; });
+    ataObj.alunos = alunosDestaT.map(a => { const exist = notasMap[a.alunoId]; return exist ? {...exist, nome: a.nome || exist.nome, serie: a.serie || exist.serie} : a; });
+    atasDBArr[idxExist] = ataObj;
+  } else { ataObj.alunos = alunosDestaT; atasDBArr.push(ataObj); }
+  _salvarTurmasAtas(atasDBArr);
+  _mostrarToast(ataExist ? '📋 Ata atualizada!' : '📋 Ata criada!',
+    `${turmaAA.nome || serieTexto} (${turmaAA.anoLetivo||'—'}) → ${alunosDestaT.length} aluno(s) • Schema: ${schema ? schema.nome : 'padrão'}.`,
+    12000, turmaAA.anoLetivo || '');
+}
+
+/* =========================
+   Salvar/Restaurar estado da página
+========================= */
+function salvarEstadoPagina(){
+  const estado = {
+    checkboxesMarcadas: Array.from(document.querySelectorAll('.chkTurma:checked'))
+      .map(cb => cb.dataset.turma).filter(Boolean),
+    anoSelecionado: selAno.value,
+    seriesSelecionadas: seriesSelecionadas,
+    busca: inpBusca.value,
+    sortField: currentSortField,
+    sortOrder: currentSortOrder,
+    turnoFiltro: document.getElementById("selTurno")?.value || '',
+    modeloFiltro: document.getElementById("selModelo")?.value || '',
+    statusFiltro: document.getElementById("selStatus")?.value || '',
+    modoFiltro: document.querySelector('input[name="modoFiltro"]:checked')?.value || 'turma',
+    turmaSort: currentTurmaSort
+  };
+  sessionStorage.setItem('pesquisaAnoAtivoEstado', JSON.stringify(estado));
+}
+
+function restaurarEstadoPagina(){
+  try {
+    const estadoSalvo = sessionStorage.getItem('pesquisaAnoAtivoEstado');
+    if(!estadoSalvo) return false;
+    
+    const estado = JSON.parse(estadoSalvo);
+    
+    // Restaurar filtros
+    if(estado.anoSelecionado) selAno.value = estado.anoSelecionado;
+    if(estado.seriesSelecionadas) seriesSelecionadas = estado.seriesSelecionadas;
+    if(estado.busca) inpBusca.value = estado.busca;
+    if(estado.sortField) currentSortField = estado.sortField;
+    if(estado.sortOrder) currentSortOrder = estado.sortOrder;
+    if(estado.turnoFiltro) document.getElementById("selTurno").value = estado.turnoFiltro;
+    if(estado.modeloFiltro) document.getElementById("selModelo").value = estado.modeloFiltro;
+    if(estado.statusFiltro) document.getElementById("selStatus").value = estado.statusFiltro;
+    if(estado.modoFiltro){
+      const radio = document.querySelector(`input[name="modoFiltro"][value="${estado.modoFiltro}"]`);
+      if(radio) radio.checked = true;
+    }
+    
+    // Restaurar ordenação de turmas
+    if(estado.turmaSort){
+      currentTurmaSort = estado.turmaSort;
+      const sel = document.getElementById("sortTurmaField");
+      if(sel) sel.value = currentTurmaSort;
+    }
+    // Atualizar UI de ordenação de alunos
+    if(sortField) sortField.value = currentSortField;
+    if(btnToggleSort) btnToggleSort.textContent = currentSortOrder === 'asc' ? '↑↓' : '↓↑';
+    
+    // Renderizar e depois restaurar checkboxes
+    renderChips();
+    _jaFoiPesquisado = true;
+    atualizarListas();
+    
+    setTimeout(() => {
+      estado.checkboxesMarcadas.forEach(id => {
+        const cb = document.querySelector(`.chkTurma[data-turma="${id}"]`);
+        if(cb) cb.checked = true;
+      });
+      if(estado.checkboxesMarcadas.length){ syncCheckAllTurmas(); atualizarListaAlunos(); }
+    }, 100);
+    
+    return true;
+  } catch(e){
+    console.warn('Erro ao restaurar estado:', e);
+    return false;
+  }
+}
+
+/* =========================
+   Init
+========================= */
+(async function init(){
+  await carregarDB();
+  __lastLoadAt = Date.now(); // setado antes de restaurar para bloquear maybeAutoRefresh imediato
+  
+  // Tentar restaurar estado salvo
+  const estadoRestaurado = restaurarEstadoPagina();
+  
+  if(!estadoRestaurado){
+    renderChips();
+    if(anoAtivo && selAno.value){
+      _jaFoiPesquisado = true;
+      atualizarListas();
+    } else {
+      listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
+      listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">As turmas e alunos aparecerão após a pesquisa.</div>`;
+      countTurmas.textContent = "—"; countAlunos.textContent = "—";
+    }
+  }
+  
+  // Salvar estado apenas ao navegar para edição (não ao fechar/recarregar)
+  // Isso garante que ao abrir a página do zero, nenhum estado antigo seja restaurado
+  window.addEventListener('beforeunload', ()=>{
+    // Só salva se estiver indo para a página de edição
+    const destino = document.__pesquisaDestino || '';
+    if(destino.includes('editar-aluno-ativo')) salvarEstadoPagina();
+    else sessionStorage.removeItem('pesquisaAnoAtivoEstado');
+  });
+})();
+
+})();
+</script>
+
+<!-- Modal: schema para gerar ata -->
+<div id="modalGerarAta" style="display:none;position:fixed;inset:0;z-index:9998;
+  background:rgba(15,23,42,.65);backdrop-filter:blur(3px);
+  align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--card-bg,#fff);border-radius:18px;border:1px solid var(--card-border);
+    box-shadow:0 24px 48px rgba(0,0,0,.25);max-width:460px;width:100%;padding:28px 28px 22px;">
+    <h3 style="margin:0 0 6px;font-size:17px;" id="modalGerarAtaTitulo">📋 Gerar ata</h3>
+    <p style="margin:0 0 18px;font-size:13px;color:var(--muted);" id="modalGerarAtaSub"></p>
+    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px;">Schema de disciplinas</label>
+    <select id="modalSchemaSelect"
+      style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--card-border);
+             font-size:14px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;"></select>
+    <div id="modalSchemaPreview" style="font-size:12px;color:var(--muted);margin-bottom:18px;min-height:18px;"></div>
+    <div id="modalGerarAtaAviso"
+      style="display:none;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;
+             padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:16px;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button type="button" id="modalGerarAtaCancelar"
+        style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--card-border);
+               background:var(--card-bg);cursor:pointer;font-size:13px;font-weight:700;">Cancelar</button>
+      <button type="button" id="modalGerarAtaConfirmar"
+        style="padding:9px 18px;border-radius:10px;border:none;
+               background:#8b1a1a;color:#fff;cursor:pointer;font-size:13px;font-weight:700;">📋 Gerar ata</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toastGerarAta" style="position:fixed;">
+  <button class="toast-close" onclick="document.getElementById('toastGerarAta').classList.remove('visible')">✕</button>
+  <div class="toast-title" id="toastTitle">📋 Ata salva!</div>
+  <div class="toast-sub" id="toastSub">Vá até a área de atas para inserir ou editar as notas e nomes.</div>
+  <a class="toast-btn" href="../atas/pesquisa-ata.html" id="toastLink">Ver na pesquisa de atas →</a>
+</div>
+
+</body>
+</html>

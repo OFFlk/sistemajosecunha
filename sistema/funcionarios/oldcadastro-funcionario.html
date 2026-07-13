@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script>
+(function(){
+  const KEY = 'ui_theme_v1';
+  const saved = (localStorage.getItem(KEY) || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Cadastro de Funcionários • Ano Ativo</title>
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/cadastro-funcionario.css">
+
+</head>
+
+<body>
+<!-- ══ Header Placeholder ══ -->
+<div id="header-placeholder"></div>
+
+<main class="wrap">
+
+  <!-- ── Card: Dados do funcionário ── -->
+  <section class="card" id="formCard">
+    <div class="card-head">
+      <div>
+        <h2>Dados do funcionário</h2>
+        <p class="muted" id="formDesc">Preencha os campos e clique em <b>Salvar funcionário</b>.</p>
+      </div>
+      <div class="pill" id="pillCount">Banco: —</div>
+    </div>
+
+    <div id="editBanner" class="edit-banner" style="display:none;"></div>
+    <div id="msgForm" class="warn" style="display:none;"></div>
+    <div id="msgOk" class="ok-msg" style="display:none;"></div>
+
+    <!-- Chip de Ano Ativo -->
+    <div class="ano-chip-wrap">
+      <span class="ano-chip">📅 Ano Ativo:
+        <select id="selectAnoAtivo">
+          <option value="">—</option>
+        </select>
+      </span>
+      <small class="help" style="margin:0;" id="anoAtivoMsg"></small>
+    </div>
+
+    <!-- Linha 1: identificação -->
+    <div class="grid-3" style="margin-bottom:14px; align-items:center;">
+      <div class="field">
+        <label for="cpf">CPF <span class="req">*</span></label>
+        <div class="cpf-wrap">
+          <input id="cpf" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off"/>
+          <span class="cpf-status-icon" id="cpfIcon"></span>
+        </div>
+        <small class="help" style="visibility:hidden;">—</small>
+      </div>
+      <div class="field">
+        <label for="rgCnh">RG</label>
+        <input id="rgCnh" placeholder="00.000.000-0" inputmode="numeric" maxlength="13" autocomplete="off"/>
+        <small class="help" style="visibility:hidden;">—</small>
+      </div>
+      <div class="field">
+        <label for="nome">Nome completo <span class="req">*</span></label>
+        <input id="nome" placeholder="Nome completo" autocomplete="off"/>
+        <small class="help" id="nomeMsg"></small>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Linha 2: dados pessoais -->
+    <div class="grid-4" style="margin-bottom:14px;">
+      <div class="field">
+        <label for="nasc">Data de nascimento <span class="req">*</span></label>
+        <input id="nasc" type="date"/>
+      </div>
+      <div class="field field-age">
+        <label>Idade</label>
+        <input id="idade" type="text" readonly placeholder="—" tabindex="-1"/>
+      </div>
+      <div class="field">
+        <label for="sexo">Sexo <span class="req">*</span></label>
+        <select id="sexo">
+          <option value="">— selecione —</option>
+          <option value="F">Feminino</option>
+          <option value="M">Masculino</option>
+          <option value="O">Outro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="corRaca">Cor/Raça</label>
+        <select id="corRaca">
+          <option value="NÃO DECLARADA" selected>Não declarada</option>
+          <option value="BRANCA">Branca</option>
+          <option value="PRETA">Preta</option>
+          <option value="PARDA">Parda</option>
+          <option value="AMARELA">Amarela</option>
+          <option value="INDÍGENA">Indígena</option>
+          <option value="OUTRA">Outra</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Linha 3: naturalidade -->
+    <div class="grid-2" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Naturalidade — Cidade</label>
+        <div class="inline-2" style="align-items:start;">
+          <div class="nat-wrap">
+            <div class="nat-ghost-layer" id="natGhost" aria-hidden="true"></div>
+            <input id="natCidade" class="nat-input-real" placeholder="Cidade de nascimento"
+                   autocomplete="off" autocorrect="off" spellcheck="false"/>
+            <div class="nat-dropdown" id="natDropdown" role="listbox"></div>
+          </div>
+          <select id="natUF">
+            <option value="">--</option>
+            <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
+            <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
+            <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+            <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option>
+            <option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option>
+            <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+            <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+          </select>
+        </div>
+        <small class="help">Digite para ver sugestões baseadas em registros anteriores.</small>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Linha 4: dados funcionais -->
+    <div class="grid-3" style="margin-bottom:14px;">
+      <div class="field">
+        <label for="funcao">Função <span class="req">*</span></label>
+        <select id="funcao">
+          <option value="">— selecione —</option>
+          <option value="PROFESSOR">Professor(a)</option>
+          <option value="DIRETOR">Diretor(a)</option>
+          <option value="VICE-DIRETOR">Vice-Diretor(a)</option>
+          <option value="COORDENADOR PEDAGÓGICO">Coordenador(a) Pedagógico(a)</option>
+          <option value="SECRETÁRIO ESCOLAR">Secretário(a) Escolar</option>
+          <option value="AUXILIAR ADMINISTRATIVO">Auxiliar Administrativo</option>
+          <option value="AUXILIAR DE SERVIÇOS GERAIS">Auxiliar de Serviços Gerais</option>
+          <option value="MERENDEIRA">Merendeira</option>
+          <option value="PORTEIRO">Porteiro(a)</option>
+          <option value="INSPETOR DE ALUNOS">Inspetor(a) de Alunos</option>
+          <option value="PSICÓLOGO">Psicólogo(a)</option>
+          <option value="ASSISTENTE SOCIAL">Assistente Social</option>
+          <option value="OUTRO">Outro...</option>
+        </select>
+        <div id="wrapFuncaoOutro" style="display:none; margin-top:8px;">
+          <input id="funcaoOutro" placeholder="Digite a função manualmente" autocomplete="off" style="width:100%;padding:11px 12px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--text);font-size:14px;font-family:'Nunito',sans-serif;outline:none;transition:border-color 0.15s;"/>
+          <small class="help">Preencha a função não listada.</small>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cargaHoraria">Carga horária</label>
+        <input id="cargaHoraria" type="number" min="1" max="99" placeholder="Ex.: 40" autocomplete="off" inputmode="numeric"/>
+        <small class="help">Número de horas (1–99). Exibido como "00H" na tabela.</small>
+      </div>
+      <div class="field">
+        <label for="status">Status / Vínculo <span class="req">*</span></label>
+        <select id="status">
+          <option value="">— selecione —</option>
+          <option value="CE">Contrato Emergencial (CE)</option>
+          <option value="PS">Processo Seletivo (PS)</option>
+          <option value="EF">Concursado / Efetivo (EF)</option>
+          <option value="OUTRO">Outro</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Linha 5: turnos -->
+    <div class="field" style="margin-bottom:14px;">
+      <label>Turno(s) de atuação</label>
+      <div class="turnos-group">
+        <label class="turno-check" id="lblMatutino">
+          <input type="checkbox" id="chkMatutino" value="MAT"/>
+          🌅 Matutino
+        </label>
+        <label class="turno-check" id="lblVespertino">
+          <input type="checkbox" id="chkVespertino" value="VES"/>
+          ☀️ Vespertino
+        </label>
+        <label class="turno-check" id="lblNoturno">
+          <input type="checkbox" id="chkNoturno" value="NOT"/>
+          🌙 Noturno
+        </label>
+      </div>
+      <small class="help">Pode selecionar mais de um turno.</small>
+    </div>
+
+    <div class="actions">
+      <button class="btn secondary" id="btnLimpar" type="button">Limpar campos</button>
+      <button class="btn ghost" id="btnCancelarEdicao" type="button" style="display:none;">✖ Cancelar edição</button>
+      <button class="btn primary" id="btnSalvar" type="button">💾 Salvar funcionário</button>
+    </div>
+
+  </section>
+
+  <!-- ── Card: Lista ── -->
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Funcionários cadastrados</h2>
+        <p class="muted">Lista completa dos funcionários registrados no banco.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th class="th-sort" data-col="nome" data-label="Nome">Nome ▲</th>
+            <th class="th-sort" data-col="cpf"  data-label="CPF">CPF</th>
+            <th>RG</th>
+            <th class="th-sort" data-col="nasc" data-label="Nasc.">Nasc.</th>
+            <th>Idade</th>
+            <th class="th-sort" data-col="sexo" data-label="Sexo">Sexo</th>
+            <th class="th-sort" data-col="naturalidade" data-label="Naturalidade">Naturalidade</th>
+            <th>Cor/Raça</th>
+            <th class="th-sort" data-col="funcao" data-label="Função">Função</th>
+            <th class="th-sort" data-col="ch"   data-label="C.H.">C.H.</th>
+            <th>Turnos</th>
+            <th class="th-sort" data-col="status" data-label="Vínculo">Vínculo</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyFunc">
+          <tr><td class="muted" colspan="13">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+
+  <!-- Menu flutuante de ações da tabela -->
+  <div id="acoesMenu" class="acoes-menu" style="display:none;">
+    <button class="acoes-btn" id="acoesEditar">✏️ Editar</button>
+    <button class="acoes-btn danger" id="acoesExcluir">🗑 Excluir</button>
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════════════════
+     HEADER LOGIC (sempre primeiro)
+══════════════════════════════════════════ -->
+<script src="../header-logic.js"></script>
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT PRINCIPAL DA PÁGINA
+══════════════════════════════════════════ -->
+<script>
+(function(){
+  /* ══════════════════════════════════════════
+     Helpers
+  ══════════════════════════════════════════ */
+  function stripNum(s){ return (s||'').toString().replace(/\D+/g,''); }
+
+  function formatCPF(cpf){
+    const d = stripNum(cpf);
+    if(d.length !== 11) return cpf || '';
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+
+  function maskCPF(value){
+    const d = stripNum(value).slice(0,11);
+    if(!d) return '';
+    if(d.length <= 3) return d;
+    if(d.length <= 6) return d.replace(/(\d{3})(\d+)/, '$1.$2');
+    if(d.length <= 9) return d.replace(/(\d{3})(\d{3})(\d+)/, '$1.$2.$3');
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4').replace(/-$/, '');
+  }
+
+  function isValidCPF(cpf){
+    const d = stripNum(cpf);
+    if(d.length !== 11) return false;
+    if(/^(\d)\1{10}$/.test(d)) return false;
+    let sum = 0;
+    for(let i=0;i<9;i++) sum += parseInt(d[i],10) * (10-i);
+    let dv1 = 11 - (sum%11); if(dv1>=10) dv1=0;
+    if(dv1 !== parseInt(d[9],10)) return false;
+    sum = 0;
+    for(let i=0;i<10;i++) sum += parseInt(d[i],10) * (11-i);
+    let dv2 = 11 - (sum%11); if(dv2>=10) dv2=0;
+    return dv2 === parseInt(d[10],10);
+  }
+
+  function calcAge(dateStr){
+    if(!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    if(isNaN(d)) return '';
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if(m < 0 || (m===0 && today.getDate() < d.getDate())) age--;
+    return age < 0 ? '' : String(age);
+  }
+
+  function maskRG(value){
+    // Suporta 9 dígitos (00.000.000-0) e 10 dígitos (00.000.000-00)
+    const d = stripNum(value).slice(0,10);
+    if(!d) return '';
+    if(d.length <= 2) return d;
+    if(d.length <= 5) return d.replace(/(\d{2})(\d+)/, '$1.$2');
+    if(d.length <= 8) return d.replace(/(\d{2})(\d{3})(\d+)/, '$1.$2.$3');
+    if(d.length === 9) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{1})/, '$1.$2.$3-$4');
+    return d.replace(/(\d{2})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+
+  function formatDate(str){
+    if(!str) return '';
+    const d = new Date(str + 'T00:00:00');
+    if(isNaN(d)) return str;
+    return d.toLocaleDateString('pt-BR');
+  }
+
+
+  function normUpper(s){ return (s||'').toString().trim().replace(/\s+/g,' ').toUpperCase(); }
+
+  function gerarFuncId(){
+    return 'FUNC-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+  }
+
+  function formatCH(val){
+    if(!val && val !== 0) return '—';
+    const n = parseInt(val, 10);
+    if(isNaN(n)) return '—';
+    return String(n).padStart(2,'0') + 'H';
+  }
+
+  const STATUS_LABEL = { CE:'CE', PS:'PS', EF:'EF', OUTRO:'Outro' };
+
+  /* ══════════════════════════════════════════
+     Estado
+  ══════════════════════════════════════════ */
+  let funcionarios = [];
+  let _funcoesExtras = []; // funções personalizadas (não listadas no select padrão)
+
+  /* ══════════════════════════════════════════
+     Firestore
+  ══════════════════════════════════════════ */
+  async function carregarDB(){
+    console.log('[DEBUG] carregarDB iniciou');
+    try{
+      await new Promise(res=>{
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        console.log('[DEBUG] aguardando auth:ready...');
+        document.addEventListener('auth:ready', res, {once:true});
+      });
+      console.log('[DEBUG] auth ok, chamando DB.escola.get()');
+      const dadosEscola = await window.DB.escola.get();
+      console.log('[DEBUG] dadosEscola recebido, funcionariosDB length:', dadosEscola?.funcionariosDB?.length);
+      if(Array.isArray(dadosEscola?.funcionariosDB) && dadosEscola.funcionariosDB.length){
+        funcionarios = dadosEscola.funcionariosDB;
+      } else {
+        funcionarios = [];
+      }
+      // Carrega funções personalizadas salvas anteriormente
+      if(Array.isArray(dadosEscola?.funcoesCadastradas)){
+        _funcoesExtras = dadosEscola.funcoesCadastradas;
+      }
+    }catch(e){
+      console.warn('carregarDB funcionarios:', e);
+      funcionarios = [];
+    }
+    console.log('[DEBUG] funcionarios carregados:', funcionarios.length, '| anoAtivo:', anoAtivo);
+    popularFuncaoSelect();
+    renderTabela();
+    atualizarPill();
+  }
+
+  async function salvarDB(){
+    try{
+      // Salva sempre no documento da escola (garante persistência independente de coleção dedicada)
+      if(window.DB && window.DB.escola && window.DB.escola.save){
+        await window.DB.escola.save({ funcionariosDB: funcionarios });
+      } else if(window.DB && window.DB.funcionarios && window.DB.funcionarios.saveAll){
+        await window.DB.funcionarios.saveAll(funcionarios);
+      }
+    }catch(e){
+      console.error('salvarDB funcionarios:', e);
+      throw e;
+    }
+  }
+
+  async function salvarFuncoesExtras(){
+    try{
+      if(window.DB && window.DB.escola && window.DB.escola.save){
+        await window.DB.escola.save({ funcoesCadastradas: _funcoesExtras });
+      }
+    }catch(e){
+      console.error('salvarFuncoesExtras:', e);
+    }
+  }
+
+  /* ══════════════════════════════════════════
+     Ano Ativo
+  ══════════════════════════════════════════ */
+  const selectAnoAtivo = document.getElementById('selectAnoAtivo');
+  const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
+  let anoAtivo = new Date().getFullYear();
+
+  async function carregarAnoAtivo(){
+    try{
+      await new Promise(res=>{
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        document.addEventListener('auth:ready', res, {once:true});
+      });
+      const dados = await window.DB.loadAll();
+      const ano = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+      anoAtivo = ano && !isNaN(Number(ano)) ? parseInt(ano, 10) : new Date().getFullYear();
+    } catch(e){
+      console.warn('carregarAnoAtivo:', e);
+      anoAtivo = new Date().getFullYear();
+    }
+    selectAnoAtivo.innerHTML = `<option value="${anoAtivo}">${anoAtivo}</option>`;
+    selectAnoAtivo.value = anoAtivo;
+    anoAtivoMsg.textContent = `Carregando no ano ${anoAtivo}`;
+  }
+
+  selectAnoAtivo.addEventListener('change', function(){
+    anoAtivo = parseInt(selectAnoAtivo.value, 10);
+    renderTabela();
+    atualizarPill();
+  });
+
+  /* ══════════════════════════════════════════
+     Campos do formulário
+  ══════════════════════════════════════════ */
+  const cpfEl        = document.getElementById('cpf');
+  const cpfIcon      = document.getElementById('cpfIcon');
+  const rgEl         = document.getElementById('rgCnh');
+  const nomeEl       = document.getElementById('nome');
+  const nomeMsg      = document.getElementById('nomeMsg');
+  const nascEl       = document.getElementById('nasc');
+  const idadeEl      = document.getElementById('idade');
+  const sexoEl       = document.getElementById('sexo');
+  const corRacaEl    = document.getElementById('corRaca');
+
+  // Naturalidade
+  const natCidadeEl  = document.getElementById('natCidade');
+  const natUFEl      = document.getElementById('natUF');
+  const natGhost     = document.getElementById('natGhost');
+  const natDropdown  = document.getElementById('natDropdown');
+
+  // Função
+  const funcaoEl     = document.getElementById('funcao');
+  const wrapFuncaoOutro = document.getElementById('wrapFuncaoOutro');
+  const funcaoOutroEl   = document.getElementById('funcaoOutro');
+
+  const cargaHorariaEl = document.getElementById('cargaHoraria');
+  const statusEl       = document.getElementById('status');
+
+  const chkMatutino     = document.getElementById('chkMatutino');
+  const chkVespertino   = document.getElementById('chkVespertino');
+  const chkNoturno      = document.getElementById('chkNoturno');
+  const lblMatutino     = document.getElementById('lblMatutino');
+  const lblVespertino   = document.getElementById('lblVespertino');
+  const lblNoturno      = document.getElementById('lblNoturno');
+
+  const msgForm      = document.getElementById('msgForm');
+  const msgOk        = document.getElementById('msgOk');
+  const editBanner   = document.getElementById('editBanner');
+  const formDesc     = document.getElementById('formDesc');
+
+  const btnSalvar          = document.getElementById('btnSalvar');
+  const btnLimpar          = document.getElementById('btnLimpar');
+  const btnCancelarEdicao  = document.getElementById('btnCancelarEdicao');
+
+  const pillCount   = document.getElementById('pillCount');
+  const tbodyFunc   = document.getElementById('tbodyFunc');
+
+  /* ══════════════════════════════════════════
+     Popular select de função
+  ══════════════════════════════════════════ */
+  function popularFuncaoSelect(){
+    const val = funcaoEl.value;
+    funcaoEl.innerHTML = `
+      <option value="">— selecione —</option>
+      <option value="PROFESSOR">Professor(a)</option>
+      <option value="DIRETOR">Diretor(a)</option>
+      <option value="VICE-DIRETOR">Vice-Diretor(a)</option>
+      <option value="COORDENADOR PEDAGÓGICO">Coordenador(a) Pedagógico(a)</option>
+      <option value="SECRETÁRIO ESCOLAR">Secretário(a) Escolar</option>
+      <option value="AUXILIAR ADMINISTRATIVO">Auxiliar Administrativo</option>
+      <option value="AUXILIAR DE SERVIÇOS GERAIS">Auxiliar de Serviços Gerais</option>
+      <option value="MERENDEIRA">Merendeira</option>
+      <option value="PORTEIRO">Porteiro(a)</option>
+      <option value="INSPETOR DE ALUNOS">Inspetor(a) de Alunos</option>
+      <option value="PSICÓLOGO">Psicólogo(a)</option>
+      <option value="ASSISTENTE SOCIAL">Assistente Social</option>
+    `;
+    _funcoesExtras.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f;
+      opt.textContent = f;
+      funcaoEl.appendChild(opt);
+    });
+    const optOutro = document.createElement('option');
+    optOutro.value = 'OUTRO';
+    optOutro.textContent = 'Outro...';
+    funcaoEl.appendChild(optOutro);
+    if(val) funcaoEl.value = val;
+  }
+
+  funcaoEl.addEventListener('change', function(){
+    if(funcaoEl.value === 'OUTRO'){
+      wrapFuncaoOutro.style.display = 'block';
+      funcaoOutroEl.focus();
+    } else {
+      wrapFuncaoOutro.style.display = 'none';
+      funcaoOutroEl.value = '';
+    }
+  });
+
+  /* ══════════════════════════════════════════
+     Máscara CPF
+  ══════════════════════════════════════════ */
+  cpfEl.addEventListener('input', function(){
+    cpfEl.value = maskCPF(cpfEl.value);
+    const d = stripNum(cpfEl.value);
+    cpfIcon.textContent = '';
+    cpfIcon.style.color = '';
+    if(!d) return;
+    if(isValidCPF(d)){
+      cpfIcon.textContent = '✓';
+      cpfIcon.style.color = '#16a34a';
+    } else {
+      if(d.length === 11){
+        cpfIcon.textContent = '✗';
+        cpfIcon.style.color = '#dc2626';
+      }
+    }
+  });
+
+  /* ══════════════════════════════════════════
+     Máscara RG
+  ══════════════════════════════════════════ */
+  rgEl.addEventListener('input', function(){
+    rgEl.value = maskRG(rgEl.value);
+  });
+
+  /* ══════════════════════════════════════════
+     Contador de caracteres do nome
+  ══════════════════════════════════════════ */
+  const NOME_MAX = 50;
+  nomeEl.addEventListener('input', function(){
+    const len = nomeEl.value.length;
+    if(len > NOME_MAX){
+      nomeEl.value = nomeEl.value.slice(0, NOME_MAX);
+      nomeMsg.textContent = `Limite de ${NOME_MAX} caracteres atingido.`;
+      nomeMsg.style.color = '#dc2626';
+    } else {
+      nomeMsg.textContent = `${len}/${NOME_MAX}`;
+      nomeMsg.style.color = '';
+    }
+  });
+
+  /* ══════════════════════════════════════════
+     Idade automática
+  ══════════════════════════════════════════ */
+  nascEl.addEventListener('change', function(){
+    const age = calcAge(nascEl.value);
+    idadeEl.value = age ? age + ' anos' : '';
+  });
+
+  /* ══════════════════════════════════════════
+     Autocomplete de naturalidade
+  ══════════════════════════════════════════ */
+  let _sugestoesCidades = [];
+  let _indexAtual = -1;
+
+  function construirSugestoes(){
+    const cidades = funcionarios.map(f=>{
+      const c = (f.naturalidadeCidade||'').trim();
+      const u = (f.naturalidadeUF||'').trim().toUpperCase();
+      return c && u ? {cidade:c, uf:u} : null;
+    }).filter(x=>x);
+    const set = new Set();
+    const uniq = [];
+    cidades.forEach(x=>{
+      const key = x.cidade.toLowerCase()+'|'+x.uf;
+      if(!set.has(key)){
+        set.add(key);
+        uniq.push(x);
+      }
+    });
+    return uniq;
+  }
+
+  function filtrarSugestoes(query){
+    if(!query.trim()) return [];
+    const q = query.toLowerCase();
+    return _sugestoesCidades.filter(x=>x.cidade.toLowerCase().includes(q));
+  }
+
+  function renderizarDropdown(sugestoes){
+    natDropdown.innerHTML='';
+    if(!sugestoes.length){
+      natDropdown.style.display='none';
+      return;
+    }
+    sugestoes.forEach((sug,i)=>{
+      const opt = document.createElement('div');
+      opt.className='nat-dropdown-item';
+      opt.textContent = sug.cidade+' ('+sug.uf+')';
+      opt.setAttribute('role','option');
+      opt.setAttribute('data-index',i);
+      opt.addEventListener('click', function(){
+        natCidadeEl.value = sug.cidade;
+        natUFEl.value = sug.uf;
+        natGhost.textContent = sug.cidade;
+        natDropdown.style.display='none';
+        _indexAtual=-1;
+      });
+      natDropdown.appendChild(opt);
+    });
+    natDropdown.style.display='block';
+    _indexAtual=-1;
+  }
+
+  natCidadeEl.addEventListener('input', function(){
+    const v = natCidadeEl.value;
+    natGhost.textContent = v;
+    const sugestoes = filtrarSugestoes(v);
+    renderizarDropdown(sugestoes);
+  });
+
+  natCidadeEl.addEventListener('keydown', function(e){
+    const itens = natDropdown.querySelectorAll('.nat-dropdown-item');
+    if(!itens.length) return;
+    if(e.key==='ArrowDown'){
+      e.preventDefault();
+      _indexAtual = (_indexAtual+1) % itens.length;
+      itens.forEach((it,i)=>{
+        it.classList.toggle('highlight', i===_indexAtual);
+      });
+    } else if(e.key==='ArrowUp'){
+      e.preventDefault();
+      _indexAtual = (_indexAtual-1+itens.length) % itens.length;
+      itens.forEach((it,i)=>{
+        it.classList.toggle('highlight', i===_indexAtual);
+      });
+    } else if(e.key==='Enter'){
+      if(_indexAtual>=0 && itens[_indexAtual]){
+        e.preventDefault();
+        itens[_indexAtual].click();
+      }
+    } else if(e.key==='Escape'){
+      natDropdown.style.display='none';
+      _indexAtual=-1;
+    }
+  });
+
+  document.addEventListener('click', function(e){
+    if(!natCidadeEl.contains(e.target) && !natDropdown.contains(e.target)){
+      natDropdown.style.display='none';
+      _indexAtual=-1;
+    }
+  });
+
+  /* ══════════════════════════════════════════
+     Marcar label quando checkbox marcado
+  ══════════════════════════════════════════ */
+  chkMatutino.addEventListener('change', function(){
+    lblMatutino.classList.toggle('checked', chkMatutino.checked);
+  });
+  chkVespertino.addEventListener('change', function(){
+    lblVespertino.classList.toggle('checked', chkVespertino.checked);
+  });
+  chkNoturno.addEventListener('change', function(){
+    lblNoturno.classList.toggle('checked', chkNoturno.checked);
+  });
+
+  /* ══════════════════════════════════════════
+     Limpar formulário
+  ══════════════════════════════════════════ */
+  function limparFormulario(){
+    cpfEl.value=''; rgEl.value=''; nomeEl.value='';
+    nascEl.value=''; idadeEl.value='';
+    sexoEl.value=''; corRacaEl.value='NÃO DECLARADA';
+    natCidadeEl.value=''; natUFEl.value=''; natGhost.textContent='';
+    funcaoEl.value=''; wrapFuncaoOutro.style.display='none'; funcaoOutroEl.value='';
+    cargaHorariaEl.value='';
+    statusEl.value='';
+    chkMatutino.checked=false; chkVespertino.checked=false; chkNoturno.checked=false;
+    lblMatutino.classList.remove('checked');
+    lblVespertino.classList.remove('checked');
+    lblNoturno.classList.remove('checked');
+    cpfIcon.textContent=''; cpfIcon.style.color='';
+    nomeMsg.textContent='0/50'; nomeMsg.style.color='';
+    msgForm.style.display='none'; msgOk.style.display='none';
+    editBanner.style.display='none';
+    btnCancelarEdicao.style.display='none';
+    formDesc.innerHTML = 'Preencha os campos e clique em <b>Salvar funcionário</b>.';
+    btnSalvar.textContent = '💾 Salvar funcionário';
+    _editandoId = null;
+  }
+
+  btnLimpar.addEventListener('click', function(){
+    limparFormulario();
+  });
+
+  btnCancelarEdicao.addEventListener('click', function(){
+    limparFormulario();
+  });
+
+  /* ══════════════════════════════════════════
+     Salvar funcionário
+  ══════════════════════════════════════════ */
+  let _editandoId = null;
+
+  btnSalvar.addEventListener('click', async function(){
+    msgForm.style.display='none';
+    msgOk.style.display='none';
+
+    const cpf = stripNum(cpfEl.value);
+    if(!isValidCPF(cpf)){
+      msgForm.textContent = 'CPF inválido.';
+      msgForm.style.display='block';
+      return;
+    }
+
+    const nome = nomeEl.value.trim();
+    if(!nome){
+      msgForm.textContent = 'Nome obrigatório.';
+      msgForm.style.display='block';
+      return;
+    }
+
+    const nasc = nascEl.value;
+    if(!nasc){
+      msgForm.textContent = 'Data de nascimento obrigatória.';
+      msgForm.style.display='block';
+      return;
+    }
+
+    const sexo = sexoEl.value;
+    if(!sexo){
+      msgForm.textContent = 'Sexo obrigatório.';
+      msgForm.style.display='block';
+      return;
+    }
+
+    let funcao = funcaoEl.value;
+    if(funcao === 'OUTRO'){
+      const f = funcaoOutroEl.value.trim();
+      if(!f){
+        msgForm.textContent = 'Digite a função.';
+        msgForm.style.display='block';
+        return;
+      }
+      funcao = normUpper(f);
+      if(!_funcoesExtras.includes(funcao)){
+        _funcoesExtras.push(funcao);
+        await salvarFuncoesExtras();
+        popularFuncaoSelect();
+      }
+    }
+    if(!funcao){
+      msgForm.textContent = 'Função obrigatória.';
+      msgForm.style.display='block';
+      return;
+    }
+
+    const status = statusEl.value;
+    if(!status){
+      msgForm.textContent = 'Status obrigatório.';
+      msgForm.style.display='block';
+      return;
+    }
+
+    const turnos = [];
+    if(chkMatutino.checked) turnos.push('MAT');
+    if(chkVespertino.checked) turnos.push('VES');
+    if(chkNoturno.checked) turnos.push('NOT');
+
+    const funcId = _editandoId || gerarFuncId();
+
+    if(!_editandoId){
+      const jaExiste = funcionarios.some(f => stripNum(f.cpf||'')===cpf && String(f.anoLetivo||f.ano)===String(anoAtivo));
+      if(jaExiste){
+        msgForm.textContent = 'CPF já cadastrado neste ano.';
+        msgForm.style.display='block';
+        return;
+      }
+    } else {
+      const outro = funcionarios.find(f => f.funcId!==funcId && stripNum(f.cpf||'')===cpf && String(f.anoLetivo||f.ano)===String(anoAtivo));
+      if(outro){
+        msgForm.textContent = 'CPF já em uso por outro funcionário neste ano.';
+        msgForm.style.display='block';
+        return;
+      }
+    }
+
+    const obj = {
+      funcId,
+      anoLetivo: String(anoAtivo),
+      cpf: formatCPF(cpf),
+      rgCnh: rgEl.value.trim(),
+      nome: normUpper(nome),
+      dataNascimento: nasc,
+      sexo,
+      corRaca: corRacaEl.value,
+      naturalidadeCidade: natCidadeEl.value.trim(),
+      naturalidadeUF: natUFEl.value,
+      funcao,
+      cargaHoraria: cargaHorariaEl.value ? parseInt(cargaHorariaEl.value,10) : null,
+      status,
+      turnos
+    };
+
+    if(_editandoId){
+      const idx = funcionarios.findIndex(f=>f.funcId===funcId);
+      if(idx>=0) funcionarios[idx] = obj;
+    } else {
+      funcionarios.push(obj);
+    }
+
+    try{
+      await salvarDB();
+      _sugestoesCidades = construirSugestoes();
+      renderTabela();
+      atualizarPill();
+      msgOk.textContent = _editandoId ? 'Funcionário atualizado!' : 'Funcionário salvo!';
+      msgOk.style.display='block';
+      limparFormulario();
+    } catch(e){
+      console.error(e);
+      msgForm.textContent = 'Erro ao salvar.';
+      msgForm.style.display='block';
+    }
+  });
+
+  /* ══════════════════════════════════════════
+     Editar funcionário
+  ══════════════════════════════════════════ */
+  function iniciarEdicao(f){
+    _editandoId = f.funcId;
+    cpfEl.value = f.cpf||'';
+    cpfEl.dispatchEvent(new Event('input'));
+    rgEl.value = f.rgCnh||'';
+    nomeEl.value = f.nome||'';
+    nomeEl.dispatchEvent(new Event('input'));
+    nascEl.value = f.dataNascimento||'';
+    nascEl.dispatchEvent(new Event('change'));
+    sexoEl.value = f.sexo||'';
+    corRacaEl.value = f.corRaca||'NÃO DECLARADA';
+    natCidadeEl.value = f.naturalidadeCidade||'';
+    natUFEl.value = f.naturalidadeUF||'';
+    natGhost.textContent = f.naturalidadeCidade||'';
+
+    const funcaoVal = f.funcao||'';
+    const opts = Array.from(funcaoEl.options).map(o=>o.value);
+    if(opts.includes(funcaoVal)){
+      funcaoEl.value = funcaoVal;
+      wrapFuncaoOutro.style.display='none';
+      funcaoOutroEl.value='';
+    } else {
+      funcaoEl.value = 'OUTRO';
+      wrapFuncaoOutro.style.display='block';
+      funcaoOutroEl.value = funcaoVal;
+    }
+
+    cargaHorariaEl.value = f.cargaHoraria||'';
+    statusEl.value = f.status||'';
+
+    chkMatutino.checked = Array.isArray(f.turnos) && f.turnos.includes('MAT');
+    chkVespertino.checked = Array.isArray(f.turnos) && f.turnos.includes('VES');
+    chkNoturno.checked = Array.isArray(f.turnos) && f.turnos.includes('NOT');
+    lblMatutino.classList.toggle('checked', chkMatutino.checked);
+    lblVespertino.classList.toggle('checked', chkVespertino.checked);
+    lblNoturno.classList.toggle('checked', chkNoturno.checked);
+
+    editBanner.innerHTML = `✏️ <b>Editando:</b> ${f.nome} (CPF: ${f.cpf})`;
+    editBanner.style.display = 'block';
+    formDesc.innerHTML = 'Altere os campos desejados e clique em <b>Atualizar funcionário</b>.';
+    btnSalvar.textContent = '💾 Atualizar funcionário';
+    btnCancelarEdicao.style.display = 'inline-block';
+    document.getElementById('formCard').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  /* ══════════════════════════════════════════
+     Renderizar tabela
+  ══════════════════════════════════════════ */
+  let _sortCol = 'nome';
+  let _sortAsc = true;
+
+  function renderTabela(){
+    const lista = funcionarios.filter(f => String(f.anoLetivo || f.ano) === String(anoAtivo));
+    if(!lista.length){
+      tbodyFunc.innerHTML = '<tr><td class="muted" colspan="13">Nenhum funcionário cadastrado no ano ativo.</td></tr>';
+      return;
+    }
+
+    const sorted = [...lista].sort((a,b)=>{
+      let valA = a[_sortCol];
+      let valB = b[_sortCol];
+      if(_sortCol === 'nasc'){
+        valA = a.dataNascimento||'';
+        valB = b.dataNascimento||'';
+      } else if(_sortCol === 'ch'){
+        valA = parseInt(a.cargaHoraria,10)||0;
+        valB = parseInt(b.cargaHoraria,10)||0;
+      } else if(_sortCol === 'naturalidade'){
+        valA = (a.naturalidadeCidade||'') + ' ' + (a.naturalidadeUF||'');
+        valB = (b.naturalidadeCidade||'') + ' ' + (b.naturalidadeUF||'');
+      }
+      if(typeof valA === 'number' && typeof valB === 'number'){
+        return _sortAsc ? valA - valB : valB - valA;
+      }
+      const strA = (valA||'').toString().toLowerCase();
+      const strB = (valB||'').toString().toLowerCase();
+      const cmp = strA.localeCompare(strB,'pt-BR');
+      return _sortAsc ? cmp : -cmp;
+    });
+
+    const tbody = document.createDocumentFragment();
+    sorted.forEach(f=>{
+      const tr = document.createElement('tr');
+      const naturalidade = (f.naturalidadeCidade||'') + (f.naturalidadeUF ? ', '+f.naturalidadeUF : '');
+      const turnos = Array.isArray(f.turnos) && f.turnos.length
+        ? f.turnos.map(t=>{
+            if(t==='MAT') return '🌅';
+            if(t==='VES') return '☀️';
+            if(t==='NOT') return '🌙';
+            return t;
+          }).join(' ')
+        : '—';
+      tr.innerHTML = `
+        <td><button class="btn-acoes" type="button">⋮</button></td>
+        <td>${f.nome||'—'}</td>
+        <td class="mono">${f.cpf||'—'}</td>
+        <td class="mono">${f.rgCnh||'—'}</td>
+        <td>${formatDate(f.dataNascimento)}</td>
+        <td>${calcAge(f.dataNascimento) || '—'}</td>
+        <td>${f.sexo||'—'}</td>
+        <td>${naturalidade||'—'}</td>
+        <td>${f.corRaca||'—'}</td>
+        <td>${f.funcao||'—'}</td>
+        <td>${formatCH(f.cargaHoraria)}</td>
+        <td>${turnos}</td>
+        <td><span class="badge-status">${STATUS_LABEL[f.status]||f.status||'—'}</span></td>
+      `;
+      tr.querySelector('.btn-acoes').addEventListener('click', function(e){
+        e.stopPropagation();
+        abrirAcoesMenu(this, f);
+      });
+      tbody.appendChild(tr);
+    });
+    tbodyFunc.innerHTML='';
+    tbodyFunc.appendChild(tbody);
+
+    document.querySelectorAll('.th-sort').forEach(th=>{
+      const col = th.dataset.col;
+      const lbl = th.dataset.label;
+      if(col === _sortCol){
+        th.textContent = lbl + (_sortAsc ? ' ▲' : ' ▼');
+      } else {
+        th.textContent = lbl;
+      }
+    });
+  }
+
+  function atualizarPill(){
+    const total = funcionarios.filter(f => String(f.anoLetivo || f.ano) === String(anoAtivo)).length;
+    pillCount.textContent = `Banco ${anoAtivo}: ${total} func.`;
+  }
+
+  /* ══════════════════════════════════════════
+     Menu de ações da tabela
+  ══════════════════════════════════════════ */
+  let _acoesFunc = null;
+  const acoesMenu = document.getElementById('acoesMenu');
+
+  function abrirAcoesMenu(btn, f){
+    if(_acoesFunc && _acoesFunc.funcId === f.funcId){
+      fecharAcoesMenu(); return;
+    }
+    _acoesFunc = f;
+    const rect = btn.getBoundingClientRect();
+    acoesMenu.style.display = 'block';
+    const menuW = acoesMenu.offsetWidth || 150;
+    let left = rect.right - menuW;
+    if(left < 8) left = 8;
+    acoesMenu.style.top  = (rect.bottom + 6) + 'px';
+    acoesMenu.style.left = left + 'px';
+  }
+
+  function fecharAcoesMenu(){
+    _acoesFunc = null;
+    acoesMenu.style.display = 'none';
+  }
+
+  document.getElementById('acoesEditar').addEventListener('click', function(){
+    if(_acoesFunc) iniciarEdicao(_acoesFunc);
+    fecharAcoesMenu();
+  });
+
+  document.getElementById('acoesExcluir').addEventListener('click', async function(){
+    if(!_acoesFunc) return;
+    const f = _acoesFunc;
+    fecharAcoesMenu();
+    if(!confirm(`Excluir "${f.nome}"?`)) return;
+    funcionarios = funcionarios.filter(x => x.funcId !== f.funcId);
+    try{
+      await salvarDB();
+      renderTabela();
+      atualizarPill();
+    } catch(e){
+      console.error(e);
+      alert('Erro ao excluir.');
+    }
+  });
+
+  document.addEventListener('click', function(e){
+    if(acoesMenu.style.display !== 'none' &&
+       !acoesMenu.contains(e.target) &&
+       !e.target.classList.contains('btn-acoes')){
+      fecharAcoesMenu();
+    }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') fecharAcoesMenu();
+  });
+
+  /* ══════════════════════════════════════════
+     Click nos cabeçalhos para ordenar
+  ══════════════════════════════════════════ */
+  document.querySelectorAll('.th-sort').forEach(th => {
+    th.addEventListener('click', function(){
+      const col = th.dataset.col;
+      if(_sortCol === col){
+        _sortAsc = !_sortAsc;
+      } else {
+        _sortCol = col;
+        _sortAsc = true;
+      }
+      renderTabela();
+    });
+  });
+
+  /* ══════════════════════════════════════════
+     Init
+  ══════════════════════════════════════════ */
+  (async function(){
+    await carregarAnoAtivo();
+    await carregarDB();
+    _sugestoesCidades = construirSugestoes();
+  })();
+})();
+</script>
+
+</body>
+</html>
+
+</body>
+</html>
