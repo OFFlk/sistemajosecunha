@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/cadastro_admin.css">
+<title>Admin • Usuários</title>
+<style>
+/* ── Variáveis específicas desta página ── */
+:root {
+  --card-bg:     #ffffff;
+  --card-border: var(--brand-border);
+  --field-bg:    #ffffff;
+  --field-border: var(--brand-border);
+  --shadow:      0 4px 20px rgba(0,0,0,0.06);
+}
+html[data-theme="dark"] {
+  --card-bg:     #131c2e;
+  --card-border: #2a3a5c;
+  --field-bg:    #0a1426;
+  --field-border: #1e2540;
+  --shadow:      0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* ── Layout ── */
+.container { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; }
+
+/* ── Card ── */
+.card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; transition: background 0.3s, border-color 0.3s; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--card-border); background: var(--chip-bg); flex-wrap: wrap; }
+.card-head-title { font-size: 15px; font-weight: 800; color: var(--title-color); }
+.card-head-sub { font-size: 12px; color: var(--muted); margin-top: 3px; font-weight: 600; }
+.card-body { padding: 20px 24px 24px; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 6px; background: var(--card-bg); border: 1px solid var(--card-border); padding: 4px; border-radius: 10px; }
+.tab { border: 0; background: transparent; color: var(--muted); padding: 8px 16px; border-radius: 7px; font-weight: 800; font-size: 13px; cursor: pointer; font-family: 'Nunito', sans-serif; user-select: none; transition: background 0.18s, color 0.18s; white-space: nowrap; }
+.tab:hover { background: var(--chip-bg); color: var(--chip-color); }
+.tab.active { background: var(--brand); color: #fff; }
+
+/* ── Note box ── */
+.note { color: var(--muted); font-size: 13px; line-height: 1.5; padding: 4px 0 12px; }
+.note-box { border-radius: 12px; padding: 16px 18px; border: 1px solid var(--card-border); background: var(--bg); margin-bottom: 14px; }
+.note-box-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.note-box-head b { font-size: 14px; font-weight: 800; color: var(--title-color); }
+
+/* ── Pill ── */
+.pill { display: inline-flex; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--chip-color); font-weight: 700; font-size: 12px; }
+.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+
+/* ── Tabela ── */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; vertical-align: top; }
+th { color: var(--muted); font-weight: 700; font-size: 12px; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ── Grid formulário ── */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media(max-width:860px){ .grid2{ grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { color: var(--muted); font-weight: 700; font-size: 13px; }
+.field input, .field select { width: 100%; padding: 10px 14px; border-radius: 10px; background: var(--field-bg); border: 1px solid var(--field-border); color: var(--ink); outline: none; font-family: 'Nunito', sans-serif; font-size: 14px; transition: border-color 0.15s, box-shadow 0.15s; }
+.field input:focus, .field select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+
+/* ── Botões ── */
+.btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: 10px; background: var(--brand); border: 1px solid var(--brand); color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s; }
+.btn-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-danger-sm { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 8px; background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-color); font-size: 12px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s; }
+.btn-danger-sm:hover { background: rgba(185,28,28,0.20); }
+.btn-danger-sm:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-approve { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 8px; background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.30); color: #16a34a; font-size: 12px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s; }
+.btn-approve:hover { background: rgba(22,163,74,0.22); }
+.btn-approve:disabled { opacity: 0.6; cursor: not-allowed; }
+html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222,128,0.30); }
+
+.spacer { height: 14px; }
+
+/* ── Footer ── */
+footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+.l-fdot { width: 4px; height: 4px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-head-title">Gestão de contas</div>
+        <div class="card-head-sub">Solicitações → Aprovar/Reprovar • Usuários • Admins</div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Abas de gestão">
+        <button class="tab active" type="button" data-view="requests">Solicitações</button>
+        <button class="tab" type="button" data-view="users">Usuários</button>
+        <button class="tab" type="button" data-view="admins">Admins</button>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <div id="msg" class="note"></div>
+
+      <!-- Solicitações -->
+      <section id="view-requests">
+        <div class="note-box">
+          <div class="note-box-head">
+            <b>Solicitações pendentes</b>
+            <span class="pill" id="pendingCount">0 pendente(s)</span>
+          </div>
+          <div style="overflow:auto;">
+            <table>
+              <thead><tr><th>Nome</th><th>Email</th><th>schoolId</th><th>Data</th><th style="text-align:right;">Ações</th></tr></thead>
+              <tbody id="pendingTbody"><tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Usuários -->
+      <section id="view-users" style="display:none;">
+        <div class="note-box">
+          <div class="note-box-head">
+            <b>Usuários cadastrados</b>
+            <span class="pill" id="usersCount">0 usuário(s)</span>
+          </div>
+          <div style="overflow:auto;">
+            <table>
+              <thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>schoolId</th><th class="mono">uid</th><th>Ações</th></tr></thead>
+              <tbody id="usersTbody"><tr><td colspan="6" style="color:var(--muted);font-size:13px;padding:16px 8px;">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Admins -->
+      <section id="view-admins" style="display:none;">
+        <div class="note-box">
+          <b style="font-size:14px;font-weight:800;color:var(--title-color);">Criar admin</b>
+          <div class="spacer"></div>
+          <div class="grid2">
+            <div class="field"><label for="aName">Nome</label><input id="aName" placeholder="Ex.: Maria" autocomplete="name"></div>
+            <div class="field"><label for="aSchool">schoolId</label><select id="aSchool"><option value="">Carregando escolas...</option></select></div>
+            <div class="field"><label for="aEmail">Email</label><input id="aEmail" placeholder="admin@escola.com" autocomplete="username"></div>
+            <div class="field"><label for="aPass">Senha</label><input id="aPass" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+          </div>
+          <div class="spacer"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button class="btn-primary" id="btnCreateAdmin" type="button">➕ Criar admin</button>
+          </div>
+        </div>
+        <div class="spacer"></div>
+        <div class="note-box">
+          <div class="note-box-head">
+            <b>Admins cadastrados</b>
+            <span class="pill" id="adminsCount">0 admin(s)</span>
+          </div>
+          <div style="overflow:auto;">
+            <table>
+              <thead><tr><th>Nome</th><th>Email</th><th>schoolId</th><th class="mono">uid</th><th>Ações</th></tr></thead>
+              <tbody id="adminsTbody"><tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="l-fdot"></div>
+  sistema interno de gestão escolar · desenvolvido sob medida
+</footer>
+
+<script src="../header-logic.js"></script>
+<script>
+(function(){
+  'use strict';
+  var el = function(id){ return document.getElementById(id); };
+
+  function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escapeAttr(s){ return escapeHtml(s); }
+  function fmtDate(v){
+    if(!v) return '—';
+    try{
+      var d = v && v.toDate ? v.toDate() : new Date(v.seconds ? v.seconds*1000 : v);
+      return d.toLocaleDateString('pt-BR');
+    }catch(_){ return '—'; }
+  }
+
+  function setMsg(txt, isErr){
+    var m = el('msg');
+    if(!m) return;
+    m.textContent = txt || '';
+    m.style.color = isErr ? 'var(--danger-color)' : (txt ? 'var(--chip-color)' : '');
+  }
+
+  // ── Tabs ──
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      document.querySelectorAll('[id^="view-"]').forEach(function(s){ s.style.display='none'; });
+      var target = el('view-' + tab.dataset.view);
+      if(target) target.style.display='';
+    });
+  });
+
+  function getEffectiveSchoolId(){
+    try{
+      var s = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+      if(!s) return '';
+      var sid = String(s.schoolId||'').trim();
+      if(!sid || sid.toUpperCase() !== 'ADMIN') return sid;
+      return String(localStorage.getItem('admin_active_school_v1')||'').trim();
+    }catch(_){ return ''; }
+  }
+
+  async function populateSchoolSelect(){
+    var sel = el('aSchool');
+    if(!sel) return;
+    try{
+      var schools = window.Auth && typeof Auth.listSchools === 'function' ? (Auth.listSchools()||[]) : [];
+      if(!schools.length && window.Auth && window.Auth.db){
+        var snap = await Auth.db.collection('schools').get();
+        snap.docs.forEach(function(d){ schools.push(Object.assign({schoolId:d.id},d.data())); });
+      }
+      sel.innerHTML = '';
+      var opt0 = document.createElement('option'); opt0.value=''; opt0.textContent='Selecione a escola...'; sel.appendChild(opt0);
+      schools.sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||''),'pt-BR'); }).forEach(function(sc){
+        var opt = document.createElement('option');
+        opt.value = String(sc.schoolId||sc.id||'').trim();
+        opt.textContent = sc.name ? sc.name + ' (' + opt.value + ')' : opt.value;
+        sel.appendChild(opt);
+      });
+      var effSchool = getEffectiveSchoolId();
+      if(effSchool && effSchool.toUpperCase() !== 'ADMIN'){
+        sel.value = effSchool;
+        sel.disabled = true;
+        sel.title = 'SchoolId definido pela sua sessão';
+      }
+    }catch(e){
+      sel.innerHTML = '<option value="">Erro ao carregar escolas</option>';
+    }
+  }
+
+  async function deleteUserById(uid, name){
+    if(!confirm('Excluir o usuário "' + name + '"? Esta ação não pode ser desfeita.')) return false;
+    await Auth.deleteUser(uid);
+    return true;
+  }
+
+  async function refresh(){
+    setMsg('Carregando...');
+    try{
+      var effSchool = getEffectiveSchoolId();
+      var isMaster  = !effSchool || effSchool.toUpperCase() === 'ADMIN';
+      var session   = Auth.getSession();
+      var allUsers  = await Auth.listUsers();
+      var filtered  = isMaster ? allUsers : allUsers.filter(function(u){ return String(u.schoolId||'').trim() === effSchool; });
+
+      var pending = filtered.filter(function(u){ return String(u.role||'').trim().toLowerCase() === 'pending'; });
+      var users   = filtered.filter(function(u){ var r=String(u.role||'').trim().toLowerCase(); return r!=='pending'&&r!=='admin'; });
+      var admins  = filtered.filter(function(u){ return String(u.role||'').trim().toLowerCase() === 'admin'; });
+
+      // Solicitações
+      el('pendingCount').textContent = pending.length + ' pendente(s)';
+      var pbody = el('pendingTbody');
+      pbody.innerHTML = '';
+      if(!pending.length){
+        pbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Nenhuma solicitação pendente.</td></tr>';
+      } else {
+        pending.forEach(function(r){
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td><b>'+escapeHtml(r.name||'—')+'</b></td><td>'+escapeHtml(r.email||'—')+'</td><td><span class="pill mono">'+escapeHtml(r.schoolId||'—')+'</span></td><td>'+escapeHtml(fmtDate(r.createdAt))+'</td><td style="text-align:right;"><div class="row-actions"><button class="btn-approve" data-act="approve" data-uid="'+escapeAttr(r.uid)+'">Aprovar</button><button class="btn-danger-sm" data-act="reject" data-uid="'+escapeAttr(r.uid)+'">Reprovar</button></div></td>';
+          pbody.appendChild(tr);
+        });
+        pbody.querySelectorAll('button[data-act]').forEach(function(b){
+          b.addEventListener('click', async function(){
+            var uid=b.dataset.uid, act=b.dataset.act; b.disabled=true;
+            try{
+              if(act==='approve'){ await Auth.approveUser(uid); setMsg('Usuário aprovado com sucesso!'); }
+              else { await Auth.deleteUser(uid); setMsg('Solicitação reprovada e removida.'); }
+              await refresh();
+            }catch(err){ setMsg(String(err&&err.message||err||'Erro'),true); b.disabled=false; }
+          });
+        });
+      }
+
+      // Usuários
+      el('usersCount').textContent = users.length + ' usuário(s)';
+      var ubody = el('usersTbody');
+      ubody.innerHTML = '';
+      if(!users.length){
+        ubody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-size:13px;padding:16px 8px;">Nenhum usuário cadastrado.</td></tr>';
+      } else {
+        users.forEach(function(u){
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td><b>'+escapeHtml(u.name||'—')+'</b></td><td>'+escapeHtml(u.email||'—')+'</td><td><span class="pill">'+escapeHtml(String(u.role||'user'))+'</span></td><td><span class="pill mono">'+escapeHtml(u.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(u.uid||'—')+'</td><td>'+(isMaster?'<button class="btn-danger-sm" data-del-uid="'+escapeAttr(u.uid)+'" data-del-name="'+escapeAttr(u.name||u.email||'?')+'">Excluir</button>':'—')+'</td>';
+          ubody.appendChild(tr);
+        });
+        if(isMaster){ ubody.querySelectorAll('[data-del-uid]').forEach(function(btn){ btn.addEventListener('click',async function(){ btn.disabled=true; try{ var ok=await deleteUserById(btn.dataset.delUid,btn.dataset.delName); if(ok){setMsg('Usuário excluído.');await refresh();}else btn.disabled=false; }catch(err){setMsg(String(err&&err.message||err||'Erro'),true);btn.disabled=false;} }); }); }
+      }
+
+      // Admins
+      el('adminsCount').textContent = admins.length + ' admin(s)';
+      var abody = el('adminsTbody');
+      abody.innerHTML = '';
+      if(!admins.length){
+        abody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Nenhum admin cadastrado.</td></tr>';
+      } else {
+        admins.forEach(function(a){
+          var tr = document.createElement('tr');
+          var canDelete = isMaster && a.uid !== (session && session.uid);
+          tr.innerHTML = '<td><b>'+escapeHtml(a.name||'—')+'</b></td><td>'+escapeHtml(a.email||'—')+'</td><td><span class="pill mono">'+escapeHtml(a.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(a.uid||'—')+'</td><td>'+(canDelete?'<button class="btn-danger-sm" data-del-uid="'+escapeAttr(a.uid)+'" data-del-name="'+escapeAttr(a.name||a.email||'?')+'">Excluir</button>':'—')+'</td>';
+          abody.appendChild(tr);
+        });
+        if(isMaster){ abody.querySelectorAll('[data-del-uid]').forEach(function(btn){ btn.addEventListener('click',async function(){ btn.disabled=true; try{ var ok=await deleteUserById(btn.dataset.delUid,btn.dataset.delName); if(ok){setMsg('Admin excluído.');await refresh();}else btn.disabled=false; }catch(err){setMsg(String(err&&err.message||err||'Erro'),true);btn.disabled=false;} }); }); }
+      }
+
+      setMsg('');
+    }catch(err){
+      setMsg('Erro ao carregar dados: ' + String(err&&err.message||err), true);
+    }
+  }
+
+  el('btnCreateAdmin').addEventListener('click', async function(){
+    try{
+      var name=el('aName').value.trim(), email=el('aEmail').value.trim().toLowerCase(), password=el('aPass').value, effSchool=getEffectiveSchoolId();
+      var schoolId = el('aSchool').value.trim();
+      if(effSchool && effSchool.toUpperCase()!=='ADMIN') schoolId=effSchool;
+      if(!name||!email||!password||!schoolId){ setMsg('Preencha nome, e-mail, senha e schoolId.',true); return; }
+      if(password.length<6){ setMsg('Senha deve ter pelo menos 6 caracteres.',true); return; }
+      el('btnCreateAdmin').disabled=true; el('btnCreateAdmin').textContent='Criando...';
+      var res = await Auth.createUser({name:name,email:email,password:password,role:'admin',schoolId:schoolId});
+      if(res&&res.ok===false) throw new Error(res.message||'Erro ao criar admin.');
+      el('aName').value=''; el('aEmail').value=''; el('aPass').value=''; el('aSchool').selectedIndex=0;
+      setMsg('Admin criado com sucesso!');
+      await refresh();
+    }catch(err){ setMsg(String(err&&err.message||err||'Erro'),true); }
+    finally{ el('btnCreateAdmin').disabled=false; el('btnCreateAdmin').textContent='➕ Criar admin'; }
+  });
+
+  document.addEventListener('auth:ready', async function(){
+    await populateSchoolSelect();
+    await refresh();
+  }, { once: true });
+
+})();
+</script>
+
+</body>
+</html>

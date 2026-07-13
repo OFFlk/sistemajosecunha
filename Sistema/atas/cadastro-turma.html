@@ -1,0 +1,2029 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script src="../auth.firebase.js"></script>
+<!-- página exclusiva de ADMIN -->
+<script>window.Auth && Auth.requireRole('admin');</script>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<title>Cadastro de Turma</title>
+
+<!-- PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+/* ── Variáveis sobrescritas por esta página ── */
+:root {
+  --card-bg:      #ffffff;
+  --card-border:  var(--brand-border, #ddd6fe);
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border, #ddd6fe);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  --radius:       14px;
+}
+html[data-theme="dark"] {
+  --card-bg:      #131c2e;
+  --card-border:  #2a3a5c;
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* ── Classes exclusivas desta página ── */
+
+/* Container mais largo que o padrão global (1100px) */
+.container { max-width: 1100px; margin: 22px auto 48px; padding: 0 18px; }
+
+/* Card — padding e margin específicos desta página */
+.card { padding: 20px; margin-bottom: 16px; }
+
+.top-actions{ display:flex; gap:10px; justify-content:flex-end; margin-bottom:14px; flex-wrap:wrap; }
+
+/* Botão secundário */
+.btn.btn-secondary, button.btn-secondary, button.btn.btn-secondary {
+  background: transparent; border: 1.5px solid var(--brand, #7c3aed); color: var(--brand, #7c3aed);
+}
+.btn.btn-secondary:hover, button.btn-secondary:hover { background: var(--brand-faded, #f5f3ff); }
+html[data-theme="dark"] .btn.btn-secondary, html[data-theme="dark"] button.btn-secondary { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
+html[data-theme="dark"] .btn.btn-secondary:hover { background: var(--brand-faded-d, rgba(124,58,237,0.2)); }
+
+/* Botão danger outline */
+.btn.btn-danger-outline, button.btn-danger-outline {
+  background: transparent; border: 1.5px solid #b91c1c; color: #b91c1c;
+}
+.btn.btn-danger-outline:hover { background: rgba(185,28,28,0.08); }
+html[data-theme="dark"] .btn.btn-danger-outline { color: #fca5a5; border-color: #fca5a5; }
+html[data-theme="dark"] .btn.btn-danger-outline:hover { background: rgba(252,165,165,0.08); }
+
+/* Botão editar na tabela */
+.btn-edit { padding: 5px 10px; font-size: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; white-space: nowrap; font-family: 'Nunito', sans-serif; }
+.btn-gray { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn-gray:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+.btn-mini { padding:8px 10px; font-size:13px; }
+
+/* Formulário */
+.row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
+@media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
+@media(max-width:540px){ .row{grid-template-columns:1fr;} }
+.campo{ display:flex; flex-direction:column; min-width:0; }
+.campo label { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block; }
+.campo input, .campo select,
+#formGridDinamico input, #formGridDinamico select,
+.row input, .row select {
+  padding: 10px 12px; font-size: 14px; width: 100%;
+  border: 1px solid var(--field-border, #ddd6fe); border-radius: 10px;
+  background: var(--field-bg, #fff); color: var(--ink);
+  outline: none; font-family: 'Nunito', sans-serif;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.campo input:focus, .campo select:focus,
+#formGridDinamico input:focus, #formGridDinamico select:focus,
+.row input:focus, .row select:focus {
+  border-color: var(--brand, #7c3aed);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+}
+html[data-theme="dark"] .campo input, html[data-theme="dark"] .campo select,
+html[data-theme="dark"] #formGridDinamico input, html[data-theme="dark"] #formGridDinamico select,
+html[data-theme="dark"] .row input, html[data-theme="dark"] .row select {
+  background: var(--field-bg, #0a1426); color: var(--ink); border-color: var(--field-border, #1e2540);
+}
+.form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
+.actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
+
+/* Tabela — variantes específicas desta página */
+.table-wrap{ overflow-x:auto; padding-bottom:6px; border:1px solid var(--line); border-radius:14px; margin-top:14px; }
+table{ width:max-content; min-width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+html[data-theme="dark"] tbody tr:hover td{ background:var(--chip-bg); }
+th.th-vertical{ width:34px; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; padding:10px 4px; font-size:12px; line-height:1; }
+th.th-num{ width:42px; }
+th.th-nome{ width:220px; }
+td.col-nome{ text-align:left; padding-left:8px; word-break:break-word; }
+th.th-nota, td.col-nota{ width:42px; font-size:11px; }
+
+/* Séries */
+.series-wrap{ display:flex; flex-direction:column; gap:8px; min-height:44px; }
+.series-linha{ display:flex; gap:8px; align-items:center; }
+.series-linha select{ flex:1; padding:10px 12px; font-size:14px; border:1px solid var(--field-border); border-radius:10px; background:var(--field-bg); color:var(--ink); outline:none; font-family:'Nunito',sans-serif; transition:border-color 0.15s, box-shadow 0.15s; }
+.series-linha select:focus{ border-color:var(--brand,#7c3aed); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
+html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border-color:var(--field-border); color:var(--ink); }
+.preview-serie{ font-size:13px; color:var(--muted); margin-top:6px; }
+
+/* Avisos */
+.aviso-warn{ background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
+
+/* Cabeçalho da ata (pré-visualização) */
+.cabecalho{ display:flex; align-items:center; gap:15px; margin-bottom:10px; }
+.cabecalho img{ width:90px; height:auto; display:none; }
+.cabecalho-texto{ flex:1; text-align:center; }
+.cabecalho-texto h2{ margin:0; }
+.cabecalho-texto p{ margin:2px 0; font-size:14px; }
+
+.hidden{ display:none !important; }
+
+/* ── Card de Scans do Livro de Atas ── */
+#cardScansAtas {
+  border: 2px dashed var(--brand-border, #ddd6fe);
+  border-radius: var(--radius, 14px);
+  background: var(--card-bg);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: border-color 0.2s;
+}
+#cardScansAtas:has(.scan-item) {
+  border-style: solid;
+}
+.scans-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.scans-header h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scans-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--brand-faded, #f5f3ff);
+  color: var(--brand, #7c3aed);
+  border-radius: 99px;
+  padding: 2px 9px;
+}
+.scans-optional {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-left: 4px;
+}
+.scans-drop-zone {
+  border: 1.5px dashed var(--field-border, #ddd6fe);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--field-bg, #fff);
+  margin-bottom: 14px;
+  position: relative;
+}
+.scans-drop-zone:hover,
+.scans-drop-zone.drag-over {
+  border-color: var(--brand, #7c3aed);
+  background: var(--brand-faded, #f5f3ff);
+}
+.scans-drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+.scans-drop-icon { font-size: 28px; margin-bottom: 6px; }
+.scans-drop-text { font-size: 13px; color: var(--muted); }
+.scans-drop-text strong { color: var(--brand, #7c3aed); }
+.scans-uploading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.scans-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--brand-faded, #ddd6fe);
+  border-top-color: var(--brand, #7c3aed);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.scans-list { display: flex; flex-direction: column; gap: 8px; }
+.scan-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #ede9fe);
+  border-radius: 10px;
+  background: var(--field-bg, #fff);
+  font-size: 13px;
+}
+.scan-item-icon { font-size: 20px; flex-shrink: 0; }
+.scan-item-info { flex: 1; min-width: 0; }
+.scan-item-name {
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scan-item-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.scan-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.scans-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 0 2px;
+}
+
+</style>
+<script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
+</head>
+
+<body>
+<div id="header-placeholder"></div>
+
+<div class="container">
+
+  <div class="card">
+    <div id="avisoEscola" class="aviso-warn" style="display:none">
+      ⚠️ Nenhuma escola cadastrada. Vá em <b>Editar escola</b> para configurar o cabeçalho.
+    </div>
+
+    <div class="cabecalho">
+      <img id="escudo" alt="Escudo da escola">
+      <div class="cabecalho-texto">
+        <h2 id="nomeEscola">Nome da Escola</h2>
+        <p id="enderecoEscola">Endereço da Escola</p>
+        <strong>ATA DE RESULTADOS FINAIS</strong>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="campo">
+        <label>Ano</label>
+        <select id="ano"></select>
+      </div>
+
+      
+
+      <!-- Schema da turma (biblioteca do Admin) -->
+      <div class="campo" id="wrapSchema">
+        <label>Schema da turma</label>
+        <select id="schemaTurma" title="Escolha um schema salvo no Admin"></select>
+      </div>
+<!-- wrap de série (turma) pode sumir via schema -->
+      <div class="campo" id="wrapSerieTurma">
+        <label>Série(s) da turma</label>
+
+        <!-- Mantém exportarPDF intacto -->
+        <input id="serieAta" type="hidden">
+
+        <div id="seriesTurmaWrap" class="series-wrap"></div>
+
+        <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
+          <button type="button" class="btn btn-secondary btn-mini" id="btnMaisSerie" onclick="adicionarSelectSerieTurma()">+ Adicionar série</button>
+        </div>
+
+        <div id="serieTurmaPreview" class="preview-serie">Nenhuma série selecionada</div>
+      </div>
+
+      <div class="campo">
+        <label>Turno</label>
+        <select id="turno">
+          <option>MATUTINO</option>
+          <option>VESPERTINO</option>
+          <option>NOTURNO</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── Card de Scans do Livro de Atas (oculto até clicar Continuar ou ao editar) ── -->
+  <div id="cardScansAtas" class="hidden">
+    <div class="scans-header">
+      <h3>
+        📄 Scans do Livro de Atas
+        <span class="scans-optional">— opcional</span>
+      </h3>
+      <span class="scans-badge" id="scansBadge">0 arquivo(s)</span>
+    </div>
+
+    <!-- Zona de upload -->
+    <div class="scans-drop-zone" id="scansDropZone">
+      <input type="file" id="scansInput" accept="image/*,application/pdf" multiple>
+      <div class="scans-drop-icon">📁</div>
+      <div class="scans-drop-text">
+        <strong>Clique para selecionar</strong> ou arraste aqui<br>
+        PDF ou imagem (JPG, PNG) — scan do livro físico
+      </div>
+    </div>
+
+    <!-- Progresso de upload -->
+    <div class="scans-uploading hidden" id="scansUploading">
+      <div class="scans-spinner"></div>
+      <span id="scansUploadingText">Enviando...</span>
+    </div>
+
+    <!-- Lista de arquivos -->
+    <div class="scans-list" id="scansList">
+      <div class="scans-empty" id="scansEmpty">Nenhum scan enviado ainda.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Alunos</h3>
+
+    <!-- ✅ Agora o form é dinâmico -->
+    <div class="form-grid" id="formGridDinamico"></div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
+      <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarCardScans()" style="display:none">Continuar →</button>
+      <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
+      <button class="btn btn-primary" onclick="exportarPDF()">Exportar PDF</button>
+    </div>
+
+    <div class="table-wrap"><table>
+      <thead>
+        <!-- ✅ Thead dinâmico -->
+        <tr id="theadDinamico"></tr>
+      </thead>
+      <tbody id="tabela"></tbody>
+    </table></div>
+  </div>
+
+</div>
+
+<script>
+/* =========================
+   Helpers
+========================= */
+const $ = (id) => document.getElementById(id);
+function normStr(v){ return String(v ?? "").trim(); }
+
+/* =========================
+   DB por escola (schoolId)
+   - grava tudo em localStorage no formato: schools:<schoolId>:<chave>
+   - evita vazamento de dados entre escolas
+========================= */
+const DB = (() => {
+  const SESSION_KEY = "auth_session_v2";
+  const ADMIN_ACTIVE_SCHOOL_KEY = "admin_active_school_v1";
+
+  const SAFE_KEYS = new Set([
+    "turmasDB",
+    "alunosDB",
+    "alunosAliasesDB",
+    "atasDB",
+    "matriculasDB",
+    "turmasMetaDB",
+    "dadosEscola"
+  ]);
+
+  function safeParse(raw){
+    try{ return JSON.parse(raw); }catch{ return null; }
+  }
+
+  function getSession(){
+    try{
+      if (window.Auth && typeof Auth.getSession === "function") return Auth.getSession();
+    }catch{}
+    return safeParse(localStorage.getItem(SESSION_KEY));
+  }
+
+  function activeSchoolId(){
+    const s = getSession();
+    const sid = String(s?.schoolId || "").trim().toUpperCase();
+    if (sid === "ADMIN"){
+      const picked = String(localStorage.getItem(ADMIN_ACTIVE_SCHOOL_KEY) || "").trim().toUpperCase();
+      return picked || "ADMIN";
+    }
+    return sid;
+  }
+
+  function key(baseKey){
+    const sid = activeSchoolId();
+    if (!sid) return null;
+    return `schools:${sid}:${baseKey}`;
+  }
+
+  function migrateIfNeeded(baseKey){
+    if (!SAFE_KEYS.has(baseKey)) return;
+    const scoped = key(baseKey);
+    if (!scoped) return;
+    if (localStorage.getItem(scoped) !== null) return;
+
+    const legacy = localStorage.getItem(baseKey);
+    if (legacy === null) return;
+
+    localStorage.setItem(scoped, legacy);
+    // não remove legado para não quebrar páginas antigas
+  }
+
+  function read(baseKey, fallback){
+    migrateIfNeeded(baseKey);
+    const k = key(baseKey);
+    if (!k) return fallback;
+    const v = safeParse(localStorage.getItem(k));
+    return (v === null || v === undefined) ? fallback : v;
+  }
+
+  function write(baseKey, value){
+    const k = key(baseKey);
+    if (!k){
+      alert("Sua conta não está vinculada a uma escola (schoolId). Peça ao admin para configurar.");
+      return false;
+    }
+    localStorage.setItem(k, JSON.stringify(value));
+    return true;
+  }
+
+  function remove(baseKey){
+    const k = key(baseKey);
+    if (!k) return false;
+    localStorage.removeItem(k);
+    return true;
+  }
+
+  // Intercepta write para também persistir no Firestore em paralelo
+  const FIRESTORE_MAP = {
+    turmasDB:       'turmas',
+    alunosDB:       'alunos',
+    alunosAliasesDB:'matriculas',
+    atasDB:         'atas',
+    matriculasDB:   'matriculas',
+    dadosEscola:    null, // tratado separadamente via DB.escola.save()
+  };
+
+  function writeFirestore(baseKey, value){
+    try{
+      if(!window.DB || !window.Auth || !window.Auth.getSession()) return;
+      const colName = FIRESTORE_MAP[baseKey];
+      if(colName === undefined) return; // chave não mapeada
+      if(colName === null){
+        // dadosEscola → DB.escola.save()
+        if(baseKey === 'dadosEscola' && window.DB.escola)
+          DB.escola.save(value).catch(e=>console.warn('Firestore dadosEscola:', e));
+        return;
+      }
+      const col = window.DB[colName];
+      if(!col) return;
+      // Array → saveAll; objeto → save
+      if(Array.isArray(value)){
+        col.saveAll(value).catch(e=>console.warn(`Firestore ${colName} saveAll:`, e));
+      } else {
+        col.save(value).catch(e=>console.warn(`Firestore ${colName} save:`, e));
+      }
+    }catch(e){ console.warn('writeFirestore erro:', e); }
+  }
+
+  function writeBoth(baseKey, value){
+    const ok = write(baseKey, value);   // localStorage síncrono
+    if(ok) writeFirestore(baseKey, value); // Firestore assíncrono
+    return ok;
+  }
+
+  return { read, write: writeBoth, remove, key, activeSchoolId };
+})();
+
+/* =========================
+   Schema (Admin -> Cadastro)
+========================= */
+const SCHEMAS_KEY = "turmasSchemas_v1";
+const ACTIVE_SCHEMA_ID_KEY = "turmasSchemaActiveId_v1";
+
+function getDefaultConfig() {
+  return {
+    version: 1,
+    nome: "Padrão (arquivo original)",
+    serieAtiva: true,
+    resultadoAtivo: true,
+    ordenarPor: "nome",
+    colunas: [
+      { key:"port",  label:"Português",  type:"nota", enabled:true },
+      { key:"mat",   label:"Matemática", type:"nota", enabled:true },
+      { key:"hist",  label:"História",   type:"nota", enabled:true },
+      { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
+      { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
+      { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
+      { key:"arte",  label:"Arte",       type:"nota", enabled:true },
+      { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
+    ]
+  };
+}
+
+function normalizeSchema(cfg) {
+  const def = getDefaultConfig();
+  const out = {
+    id: String(cfg?.id || cfg?.schemaId || "").trim() || "",
+    version: 1,
+    nome: String(cfg?.nome ?? def.nome),
+    serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
+    resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+    ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
+    colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+  };
+
+  out.colunas = out.colunas
+    .map(c => ({
+      key: String(c?.key ?? "").trim().toLowerCase(),
+      label: String(c?.label ?? "").trim(),
+      type: (c?.type === "texto") ? "texto" : "nota",
+      enabled: c?.enabled !== false
+    }))
+    .filter(c => c.key && c.label);
+
+  // remove duplicadas por key
+  const seen = new Set();
+  out.colunas = out.colunas.filter(c => {
+    if (seen.has(c.key)) return false;
+    seen.add(c.key);
+    return true;
+  });
+
+  return out;
+}
+
+function loadSchemas() {
+  try {
+    const raw = localStorage.getItem(SCHEMAS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.map(normalizeSchema) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getActiveSchemaId() {
+  return localStorage.getItem(ACTIVE_SCHEMA_ID_KEY) || "";
+}
+
+function getSchemaById(id) {
+  const schemas = loadSchemas();
+  return schemas.find(s => String(s.id) === String(id)) || null;
+}
+
+function loadSchemaConfig() {
+  // usa o schema padrão escolhido no Admin
+  const schemas = loadSchemas();
+  if (!schemas.length) return getDefaultConfig();
+
+  const activeId = getActiveSchemaId();
+  return schemas.find(s => s.id === activeId) || schemas[0] || getDefaultConfig();
+}
+
+// ✅ Quando editando turma, usa snapshotapshot dela
+let SCHEMA_ATIVO = null;
+function getSchemaAtivoParaTela() {
+  return SCHEMA_ATIVO || loadSchemaConfig();
+}
+
+let SCHEMAS_CACHE = [];
+let schemaSelecionadoId = ""; // para turma nova (não edição)
+
+function renderSelectSchemasCadastro() {
+  const sel = $("schemaTurma");
+  if (!sel) return;
+
+  SCHEMAS_CACHE = loadSchemas();
+
+  // Se não tiver schemas ainda, cria um "virtual" default
+  if (!SCHEMAS_CACHE.length) {
+    const def = getDefaultConfig();
+    def.id = "default";
+    SCHEMAS_CACHE = [def];
+  }
+
+  // seleciona o padrão do Admin (activeId) ou o primeiro
+  if (!schemaSelecionadoId) {
+    const activeId = getActiveSchemaId();
+    schemaSelecionadoId = SCHEMAS_CACHE.some(s => s.id === activeId) ? activeId : SCHEMAS_CACHE[0].id;
+  }
+
+  sel.innerHTML = SCHEMAS_CACHE.map(s => {
+    const isSel = s.id === schemaSelecionadoId;
+    return `<option value="${s.id}" ${isSel ? "selected" : ""}>${String(s.nome || s.id)}</option>`;
+  }).join("");
+
+  sel.onchange = () => onTrocarSchemaTurma(sel.value);
+
+  // em turma existente, trava o select
+  sel.disabled = !!modoEdicao;
+}
+
+function onTrocarSchemaTurma(id) {
+  if (modoEdicao) {
+    alert("Esta turma já existe e usa o schema salvo nela (snapshot).");
+    renderSelectSchemasCadastro();
+    return;
+  }
+
+  schemaSelecionadoId = id;
+
+  // aplica schema selecionado na tela (turma nova)
+  SCHEMA_ATIVO = getSchemaById(id) || loadSchemaConfig();
+
+  // re-render UI
+  renderFormularioDinamico();
+  renderTheadDinamico();
+
+  const schema = getSchemaAtivoParaTela();
+  if (schema.serieAtiva) iniciarSeriesTurma();
+  else {
+    seriesTurma = [];
+    atualizarSerieAtaHiddenEPreview();
+  }
+
+  // como o schema mudou, zera alunos (evita mistura de colunas)
+  alunos = [];
+  atualizarTabela();
+}
+
+function getColunasAtivas(schema) {
+  return (schema?.colunas || []).filter(c => c.enabled);
+}
+
+/* =========================
+   Render dinâmico (form + thead)
+========================= */
+function renderFormularioDinamico() {
+  const grid = $("formGridDinamico");
+  if (!grid) return;
+
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  let html = `
+    <div class="campo"><label>Nome do aluno *</label><input id="nome"></div>
+  `;
+
+  if (schema.serieAtiva) {
+    html += `
+      <div class="campo">
+        <label>Série *</label>
+        <select id="serie"></select>
+      </div>
+    `;
+  }
+
+  for (const c of colAtivas) {
+    html += `
+      <div class="campo">
+        <label>${c.label}</label>
+        <input id="${c.key}">
+      </div>
+    `;
+  }
+
+  if (schema.resultadoAtivo) {
+    html += `
+      <div class="campo">
+        <label>Resultado Final *</label>
+        <select id="resultado">
+          <option>Não informado</option>
+          <option>AP</option>
+          <option>REP</option>
+          <option>DEST</option>
+          <option>TRA</option>
+          <option>FAL</option>
+          <option>AND</option>
+        </select>
+      </div>
+    `;
+  }
+
+  grid.innerHTML = html;
+
+  // Ajusta visibilidade da área de série da turma (cabeçalho)
+  const wrapSerieTurma = $("wrapSerieTurma");
+  if (wrapSerieTurma) {
+    wrapSerieTurma.classList.toggle("hidden", !schema.serieAtiva);
+  }
+}
+
+function renderTheadDinamico() {
+  const tr = $("theadDinamico");
+  if (!tr) return;
+
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  // Nº e Nome ficam horizontais e com largura fixa
+  let html = `<th class="th-num">Nº</th><th class="th-nome">Nome</th>`;
+
+  // Todas as demais colunas ficam com cabeçalho vertical
+  if (schema.serieAtiva) html += `<th class="th-vertical th-nota">Série</th>`;
+
+  for (const c of colAtivas) {
+    html += `<th class="th-vertical th-nota">${c.label}</th>`;
+  }
+
+  if (schema.resultadoAtivo) html += `<th class="th-vertical th-nota">Resultado</th>`;
+
+  html += `<th class="th-vertical th-nota">Ações</th>`;
+  tr.innerHTML = html;
+}
+
+/* =========================
+   Escola (cabeçalho)
+========================= */
+function carregarDadosEscola() {
+  const aviso = $("avisoEscola");
+  const rawObj = DB.read("dadosEscola", null);
+  const raw = rawObj ? JSON.stringify(rawObj) : null;
+
+  if (!raw) {
+    if (aviso) aviso.style.display = "block";
+    return;
+  }
+
+  if (aviso) aviso.style.display = "none";
+
+  let escola = {};
+  try { escola = JSON.parse(raw); } catch { escola = {}; }
+
+  const elNome = $("nomeEscola");
+  const elEnd = $("enderecoEscola");
+  const imgEscudo = $("escudo");
+
+  if (elNome && escola.nome) elNome.textContent = escola.nome;
+  if (elEnd && escola.endereco) elEnd.textContent = escola.endereco;
+
+  if (imgEscudo) {
+    if (escola.escudo) {
+      imgEscudo.src = escola.escudo;
+      imgEscudo.style.display = "block";
+    } else {
+      imgEscudo.style.display = "none";
+      imgEscudo.removeAttribute("src");
+    }
+  }
+}
+
+/* =========================
+   Ano
+========================= */
+function preencherAnos() {
+  const el = $("ano");
+  if (!el) return;
+
+  const anoAtual = new Date().getFullYear();
+  el.innerHTML = "";
+  for (let a = 1990; a <= anoAtual + 1; a++) {
+    el.innerHTML += `<option${a === anoAtual ? " selected" : ""}>${a}</option>`;
+  }
+}
+
+/* =========================
+   Séries (turma e aluno) - mantém sua lógica
+   (será usada apenas se schema.serieAtiva = true)
+========================= */
+const SERIES_PADRAO = [
+  "Alfabetização",
+  "Eixo 1", "Eixo 2", "Eixo 3",
+  "1ª série", "2ª série", "3ª série", "4ª série", "5ª série", "6ª série", "7ª série", "8ª série",
+  "1º ano", "2º ano", "3º ano", "4º ano", "5º ano", "6º ano", "7º ano", "8º ano", "9º ano"
+];
+
+function normalizarSerieChave(s) {
+  let t = String(s ?? "").trim().toLowerCase();
+  t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  t = t.replace(/\s*\(importado\)\s*$/i, "");
+  t = t.replace(/[ºª]{2,}/g, (m) => m[0]);
+  t = t.replace(/\s+/g, " ").trim();
+  t = t.replace(/\b([1-9])\s*(o|°)\b/g, "$1º");
+  t = t.replace(/\b([1-8])\s*a\b/g, "$1ª");
+  t = t.replace(/\b([1-9])[ºª]\b/g, "$1");
+  return t;
+}
+
+function formatarSerieBonita(s) {
+  let t = String(s ?? "").trim();
+  if (!t) return "";
+
+  t = t.replace(/\s*\(importado\)\s*$/i, "").trim();
+  t = t.replace(/[ºª]{2,}/g, (m) => m[0]);
+
+  t = t.replace(/\b([1-9])\s*(o|°)\b/gi, "$1º");
+  t = t.replace(/\b([1-8])\s*a\b/gi, "$1ª");
+  t = t.replace(/\b([1-9])\s*(ano)\b/gi, "$1º $2");
+  t = t.replace(/\b([1-8])\s*(serie|série)\b/gi, "$1ª série");
+  t = t.replace(/\bserie\b/gi, "série");
+  t = t.replace(/\s+/g, " ").trim();
+  return t;
+}
+
+function dedupSeries(lista) {
+  const out = [];
+  const seen = new Set();
+  for (const item of (lista || [])) {
+    const bonito = formatarSerieBonita(item);
+    const key = normalizarSerieChave(bonito);
+    if (!bonito) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(bonito);
+  }
+  return out;
+}
+
+let seriesTurma = [];
+
+function formatarListaBonita(arr) {
+  if (!arr || arr.length === 0) return "";
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return `${arr[0]} e ${arr[1]}`;
+  return `${arr.slice(0, -1).join(", ")} e ${arr[arr.length - 1]}`;
+}
+
+function montarOptionsSeries(disponiveis, selecionadaAtual = "") {
+  const opts = [];
+  opts.push(`<option value="">Selecione...</option>`);
+  disponiveis.forEach(s => {
+    const sel = (s === selecionadaAtual) ? "selected" : "";
+    opts.push(`<option ${sel} value="${s}">${s}</option>`);
+  });
+  return opts.join("");
+}
+
+function atualizarSerieAtaHiddenEPreview() {
+  const schema = getSchemaAtivoParaTela();
+  if (!schema.serieAtiva) {
+    seriesTurma = [];
+    if ($("serieAta")) $("serieAta").value = "";
+    if ($("serieTurmaPreview")) $("serieTurmaPreview").textContent = "";
+    return;
+  }
+
+  seriesTurma = dedupSeries(seriesTurma);
+  const texto = formatarListaBonita(seriesTurma);
+
+  const hidden = $("serieAta");
+  if (hidden) hidden.value = texto;
+
+  const prev = $("serieTurmaPreview");
+  if (prev) prev.textContent = texto ? `Selecionadas: ${texto}` : "Nenhuma série selecionada";
+
+  atualizarSelectSerieAluno();
+}
+
+function atualizarSelectSerieAluno() {
+  const schema = getSchemaAtivoParaTela();
+  if (!schema.serieAtiva) return;
+
+  const selAluno = $("serie");
+  if (!selAluno) return;
+
+  const atual = selAluno.value;
+
+  if (seriesTurma.length === 0) {
+    selAluno.innerHTML = `<option value="">Defina a(s) série(s) da turma acima</option>`;
+    return;
+  }
+
+  const listaUnica = dedupSeries(seriesTurma);
+
+  selAluno.innerHTML =
+    [`<option value="">Selecione...</option>`]
+      .concat(listaUnica.map(s => `<option value="${s}">${s}</option>`))
+      .join("");
+
+  if (listaUnica.length === 1) {
+    selAluno.value = listaUnica[0];
+    return;
+  }
+
+  const keyAtual = normalizarSerieChave(atual);
+  const match = listaUnica.find(s => normalizarSerieChave(s) === keyAtual);
+  if (match) selAluno.value = match;
+}
+
+function criarSelectSerieTurma(valorInicial = "") {
+  const schema = getSchemaAtivoParaTela();
+  if (!schema.serieAtiva) return;
+
+  const wrap = $("seriesTurmaWrap");
+  if (!wrap) return;
+
+  valorInicial = formatarSerieBonita(valorInicial);
+
+  const div = document.createElement("div");
+  div.className = "series-linha";
+
+  const select = document.createElement("select");
+  const padraoBonito = SERIES_PADRAO.map(formatarSerieBonita);
+
+  const disponiveis = padraoBonito.filter(s => !seriesTurma.includes(s) || normalizarSerieChave(s) === normalizarSerieChave(valorInicial));
+  select.innerHTML = montarOptionsSeries(disponiveis, valorInicial);
+
+  const existeEquivalente = padraoBonito.some(p => normalizarSerieChave(p) === normalizarSerieChave(valorInicial));
+
+  if (valorInicial && !existeEquivalente) {
+    const optExtra = document.createElement("option");
+    optExtra.value = valorInicial;
+    optExtra.textContent = `${valorInicial} (importado)`;
+    optExtra.selected = true;
+    select.insertBefore(optExtra, select.firstChild);
+  } else if (valorInicial) {
+    const opts = Array.from(select.options);
+    const eq = opts.find(o => normalizarSerieChave(o.value) === normalizarSerieChave(valorInicial));
+    if (eq) eq.selected = true;
+  }
+
+  const btnRemover = document.createElement("button");
+  btnRemover.type = "button";
+  btnRemover.className = "btn btn-danger-outline btn-mini";
+  btnRemover.textContent = "Remover";
+
+  btnRemover.onclick = () => {
+    const v = select.value;
+    if (v) {
+      const keyV = normalizarSerieChave(v);
+      seriesTurma = seriesTurma.filter(x => normalizarSerieChave(x) !== keyV);
+    }
+    div.remove();
+    reRenderSeriesTurma();
+  };
+
+  select.onchange = () => {
+    reCalcularSeriesTurmaDoDOM();
+    reRenderSeriesTurma();
+  };
+
+  div.appendChild(select);
+  div.appendChild(btnRemover);
+  wrap.appendChild(div);
+}
+
+function reCalcularSeriesTurmaDoDOM() {
+  const schema = getSchemaAtivoParaTela();
+  if (!schema.serieAtiva) return;
+
+  const selects = Array.from(document.querySelectorAll("#seriesTurmaWrap select"));
+  const vals = selects.map(s => s.value).filter(v => v);
+  seriesTurma = dedupSeries(vals);
+}
+
+function reRenderSeriesTurma() {
+  const schema = getSchemaAtivoParaTela();
+  if (!schema.serieAtiva) return;
+
+  const wrap = $("seriesTurmaWrap");
+  if (!wrap) return;
+
+  const selects = Array.from(document.querySelectorAll("#seriesTurmaWrap select"));
+  const valores = selects.map(s => s.value);
+
+  wrap.innerHTML = "";
+  valores.forEach(v => criarSelectSerieTurma(v));
+
+  reCalcularSeriesTurmaDoDOM();
+  atualizarSerieAtaHiddenEPreview();
+}
+
+function adicionarSelectSerieTurma() {
+  const schema = getSchemaAtivoParaTela();
+  if (!schema.serieAtiva) return;
+
+  criarSelectSerieTurma("");
+  reCalcularSeriesTurmaDoDOM();
+  reRenderSeriesTurma();
+}
+
+function iniciarSeriesTurma() {
+  const schema = getSchemaAtivoParaTela();
+  const wrap = $("seriesTurmaWrap");
+
+  if (!schema.serieAtiva) {
+    if (wrap) wrap.innerHTML = "";
+    seriesTurma = [];
+    atualizarSerieAtaHiddenEPreview();
+    return;
+  }
+
+  if (wrap) wrap.innerHTML = "";
+  seriesTurma = [];
+  criarSelectSerieTurma("");
+  atualizarSerieAtaHiddenEPreview();
+}
+
+/* =========================
+   Alunos
+========================= */
+let alunos = [];
+
+function formatarNota(v) {
+  if (!v) return "--";
+  v = String(v).trim();
+  if (v === "-" || v === "--") return "--";
+  // tenta numérico
+  const num = parseFloat(v.replace(",", "."));
+  if (!isNaN(num)) return num.toFixed(1).replace(".", ",");
+  // conceito (texto não-numérico): preserva em maiúsculas
+  return v.toUpperCase();
+}
+
+function limparCamposAluno() {
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  const nomeEl = $("nome");
+  if (nomeEl) nomeEl.value = "";
+
+  // preserva a série selecionada (só reseta se turma não tiver séries)
+  if (schema.serieAtiva && $("serie")) {
+    const serieEl = $("serie");
+    const ultimaSerie = serieEl.value; // guarda antes de re-render
+    atualizarSelectSerieAluno();
+    // se turma é multiseriada, restaura a última escolha; se único, já fica selecionado
+    if (seriesTurma.length > 1 && ultimaSerie) serieEl.value = ultimaSerie;
+  }
+
+  for (const c of colAtivas) {
+    const el = document.getElementById(c.key);
+    if (el) el.value = "";
+  }
+
+  if (schema.resultadoAtivo && $("resultado")) $("resultado").value = "Não informado";
+
+  if (nomeEl) nomeEl.focus();
+}
+
+function ordenarAlunos() {
+  const schema = getSchemaAtivoParaTela();
+  if (schema.ordenarPor === "numero") return; // mantém ordem de cadastro
+  alunos.sort((a,b)=>String(a.nome||"").localeCompare(String(b.nome||""),'pt-BR'));
+}
+
+function adicionarAluno() {
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  const nomeEl = $("nome");
+  if (!nomeEl) return;
+
+  if (!nomeEl.value.trim()) { alert("Informe o nome do aluno."); return; }
+
+  if (schema.serieAtiva) {
+    const serieEl = $("serie");
+    if (seriesTurma.length === 0) { alert("Defina a(s) série(s) da turma no cabeçalho antes de adicionar alunos."); return; }
+    if (!serieEl || !serieEl.value) { alert("Selecione a série do aluno (limitada pela série da turma)."); return; }
+  }
+
+  const aluno = { nome: nomeEl.value.trim() };
+
+  if (schema.serieAtiva) {
+    aluno.serie = formatarSerieBonita($("serie").value);
+  }
+
+  for (const c of colAtivas) {
+    const el = document.getElementById(c.key);
+    const val = el ? el.value : "";
+    aluno[c.key] = (c.type === "texto") ? String(val || "").trim() : formatarNota(val);
+  }
+
+  if (schema.resultadoAtivo) {
+    const resEl = $("resultado");
+    aluno.resultado = resEl ? resEl.value : "Não informado";
+  }
+
+  alunos.push(aluno);
+  ordenarAlunos();
+  atualizarTabela();
+  limparCamposAluno();
+}
+
+function atualizarTabela() {
+  const tb = $("tabela");
+  if (!tb) return;
+
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  tb.innerHTML = "";
+  alunos.forEach((a,i)=>{
+    let linha = `
+      <tr>
+        <td>${i+1}</td>
+        <td class="col-nome">${a.nome ?? ""}</td>
+    `;
+
+    if (schema.serieAtiva) linha += `<td class="col-nota">${a.serie ?? ""}</td>`;
+
+    for (const c of colAtivas) {
+      linha += `<td class="col-nota">${(a[c.key] ?? "--")}</td>`;
+    }
+
+    if (schema.resultadoAtivo) linha += `<td class="col-nota">${a.resultado ?? ""}</td>`;
+
+    linha += `<td class="col-nota"><button class="btn-edit btn-secondary" onclick="editarAluno(${i})">Editar</button></td></tr>`;
+    tb.innerHTML += linha;
+  });
+}
+
+/* ✅ Editar aluno: agora é dinâmico */
+function editarAluno(i) {
+  const a = alunos[i];
+  if (!a) return;
+
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  if ($("nome")) $("nome").value = a.nome || "";
+
+  if (schema.serieAtiva) {
+    const selSerie = $("serie");
+    if (selSerie) {
+      const vBonito = formatarSerieBonita(a.serie || "");
+      const keyV = normalizarSerieChave(vBonito);
+
+      const opts = Array.from(selSerie.options);
+      const existe = opts.some(o => normalizarSerieChave(o.value) === keyV);
+
+      if (vBonito && !existe) {
+        const opt = document.createElement("option");
+        opt.value = vBonito;
+        opt.textContent = `${vBonito} (importado)`;
+        selSerie.appendChild(opt);
+      }
+
+      const eq = Array.from(selSerie.options).find(o => normalizarSerieChave(o.value) === keyV);
+      if (eq) selSerie.value = eq.value;
+    }
+  }
+
+  for (const c of colAtivas) {
+    const el = document.getElementById(c.key);
+    if (!el) continue;
+
+    const val = a[c.key];
+    // para ambos os tipos: preserva o valor salvo (inclusive conceitos como CNA, CPLA)
+    el.value = (val && val !== "--") ? String(val) : "";
+  }
+
+  if (schema.resultadoAtivo && $("resultado")) {
+    $("resultado").value = a.resultado || "Não informado";
+  }
+
+  alunos.splice(i, 1);
+  atualizarTabela();
+  if ($("nome")) $("nome").focus();
+}
+
+/* =========================
+   PDF (dinâmico)
+========================= */
+function exportarPDF() {
+  // Garante libs
+  if (!window.jspdf || !window.jspdf.jsPDF) { alert("Biblioteca jsPDF não carregou."); return; }
+
+  const schema = getSchemaAtivoParaTela();
+  const colAtivas = getColunasAtivas(schema);
+
+  const { jsPDF } = window.jspdf;
+
+  // Sempre A4 horizontal (landscape)
+  const doc = new jsPDF("l","mm","a4");
+
+  const imgEscudo = $("escudo");
+  const elNomeEscola = $("nomeEscola");
+  const elEndereco = $("enderecoEscola");
+  const elAno = $("ano");
+  const elSerieAta = $("serieAta");
+  const elTurno = $("turno");
+
+  // =========================
+  // Cabeçalho do documento (mantém a estrutura)
+  // =========================
+  let y = 18;
+
+  if (imgEscudo && imgEscudo.src) {
+    try { doc.addImage(imgEscudo, "PNG", 12, y-10, 26, 26); } catch {}
+  }
+
+  doc.setFont("Times","Bold");
+  doc.setFontSize(15);
+  doc.text((elNomeEscola?.textContent || "ESCOLA").toString(), 148.5, y, {align:"center"});
+
+  doc.setFontSize(10);
+  doc.setFont("Times","Normal");
+  doc.text((elEndereco?.textContent || "").toString(), 148.5, y+6, {align:"center"});
+
+  doc.setFontSize(13);
+  doc.setFont("Times","Bold");
+  doc.text("ATA DE RESULTADOS FINAIS", 148.5, y+16, {align:"center"});
+
+  y += 26;
+
+  doc.setFontSize(10);
+  doc.setFont("Times","Normal");
+  doc.text(`ANO: ${(elAno?.value || "")}`, 12, y);
+
+  if (schema.serieAtiva) {
+    doc.text(`SÉRIE: ${(elSerieAta?.value || "")}`, 120, y, {align:"center"});
+  }
+
+  doc.text(`TURNO: ${(elTurno?.value || "")}`, 285, y, {align:"right"});
+
+  y += 6;
+
+  // =========================
+  // Tabela (estrutura nova)
+  // - largura ponta a ponta (com margem)
+  // - Nº e Nome fixos
+  // - restantes com mesma largura (dependendo do total)
+  // =========================
+  const margemX = 10; // margem para impressão
+  const pageW = doc.internal.pageSize.getWidth();
+  const usableW = pageW - (margemX * 2);
+
+  const head = ["Nº", "Nome"];
+  if (schema.serieAtiva) head.push("Série");
+  for (const c of colAtivas) head.push(c.label);
+  if (schema.resultadoAtivo) head.push("Resultado");
+
+  const body = alunos.map((a,i)=>{
+    const row = [i+1, a.nome ?? ""];
+    if (schema.serieAtiva) row.push(a.serie ?? "");
+    for (const c of colAtivas) row.push(a[c.key] ?? "--");
+    if (schema.resultadoAtivo) row.push(a.resultado ?? "");
+    return row;
+  });
+
+  const totalCols = head.length;
+  const wNum = 10;
+  const wNome = 75;
+
+  const restCols = Math.max(0, totalCols - 2);
+  const wEach = restCols > 0 ? Math.max(8, (usableW - wNum - wNome) / restCols) : 10;
+
+  const columnStyles = {
+    0: { cellWidth: wNum, halign: "center" },
+    1: { cellWidth: wNome, halign: "left", overflow: "linebreak" }
+  };
+
+  // define mesma largura para todas as outras colunas
+  for (let ci = 2; ci < totalCols; ci++) {
+    columnStyles[ci] = { cellWidth: wEach, halign: "center" };
+  }
+
+  // fonte levemente menor quando tem muitas colunas (até ~18)
+  const baseFont = (totalCols >= 16) ? 7 : (totalCols >= 13 ? 8 : 9);
+
+  doc.autoTable({
+    startY: y,
+    theme: "grid",
+    margin: { left: margemX, right: margemX },
+    tableWidth: usableW,
+    styles: {
+      font: "Times",
+      fontSize: baseFont,
+      halign: "center",
+      valign: "middle",
+      cellPadding: 1.4,
+      lineWidth: 0.25,
+      lineColor: 0
+    },
+    headStyles: {
+      fontStyle: "bold",
+      halign: "center",
+      valign: "middle",
+      fillColor: [230,230,230],
+      textColor: 0
+    },
+    columnStyles,
+    head: [head],
+    body
+  });
+
+  doc.save("ata_resultados_finais.pdf");
+}
+
+/* =========================
+   DB local (turmasDB)
+========================= */
+function lerTurmasDB() {
+  try { return DB.read("turmasDB", []); }
+  catch { return []; }
+}
+function salvarTurmasDB(arr) { DB.write("turmasDB", arr); }
+
+
+/* =========================
+   DBs do sistema (alunos/aliases/atas/matrículas/metadados)
+   - Mantém a mesma lógica do Admin "Configuração de IDs"
+========================= */
+function lerJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw);
+  } catch { return fallback; }
+}
+function salvarJSON(key, val){
+  localStorage.setItem(key, JSON.stringify(val));
+}
+
+// alunosDB: [{id, nomeOficial, criadoEm, atualizadoEm}]
+function lerAlunosDB(){ return lerJSON("alunosDB", []); }
+function salvarAlunosDB(v){ salvarJSON("alunosDB", Array.isArray(v) ? v : []); }
+
+// alunosAliasesDB: { aliasKey: alunoId }
+function lerAliasesDB(){ return lerJSON("alunosAliasesDB", {}); }
+function salvarAliasesDB(v){ salvarJSON("alunosAliasesDB", (v && typeof v === "object") ? v : {}); }
+
+function lerAtasDB(){ return lerJSON("atasDB", []); }
+function salvarAtasDB(v){ salvarJSON("atasDB", Array.isArray(v) ? v : []); }
+
+function lerMatriculasDB(){ return lerJSON("matriculasDB", []); }
+function salvarMatriculasDB(v){ salvarJSON("matriculasDB", Array.isArray(v) ? v : []); }
+
+function lerTurmasMetaDB(){ return lerJSON("turmasMetaDB", []); }
+function salvarTurmasMetaDB(v){ salvarJSON("turmasMetaDB", Array.isArray(v) ? v : []); }
+
+function normNome(s){
+  return String(s||"")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9\s]/g,"")
+    .replace(/\s+/g," ");
+}
+
+// proximoAlunoId removido — use window.Identidade.findOrCreate()
+
+// IDs determinísticos do sistema
+function idAtaFromTurmaId(turmaId){
+  return "ATA|" + String(turmaId||"").trim();
+}
+function idMatriculaFrom(turmaId, alunoId){
+  return "MAT|" + String(turmaId||"").trim() + "|" + String(alunoId||"").trim();
+}
+
+// Regras de status (opção B) — esta tela é "ata final", então status padrão tende a ser "CONCLUIDO"
+function statusFromResultado(res){
+  const r = String(res||"").trim().toUpperCase();
+  if (r === "TRA") return "TRANSFERIDO";
+  if (r === "DEST") return "DESISTENTE";
+  if (r === "FAL") return "FALTOU";
+  if (r === "AND") return "ANDAMENTO";
+  if (!r || r === "NÃO INFORMADO" || r === "NAO INFORMADO") return "DESCONHECIDO";
+  // AP/REP/S/P/CSA/CPA/etc. -> concluiu (registro final)
+  return "CONCLUIDO";
+}
+
+/**
+ * Garante alunoId para os alunos desta turma (atualiza turmasDB, alunosDB, alunosAliasesDB)
+ * e cria/atualiza bancos auxiliares (atasDB, matriculasDB, turmasMetaDB) para esta turma.
+ */
+function garantirIdsESistemaParaTurma(turmaObj){
+  if (!turmaObj || !Array.isArray(turmaObj.alunos)) return;
+
+  const now = new Date().toISOString();
+
+  // 1) alunoId via Identidade.findOrCreate — cross-módulo, sem duplicatas
+  if(!window.Identidade){
+    console.warn('[cadastro-turma] identidade-aluno.js não carregado');
+  } else {
+    let alterouTurma = false;
+    for (const al of turmaObj.alunos){
+      const nomeRaw = String(al?.nome||"").trim();
+      if (!nomeRaw) continue;
+      // arquivo de atas só tem nome; findOrCreate usa 3ª prioridade (nome normalizado)
+      const { alunoId } = window.Identidade.findOrCreate({ nomeOficial: nomeRaw, nome: nomeRaw });
+      if (String(al.alunoId||"") !== alunoId){
+        al.alunoId = alunoId;
+        alterouTurma = true;
+      }
+    }
+    if (alterouTurma){
+      const turmas = lerTurmasDB();
+      const tid = String(turmaObj.id || turmaObj.turmaId || "").trim();
+      const ix = turmas.findIndex(t => String(t?.id||t?.turmaId||"").trim() === tid);
+      if (ix >= 0){ turmas[ix] = turmaObj; salvarTurmasDB(turmas); }
+    }
+    // Identidade.findOrCreate já persistiu alunosDB — aliases não são mais necessários
+  }
+
+  // 2) bancos auxiliares: ata + meta + matrículas
+  const turmaId = String(turmaObj.id || turmaObj.turmaId || "").trim();
+  if (!turmaId) return;
+
+  // garante campo turmaId
+  turmaObj.turmaId = turmaId;
+
+  const ataId = idAtaFromTurmaId(turmaId);
+
+  // atasDB (upsert)
+  const atas = lerAtasDB();
+  const ixAta = atas.findIndex(a => String(a?.id||"").trim() === ataId);
+  const ataObj = {
+    id: ataId,
+    turmaId,
+    anoLetivo: String(turmaObj?.anoLetivo||"").trim(),
+    turno: String(turmaObj?.turno||"").trim(),
+    seriesTurma: Array.isArray(turmaObj?.seriesTurma) ? turmaObj.seriesTurma : [],
+    serieTexto: String(turmaObj?.serieTexto||"").trim(),
+    origemArquivo: String(turmaObj?.origemArquivo||"").trim(),
+    aba: String(turmaObj?.aba||"").trim(),
+    schemaId: String(turmaObj?.schemaId||"").trim(),
+    schemaSnapshot: turmaObj?.schemaSnapshot || null,
+    criadoEm: turmaObj?.criadoEm || "",
+    atualizadoEm: now
+  };
+  if (ixAta >= 0) atas[ixAta] = ataObj; else atas.push(ataObj);
+  salvarAtasDB(atas);
+
+  // turmasMetaDB (upsert)
+  const metas = lerTurmasMetaDB();
+  const ixMeta = metas.findIndex(m => String(m?.turmaId||"").trim() === turmaId);
+  const metaObj = {
+    turmaId,
+    ataId,
+    anoLetivo: String(turmaObj?.anoLetivo||"").trim(),
+    turno: String(turmaObj?.turno||"").trim(),
+    seriesTurma: Array.isArray(turmaObj?.seriesTurma) ? turmaObj.seriesTurma : [],
+    serieTexto: String(turmaObj?.serieTexto||"").trim(),
+    origemArquivo: String(turmaObj?.origemArquivo||"").trim(),
+    aba: String(turmaObj?.aba||"").trim(),
+    alunos: Array.isArray(turmaObj?.alunos) ? turmaObj.alunos.length : 0,
+    atualizadoEm: now
+  };
+  if (ixMeta >= 0) metas[ixMeta] = metaObj; else metas.push(metaObj);
+  salvarTurmasMetaDB(metas);
+
+  // matriculasDB — cria/atualiza uma matrícula por (turmaId, alunoId)
+  const mats = lerMatriculasDB();
+  const matIndex = new Map();
+  mats.forEach((m, i)=>{
+    const mid = String(m?.id||"").trim();
+    if (mid) matIndex.set(mid, i);
+  });
+
+  for (const a of (turmaObj.alunos || [])){
+    const alunoId = String(a?.alunoId||"").trim();
+    if (!alunoId) continue;
+
+    const mid = idMatriculaFrom(turmaId, alunoId);
+    const obj = {
+      id: mid,
+      turmaId,
+      ataId,
+      alunoId,
+      nomeRaw: String(a?.nome||"").trim(),
+      serie: String(a?.serie||"").trim(),
+      resultado: String(a?.resultado||"").trim() || "Não informado",
+      status: statusFromResultado(a?.resultado),
+      statusAtualizadoEm: now
+    };
+
+    const ix = matIndex.get(mid);
+    if (ix !== undefined) mats[ix] = { ...mats[ix], ...obj };
+    else mats.push(obj);
+  }
+
+  salvarMatriculasDB(mats);
+}
+
+
+/* =========================
+   Edição via URL (?edit=ID)
+========================= */
+let modoEdicao = false;
+let idTurmaEditando = "";
+
+function getQueryParam(nome) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(nome) || "";
+}
+
+function montarIdPadraoTurma() {
+  const schema = getSchemaAtivoParaTela();
+
+  const a = ( $("ano")?.value || "SEM-ANO" ).trim();
+  const t = ( $("turno")?.value || "SEM-TURNO" ).trim();
+  const s = schema.serieAtiva ? ( $("serieAta")?.value || "SEM-SERIE" ).trim() : "SEM-SERIE";
+  return `${a}|${t}|${s}|MANUAL`;
+}
+
+/* ✅ Carregar turma robusto + schema snapshot */
+function carregarTurmaParaEdicao(id) {
+  const db = lerTurmasDB();
+  const turma = db.find(t => t.id === id);
+
+  if (!turma) { alert("Turma não encontrada no banco (turmasDB)."); return; }
+
+  // ✅ aplica snapshot do schema dessa turma
+  SCHEMA_ATIVO = turma.schemaSnapshot ? normalizeSchema(turma.schemaSnapshot) : null;
+
+  // exibe o schemaId (se existir) e trava o select
+  schemaSelecionadoId = turma.schemaId || "";
+  renderSelectSchemasCadastro();
+
+  // re-render UI conforme o schema do snapshot
+  renderFormularioDinamico();
+  renderTheadDinamico();
+
+  const schema = getSchemaAtivoParaTela();
+
+  let anoLetivo = normStr(turma.anoLetivo);
+  let turnoTurma = normStr(turma.turno);
+  let serieTexto = normStr(turma.serieTexto);
+  let listaSeries = Array.isArray(turma.seriesTurma) ? turma.seriesTurma.map(normStr).filter(Boolean) : [];
+
+  if ((!anoLetivo || !turnoTurma || !serieTexto) && turma.id) {
+    const partes = String(turma.id).split("|");
+    const idAno = normStr(partes[0]);
+    const idTurno = normStr(partes[1]);
+    const idSerie = normStr(partes[2]);
+
+    if (!anoLetivo && idAno && idAno !== "SEM-ANO") anoLetivo = idAno;
+    if (!turnoTurma && idTurno && idTurno !== "SEM-TURNO") turnoTurma = idTurno;
+    if (!serieTexto && idSerie && idSerie !== "SEM-SERIE") serieTexto = idSerie;
+  }
+
+  if ($("ano") && anoLetivo) $("ano").value = anoLetivo;
+  if ($("turno") && turnoTurma) $("turno").value = turnoTurma;
+
+  // Séries (só se schema exige)
+  if (schema.serieAtiva) {
+    if (!listaSeries.length && serieTexto) listaSeries = [serieTexto];
+
+    if (!listaSeries.length && Array.isArray(turma.alunos)) {
+      const unicas = Array.from(new Set(
+        turma.alunos.map(a => normStr(a.serie)).filter(Boolean)
+      ));
+      if (unicas.length) listaSeries = unicas;
+    }
+
+    const wrap = $("seriesTurmaWrap");
+    if (wrap) wrap.innerHTML = "";
+    seriesTurma = [];
+
+    listaSeries.forEach(s => criarSelectSerieTurma(s));
+    reRenderSeriesTurma();
+  } else {
+    // se série não é ativa, limpa tudo
+    seriesTurma = [];
+    if ($("serieAta")) $("serieAta").value = "";
+  }
+
+  // Alunos
+  alunos = Array.isArray(turma.alunos) ? turma.alunos : [];
+
+  // normaliza séries se for ativa
+  if (schema.serieAtiva) {
+    alunos = alunos.map(a => ({ ...a, serie: formatarSerieBonita(a.serie) }));
+  }
+
+  // ordena conforme regra do schema
+  ordenarAlunos();
+  atualizarTabela();
+
+  modoEdicao = true;
+  idTurmaEditando = turma.id;
+}
+
+/* =========================
+   Salvar turma no banco
+========================= */
+async function salvarNoBanco() {
+  const schema = getSchemaAtivoParaTela();
+
+  const elAno = $("ano");
+  const elTurno = $("turno");
+  const elSerieHidden = $("serieAta");
+
+  if (!elAno?.value) { alert("Selecione o ano."); return; }
+  if (!elTurno?.value) { alert("Selecione o turno."); return; }
+
+  if (schema.serieAtiva) {
+    if (!elSerieHidden?.value || !elSerieHidden.value.trim()) {
+      alert("Defina a(s) série(s) da turma no cabeçalho.");
+      return;
+    }
+  }
+
+  if (!Array.isArray(alunos) || alunos.length === 0) {
+    alert("Adicione pelo menos 1 aluno antes de salvar.");
+    return;
+  }
+
+  const db = lerTurmasDB();
+  const idFinal = modoEdicao ? idTurmaEditando : montarIdPadraoTurma();
+
+  const existente = db.find(t => t.id === idFinal);
+
+  const seriesLimpa = schema.serieAtiva ? dedupSeries(seriesTurma) : [];
+
+  const turmaObj = {
+    id: idFinal,
+    origemArquivo: existente?.origemArquivo || "MANUAL",
+    aba: existente?.aba || "MANUAL",
+    anoLetivo: normStr(elAno.value),
+    turno: normStr(elTurno.value),
+
+    // séries só se ativa
+    seriesTurma: seriesLimpa,
+    serieTexto: schema.serieAtiva ? normStr(elSerieHidden.value) : "",
+
+    // alunos 그대로
+    alunos: alunos.map(a => {
+      const copia = { ...a };
+      if (schema.serieAtiva) copia.serie = formatarSerieBonita(copia.serie);
+      return copia;
+    }),
+
+    // ✅ referência do schema escolhido (turma nova) + snapshot congelado
+    schemaId: modoEdicao ? (existente?.schemaId || "") : (schemaSelecionadoId || ""),
+    schemaSnapshot: schema,
+
+    atualizadoEm: new Date().toISOString(),
+    criadoEm: existente?.criadoEm || new Date().toISOString()
+  };
+
+  const idx = db.findIndex(t => t.id === idFinal);
+  if (idx >= 0) db[idx] = turmaObj;
+  else db.push(turmaObj);
+
+  salvarTurmasDB(db);
+
+  // ✅ IDs e bancos do sistema (atas/matrículas/metadados) agora são gerados automaticamente
+  garantirIdsESistemaParaTurma(turmaObj);
+
+  // ✅ CORREÇÃO: Salvar no Firebase (Firestore)
+  try {
+    if (window.DB && window.DB.turmas) {
+      // Prepara objeto para Firebase (usa _id em vez de id)
+      const turmaFirebase = { ...turmaObj };
+      
+      // Se está editando, precisa incluir o _id para atualizar o documento correto
+      if (modoEdicao && existente?._id) {
+        turmaFirebase._id = existente._id;
+      }
+      
+      await window.DB.turmas.save(turmaFirebase);
+      console.log('✅ Turma salva no Firebase:', idFinal);
+    }
+  } catch (err) {
+    console.error('❌ Erro ao salvar no Firebase:', err);
+    alert('Turma salva localmente, mas houve erro ao sincronizar com a nuvem. Verifique sua conexão.');
+  }
+
+  alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
+
+  // ── Scans: registra o ID disponível e libera o card ──
+  turmaIdSalvo = idFinal;
+  if (!modoEdicao) {
+    mostrarCardScans();
+    const btnC = $('btnContinuarScans');
+    if (btnC) btnC.style.display = 'none';
+  }
+}
+
+/* =========================
+   Boot
+========================= */
+document.addEventListener("DOMContentLoaded", async () => {
+  // Pré-carrega dados do Firestore no localStorage antes de qualquer render
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+    const dados = await window.DB.loadAll();
+    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
+    if(sid){
+      const pre = (k)=>`schools:${sid}:${k}`;
+      if(dados.turmasDB)    localStorage.setItem(pre('turmasDB'),    JSON.stringify(dados.turmasDB));
+      if(dados.alunosDB)    localStorage.setItem(pre('alunosDB'),    JSON.stringify(dados.alunosDB));
+      if(dados.matriculas)  localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
+      if(dados.atasDB)      localStorage.setItem(pre('atasDB'),      JSON.stringify(dados.atasDB));
+      if(dados.dadosEscola && Object.keys(dados.dadosEscola).length)
+        localStorage.setItem(pre('dadosEscola'), JSON.stringify(dados.dadosEscola));
+    }
+  }catch(e){ console.warn('DOMContentLoaded Firestore pré-carga:', e); }
+
+  // dados da escola (cabeçalho)
+  carregarDadosEscola();
+
+  // ano
+  preencherAnos();
+
+  // schemas
+  renderSelectSchemasCadastro();
+  SCHEMA_ATIVO = getSchemaById(schemaSelecionadoId) || loadSchemaConfig();
+
+  // formulário e tabela
+  renderFormularioDinamico();
+  renderTheadDinamico();
+
+  // séries
+  iniciarSeriesTurma();
+
+  // edição de turma (?edit=)
+  const id = getQueryParam("edit");
+  if (id) carregarTurmaParaEdicao(id);
+});
+
+</script>
+
+
+<script>
+/* =========================
+   Scans do Livro de Atas (Cloudinary)
+========================= */
+
+// ID da turma disponível para o módulo de scans após o save
+let turmaIdSalvo = '';
+
+const ATAS_API_LIST   = '/.netlify/functions/atas-list';
+const ATAS_API_UPLOAD = '/.netlify/functions/atas-upload';
+const ATAS_API_DELETE = '/.netlify/functions/atas-delete';
+
+/** Mesmo slug usado no backend */
+function slugTurmaId(turmaId) {
+  return String(turmaId)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_\-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function iconeArquivo(mimeType) {
+  if ((mimeType || '').startsWith('image/')) return '🖼️';
+  if (mimeType === 'application/pdf') return '📄';
+  return '📎';
+}
+
+function formatarData(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
+  } catch { return iso; }
+}
+
+/* Mostra o card de scans e carrega arquivos se já tiver turmaId */
+function mostrarCardScans() {
+  const card = $('cardScansAtas');
+  if (!card) return;
+  card.classList.remove('hidden');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Se editando, carrega lista do Cloudinary
+  if (modoEdicao && idTurmaEditando) {
+    carregarScans(idTurmaEditando);
+    return;
+  }
+  // Se já salvou nesta sessão, carrega normalmente
+  if (turmaIdSalvo) {
+    carregarScans(turmaIdSalvo);
+    return;
+  }
+  // Ainda não salvou: avisa no card (não bloqueia)
+  const empty = $('scansEmpty');
+  if (empty) empty.textContent = 'Salve a turma primeiro, depois envie os scans aqui.';
+}
+
+/* Atualiza badge com contagem */
+function atualizarBadgeScans(n) {
+  const badge = $('scansBadge');
+  if (badge) badge.textContent = `${n} arquivo(s)`;
+}
+
+/* Carrega lista de scans do Cloudinary para a turma */
+async function carregarScans(turmaId) {
+  const lista = $('scansList');
+  const empty = $('scansEmpty');
+  if (!lista) return;
+
+  // Limpa itens anteriores (mantém o empty)
+  Array.from(lista.querySelectorAll('.scan-item')).forEach(el => el.remove());
+  if (empty) empty.style.display = 'block';
+  atualizarBadgeScans(0);
+
+  try {
+    const res  = await fetch(`${ATAS_API_LIST}?turmaId=${encodeURIComponent(turmaId)}`);
+    const data = await res.json();
+    const files = data.files || [];
+
+    atualizarBadgeScans(files.length);
+    if (empty) empty.style.display = files.length ? 'none' : 'block';
+
+    files.forEach(f => adicionarScanNaLista(f));
+
+  } catch (err) {
+    console.error('[scans] erro ao carregar:', err);
+  }
+}
+
+/* Renderiza um item de scan na lista */
+function adicionarScanNaLista(file) {
+  const lista = $('scansList');
+  const empty = $('scansEmpty');
+  if (!lista) return;
+
+  if (empty) empty.style.display = 'none';
+
+  const div = document.createElement('div');
+  div.className = 'scan-item';
+  div.dataset.fileId = file.fileId;
+
+  // Para PDFs salvos como imagem no Cloudinary: gera URL de visualização em PDF
+  const viewUrl = (file.isPdf || file.fileName?.toLowerCase().endsWith('.pdf'))
+    ? file.webViewLink.replace('/upload/', '/upload/fl_attachment:false/')
+    : file.webViewLink;
+
+  div.innerHTML = `
+    <span class="scan-item-icon">${iconeArquivo(file.mimeType)}</span>
+    <div class="scan-item-info">
+      <div class="scan-item-name" title="${file.fileName}">${file.fileName}</div>
+      <div class="scan-item-meta">Enviado em ${formatarData(file.createdAt)}</div>
+    </div>
+    <div class="scan-item-actions">
+      <a href="${viewUrl}" target="_blank" class="btn btn-secondary btn-edit btn-mini">Abrir</a>
+      <button class="btn btn-danger-outline btn-edit btn-mini" onclick="deletarScan('${file.fileId}','${file.mimeType}',this)">Excluir</button>
+    </div>
+  `;
+
+  lista.insertBefore(div, lista.firstChild);
+
+  // Atualiza badge
+  const total = lista.querySelectorAll('.scan-item').length;
+  atualizarBadgeScans(total);
+}
+
+/* Upload de um arquivo */
+async function uploadScan(file, turmaId) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const base64 = e.target.result.split(',')[1];
+        const isPdf  = (file.type === 'application/pdf') ||
+                       file.name.toLowerCase().endsWith('.pdf');
+        const res = await fetch(ATAS_API_UPLOAD, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            turmaId,
+            fileName:   file.name,
+            // PDFs sobem como image/pdf para o Cloudinary converter em imagem
+            mimeType:   isPdf ? 'image/pdf' : (file.type || 'application/octet-stream'),
+            fileBase64: base64,
+            isPdf,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erro no upload');
+        resolve(data);
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('Erro ao ler o arquivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/* Excluir scan */
+async function deletarScan(fileId, mimeType, btn) {
+  if (!confirm('Excluir este scan? A ação não pode ser desfeita.')) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const res = await fetch(ATAS_API_DELETE, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId, mimeType }),
+    });
+    if (!res.ok) throw new Error('Erro ao excluir');
+
+    // Remove da lista
+    const item = btn.closest('.scan-item');
+    if (item) item.remove();
+
+    const lista = $('scansList');
+    const total = lista ? lista.querySelectorAll('.scan-item').length : 0;
+    atualizarBadgeScans(total);
+    if (total === 0) {
+      const empty = $('scansEmpty');
+      if (empty) empty.style.display = 'block';
+    }
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = 'Excluir';
+    alert('Erro ao excluir o arquivo. Tente novamente.');
+    console.error('[scans] deletar:', err);
+  }
+}
+
+/* Processa seleção/drop de arquivos */
+async function processarArquivosScans(files, turmaId) {
+  if (!files || files.length === 0) return;
+  if (!turmaId) {
+    alert('Salve a turma antes de enviar os scans.');
+    return;
+  }
+
+  const uploading = $('scansUploading');
+  const uploadText = $('scansUploadingText');
+  const input = $('scansInput');
+
+  if (uploading) uploading.classList.remove('hidden');
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (uploadText) uploadText.textContent = `Enviando ${i + 1} de ${files.length}: ${f.name}`;
+    try {
+      const result = await uploadScan(f, turmaId);
+      adicionarScanNaLista(result);
+    } catch (err) {
+      alert(`Erro ao enviar "${f.name}": ${err.message}`);
+      console.error('[scans] upload:', err);
+    }
+  }
+
+  if (uploading) uploading.classList.add('hidden');
+  if (input) input.value = ''; // limpa para permitir re-upload do mesmo arquivo
+}
+
+/* Resolve o turmaId atual (edição ou recém-salva) */
+function getTurmaIdAtual() {
+  if (modoEdicao && idTurmaEditando) return idTurmaEditando;
+  if (turmaIdSalvo) return turmaIdSalvo;
+  return null; // ainda não salvo — processarArquivosScans vai avisar
+}
+
+/* Inicializa eventos do card de scans */
+function iniciarCardScans() {
+  const input   = $('scansInput');
+  const dropZone = $('scansDropZone');
+
+  if (input) {
+    input.addEventListener('change', () => {
+      const turmaId = getTurmaIdAtual();
+      processarArquivosScans(Array.from(input.files), turmaId);
+    });
+  }
+
+  if (dropZone) {
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const turmaId = getTurmaIdAtual();
+      processarArquivosScans(Array.from(e.dataTransfer.files), turmaId);
+    });
+  }
+}
+
+/* Hook no DOMContentLoaded — inicializa eventos e mostra card se editando */
+document.addEventListener('DOMContentLoaded', () => {
+  iniciarCardScans();
+});
+
+/* Hook para mostrar botão "Continuar" e mostrar card automaticamente ao editar */
+const _carregarTurmaOriginal = carregarTurmaParaEdicao;
+// Sobrescreve para ativar o card de scans ao entrar em modo edição
+window.addEventListener('load', () => {
+  const id = getQueryParam('edit');
+  if (id) {
+    mostrarCardScans();
+    // Oculta o botão Continuar (não faz sentido em modo edição)
+    const btnContinuar = $('btnContinuarScans');
+    if (btnContinuar) btnContinuar.style.display = 'none';
+  } else {
+    // Modo criação: exibe o botão Continuar nas actions
+    const btnContinuar = $('btnContinuarScans');
+    if (btnContinuar) btnContinuar.style.display = '';
+  }
+});
+</script>
+
+<script src="../header-logic.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Escolas (Admin)</title>
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/admin_escolas.css">
+
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+</head>
+
+<body>
+
+<div id="header-placeholder"></div>
+
+
+
+
+
+
+<div class="wrap">
+  <div class="l-section">
+    <div class="l-slabel">// gerenciar escolas</div>
+    <div class="l-sline"></div>
+  </div>
+
+  <div class="grid">
+
+    <!-- Card: cadastrar escola -->
+    <div class="card">
+      <h2>Cadastrar escola</h2>
+      <p>O <strong>schoolId</strong> é gerado automaticamente pelo nome, mas você pode editar antes de salvar.</p>
+
+      <form id="frm">
+        <div class="form">
+          <div class="field">
+            <label for="schoolName">Nome completo</label>
+            <input id="schoolName" autocomplete="off" placeholder="Ex.: Escola Municipal José Cunha"/>
+          </div>
+          <div class="field">
+            <label for="schoolId">schoolId</label>
+            <input id="schoolId" autocomplete="off" placeholder="Ex.: ESCOLA_JOSE_CUNHA"/>
+          </div>
+          <div class="field">
+            <label for="displayName">Nome de exibição <span style="font-weight:400;color:var(--muted);">— header</span></label>
+            <input id="displayName" autocomplete="off" placeholder="Ex.: E.M. José Cunha" maxlength="20"/>
+          </div>
+          <button class="btn-save" type="submit">💾 Salvar</button>
+        </div>
+        <div class="field-hint" style="margin-top:8px;">
+          <span>O nome de exibição aparece no chip do header — máx. 20 caracteres</span>
+          <span class="counter" id="displayNameCounter">0/20</span>
+        </div>
+      </form>
+
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <!-- Card: lista de escolas -->
+    <div class="card" id="cardList">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
+        <h2 style="margin:0;">Escolas cadastradas</h2>
+        <span class="pill" id="count">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Nome de exibição</th>
+              <th>schoolId</th>
+              <th style="width:160px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="4" style="color:var(--muted);">Nenhuma escola cadastrada.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Card: solicitações de alteração -->
+    <div class="card" id="cardApprovals" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
+        <h2 style="margin:0;">Solicitações de alteração</h2>
+        <span class="pill" id="reqCount">0</span>
+      </div>
+      <p>Apenas o <strong>ADMIN</strong> global pode aprovar ou reprovar alterações solicitadas por admins de escolas.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Escola</th>
+              <th>Solicitado por</th>
+              <th>Alterações</th>
+              <th style="width:180px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyReq">
+            <tr><td colspan="4" style="color:var(--muted);">Nenhuma solicitação pendente.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="reqMsg" class="msg"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../header-logic.js"></script>
+<!-- ── Script 2: lógica principal ── -->
+<script>
+  Auth.requireAuth('/login.html');
+  Auth.requireRole('admin', '/login.html');
+
+  function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function slugifySchoolId(name){
+    return String(name||'')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-zA-Z0-9]+/g,'_')
+      .replace(/^_+|_+$/g,'')
+      .toUpperCase() || 'ESCOLA';
+  }
+
+  const $frm         = document.getElementById('frm');
+  const $name        = document.getElementById('schoolName');
+  const $id          = document.getElementById('schoolId');
+  const $display     = document.getElementById('displayName');
+  const $counter     = document.getElementById('displayNameCounter');
+  const $msg         = document.getElementById('msg');
+  const $tbody       = document.getElementById('tbody');
+  const $count       = document.getElementById('count');
+  const $cardApprovals = document.getElementById('cardApprovals');
+  const $reqCount    = document.getElementById('reqCount');
+  const $tbodyReq    = document.getElementById('tbodyReq');
+
+  let idDirty   = false;
+  let editingId = null;
+
+  // Contador de caracteres do displayName
+  $display.addEventListener('input', () => {
+    const len = $display.value.length;
+    $counter.textContent = len + '/20';
+    $counter.className = 'counter' + (len >= 20 ? ' full' : len >= 16 ? ' warn' : '');
+  });
+
+  function setMsg(text, kind){
+    $msg.className = 'msg' + (kind ? ' '+kind : '');
+    $msg.textContent = text || '';
+  }
+
+  async function fetchSchools(){
+    await new Promise(res => {
+      if (window.Auth && window.Auth.db) { res(); return; }
+      document.addEventListener('auth:ready', res, { once: true });
+    });
+    const snap = await Auth.db.collection('schools').get();
+    return snap.docs.map(d => ({ schoolId: d.id, id: d.id, ...d.data() }));
+  }
+
+  function showRequestForm(sid, currentName, currentDisplay){
+    const existing = document.getElementById('reqFormCard');
+    if(existing) existing.remove();
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'reqFormCard';
+    card.innerHTML = `
+      <h2>✏️ Solicitar edição — <span class="pill">${escapeHtml(sid)}</span></h2>
+      <p>Sua solicitação será enviada para aprovação do ADMIN global.</p>
+      <div class="form">
+        <div class="field">
+          <label>Novo nome da escola</label>
+          <input id="reqNewName" value="${escapeHtml(currentName)}" placeholder="Nome da escola" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label>Novo nome de exibição</label>
+          <input id="reqNewDisplay" value="${escapeHtml(currentDisplay)}" placeholder="Ex.: E.M. José Cunha" maxlength="20" autocomplete="off"/>
+          <div class="field-hint"><span>Máx. 20 caracteres</span><span class="counter" id="reqDisplayCounter">${escapeHtml(currentDisplay)?.length||0}/20</span></div>
+        </div>
+        <div class="field">
+          <label>schoolId</label>
+          <input value="${escapeHtml(sid)}" readonly/>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <button class="btn-save" id="btnSendReq" type="button">📨 Enviar</button>
+          <button class="mini" id="btnCancelReq" type="button">Cancelar</button>
+        </div>
+      </div>
+      <div id="reqFormMsg" class="msg" style="margin-top:10px;"></div>
+    `;
+
+    const grid = document.querySelector('.grid');
+    grid.insertBefore(card, grid.firstElementChild);
+    window.scrollTo({top: card.offsetTop - 90, behavior:'smooth'});
+
+    card.querySelector('#reqNewDisplay').addEventListener('input', function(){
+      const c = card.querySelector('#reqDisplayCounter');
+      const len = this.value.length;
+      c.textContent = len+'/20';
+      c.className = 'counter'+(len>=20?' full':len>=16?' warn':'');
+    });
+
+    document.getElementById('btnCancelReq').addEventListener('click', () => card.remove());
+    document.getElementById('btnSendReq').addEventListener('click', async () => {
+      const newName    = document.getElementById('reqNewName').value.trim();
+      const newDisplay = document.getElementById('reqNewDisplay').value.trim();
+      const msgEl      = document.getElementById('reqFormMsg');
+      if(!newName){ msgEl.textContent='Informe o novo nome.'; msgEl.className='msg err'; return; }
+      const btn = document.getElementById('btnSendReq');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      try{
+        const session = Auth.getSession();
+        await Auth.db.collection('schools').doc(sid).collection('changeRequests').add({
+          schoolId: sid, requestedBy: session?.email||session?.uid||'',
+          requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          status: 'pending', changes: { name: newName, displayName: newDisplay }
+        });
+        msgEl.textContent = 'Solicitação enviada! Aguarde aprovação do ADMIN.';
+        msgEl.className = 'msg ok';
+        btn.textContent = '✅ Enviado';
+      }catch(e){
+        msgEl.textContent = 'Erro: '+(e.message||e);
+        msgEl.className = 'msg err';
+        btn.disabled = false; btn.textContent = '📨 Enviar';
+      }
+    });
+  }
+
+  async function renderSchoolRows(){
+    $tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Carregando...</td></tr>';
+    try{
+      const session  = Auth.getSession();
+      const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
+      const active   = (localStorage.getItem('admin_active_school_v1')||'').trim() || 'ADMIN';
+
+      let schools = await fetchSchools();
+      if (!isMaster){
+        const myId = String(session?.schoolId||'').trim();
+        schools = schools.filter(s => String(s.schoolId||'').trim() === myId);
+      } else if (active.toUpperCase() !== 'ADMIN'){
+        schools = schools.filter(s => String(s.schoolId||'').trim() === active);
+      }
+
+      $count.textContent = schools.length + ' escola(s)';
+
+      if(!schools.length){
+        $tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Nenhuma escola cadastrada.</td></tr>';
+        return;
+      }
+
+      $tbody.innerHTML = '';
+      for(const sc of schools){
+        const sid  = String(sc.schoolId || sc.id || '').trim();
+        const nm   = String(sc.name || sc.nome || '').trim();
+        const disp = String(sc.displayName || '').trim();
+        const tr   = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(nm||'—')}</td>
+          <td>${disp ? `<span class="pill">${escapeHtml(disp)}</span>` : '<span style="color:var(--muted);font-size:13px;">—</span>'}</td>
+          <td><span class="pill">${escapeHtml(sid)}</span></td>
+          <td>
+            <div class="row-actions">
+              ${isMaster ? `
+                <button class="mini" type="button" data-edit="${escapeHtml(sid)}" data-name="${escapeHtml(nm)}" data-display="${escapeHtml(disp)}">Editar</button>
+                <button class="mini danger" type="button" data-del="${escapeHtml(sid)}">Excluir</button>
+              ` : `<button class="mini" type="button" data-req-edit="${escapeHtml(sid)}" data-req-name="${escapeHtml(nm)}" data-req-display="${escapeHtml(disp)}">✏️ Solicitar edição</button>`}
+            </div>
+          </td>
+        `;
+        $tbody.appendChild(tr);
+      }
+
+      $tbody.querySelectorAll('[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          editingId       = btn.dataset.edit;
+          idDirty         = true;
+          $name.value     = btn.dataset.name;
+          $id.value       = editingId;
+          $display.value  = btn.dataset.display || '';
+          const len = $display.value.length;
+          $counter.textContent = len+'/20';
+          $counter.className = 'counter'+(len>=20?' full':len>=16?' warn':'');
+          $id.setAttribute('readonly','readonly');
+          setMsg('Editando '+editingId+'. Ajuste os campos e clique em Salvar.');
+          window.scrollTo({top:0, behavior:'smooth'});
+        });
+      });
+
+      $tbody.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const sid = btn.dataset.del;
+          if(!confirm('Excluir a escola '+sid+'?')) return;
+          btn.disabled = true;
+          try{
+            await Auth.deleteSchool(sid);
+            setMsg('Escola '+sid+' excluída.', 'ok');
+            await renderSchoolRows();
+          }catch(e){
+            setMsg(e.message||'Falha ao excluir.', 'err');
+            btn.disabled = false;
+          }
+        });
+      });
+
+      $tbody.querySelectorAll('[data-req-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          showRequestForm(btn.dataset.reqEdit, btn.dataset.reqName, btn.dataset.reqDisplay);
+        });
+      });
+
+    }catch(e){
+      $tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Erro ao carregar escolas.</td></tr>';
+      console.error('[admin_escolas] renderSchoolRows:', e);
+    }
+  }
+
+  async function makeUniqueSchoolId(base){
+    const schools  = await fetchSchools();
+    const existing = new Set(schools.map(s => String(s.schoolId||'').trim()).filter(Boolean));
+    if(!existing.has(base)) return base;
+    let n = 2;
+    while(existing.has(base+'_'+n)) n++;
+    return base+'_'+n;
+  }
+
+  $name.addEventListener('input', async () => {
+    if(idDirty) return;
+    const nm = ($name.value||'').trim();
+    if(!nm){ $id.value=''; return; }
+    $id.value = await makeUniqueSchoolId(slugifySchoolId(nm));
+  });
+  $id.addEventListener('input', () => { idDirty = true; });
+
+  $frm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    setMsg('');
+    const session  = Auth.getSession();
+    const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
+    if(!isMaster){ setMsg('Apenas o ADMIN global pode cadastrar escolas.', 'err'); return; }
+
+    const nm   = ($name.value||'').trim();
+    const disp = ($display.value||'').trim();
+    let   sid  = ($id.value||'').trim().toUpperCase();
+
+    if(!nm){ setMsg('Informe o nome.', 'err'); return; }
+    if(!sid){ sid = await makeUniqueSchoolId(slugifySchoolId(nm)); }
+
+    const btnSave = $frm.querySelector('button[type="submit"]');
+    btnSave.disabled = true; btnSave.textContent = 'Salvando...';
+    try{
+      await Auth.upsertSchool({ name: nm, schoolId: sid, displayName: disp || null });
+      setMsg(editingId ? 'Escola atualizada!' : 'Escola cadastrada!', 'ok');
+      editingId = null; idDirty = false;
+      $id.removeAttribute('readonly');
+      $name.value = ''; $id.value = ''; $display.value = '';
+      $counter.textContent = '0/20'; $counter.className = 'counter';
+      await renderSchoolRows();
+    }catch(e){
+      setMsg(e.message||'Falha ao salvar.', 'err');
+    }finally{
+      btnSave.disabled = false; btnSave.textContent = '💾 Salvar';
+    }
+  });
+
+  function refreshApprovals(){
+    if(!$cardApprovals) return;
+    const session  = Auth.getSession();
+    const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
+    if(!isMaster){ $cardApprovals.style.display='none'; return; }
+    $cardApprovals.style.display = '';
+    const REQ_KEY = 'auth_school_change_requests_v1';
+    function listReq(){ try{ return JSON.parse(localStorage.getItem(REQ_KEY)||'[]'); }catch(_){ return []; } }
+    const pending = listReq().filter(r => String(r.status||'pending').toLowerCase() === 'pending');
+    $reqCount.textContent = String(pending.length);
+    if(!pending.length){
+      $tbodyReq.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Nenhuma solicitação pendente.</td></tr>';
+      return;
+    }
+    $tbodyReq.innerHTML = pending.map(r => `
+      <tr>
+        <td><span class="pill">${escapeHtml(r.schoolId||'')}</span></td>
+        <td>${escapeHtml(r.requestedBy||'')}</td>
+        <td>${escapeHtml(Object.entries(r.changes||{}).map(([k,v])=>k+': '+v).join(' | ')||'—')}</td>
+        <td>
+          <div class="row-actions">
+            <button class="mini" data-approve="${escapeHtml(r.id)}">Aprovar</button>
+            <button class="mini danger" data-reject="${escapeHtml(r.id)}">Reprovar</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  document.addEventListener('auth:ready', async () => {
+    const session  = Auth.getSession();
+    const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
+    if(!isMaster){
+      const card = $frm?.closest('.card');
+      if(card) card.style.display = 'none';
+    }
+    await renderSchoolRows();
+    refreshApprovals();
+  }, { once: true });
+
+  document.addEventListener('auth:sessionChanged', renderSchoolRows);
+  window.addEventListener('storage', e => {
+    if(e.key === 'admin_active_school_v1') renderSchoolRows();
+  });
+</script>
+
+
+
+</body>
+</html>

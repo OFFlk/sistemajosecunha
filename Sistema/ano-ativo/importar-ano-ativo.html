@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script>
+(function(){
+  var t = localStorage.getItem('ui_theme_v1') || 'light';
+  document.documentElement.setAttribute('data-theme', (t === 'dark') ? 'dark' : 'light');
+})();
+</script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Ano Ativo • Importar</title>
+<style>
+:root {
+  --bg:           #f4f3ff;
+  --card:         #ffffff;
+  --text:         #1e1b4b;
+  --muted:        #6b7280;
+  --line:         var(--brand-border, #ddd6fe);
+  --border:       var(--brand-border, #ddd6fe);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  --primary:      var(--brand, #7c3aed);
+  --danger:       #b91c1c;
+  --danger2:      #991b1b;
+  --chip:         var(--brand-faded, #f5f3ff);
+  --chipText:     var(--brand-text, #6d28d9);
+  --ink:          #1e1b4b;
+  --radius:       14px;
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border, #ddd6fe);
+  --chip-bg:      var(--brand-faded);
+  --chip-border:  var(--brand-border);
+  --chip-color:   var(--brand-text);
+  --chip-name:    #4b5563;
+  --mark-bg:      var(--brand-faded);
+  --sub-color:    var(--brand-text);
+  --school-bg:    var(--brand-faded);
+  --school-color: var(--brand-text);
+}
+html[data-theme="dark"] {
+  --bg:           #0a0e1a;
+  --card:         #131c2e;
+  --text:         #e2e8f0;
+  --muted:        #94a3b8;
+  --line:         #1e2540;
+  --border:       #2a3a5c;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+  --primary:      var(--brand-d, #7c3aed);
+  --chip:         var(--brand-faded-d, rgba(124,58,237,0.28));
+  --chipText:     var(--brand-text-d, #c4b5fd);
+  --ink:          #e2e8f0;
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
+  --chip-bg:      var(--brand-faded-d);
+  --chip-border:  var(--brand-border-d);
+  --chip-color:   var(--brand-text-d);
+  --chip-name:    var(--brand-text-d);
+  --mark-bg:      var(--brand-faded-d);
+  --sub-color:    var(--brand-text-d);
+  --school-bg:    var(--brand-faded-d);
+  --school-color: var(--brand-text-d);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: 'Nunito', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.3s, color 0.3s; }
+html[data-theme="dark"] body { background: radial-gradient(ellipse 800px 400px at 20% 0%, rgba(124,58,237,0.10) 0%, transparent 70%), radial-gradient(ellipse 600px 400px at 80% 60%, rgba(59,130,246,0.06) 0%, transparent 70%), var(--bg); }
+a { color: inherit; }
+
+.wrap { max-width: 1100px; margin: 0 auto; padding: 24px 22px 48px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px; transition: background 0.3s, border-color 0.3s; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.chip { display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--chip-border); background: var(--chip-bg); border-radius: 999px; padding: 6px 10px; font-size: 13px; color: var(--chip-color); }
+.chip b { color: var(--text); font-weight: 700; }
+.divider { height: 1px; background: var(--border); margin: 14px 0; }
+.warn { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); font-size: 14px; }
+.ok   { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #16a34a; font-size: 14px; }
+html[data-theme="dark"] .ok { color: #4ade80; }
+.grid  { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media(max-width:920px){ .grid,.grid2,.grid3{ grid-template-columns: 1fr; } }
+.field label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; font-weight: 700; }
+.field input, .field select { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--field-border); outline: none; background: var(--field-bg); color: var(--text); font-size: 14px; font-family: 'Nunito', sans-serif; transition: border-color 0.15s, box-shadow 0.15s; }
+.field input:focus, .field select:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+html[data-theme="dark"] .field input, html[data-theme="dark"] .field select { background: var(--field-bg); border-color: var(--field-border); color: var(--text); }
+html[data-theme="dark"] .field input::placeholder { color: rgba(226,232,240,0.45); }
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.actions .btn { border-radius: 10px; padding: 10px 16px; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 7px; transition: background 0.18s, border-color 0.18s; }
+.actions .btn.primary { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
+.actions .btn.primary:hover { background: var(--brand-hover, #6d28d9); }
+html[data-theme="dark"] .actions .btn.primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
+.actions .btn.secondary { background: var(--chip-bg); color: var(--chip-color); border-color: var(--chip-border); }
+.actions .btn.secondary:hover { background: var(--brand-faded, #f5f3ff); }
+.actions .btn.cancel { background: var(--card); color: var(--muted); border-color: var(--border); }
+.actions .btn.danger { background: rgba(185,28,28,0.10); color: var(--danger); border-color: rgba(185,28,28,0.30); margin-right: auto; }
+.actions .btn.danger:hover { background: rgba(185,28,28,0.18); }
+.muted { color: var(--muted); font-size: 13px; }
+
+
+/* ── Campos globais da página ── */
+.wrap select,
+.wrap input[type="text"],
+.wrap input[type="number"],
+.wrap input[type="file"],
+.wrap textarea {
+  width: 100%;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--field-bg);
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.wrap input[type="file"] { padding: 8px 12px; cursor: pointer; }
+.wrap select:focus,
+.wrap input:focus,
+.wrap textarea:focus {
+  border-color: var(--brand, #7c3aed);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+html[data-theme="dark"] .wrap select,
+html[data-theme="dark"] .wrap input,
+html[data-theme="dark"] .wrap textarea {
+  background: var(--field-bg);
+  border-color: var(--field-border);
+  color: var(--text);
+}
+
+/* ── Header ── */
+.l-bar { height: 2px; background: linear-gradient(90deg, var(--brand, #7c3aed), #3b82f6, #06b6d4); position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
+.app-header { position: sticky; top: 2px; z-index: 99; width: 100%; background: #ffffff; border-bottom: 1px solid var(--brand-border, #ddd6fe); transition: background 0.3s, border-color 0.3s; }
+html[data-theme="dark"] .app-header { background: #0c1120; border-color: #1e2540; }
+.app-header-inner { width: 100%; padding: 0 36px; height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mark { width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); border: 1px solid var(--brand-border, #ddd6fe); font-weight: 800; font-size: 22px; transition: all 0.3s; }
+.brand-title { font-weight: 800; font-size: 16px; color: #1e1b4b; letter-spacing: -0.2px; font-family: 'Nunito', sans-serif; transition: color 0.3s; }
+html[data-theme="dark"] .brand-title { color: #e2e8f0; }
+.brand-sub { font-size: 13px; color: var(--brand-text, #6d28d9); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50vw; font-family: 'Nunito', sans-serif; }
+html[data-theme="dark"] .brand-sub { color: var(--brand-text-d, #c4b5fd); }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; justify-content: flex-end; }
+@media(max-width:640px){ .header-actions{ flex-wrap: wrap; } .brand{ min-width: 0; } }
+.theme-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--brand-border, #ddd6fe); background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s, color 0.18s, border-color 0.18s; }
+html[data-theme="dark"] .theme-toggle { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+.theme-toggle:hover { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
+.theme-toggle-compact { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; border: 1px solid var(--brand-border, #ddd6fe); background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 15px; cursor: pointer; font-family: 'Nunito', sans-serif; transition: background 0.18s, color 0.18s, border-color 0.18s; }
+html[data-theme="dark"] .theme-toggle-compact { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+.theme-toggle-compact:hover { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
+.btn-back { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; border: 1px solid var(--brand-border, #ddd6fe); text-decoration: none; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: border-color 0.18s, box-shadow 0.18s; }
+html[data-theme="dark"] .btn-back { border-color: var(--brand-border-d, #7c3aed); }
+.btn-back:hover { border-color: var(--brand, #7c3aed); box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
+.btn-back .b-icon { padding: 8px 10px; background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; border-right: 1px solid var(--brand-border, #ddd6fe); display: flex; align-items: center; }
+html[data-theme="dark"] .btn-back .b-icon { background: var(--brand-faded-d, rgba(124,58,237,0.28)); color: var(--brand-text-d, #c4b5fd); border-color: var(--brand-border-d, #7c3aed); }
+.btn-back .b-label { padding: 8px 13px; color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; display: flex; align-items: center; }
+html[data-theme="dark"] .btn-back .b-label { color: var(--brand-text-d, #c4b5fd); }
+.btn-home { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; border: 1px solid var(--brand, #7c3aed); background: var(--brand, #7c3aed); text-decoration: none; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s, border-color 0.18s; }
+html[data-theme="dark"] .btn-home { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
+.btn-home:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
+html[data-theme="dark"] .btn-home:hover { background: var(--brand-hover-d, #6d28d9); }
+.btn-home .b-icon { padding: 8px 10px; background: rgba(0,0,0,0.15); color: #fff; font-size: 13px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; }
+.btn-home .b-label { padding: 8px 13px; color: #fff; font-size: 13px; font-weight: 800; display: flex; align-items: center; }
+.header-context { display: flex; gap: 8px; align-items: center; margin-right: 4px; flex-wrap: wrap; }
+.ctx-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--chip-bg); font-size: 13px; color: var(--chip-name); max-width: 280px; transition: all 0.3s; }
+.ctx-chip .avatar { width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; background: var(--mark-bg); border: 1px solid var(--chip-border); flex: 0 0 auto; overflow: hidden; font-size: 12px; }
+.ctx-chip .text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+.ctx-chip .name { font-weight: 700; font-size: 13px; color: var(--chip-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-chip .sub  { font-size: 11px; color: var(--sub-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.school-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--school-bg); color: var(--school-color); font-weight: 700; font-size: 13px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.3s; }
+.school-pill select { border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--school-color); border-radius: 6px; padding: 4px 8px; font-weight: 700; font-size: 12px; outline: none; width: 100%; min-width: 0; max-width: 100%; font-family: 'Nunito', sans-serif; }
+.ctx-chip.ctx-clickable { cursor: pointer; user-select: none; position: relative; }
+.ctx-chip.ctx-clickable:focus { outline: 2px solid rgba(0,0,0,0.15); outline-offset: 2px; }
+.ctx-menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 200px; padding: 6px; border-radius: 12px; border: 1px solid var(--chip-border); background: var(--card); backdrop-filter: blur(8px); box-shadow: 0 14px 28px rgba(0,0,0,0.14); display: none; z-index: 80; }
+html[data-theme="dark"] .ctx-menu { background: #0f1829; border-color: #1e2540; }
+.ctx-menu.open { display: block; }
+.ctx-menu .menu-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; cursor: pointer; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--ink); margin-bottom: 4px; transition: filter 0.15s; }
+.ctx-menu .menu-btn:last-child { margin-bottom: 0; }
+.ctx-menu .menu-btn:hover { filter: brightness(0.95); }
+.ctx-menu .menu-btn.danger { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
+html[data-theme="dark"] .ctx-menu .menu-btn.danger { color: #fca5a5; }
+</style>
+
+<body>
+
+<body>
+<div class="l-bar"></div>
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="brand">
+      <div class="mark">📥</div>
+      <div>
+        <div class="brand-title">Ano Ativo • Importar <span class="v-badge">v1</span></div>
+        <div class="brand-sub">// cadastro em lote: XLSX/CSV/TSV → turma → salvar</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="header-context" id="headerContext"></div>
+      <button class="theme-toggle" id="themeToggle" type="button">
+        <span id="themeIcon">🌙</span><span id="themeText">Escuro</span>
+      </button>
+      <button class="theme-toggle-compact" id="themeToggleCompact" type="button">
+        <span id="themeIconCompact">🌙</span>
+      </button>
+      <a class="btn-back" href="ano-ativo.html">
+        <span class="b-icon">◀︎</span><span class="b-label">Ano Ativo</span>
+      </a>
+      <a class="btn-home" href="../index.html">
+        <span class="b-icon">🏠</span><span class="b-label">Início</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<div class="grid">
+      <div class="card">
+        <h2>0) Turma e ano letivo</h2>
+        <div class="muted">A <b>série</b> é identificada por aluno, mas a <b>turma</b> é a que você selecionar aqui (não cria turma por série).</div>
+
+        <div class="row">
+          <div>
+            <label>Turma (do banco do Ano Ativo)</label>
+            <select id="turmaSelect">
+              <option value="">— carregando turmas… —</option>
+            </select>
+            <div class="small" id="turmaHint">Se estiver vazio, cadastre uma turma antes.</div>
+          </div>
+          <div>
+            <label>Ano letivo (será gravado nos registros)</label>
+            <input id="ano" type="number" min="1900" max="2100" placeholder="Ex: 2026" />
+            <div class="small">Dica: ao salvar, o ano também fica salvo como "ano ativo" para pesquisa.</div>
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top:12px">
+          <button class="btn primary" id="btnSalvar" disabled>💾 Salvar cadastro</button>
+          <button class="btn gray" id="btnLimparTudo" disabled>🧹 Limpar importação</button>
+        </div>
+
+        <div class="kpi">
+          <span class="pill" id="kpiTurma">Turma: —</span>
+          <span class="pill" id="kpiAno">Ano: —</span>
+          <span class="pill" id="kpiLinhas">Linhas carregadas: 0</span>
+        </div>
+
+        <div id="msg" class="status" aria-live="polite"></div>
+
+        <div class="hint small">
+          <div><b>Colunas esperadas:</b> SÉRIE, NOME, CPF, DATA DE NASCIMENTO, MÃE, PAI, NATURALIDADE, SEXO, COR/RAÇA.</div>
+          <div>Você pode ter cabeçalho (recomendado). Se não tiver, o import assume essa ordem.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>1) Carregar XLSX</h2>
+        <div class="muted">Funciona online (usa biblioteca XLSX via CDN). Se falhar, use "Colar tabela".</div>
+
+        <div class="row">
+          <div>
+            <label>Arquivo (.xlsx)</label>
+            <input id="file" type="file" accept=".xlsx" />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <div class="actions">
+              <button class="btn primary" id="btnXlsx">⬆ Carregar XLSX</button>
+              <button class="btn gray" id="btnLimparXlsx">Limpar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2>2) Colar tabela</h2>
+        <div class="muted">Cole direto do Excel (TSV) ou CSV. A primeira linha pode ser cabeçalho.</div>
+
+        <label>Cole aqui (TSV/CSV)</label>
+        <textarea id="paste" placeholder="Cole aqui..."></textarea>
+
+        <div class="actions" style="margin-top:12px">
+          <button class="btn primary" id="btnPaste">📋 Carregar colagem</button>
+          <button class="btn gray" id="btnExemplo">Inserir exemplo</button>
+          <button class="btn gray" id="btnLimparPaste">Limpar</button>
+        </div>
+
+        <div class="muted" style="margin-top:10px">
+          Status do banco: <span class="pill" id="dbStatus">carregando…</span>
+        </div>
+
+        <div class="tableWrap" id="previewWrap" style="display:none">
+          <table id="preview"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    
+// ---- Namespacing por escola (Ano Ativo)
+function _safeParse(json, fallback){ try{ const v = JSON.parse(json); return (v==null?fallback:v); }catch(_){ return fallback; } }
+function _getSession(){
+  if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
+  return _safeParse(localStorage.getItem('auth_session_v2') || 'null', null);
+}
+function _activeSchoolId(){
+  const s = _getSession();
+  if(!s) return 'SEM_ESCOLA';
+  const sid = String(s.schoolId||'').trim();
+  if (sid.toUpperCase() !== 'ADMIN') return sid || 'SEM_ESCOLA';
+  return (localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
+}
+
+  const _AA_FIRESTORE_MAP = {
+    'anoAtivoAlunosDB_v1':     'alunos',
+    'anoAtivoTurmasDB_v1':     'turmas',
+    'anoAtivoMatriculasDB_v1': 'matriculas',
+    'configAnoAtivoAtual_v1':  null,
+    'anoAtivoAluSeq_v1':       null,
+  };
+  function _toFirestore(k, value){
+    try{
+      if(!window.DB || !window.Auth || !window.Auth.getSession()) return;
+      const col = _AA_FIRESTORE_MAP[k];
+      if(col === undefined) return;
+      if(col === null){
+        if(k === 'configAnoAtivoAtual_v1' && window.DB.escola)
+          window.DB.escola.save({ configAnoAtivo: value }).catch(()=>{});
+        return;
+      }
+      const fc = window.DB[col]; if(!fc) return;
+      const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+      Array.isArray(parsed)
+        ? fc.saveAll(parsed).catch(e=>console.warn(`Firestore ${col}:`,e))
+        : fc.save(parsed).catch(e=>console.warn(`Firestore ${col}:`,e));
+    }catch(e){ console.warn('_toFirestore:',e); }
+  }
+const DB = {
+  sid(){ return _activeSchoolId(); },
+  key(k){ return `schools:${DB.sid()}:${k}`; },
+  readAny(k){ return _safeParse(localStorage.getItem(DB.key(k)) || 'null', null); },
+  readArray(k){
+    const v = DB.readAny(k);
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'object') return Object.values(v);
+    return [];
+  },
+  write(k, value){
+    localStorage.setItem(DB.key(k), JSON.stringify(value));
+    _toFirestore(k, value);
+  },
+  migrateFromGlobalIfMissing(k){
+    const scopedKey = DB.key(k);
+    if (localStorage.getItem(scopedKey) != null) return;
+    const legacy = localStorage.getItem(k);
+    if (legacy == null) return;
+    localStorage.setItem(scopedKey, legacy);
+  }
+};
+
+const K_ALUNOS = 'anoAtivoAlunosDB_v1';
+const K_TURMAS = 'anoAtivoTurmasDB_v1';
+const K_MATS   = 'anoAtivoMatriculasDB_v1';
+const K_ANO_ATUAL = 'configAnoAtivoAtual_v1';
+const K_ALU_SEQ = 'anoAtivoAluSeq_v1';
+
+[K_ALUNOS, K_TURMAS, K_MATS, K_ANO_ATUAL, K_ALU_SEQ].forEach(DB.migrateFromGlobalIfMissing);
+
+    const $ = (id)=>document.getElementById(id);
+
+    function setMsg(text, ok=true){
+      const el = $('msg');
+      el.textContent = text || '';
+      if(!text){ el.className = 'status'; return; }
+      el.className = 'status ' + (ok ? 'ok' : 'err');
+    }
+
+    function readAny(key){ return DB.readAny(key); }
+    function readArray(key){ return DB.readArray(key); }
+    function write(key, value){ return DB.write(key, value); }
+
+    function normalize(s){
+      return String(s ?? '')
+        .trim()
+        .replace(/\u00A0/g,' ')
+        .replace(/\s+/g,' ')
+        .toUpperCase();
+    }
+
+    function normHeader(h){
+      const s = normalize(h)
+        .replace(/Ç/g,'C').replace(/Ã/g,'A').replace(/Á/g,'A').replace(/Â/g,'A')
+        .replace(/É/g,'E').replace(/Ê/g,'E').replace(/Í/g,'I').replace(/Ó/g,'O')
+        .replace(/Ô/g,'O').replace(/Õ/g,'O').replace(/Ú/g,'U');
+      if (s.includes('SERIE')) return 'SERIE';
+      if (s === 'NOME' || s.includes('NOME')) return 'NOME';
+      if (s === 'CPF') return 'CPF';
+      if (s.includes('DATA') && (s.includes('NASC') || s.includes('NASCIMENTO'))) return 'DATA_NASC';
+      if (s === 'MAE' || s.includes(' MAE') || s.includes('MÃE')) return 'MAE';
+      if (s === 'PAI' || s.includes(' PAI')) return 'PAI';
+      if (s.includes('NATURALIDADE')) return 'NATURALIDADE';
+      if (s === 'SEXO' || s.includes('SEXO')) return 'SEXO';
+      if (s.includes('COR') || s.includes('RACA') || s.includes('RAÇA')) return 'COR_RACA';
+      return s;
+    }
+
+    function parseDateBR(v){
+      if (!v) return null;
+      if (v instanceof Date && !isNaN(v)) return v;
+      const s = String(v).trim();
+      if (/^\d+(\.\d+)?$/.test(s)){
+        const n = Number(s);
+        if (!isNaN(n) && n > 20000 && n < 90000){
+          const epoch = new Date(Date.UTC(1899,11,30));
+          const d = new Date(epoch.getTime() + n*24*3600*1000);
+          return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+        }
+      }
+      const m1 = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+      if (m1){ const d = new Date(Number(m1[3]), Number(m1[2])-1, Number(m1[1])); if (!isNaN(d)) return d; }
+      const m2 = s.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+      if (m2){ const d = new Date(Number(m2[1]), Number(m2[2])-1, Number(m2[3])); if (!isNaN(d)) return d; }
+      return null;
+    }
+
+    function fmtDateBR(d){
+      if (!(d instanceof Date) || isNaN(d)) return '';
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    }
+
+    function calcIdade(d){
+      if (!(d instanceof Date) || isNaN(d)) return '';
+      const today = new Date();
+      let age = today.getFullYear() - d.getFullYear();
+      const m = today.getMonth() - d.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+      return age < 0 ? '' : age;
+    }
+
+    function ensureSex(v){
+      const s = normalize(v);
+      if (!s) return '';
+      if (s.startsWith('F')) return 'F';
+      if (s.startsWith('M')) return 'M';
+      return s.slice(0,1);
+    }
+
+    function digits(s){ return String(s||'').replace(/\D/g,''); }
+
+    function formatCPF(v){
+      const d = digits(v);
+      if(d.length !== 11) return String(v||'').trim();
+      return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    // nextAlunoId removido — use window.Identidade.findOrCreate()
+
+    function refreshDbStatus(){
+      const a = readArray(K_ALUNOS).length;
+      const t = readArray(K_TURMAS).length;
+      const m = readArray(K_MATS).length;
+      $('dbStatus').textContent = `alunos: ${a} • turmas: ${t} • matrículas: ${m}`;
+    }
+
+    function getAnoOrDetect(){
+      const v = String($('ano').value || '').trim();
+      if (v) return Number(v);
+      const saved = String(localStorage.getItem(DB.key(K_ANO_ATUAL)) || '').trim();
+      if (saved && /^\d{4}$/.test(saved)) return Number(saved);
+      const turmas = readArray(K_TURMAS);
+      const maxAno = turmas.reduce((m,t)=>Math.max(m, Number(t.anoLetivo||0)), 0);
+      return maxAno || new Date().getFullYear();
+    }
+
+    function turmaLabel(t){
+      const nome = (t && (t.nome || t.turmaNome || t.descricao)) ? String(t.nome || t.turmaNome || t.descricao).trim() : '';
+      const ano = t && t.anoLetivo ? String(t.anoLetivo) : '';
+      const turno = t && t.turno ? String(t.turno) : '';
+      const series = t && t.series ? (Array.isArray(t.series) ? t.series.join(", ") : String(t.series)) : '';
+      const id = t && t.turmaId ? String(t.turmaId) : '';
+      if(nome) return `${nome} • ${ano || '—'} • ${turno || '—'} • ${id}`;
+      if(series) return `${series} • ${ano || '—'} • ${turno || '—'} • ${id}`;
+      return id || '(sem ID)';
+    }
+
+    function loadTurmaOptions(){
+      const turmas = readArray(K_TURMAS);
+      const ano = getAnoOrDetect();
+      $('ano').value = ano;
+      // Mostra APENAS turmas do ano selecionado
+      const doAno = turmas.filter(t => String(t.anoLetivo||'') === String(ano));
+      const sel = $('turmaSelect');
+      sel.innerHTML = '<option value="">— Selecione —</option>';
+      for(const t of doAno){
+        const opt = document.createElement('option');
+        opt.value = t.turmaId || '';
+        opt.textContent = turmaLabel(t);
+        sel.appendChild(opt);
+      }
+      $('turmaHint').textContent = doAno.length > 0
+        ? `${doAno.length} turma(s) encontrada(s) para ${ano}. Selecione a turma para matricular.`
+        : `Nenhuma turma cadastrada para ${ano}. Cadastre uma turma no módulo Ano Ativo.`;
+    }
+
+    function getSelectedTurma(){
+      const tid = String($('turmaSelect').value || '').trim();
+      if(!tid) return null;
+      return readArray(K_TURMAS).find(t => String(t.turmaId||'') === tid) || null;
+    }
+
+    let pendingRows = [];
+
+    function updateKpis(){
+      const turma = getSelectedTurma();
+      const ano = getAnoOrDetect();
+      $('kpiTurma').textContent = `Turma: ${turma ? (turma.nome || turma.turmaId) : '—'}`;
+      $('kpiAno').textContent = `Ano: ${ano || '—'}`;
+      $('kpiLinhas').textContent = `Linhas carregadas: ${pendingRows.length || 0}`;
+      $('btnSalvar').disabled = !(turma && pendingRows.length > 0 && ano);
+      $('btnLimparTudo').disabled = pendingRows.length === 0 && !$('file').value && !$('paste').value;
+    }
+
+    function escapeHtml(s){
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+
+    function buildPreview(rows){
+      const wrap = $('previewWrap');
+      const table = $('preview');
+      if (!rows.length){ wrap.style.display = 'none'; table.innerHTML = ''; return; }
+      const cols = ['SÉRIE','NOME','CPF','DATA DE NASCIMENTO','IDADE','MÃE','PAI','NATURALIDADE','SEXO','COR/RAÇA'];
+      table.innerHTML = `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${
+        rows.slice(0,120).map(r=>`<tr>
+          <td>${escapeHtml(r.serie||'')}</td>
+          <td>${escapeHtml(r.nome||'')}</td>
+          <td>${escapeHtml(r.cpf||'')}</td>
+          <td>${escapeHtml(r.dataNascimento||'')}</td>
+          <td>${escapeHtml(String(r.idade??''))}</td>
+          <td>${escapeHtml(r.mae||'')}</td>
+          <td>${escapeHtml(r.pai||'')}</td>
+          <td>${escapeHtml(r.naturalidade||'')}</td>
+          <td>${escapeHtml(r.sexo||'')}</td>
+          <td>${escapeHtml(r.corRaca||'')}</td>
+        </tr>`).join('')
+      }</tbody>`;
+      wrap.style.display = 'block';
+    }
+
+    function parseRowsFromMatrix(matrix){
+      const rows = matrix.filter(r=>r && r.some(c=>String(c??'').trim()!==''));
+      if (!rows.length) return [];
+      const first = rows[0];
+      const hasHeader = first.some(c=>{
+        const u = String(c||'').toUpperCase().trim();
+        return ['SERIE','SÉRIE','NOME','CPF','DATA DE NASCIMENTO','MÃE','MAE','PAI','NATURALIDADE','SEXO','COR/RAÇA','COR/RACA'].includes(u);
+      });
+      let headerMap, startIdx = 0;
+      if (hasHeader){
+        headerMap = new Map();
+        first.forEach((h,idx)=>{ headerMap.set(normHeader(h), idx); });
+        startIdx = 1;
+      } else {
+        headerMap = new Map([['SERIE',0],['NOME',1],['CPF',2],['DATA_NASC',3],['MAE',4],['PAI',5],['NATURALIDADE',6],['SEXO',7],['COR_RACA',8]]);
+      }
+      const out = [];
+      for (let i=startIdx;i<rows.length;i++){
+        const r = rows[i];
+        const get = (k)=>{ const idx = headerMap.get(k); return (idx==null)?'':r[idx]; };
+        const serie = String(get('SERIE')??'').trim();
+        const nome  = String(get('NOME')??'').trim();
+        if (!serie && !nome) continue;
+        const dn = parseDateBR(get('DATA_NASC'));
+        out.push({
+          serie, nome,
+          cpf: String(get('CPF')??'').trim(),
+          dataNascimento: dn ? fmtDateBR(dn) : String(get('DATA_NASC')??'').trim(),
+          idade: dn ? calcIdade(dn) : '',
+          mae: String(get('MAE')??'').trim(),
+          pai: String(get('PAI')??'').trim(),
+          naturalidade: String(get('NATURALIDADE')??'').trim(),
+          sexo: ensureSex(get('SEXO')),
+          corRaca: String(get('COR_RACA')??'').trim(),
+        });
+      }
+      return out;
+    }
+
+    function parseFromPaste(text){
+      const raw = text.trim();
+      if (!raw) return [];
+      const delim = raw.includes('\t') ? '\t' : ',';
+      return parseRowsFromMatrix(raw.split(/\r?\n/).filter(Boolean).map(line=>line.split(delim)));
+    }
+
+    async function loadXlsxLib(){
+      if (window.XLSX) return true;
+      return new Promise((resolve)=>{
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.onload = ()=>resolve(true);
+        s.onerror = ()=>resolve(false);
+        document.head.appendChild(s);
+      });
+    }
+
+    async function parseFromXlsxFile(file){
+      const ok = await loadXlsxLib();
+      if (!ok) throw new Error('Não foi possível carregar a biblioteca XLSX (CDN).');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      return parseRowsFromMatrix(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }));
+    }
+
+    function clearPreviewAndPending(){ pendingRows = []; buildPreview([]); setMsg(''); updateKpis(); }
+    function loadPending(rows){ pendingRows = rows || []; buildPreview(pendingRows); updateKpis(); }
+
+    function savePending(){
+      const turma = getSelectedTurma();
+      const ano = getAnoOrDetect();
+      if(!turma){ setMsg('Selecione uma turma antes de salvar.', false); return; }
+      if(!ano || isNaN(ano)){ setMsg('Informe o ano letivo antes de salvar.', false); return; }
+      if(!pendingRows.length){ setMsg('Nenhuma linha carregada para salvar.', false); return; }
+
+      if(!window.Identidade){
+        setMsg('Módulo de identidade não carregado. Recarregue a página.', false);
+        return;
+      }
+
+      const mats = readArray(K_MATS);
+      let createdA=0, updatedA=0, createdM=0, updatedM=0;
+
+      for(const r of pendingRows){
+        // find-or-create: busca por CPF → nome+nasc → nome
+        // reutiliza alunoId existente se o aluno já estiver em qualquer módulo
+        const { alunoId, isNew } = window.Identidade.findOrCreate({
+          nomeOficial:    (r.nome||'').trim(),
+          nome:           (r.nome||'').trim(),
+          cpf:            formatCPF(r.cpf||''),
+          dataNascimento: (r.dataNascimento||'').trim(),
+          mae:            (r.mae||'').trim(),
+          pai:            (r.pai||'').trim(),
+          naturalidade:   (r.naturalidade||'').trim(),
+          sexo:           (r.sexo||'').trim(),
+          corRaca:        (r.corRaca||'').trim() || 'NÃO DECLARADA',
+        });
+        if(isNew) createdA++; else updatedA++;
+
+        const tid = String(turma.turmaId||'').trim();
+        const mid = `MAT|${tid}|${alunoId}`;
+        const existingM = mats.find(m=>m.matriculaId===mid)||null;
+        if(existingM){
+          existingM.serie    = (r.serie||'').trim() || existingM.serie;
+          existingM.status   = 'ATIVO';
+          existingM.anoLetivo = ano;
+          updatedM++;
+        } else {
+          mats.push({
+            matriculaId: mid,
+            turmaId: tid,
+            alunoId,
+            anoLetivo: ano,
+            serie: (r.serie||'').trim(),
+            status: 'ATIVO',
+            criadoEm: new Date().toISOString()
+          });
+          createdM++;
+        }
+      }
+
+      // Identidade.findOrCreate já persistiu os alunos — só precisa salvar mats
+      write(K_MATS, mats);
+      write(K_ANO_ATUAL, String(ano));
+      refreshDbStatus();
+      setMsg(`Salvo com sucesso. Alunos: +${createdA} novo(s), ${updatedA} atualizado(s). Matrículas: +${createdM} nova(s), ${updatedM} atualizada(s).`);
+      updateKpis();
+    }
+
+    $('btnSalvar').addEventListener('click', savePending);
+    $('btnLimparTudo').addEventListener('click', ()=>{ $('file').value=''; $('paste').value=''; clearPreviewAndPending(); setMsg('Importação limpa.'); });
+    $('btnLimparXlsx').addEventListener('click', ()=>{ $('file').value=''; setMsg(''); updateKpis(); });
+    $('btnLimparPaste').addEventListener('click', ()=>{ $('paste').value=''; setMsg(''); updateKpis(); });
+    $('btnExemplo').addEventListener('click', ()=>{
+      $('paste').value = 'SERIE\tNOME\tCPF\tDATA DE NASCIMENTO\tMÃE\tPAI\tNATURALIDADE\tSEXO\tCOR/RAÇA\nEIXO 1\tCECILIA SILVA SANTOS\t134.128.025-06\t15/10/2024\tNAIARA PEREIRA SILVA SANTOS\tJOSE CARLIVALDO SILVA DAS VIRGENS\tVALENTE\tF\t';
+      updateKpis();
+    });
+    $('btnPaste').addEventListener('click', ()=>{
+      try{
+        if(!getSelectedTurma()){ setMsg('Selecione uma turma antes de carregar a colagem.', false); return; }
+        $('ano').value = getAnoOrDetect();
+        const rows = parseFromPaste($('paste').value);
+        if (!rows.length){ setMsg('Nenhuma linha detectada na colagem.', false); return; }
+        loadPending(rows);
+        setMsg(`Prévia carregada: ${rows.length} linha(s). Confira a tabela e clique em "Salvar cadastro".`);
+      }catch(e){ setMsg('Falha ao carregar colagem: '+(e.message||e), false); }
+    });
+    $('btnXlsx').addEventListener('click', async ()=>{
+      try{
+        const file = $('file').files?.[0];
+        if (!file){ setMsg('Selecione um arquivo .xlsx.', false); return; }
+        if(!getSelectedTurma()){ setMsg('Selecione uma turma antes de carregar o XLSX.', false); return; }
+        $('ano').value = getAnoOrDetect();
+        setMsg('Lendo XLSX…');
+        const rows = await parseFromXlsxFile(file);
+        if (!rows.length){ setMsg('Arquivo XLSX não contém registros na primeira aba.', false); return; }
+        loadPending(rows);
+        setMsg(`Prévia carregada: ${rows.length} linha(s). Confira a tabela e clique em "Salvar cadastro".`);
+      }catch(e){ setMsg('Falha ao carregar XLSX: '+(e.message||e), false); }
+    });
+    $('turmaSelect').addEventListener('change', updateKpis);
+    $('ano').addEventListener('change', ()=>{ loadTurmaOptions(); $('turmaSelect').value=''; updateKpis(); });
+    $('ano').addEventListener('blur',   ()=>{ if($('ano').value) { loadTurmaOptions(); $('turmaSelect').value=''; updateKpis(); } });
+    $('ano').addEventListener('input', ()=>{ loadTurmaOptions(); updateKpis(); });
+
+    (function init(){
+      const saved = String(localStorage.getItem(DB.key(K_ANO_ATUAL))||'').trim();
+      $('ano').value = saved || getAnoOrDetect();
+      loadTurmaOptions();
+      refreshDbStatus();
+      updateKpis();
+    })();
+  </script>
+
+<script>
+(function(){
+  function applyTheme(theme){
+    const t = (theme === 'dark') ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('ui_theme_v1', t);
+    if (window.ThemeColors) ThemeColors.apply(ThemeColors.get());
+    const emoji = (t === 'dark') ? '☀️' : '🌙';
+    const label = (t === 'dark') ? 'Claro' : 'Escuro';
+    ['themeIcon','themeIconCompact'].forEach(function(id){ const el=document.getElementById(id); if(el) el.textContent=emoji; });
+    const text = document.getElementById('themeText'); if(text) text.textContent=label;
+  }
+  function initThemeToggle(){
+    const btn  = document.getElementById('themeToggle');
+    const btnC = document.getElementById('themeToggleCompact');
+    if (!btn) return;
+    applyTheme((document.documentElement.getAttribute('data-theme') || 'light').toLowerCase());
+    const compact = !!document.querySelector('.btn-back') && !!document.querySelector('.btn-home');
+    btn.style.display  = compact ? 'none' : 'inline-flex';
+    if (btnC) btnC.style.display = compact ? 'inline-flex' : 'none';
+    function toggle(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); }
+    btn.addEventListener('click', toggle);
+    if (btnC) btnC.addEventListener('click', toggle);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initThemeToggle);
+  else initThemeToggle();
+})();
+</script>
+
+<script>
+(function(){
+  function safeParse(json, fallback){ try{ const v=JSON.parse(json); return (v==null?fallback:v); }catch(_){ return fallback; } }
+  function getSession(){
+    if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
+    return safeParse(localStorage.getItem('auth_session_v2')||'null', null);
+  }
+  function listSchools(){
+    if (window.Auth && typeof Auth.listSchools === 'function') return Auth.listSchools()||[];
+    return safeParse(localStorage.getItem('auth_schools_v1')||'[]', []);
+  }
+  function getActiveSchoolId(session){
+    if (!session) return null;
+    const sid = (session.schoolId||'').toString();
+    if (sid.toUpperCase() !== 'ADMIN') return sid;
+    return (localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN';
+  }
+  function renderHeaderContext(){
+    const host = document.getElementById('headerContext');
+    if (!host) return;
+    const s = getSession();
+    host.innerHTML = '';
+    if (!s) return;
+    const email   = (s.email||'').toString();
+    const name    = (s.name||s.displayName||'').toString()||(email?email.split('@')[0]:'Usuário');
+    const role    = (s.role||'').toString();
+    const schoolId = (s.schoolId||'').toString();
+
+    const user = document.createElement('div');
+    user.className = 'ctx-chip ctx-clickable';
+    user.setAttribute('role','button');
+    user.setAttribute('tabindex','0');
+    user.setAttribute('aria-haspopup','true');
+    user.setAttribute('aria-expanded','false');
+    user.innerHTML = `<div class="avatar">👤</div><div class="text"><div class="name"></div><div class="sub"></div></div><div class="ctx-menu" id="userMenu"><button type="button" class="btn menu-btn danger" id="btnLogout">🚪 Sair</button></div>`;
+    user.querySelector('.name').textContent = name;
+    user.querySelector('.sub').textContent  = email||(role?role:'');
+    const menu = user.querySelector('#userMenu');
+    const btnLogout = user.querySelector('#btnLogout');
+    const closeMenu = ()=>{ menu.classList.remove('open'); user.setAttribute('aria-expanded','false'); };
+    const toggleMenu = ()=>{ const open=menu.classList.toggle('open'); user.setAttribute('aria-expanded',open?'true':'false'); };
+    user.addEventListener('click', function(ev){ if(ev.target&&(ev.target.id==='btnLogout'||ev.target.closest('.ctx-menu'))) return; ev.stopPropagation(); toggleMenu(); });
+    user.addEventListener('keydown', function(ev){ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); toggleMenu(); } if(ev.key==='Escape') closeMenu(); });
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', function(ev){ if(ev.key==='Escape') closeMenu(); });
+    btnLogout.addEventListener('click', function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      try{ if(window.Auth&&typeof Auth.logout==='function') Auth.logout(); else { localStorage.removeItem('auth_session_v2'); localStorage.removeItem('auth_return_to_v2'); } }catch(_){}
+      window.location.href='/login.html';
+    });
+    host.appendChild(user);
+
+    const schools  = listSchools();
+    const effective = getActiveSchoolId(s);
+    const matched  = schools.find(x=>(x&&(x.schoolId||'').toString()===effective))||schools.find(x=>(x&&(x.id||'').toString()===effective));
+    const schoolName = matched?(matched.name||matched.nome||'').toString().trim():'';
+    const wrap = document.createElement('div');
+    wrap.className = 'school-pill';
+    const label = document.createElement('span');
+    label.textContent = '🏫';
+    wrap.appendChild(label);
+    if(schoolId.toUpperCase()==='ADMIN'&&Array.isArray(schools)&&schools.length){
+      const sel = document.createElement('select');
+      const seen = new Set();
+      schools.map(x=>({schoolId:(x.schoolId||x.id||'').toString(),name:(x.displayName||x.name||x.nome||'').toString()}))
+             .filter(o=>o.schoolId&&!seen.has(o.schoolId)&&seen.add(o.schoolId))
+             .forEach(o=>{ const opt=document.createElement('option'); opt.value=o.schoolId; opt.textContent = o.name || o.schoolId; sel.appendChild(opt); });
+      sel.value = effective;
+      sel.addEventListener('change', function(){ localStorage.setItem('admin_active_school_v1',sel.value); location.reload(); });
+      wrap.appendChild(sel);
+    } else {
+      const span = document.createElement('span');
+      span.textContent = schoolName?`${schoolName} (${schoolId})`:schoolId;
+      wrap.appendChild(span);
+    }
+    host.appendChild(wrap);
+  }
+  function boot(){ try{ renderHeaderContext(); }catch(e){ console.warn('headerContext:',e); } }
+  async function bootAsync(){
+
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+    const dados = await window.DB.loadAll();
+    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
+    if(sid){
+      const pre=(k)=>`schools:${sid}:${k}`;
+      if(dados.turmasDB)   localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dados.turmasDB));
+      if(dados.alunosDB)   localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dados.alunosDB));
+      if(dados.matriculas) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dados.matriculas));
+      if(dados.dadosEscola?.configAnoAtivo)
+        localStorage.setItem(pre('configAnoAtivoAtual_v1'), JSON.stringify(dados.dadosEscola.configAnoAtivo));
+    }
+  }catch(e){ console.warn('Ano Ativo Firestore pré-carga:', e); }
+    boot();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootAsync);
+  else bootAsync();
+})();
+</script>
+</body>
+</html>

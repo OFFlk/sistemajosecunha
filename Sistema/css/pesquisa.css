@@ -1,0 +1,374 @@
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.wrap {
+  max-width: 1200px;
+  margin: 32px auto;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+
+/* ============================================================
+   PESQUISA DE ALUNO
+   ============================================================ */
+.aluno-search-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.aluno-search-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.aluno-result-row {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.aluno-not-found {
+  padding: 10px;
+  border-radius: 10px;
+  color: var(--danger);
+}
+
+
+/* ============================================================
+   DETALHES
+   ============================================================ */
+#detalhesBox {
+  display: none;
+}
+
+.detalhe-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.summary {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+
+/* ============================================================
+   PAINEL DE NOTAS
+   ============================================================ */
+#painelNotas {
+  display: none;
+  margin-top: 20px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+#painelNotas.visible {
+  display: block;
+}
+
+/* ===== Layout dinâmico (GRID) ===== */
+
+#container.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  transition: all 0.3s ease;
+  align-items: start;
+}
+
+/* estado normal */
+.layout-normal {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ===== Card esquerdo (base) ===== */
+#card-esquerda {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#card-esquerda .list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+#card-esquerda::-webkit-scrollbar { width: 8px; }
+#card-esquerda::-webkit-scrollbar-thumb { background: #888; border-radius: 8px; }
+
+/* ===== Estado expandido ===== */
+.layout-expandido {
+  grid-template-columns: 220px 1fr;
+}
+
+/* sidebar: altura total com scroll */
+.layout-expandido #card-esquerda {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  cursor: pointer;
+}
+
+.layout-expandido #card-esquerda .list {
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+}
+
+/* esconde botões de ação */
+.layout-expandido #card-esquerda .right {
+  display: none;
+}
+
+/* esconde linha de detalhes secundários */
+.layout-expandido #card-esquerda .muted {
+  display: none;
+}
+
+/* compacta cada item da lista */
+.layout-expandido #card-esquerda .list-item {
+  padding: 7px 8px;
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.layout-expandido #card-esquerda .list-item:not(.selected):hover {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+/* item selecionado */
+#card-esquerda .list-item.selected {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  border-left: 3px solid var(--primary);
+}
+
+/* nome da turma: ocupa linha própria e quebra normalmente */
+.layout-expandido #card-esquerda .list-item .left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.layout-expandido #card-esquerda .list-item .left > div:first-child {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+/* título (b) ocupa a linha inteira e quebra */
+.layout-expandido #card-esquerda .list-item .left > div:first-child > b {
+  display: block;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+/* badges ficam em linha própria abaixo do nome */
+.layout-expandido #card-esquerda .list-item .left > div:not(:first-child) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+/* dica visual de "clique para recolher" no título da sidebar */
+.layout-expandido #card-esquerda > .section-title::after {
+  content: " ◀";
+  font-size: 10px;
+  opacity: 0.4;
+}
+
+/* título da sidebar fica menor */
+.layout-expandido #card-esquerda > .section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+/* ===== Lado direito ===== */
+/* evita quebra feia em células de tabela */
+#card-direita td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== INPUT DETALHES ===== */
+
+#card-direita input[type="text"] {
+  width: 100%;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 90%, var(--primary) 5%);
+  color: var(--text);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+/* foco */
+#card-direita input[type="text"]:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* dark mode mais visível */
+[data-theme="dark"] #card-direita input[type="text"] {
+  background: color-mix(in srgb, #000 70%, var(--primary) 10%);
+}
+
+/* Inputs dentro da tabela de edição de notas — compactos */
+#tNotasEdit input.nota-input,
+#tNotasEdit input.serie-input {
+  width: 44px;
+  max-width: 44px;
+  padding: 4px 4px;
+  font-size: 12px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 90%, var(--primary) 5%);
+  color: var(--text);
+  box-shadow: none;
+}
+
+#tNotasEdit input.serie-input {
+  width: 60px;
+  max-width: 60px;
+  text-align: left;
+}
+
+#tNotasEdit input.nota-input:focus,
+#tNotasEdit input.serie-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+  outline: none;
+}
+
+/* ===== SCROLLBAR SIDEBAR ===== */
+
+#card-esquerda .list::-webkit-scrollbar {
+  width: 8px;
+}
+
+#card-esquerda .list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#card-esquerda .list::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 8px;
+}
+
+/* dark melhora contraste */
+[data-theme="dark"] #card-esquerda .list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--primary) 70%, #fff 10%);
+}
+
+/* ===== Painel de notas — header ===== */
+.pn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg) 88%);
+  border-bottom: 2px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.pn-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pn-header-actions button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+/* Botão Salvar — estilo primário */
+#btnSalvarNotas {
+  background: var(--primary);
+  color: #fff;
+}
+#btnSalvarNotas:hover { opacity: 0.85; }
+
+/* Botão Fechar — estilo ghost */
+#btnFecharNotas {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border) !important;
+}
+#btnFecharNotas:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: var(--danger) !important;
+  color: var(--danger);
+}
+
+/* ===== Select de resultado no painel de notas ===== */
+#tNotasEdit select[data-field="resultado"] {
+  width: 72px;
+  max-width: 72px;
+  padding: 4px 2px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* ===== Espaçamento das ações (card detalhes) ===== */
+#card-direita .detalhe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px; /* 🔥 resolve o problema */
+}
+
+#card-direita .detalhe-actions button:last-child {
+  margin-left: auto;
+}

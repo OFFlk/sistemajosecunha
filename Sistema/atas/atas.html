@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  document.documentElement.setAttribute('data-theme', (saved === 'dark' || saved === 'light') ? saved : 'light');
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/hub.css">
+
+<title>Atas finais</title>
+<style>
+/* tooltip para cards bloqueados — necessário para o JS de position:fixed funcionar */
+.card[data-tooltip] {
+  position: relative;
+}
+</style>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+  <div class="l-section">
+    <div class="l-slabel">// módulos</div>
+    <div class="l-sline"></div>
+  </div>
+
+  <div class="grid-atas">
+
+    <a class="card" id="cardCadastroTurma" href="cadastro-turma.html">
+      <span class="card-badge">Admin</span>
+      <div class="card-icon">📘</div>
+      <div class="card-title">Cadastro de turma</div>
+      <div class="card-footer">
+        <div class="card-desc">Crie uma nova ata final, selecione a turma e preencha resultados/observações.</div>
+      </div>
+    </a>
+
+    <a class="card" href="pesquisa-ata.html">
+      <div class="card-icon">🔍</div>
+      <div class="card-title">Pesquisa de turma/ata</div>
+      <div class="card-footer">
+        <div class="card-desc">Encontre atas já criadas, edite informações e exporte o documento quando necessário.</div>
+      </div>
+    </a>
+
+    <a class="card" href="historico-aluno.html">
+      <div class="card-icon">👤</div>
+      <div class="card-title">Pesquisa de aluno</div>
+      <div class="card-footer">
+        <div class="card-desc">Consulte o histórico completo do aluno e localize rapidamente em quais atas/turmas ele aparece.</div>
+      </div>
+    </a>
+
+    <a class="card" id="cardGestao" href="gestao-atas.html">
+      <span class="card-badge">Admin</span>
+      <div class="card-icon">🗄️</div>
+      <div class="card-title">Gestão de dados</div>
+      <div class="card-footer">
+        <div class="card-desc">Importe, exporte, e gerencie os dados do módulo de atas finais.</div>
+      </div>
+    </a>
+
+  </div>
+</div>
+
+<footer>
+  <div class="l-fdot"></div>
+  sistema interno de gestão escolar · desenvolvido sob medida
+</footer>
+
+<!-- header-logic.js cuida de: tema, chip de usuário, auth guard e montagem do header -->
+<script src="../header-logic.js"></script>
+
+<script>
+document.addEventListener('auth:ready', function () {
+  var session = window.Auth && typeof Auth.getSession === 'function'
+    ? Auth.getSession()
+    : null;
+  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+
+  ['cardCadastroTurma', 'cardGestao'].forEach(function (id) {
+    var card = document.getElementById(id);
+    if (!card) return;
+    if (role !== 'admin') {
+      card.removeAttribute('href');
+      card.classList.add('disabled');
+      card.setAttribute('data-tooltip', 'Sem acesso');
+      card.title = 'Acesso restrito a administradores';
+    }
+  });
+
+  if (typeof initTooltipCards === 'function') initTooltipCards();
+});
+</script>
+
+<script>
+(function () {
+  var bubble = null;
+
+  function getBrandColor() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var key     = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
+    var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
+                  || { '--brand': '#7c3aed', '--brand-d': '#7c3aed' };
+    var color = dark
+      ? (palette['--brand-d'] || '#7c3aed')
+      : (palette['--brand']   || '#7c3aed');
+    return { color: color, dark: dark };
+  }
+
+  function stylesBubble(b) {
+    var bc = getBrandColor();
+    b.style.background = bc.color;
+    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+  }
+
+  function initBubble(b) {
+    b.style.cssText = [
+      'position:fixed',
+      'z-index:9999',
+      'pointer-events:none',
+      'opacity:0',
+      'transition:opacity 0.15s ease, transform 0.15s ease',
+      'transform:translateX(-50%) translateY(4px)',
+      'font-size:12px',
+      'font-family:inherit',
+      'font-weight:700',
+      'letter-spacing:0.04em',
+      'text-transform:uppercase',
+      'white-space:nowrap',
+      'padding:5px 12px',
+      'border-radius:6px',
+    ].join(';');
+    stylesBubble(b);
+  }
+
+  function ensureBubble() {
+    if (bubble) return bubble;
+    bubble = document.createElement('span');
+    initBubble(bubble);
+    document.body.appendChild(bubble);
+    return bubble;
+  }
+
+  function positionBubble(card) {
+    var rect = card.getBoundingClientRect();
+    bubble.style.left      = (rect.left + rect.width / 2) + 'px';
+    bubble.style.top       = (rect.top - 8) + 'px';
+    bubble.style.transform = 'translateX(-50%) translateY(-100%)';
+  }
+
+  function showTooltip(e) {
+    var card = e.currentTarget;
+    var b    = ensureBubble();
+    b.textContent = card.getAttribute('data-tooltip');
+    stylesBubble(b);
+    positionBubble(card);
+    requestAnimationFrame(function () {
+      b.style.opacity   = '1';
+      b.style.transform = 'translateX(-50%) translateY(-100%)';
+    });
+  }
+
+  function hideTooltip() {
+    if (bubble) bubble.style.opacity = '0';
+  }
+
+  window.initTooltipCards = function () {
+    document.querySelectorAll('.card[data-tooltip]').forEach(function (card) {
+      if (card._tooltipBound) return;
+      card._tooltipBound = true;
+      card.addEventListener('mouseenter', showTooltip);
+      card.addEventListener('mouseleave', hideTooltip);
+    });
+  };
+
+  function onThemeChange() {
+    if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initTooltipCards);
+  } else {
+    window.initTooltipCards();
+  }
+
+  new MutationObserver(onThemeChange)
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.addEventListener('colorchange', onThemeChange);
+})();
+</script>
+
+</body>
+</html>

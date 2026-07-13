@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script>
+(function(){
+  const t = localStorage.getItem('ui_theme_v1') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script>window.Auth && (Auth.requireRole ? Auth.requireRole('admin') : Auth.requireAuth());</script>
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<title>Admin • Hub</title>
+<!-- ── ARQUIVOS CSS ORGANIZADOS ── -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/hub.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+
+<div class="l-bar"></div>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="brand">
+      <div class="mark">AD</div>
+      <div>
+        <div class="brand-title">Admin <span class="v-badge">v1</span></div>
+        <div class="brand-sub">// ferramentas de manutenção e configuração</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="header-context" id="headerContext"></div>
+      <button class="theme-toggle" id="themeToggle" type="button">
+        <span id="themeIcon">🌙</span><span id="themeText">Escuro</span>
+      </button>
+      <button class="theme-toggle-compact" id="themeToggleCompact" type="button" title="Alternar tema">
+        <span id="themeIconCompact">🌙</span>
+      </button>
+      <a class="btn-home" href="../index.html">
+        <span class="b-icon">🏠</span><span class="b-label">Início</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+
+<!-- Script tema -->
+<script>
+(function(){
+  function applyTheme(theme){
+    const t = (theme === 'dark') ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('ui_theme_v1', t);
+    if (window.ThemeColors) ThemeColors.apply(ThemeColors.get());
+    const emoji = (t === 'dark') ? '☀️' : '🌙';
+    const label = (t === 'dark') ? 'Claro' : 'Escuro';
+    ['themeIcon','themeIconCompact'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = emoji; });
+    const text = document.getElementById('themeText'); if(text) text.textContent = label;
+  }
+  function init(){
+    const btn  = document.getElementById('themeToggle');
+    const btnC = document.getElementById('themeToggleCompact');
+    if (!btn) return;
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+    const compact = !!document.querySelector('.btn-back') && !!document.querySelector('.btn-home');
+    btn.style.display  = compact ? 'none' : 'inline-flex';
+    if (btnC) btnC.style.display = compact ? 'inline-flex' : 'none';
+    function toggle(){ applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+    btn.addEventListener('click', toggle);
+    if (btnC) btnC.addEventListener('click', toggle);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
+
+<div class="container">
+
+  <div class="l-section">
+    <div class="l-slabel">// módulos</div>
+    <div class="l-sline"></div>
+  </div>
+
+  <div class="grid" style="margin-bottom: 28px;">
+
+    <a class="card" id="cardBackup" href="admin_backup.html">
+      <div class="card-icon">💾</div>
+      <div class="card-title">Backup e restaurar</div>
+      <div class="card-footer">
+        <div class="card-desc">Exporte dados, restaure quando precisar e faça limpezas controladas.</div>
+      </div>
+    </a>
+
+    <a class="card" href="cadastro_admin.html">
+      <div class="card-icon">👥</div>
+      <div class="card-title">Usuários e permissões</div>
+      <div class="card-footer">
+        <div class="card-desc">Aprove cadastros, liste usuários e crie contas de administrador.</div>
+      </div>
+    </a>
+
+    <a class="card" href="admin_escolas.html">
+      <div class="card-icon">🏫</div>
+      <div class="card-title">Cadastro de escolas</div>
+      <div class="card-footer">
+        <div class="card-desc">Cadastre e gerencie escolas e schoolIds no sistema.</div>
+      </div>
+    </a>
+
+    <a class="card" href="../admin/schema_ata.html">
+      <div class="card-icon">🧩</div>
+      <div class="card-title">Edição de ata e schema</div>
+      <div class="card-footer">
+        <div class="card-desc">Configure colunas, regras e o schema padrão para cadastro de novas turmas.</div>
+      </div>
+    </a>
+
+    <a class="card" href="../admin/idaluno.html">
+      <div class="card-icon">🆔</div>
+      <div class="card-title">Configuração de IDs</div>
+      <div class="card-footer">
+        <div class="card-desc">Gere e atualize IDs automáticos, revise duplicatas e gere IDs do sistema.</div>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="l-section">
+    <div class="l-slabel">// configurações</div>
+    <div class="l-sline"></div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 18px;">
+
+    <!-- Ano letivo ativo -->
+    <div class="config-card" id="cardAnoAtivo">
+      <h3>📅 Ano letivo ativo</h3>
+      <p class="desc">Define o ano letivo padrão para o módulo de Ano Ativo. Salvo no banco da escola e sincronizado entre todos os dispositivos.</p>
+      <div class="field-inline">
+        <div>
+          <label>Ano ativo atual</label>
+          <b id="lblAnoAtivoAdmin" style="font-size:22px;display:block;">—</b>
+        </div>
+        <div>
+          <label>Definir novo ano</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="inpAnoAtivoAdmin" type="number" min="2000" max="2100" placeholder="Ex: 2026"/>
+            <button type="button" id="btnSetAnoAtivo" class="btn-save">✔ Definir</button>
+          </div>
+        </div>
+        <div id="msgAnoAtivo" style="font-size:13px;color:#16a34a;display:none;align-self:flex-end;padding-bottom:4px;"></div>
+      </div>
+    </div>
+
+    <!-- Status do banco -->
+    <div class="status-card">
+      <h3>📊 Status do banco</h3>
+      <div id="dbMeta" class="meta-line">Carregando…</div>
+      <div id="dbWarn" class="warn-box" style="display:none;">
+        <b>Atenção:</b> parece que você ainda não gerou os <b>IDs do sistema</b>. Vá em <b>"Configuração de IDs"</b> e clique em <b>"Gerar IDs do sistema"</b>.
+      </div>
+      <div class="meta-line" style="margin-top:12px;">
+        <b>Dica:</b> abra estas ferramentas pelo mesmo domínio onde você usa o sistema para acessar o mesmo banco.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <div class="l-fdot"></div>
+  sistema interno de gestão escolar · desenvolvido sob medida
+</footer>
+
+
+<!-- Script chip usuário -->
+<script>
+(function(){
+  function safeParse(json, fallback){ try{ const v = JSON.parse(json); return (v==null?fallback:v); }catch(_){ return fallback; } }
+  function getSession(){ if(window.Auth && typeof Auth.getSession==='function') return Auth.getSession(); return safeParse(localStorage.getItem('auth_session_v2')||'null',null); }
+  function listSchools(){ if(window.Auth && typeof Auth.listSchools==='function') return Auth.listSchools()||[]; return safeParse(localStorage.getItem('auth_schools_v1')||'[]',[]); }
+  function getActiveSchoolId(session){ if(!session) return null; const sid=(session.schoolId||'').toString(); if(sid.toUpperCase()!=='ADMIN') return sid; return (localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN'; }
+
+  function renderHeaderContext(){
+    const host = document.getElementById('headerContext');
+    if(!host) return;
+    const s = getSession(); host.innerHTML=''; if(!s) return;
+    const email=(s.email||'').toString(), name=(s.name||s.displayName||'').toString()||(email?email.split('@')[0]:'Usuário'), role=(s.role||'').toString(), schoolId=(s.schoolId||'').toString();
+
+    const user = document.createElement('div');
+    user.className='ctx-chip ctx-clickable'; user.setAttribute('role','button'); user.setAttribute('tabindex','0'); user.setAttribute('aria-haspopup','true'); user.setAttribute('aria-expanded','false');
+    const photoURL = s.photoURL||null;
+    user.innerHTML=`<div class="avatar">${photoURL?`<img src="${photoURL}" style="width:100%;height:100%;border-radius:999px;object-fit:cover;" onerror="this.parentElement.textContent='👤'">`:'👤'}</div><div class="text"><div class="name"></div><div class="sub"></div></div><div class="ctx-menu" id="userMenu"><button type="button" class="menu-btn" id="btnPerfil">👤 Meu perfil</button><button type="button" class="menu-btn danger" id="btnLogout">🚪 Sair</button></div>`;
+    user.querySelector('.name').textContent=name; user.querySelector('.sub').textContent=email||(role?role:'');
+
+    const menu=user.querySelector('#userMenu');
+    function closeMenu(){ menu.classList.remove('open'); user.setAttribute('aria-expanded','false'); }
+    function toggleMenu(){ const open=menu.classList.toggle('open'); user.setAttribute('aria-expanded',open?'true':'false'); }
+    user.addEventListener('click',function(ev){ if(ev.target&&(ev.target.id==='btnLogout'||ev.target.closest('.ctx-menu'))) return; ev.stopPropagation(); toggleMenu(); });
+    user.addEventListener('keydown',function(ev){ if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();toggleMenu();} if(ev.key==='Escape') closeMenu(); });
+    document.addEventListener('click',closeMenu);
+    document.addEventListener('keydown',function(ev){ if(ev.key==='Escape') closeMenu(); });
+    user.querySelector('#btnPerfil').addEventListener('click',function(ev){ ev.preventDefault();ev.stopPropagation();window.location.href='/perfil.html'; });
+    user.querySelector('#btnLogout').addEventListener('click',function(ev){ ev.preventDefault();ev.stopPropagation(); try{ if(window.Auth&&typeof Auth.logout==='function') Auth.logout(); else{localStorage.removeItem('auth_session_v2');localStorage.removeItem('auth_return_to_v2');} }catch(_){} window.location.href='/login.html'; });
+    host.appendChild(user);
+
+    const schools=listSchools(), effective=getActiveSchoolId(s);
+    const matched=schools.find(x=>(x&&(x.schoolId||'').toString()===effective))||schools.find(x=>(x&&(x.id||'').toString()===effective));
+    const schoolName=matched?(matched.displayName||matched.name||matched.nome||'').toString().trim():'';
+    const wrap=document.createElement('div'); wrap.className='school-pill';
+    const lbl=document.createElement('span'); lbl.textContent='◈'; wrap.appendChild(lbl);
+    if(schoolId.toUpperCase()==='ADMIN'&&Array.isArray(schools)&&schools.length){
+      const sel=document.createElement('select');
+      const optAll=document.createElement('option'); optAll.value='ADMIN'; optAll.textContent='Todas as escolas (ADMIN)'; sel.appendChild(optAll);
+      const seen=new Set();
+      schools.map(x=>({schoolId:(x.schoolId||x.id||'').toString(),name:(x.displayName||x.name||x.nome||'').toString()})).filter(o=>o.schoolId&&o.schoolId!=='ADMIN'&&!seen.has(o.schoolId)&&seen.add(o.schoolId)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).forEach(o=>{ const opt=document.createElement('option'); opt.value=o.schoolId; opt.textContent = o.name || o.schoolId; sel.appendChild(opt); });
+      sel.value=effective; sel.addEventListener('change',function(){ if(sel.value==='ADMIN') localStorage.removeItem('admin_active_school_v1'); else localStorage.setItem('admin_active_school_v1',sel.value); location.reload(); }); wrap.appendChild(sel);
+    } else { const span=document.createElement('span'); span.textContent=schoolName||schoolId; wrap.appendChild(span); }
+    host.appendChild(wrap);
+  }
+
+  function boot(){ try{ renderHeaderContext(); }catch(e){ console.warn('headerContext:',e); } }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  document.addEventListener('auth:ready',boot); document.addEventListener('auth:sessionChanged',boot);
+})();
+</script>
+
+
+<!-- Script Backup visibilidade + Ano Ativo + Status -->
+<script>
+(function(){
+  // Backup visível só para ADMIN global
+  function safeParse(json,fb){ try{ const v=JSON.parse(json); return v==null?fb:v; }catch(_){ return fb; } }
+  function getSession(){ if(window.Auth&&typeof Auth.getSession==='function') return Auth.getSession(); return safeParse(localStorage.getItem('auth_session_v2')||'null',null); }
+  const s=getSession(), isGlobal=!!s&&String(s.schoolId||'').toUpperCase()==='ADMIN';
+  const cardBackup=document.getElementById('cardBackup');
+  if(!isGlobal&&cardBackup) cardBackup.style.display='none';
+})();
+
+// Ano Ativo
+async function _lerAnoAtivo(){
+  try{
+    await new Promise(res=>{ if(window.Auth&&window.Auth.getSession&&window.Auth.getSession()) return res(); document.addEventListener('auth:ready',res,{once:true}); });
+    const dados = await window.DB.loadAll();
+    return (dados.dadosEscola?.configAnoAtivo||'').toString().replace(/"/g,'').trim();
+  }catch(e){ console.warn('_lerAnoAtivo Firestore:',e); return ''; }
+}
+function _salvarAnoAtivo(val){
+  if(window.DB&&window.DB.escola&&window.DB.escola.save)
+    window.DB.escola.save({configAnoAtivo:val}).catch(function(e){ console.warn('Firestore configAnoAtivo:',e); });
+}
+
+async function initAnoAtivo(){
+  const lbl=document.getElementById('lblAnoAtivoAdmin'), inp=document.getElementById('inpAnoAtivoAdmin'), btn=document.getElementById('btnSetAnoAtivo'), msg=document.getElementById('msgAnoAtivo');
+  if(!lbl||!inp||!btn) return;
+  const atual=await _lerAnoAtivo(); lbl.textContent=atual||'(não definido)'; if(atual) inp.value=atual;
+  btn.addEventListener('click',function(){
+    const val=String(inp.value||'').trim();
+    if(!val||val.length!==4||isNaN(Number(val))){ alert('Informe um ano com 4 dígitos (ex: 2026).'); return; }
+    _salvarAnoAtivo(val); lbl.textContent=val;
+    if(msg){ msg.textContent='✅ Ano ativo definido como '+val+'.'; msg.style.display='block'; setTimeout(function(){ msg.style.display='none'; },5000); }
+    btn.textContent='✔ Salvo!'; setTimeout(function(){ btn.textContent='✔ Definir'; },2000);
+  });
+}
+
+// Status do banco
+function normNome(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' '); }
+function contarAlunosUnicosEmTurmas(turmas){ const set=new Set(); for(const t of(Array.isArray(turmas)?turmas:[])){ if(!Array.isArray(t?.alunos)) continue; for(const al of t.alunos){ const id=String(al?.alunoId||'').trim(); if(id) set.add('id:'+id); else{ const n=normNome(al?.nome); if(n) set.add('nome:'+n); } } } return set.size; }
+function safeParseLS(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return fallback; return JSON.parse(raw); }catch(e){ return fallback; } }
+
+async function renderMeta(){
+  let turmas=[],alunosDB=[],aliasesDB={},schemas=[],atasDB=[],matriculasDB=[],turmasMetaDB=[];
+  try{
+    await new Promise(res=>{ if(window.Auth&&window.Auth.getSession&&window.Auth.getSession()) return res(); document.addEventListener('auth:ready',res,{once:true}); });
+    const dados=await window.DB.loadAll();
+    turmas=dados.turmasDB||safeParseLS('turmasDB',[]); alunosDB=dados.alunosDB||safeParseLS('alunosDB',[]); aliasesDB=dados.matriculas||safeParseLS('alunosAliasesDB',{}); schemas=dados.schemas||safeParseLS('turmasSchemas_v1',[]); atasDB=dados.atasDB||safeParseLS('atasDB',[]); matriculasDB=dados.matriculas||safeParseLS('matriculasDB',[]);
+  }catch(e){ turmas=safeParseLS('turmasDB',[]); alunosDB=safeParseLS('alunosDB',[]); aliasesDB=safeParseLS('alunosAliasesDB',{}); schemas=safeParseLS('turmasSchemas_v1',[]); atasDB=safeParseLS('atasDB',[]); matriculasDB=safeParseLS('matriculasDB',[]); turmasMetaDB=safeParseLS('turmasMetaDB',[]); }
+
+  const metaEl=document.getElementById('dbMeta');
+  metaEl.innerHTML=`
+    <div class="meta-line"><b>Domínio:</b> ${location.origin}</div>
+    <div class="meta-line"><b>Turmas:</b> ${Array.isArray(turmas)?turmas.length:0} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${contarAlunosUnicosEmTurmas(turmas)} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${Array.isArray(alunosDB)?alunosDB.length:0}</div>
+    <div class="meta-line"><b>Aliases:</b> ${(aliasesDB&&typeof aliasesDB==='object'&&!Array.isArray(aliasesDB))?Object.keys(aliasesDB).length:(Array.isArray(aliasesDB)?aliasesDB.length:0)} &nbsp;•&nbsp; <b>Schemas:</b> ${Array.isArray(schemas)?schemas.length:0} <span style="font-size:12px;color:var(--muted);">(chave <code>turmasSchemas_v1</code>)</span></div>
+    <div class="meta-line"><b>Atas (aux):</b> ${Array.isArray(atasDB)?atasDB.length:0} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${Array.isArray(matriculasDB)?matriculasDB.length:0}</div>
+  `;
+  const gerouAux=(atasDB.length>0||matriculasDB.length>0||turmasMetaDB.length>0);
+  document.getElementById('dbWarn').style.display=gerouAux?'none':'block';
+}
+
+document.addEventListener('DOMContentLoaded',function(){ renderMeta(); initAnoAtivo(); });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  document.documentElement.setAttribute('data-theme', (saved === 'dark' || saved === 'light') ? saved : 'light');
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/hub.css">
+<!-- CSS específico desta página -->
+<link rel="stylesheet" href="/css/escola_form.css">
+
+<title>Informações da Escola</title>
+<style>
+/* cursor default em todo o card de formulário */
+main .card,
+main .card input,
+main .card select,
+main .card textarea,
+main .card label,
+main .card .form,
+main .card .campo,
+main .card .acoes {
+  cursor: default;
+}
+/* cursor bloqueado nos botões de ação desabilitados (sobrescreve o default acima) */
+input[type="file"]:disabled,
+button:disabled {
+  cursor: not-allowed !important;
+  pointer-events: auto !important; /* mantém hover para o tooltip funcionar */
+}
+/* imagem do escudo: pointer para indicar que é clicável */
+#escudoPreview {
+  cursor: pointer;
+}
+/* tooltip nos elementos com data-tooltip — position:fixed no JS evita herdar opacity */
+[data-tooltip] {
+  position: relative;
+}
+</style>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<main class="wrap">
+  <div class="card">
+
+    <h2>Cadastro</h2>
+
+    <div class="form">
+
+      <div class="campo">
+        <label>Nome da escola *</label>
+        <input type="text" id="nomeEscola" required>
+      </div>
+
+      <div class="campo">
+        <label>Endereço *</label>
+        <input type="text" id="enderecoEscola" required>
+      </div>
+
+      <div class="campo">
+        <label>Município/Cidade</label>
+        <input type="text" id="cidadeEscola" placeholder="Ex.: Valente" required>
+      </div>
+
+      <div class="campo">
+        <label>UF</label>
+        <select id="ufEscola" required>
+          <option value="">Selecione</option>
+          <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
+          <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
+          <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+          <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option>
+          <option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option>
+          <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+          <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Código INEP</label>
+        <input type="text" id="inepEscola" inputmode="numeric" maxlength="8" placeholder="Ex.: 12345678" required oninput="this.value=(this.value||'').replace(/\D+/g,'').slice(0,8)" pattern="\d{8}">
+      </div>
+
+      <div class="campo">
+        <label>Escudo da escola</label>
+        <input type="file" accept="image/*" onchange="previewEscudo(event)">
+        <div class="preview">
+          <img id="escudoPreview" style="display:none" onclick="abrirLightbox()" title="Clique para ampliar">
+        </div>
+      </div>
+
+    </div>
+
+    <div class="acoes">
+      <button class="primary" type="button" onclick="salvarDados()">Salvar</button>
+      <span id="feedbackEscola" style="display:none;margin-left:12px;font-weight:700;font-size:14px"></span>
+    </div>
+
+  </div>
+</main>
+
+<!-- header-logic: monta header, tema, chip e auth guard -->
+<script src="../header-logic.js"></script>
+
+<!-- Guarda de role: bloqueia edição para não-admin -->
+<script>
+document.addEventListener('auth:ready', function () {
+  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+  if (role === 'admin') return; // admin passa livre
+
+  // 1. Desabilita todos os campos e o botão salvar
+  document.querySelectorAll('input, select, button, textarea').forEach(function (el) {
+    el.disabled = true;
+  });
+
+  // 2. Tooltip nos dois botões de ação: input[type=file] e button salvar
+  document.querySelectorAll('input[type="file"], button.primary').forEach(function (el) {
+    el.setAttribute('data-tooltip', 'Sem acesso');
+  });
+
+  // 3. Aviso visual abaixo do título
+  var titulo = document.querySelector('main .card h2');
+  if (titulo) {
+    var aviso = document.createElement('div');
+    aviso.style.cssText = [
+      'display:flex', 'align-items:center', 'gap:8px',
+      'background:var(--warn-bg,#fef9c3)', 'color:var(--warn-text,#854d0e)',
+      'border:1px solid var(--warn-border,#fde047)',
+      'border-radius:8px', 'padding:10px 14px',
+      'font-size:13px', 'font-weight:600',
+      'margin-bottom:16px'
+    ].join(';');
+    aviso.innerHTML = '<span style="font-size:16px">🔒</span> Somente administradores podem editar as informações da escola.';
+    titulo.insertAdjacentElement('afterend', aviso);
+  }
+
+  // 4. Garante que salvarDados() não execute mesmo se chamado por outro meio
+  window.salvarDados = function () {
+    console.warn('Acesso negado: role insuficiente para salvar dados da escola.');
+  };
+
+  // 5. Inicializa tooltip após adicionar data-tooltip dinamicamente
+  if (typeof initTooltipCards === 'function') initTooltipCards();
+});
+</script>
+
+<!-- Lógica específica desta página -->
+<script>
+let escudoBase64 = null;
+
+// schoolId e chave da escola agora gerenciados por Auth.getActiveSchoolId() via auth.firebase.js
+
+function previewEscudo(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    escudoBase64 = reader.result; // data:image/...;base64,...
+    const img = document.getElementById('escudoPreview');
+    if(img){
+      img.src = escudoBase64;
+      img.style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function salvarDados() {
+  const nomeEl = document.getElementById('nomeEscola');
+  const endEl  = document.getElementById('enderecoEscola');
+  if (!nomeEl?.value?.trim() || !endEl?.value?.trim()) {
+    alert('Preencha os campos obrigatórios.');
+    return;
+  }
+
+  const cidadeEl = document.getElementById('cidadeEscola');
+  const ufEl     = document.getElementById('ufEscola');
+  const inepEl   = document.getElementById('inepEscola');
+
+  const cidade = (cidadeEl?.value || '').trim();
+  const uf = (ufEl?.value || '').toString().toUpperCase().slice(0,2);
+  const inep = (inepEl?.value || '').replace(/\D+/g,'').slice(0,8);
+
+  const dadosEscola = {
+    nome: nomeEl.value.trim(),
+    endereco: endEl.value.trim(),
+
+    // usados no Histórico (com aliases para compatibilidade)
+    cidade,
+    municipio: cidade,
+    uf,
+    UF: uf,
+    inep,
+    codigoInep: inep,
+
+    escudo: escudoBase64
+  };
+
+  // Salva no Firestore via DB.escola.save()
+  DB.escola.save(dadosEscola)
+    .then(() => {
+      // Mantém também no localStorage como cache local (usado por historico_auto)
+      try {
+        const key = Auth.getActiveSchoolId
+          ? `schools:${Auth.getActiveSchoolId()}:dadosEscola`
+          : 'dadosEscola';
+        localStorage.setItem(key, JSON.stringify(dadosEscola));
+      } catch {}
+      mostrarFeedback('Dados salvos com sucesso!', 'ok');
+    })
+    .catch(err => {
+      console.error('Erro ao salvar:', err);
+      mostrarFeedback('Erro ao salvar. Tente novamente.', 'erro');
+    });
+}
+
+function mostrarFeedback(msg, tipo) {
+  const el = document.getElementById('feedbackEscola');
+  if (el) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.color = tipo === 'erro' ? 'var(--danger, #b91c1c)' : 'var(--brand2, #0b3fbf)';
+    setTimeout(() => { el.style.display = 'none'; }, 3500);
+  } else {
+    alert(msg);
+  }
+}
+
+function preencherFormEscola(escola) {
+  const nomeEl   = document.getElementById('nomeEscola');
+  const endEl    = document.getElementById('enderecoEscola');
+  const cidadeEl = document.getElementById('cidadeEscola');
+  const ufEl     = document.getElementById('ufEscola');
+  const inepEl   = document.getElementById('inepEscola');
+
+  if(nomeEl)   nomeEl.value   = escola.nome || '';
+  if(endEl)    endEl.value    = escola.endereco || '';
+  if(cidadeEl) cidadeEl.value = escola.cidade || escola.municipio || '';
+  if(ufEl)     ufEl.value     = (escola.uf || escola.UF || escola.estado || '').toString().toUpperCase().slice(0,2);
+  if(inepEl)   inepEl.value   = (escola.inep || escola.codigoInep || '').toString().replace(/\D+/g,'').slice(0,8);
+
+  if(escola.escudo) {
+    escudoBase64 = escola.escudo;
+    const img = document.getElementById('escudoPreview');
+    if(img){ img.src = escudoBase64; img.style.display = 'block'; }
+  }
+
+  // INEP: somente números, máx 8 dígitos
+  const inepEl2 = document.getElementById('inepEscola');
+  if(inepEl2 && !inepEl2.__masked) {
+    inepEl2.__masked = true;
+    inepEl2.addEventListener('input', () => {
+      inepEl2.value = (inepEl2.value || '').replace(/\D+/g,'').slice(0,8);
+    });
+  }
+}
+
+// Tenta carregar do Firestore; fallback para localStorage enquanto ainda offline
+(async function carregarSeExistir() {
+  // Aguarda Auth inicializar (garante que DB.escola.get() tem schoolId)
+  await new Promise(res => {
+    if (window.Auth && window.Auth.getSession && window.Auth.getSession()) { res(); return; }
+    document.addEventListener('auth:ready', res, { once: true });
+  });
+
+  // 1. Tenta carregar do cache localStorage imediatamente (UX rápida)
+  try {
+    const schoolId = window.Auth?.getActiveSchoolId?.() || '';
+    const key = schoolId ? `schools:${schoolId}:dadosEscola` : 'dadosEscola';
+    const cached = localStorage.getItem(key);
+    if (cached) preencherFormEscola(JSON.parse(cached));
+  } catch {}
+
+  // 2. Busca dados frescos do Firestore e atualiza o formulário
+  try {
+    const escola = await DB.escola.get();
+    if (escola && Object.keys(escola).length) {
+      preencherFormEscola(escola);
+    }
+  } catch(e) {
+    console.warn('Erro ao carregar dados da escola do Firestore:', e);
+  }
+})();
+
+// Garante INEP numérico mesmo quando ainda não existe dados salvos
+(function(){
+  const el = document.getElementById('inepEscola');
+  if(!el) return;
+  el.addEventListener('input', () => {
+    el.value = (el.value || '').replace(/\D+/g,'').slice(0,8);
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var bubble = null;
+
+  function getBrandColor() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var key     = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
+    var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
+                  || { '--brand': '#7c3aed', '--brand-d': '#7c3aed' };
+    var color = dark
+      ? (palette['--brand-d'] || '#7c3aed')
+      : (palette['--brand']   || '#7c3aed');
+    return { color: color, dark: dark };
+  }
+
+  function stylesBubble(b) {
+    var bc = getBrandColor();
+    b.style.background = bc.color;
+    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+  }
+
+  function initBubble(b) {
+    b.style.cssText = [
+      'position:fixed',
+      'z-index:9999',
+      'pointer-events:none',
+      'opacity:0',
+      'transition:opacity 0.15s ease, transform 0.15s ease',
+      'transform:translateX(-50%) translateY(4px)',
+      'font-size:12px',
+      'font-family:inherit',
+      'font-weight:700',
+      'letter-spacing:0.04em',
+      'text-transform:uppercase',
+      'white-space:nowrap',
+      'padding:5px 12px',
+      'border-radius:6px',
+    ].join(';');
+    stylesBubble(b);
+  }
+
+  function ensureBubble() {
+    if (bubble) return bubble;
+    bubble = document.createElement('span');
+    initBubble(bubble);
+    document.body.appendChild(bubble);
+    return bubble;
+  }
+
+  function positionBubble(el) {
+    var rect = el.getBoundingClientRect();
+    bubble.style.left      = (rect.left + rect.width / 2) + 'px';
+    bubble.style.top       = (rect.top - 8) + 'px';
+    bubble.style.transform = 'translateX(-50%) translateY(-100%)';
+  }
+
+  function showTooltip(e) {
+    var el = e.currentTarget;
+    var b  = ensureBubble();
+    b.textContent = el.getAttribute('data-tooltip');
+    stylesBubble(b);
+    positionBubble(el);
+    requestAnimationFrame(function () {
+      b.style.opacity   = '1';
+      b.style.transform = 'translateX(-50%) translateY(-100%)';
+    });
+  }
+
+  function hideTooltip() {
+    if (bubble) bubble.style.opacity = '0';
+  }
+
+  window.initTooltipCards = function () {
+    document.querySelectorAll('[data-tooltip]').forEach(function (el) {
+      if (el._tooltipBound) return;
+      el._tooltipBound = true;
+      el.addEventListener('mouseenter', showTooltip);
+      el.addEventListener('mouseleave', hideTooltip);
+    });
+  };
+
+  function onThemeChange() {
+    if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initTooltipCards);
+  } else {
+    window.initTooltipCards();
+  }
+
+  new MutationObserver(onThemeChange)
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.addEventListener('colorchange', onThemeChange);
+})();
+</script>
+
+<!-- Lightbox do escudo -->
+<div id="lightbox" onclick="fecharLightbox()" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.82);cursor:zoom-out;align-items:center;justify-content:center;">
+  <img id="lightboxImg" style="max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);user-select:none;">
+</div>
+
+<script>
+function abrirLightbox() {
+  var src = document.getElementById('escudoPreview').src;
+  if (!src) return;
+  var lb  = document.getElementById('lightbox');
+  document.getElementById('lightboxImg').src = src;
+  lb.style.display = 'flex';
+  document.addEventListener('keydown', _lbKey);
+}
+function fecharLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.removeEventListener('keydown', _lbKey);
+}
+function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<title>Cadastro de turmas • Ano Ativo</title>
+<style>
+/* ══════════════════════════════════════════════════════════
+   CADASTRO-TURMA-ATIVA.CSS (inline)
+   Estilos exclusivos da página de cadastro de turmas.
+
+   Carregado após os arquivos globais:
+     /css/base.css · /css/header.css · /css/components.css
+   ══════════════════════════════════════════════════════════ */
+
+
+/* ============================================================
+   VARIÁVEIS AUSENTES NOS ARQUIVOS COMPARTILHADOS
+   ============================================================ */
+:root {
+  --card:    var(--header-bg, #ffffff);
+  --shadow:  0 4px 20px rgba(0,0,0,0.06);
+  --radius:  14px;
+  --radius2: 10px;
+}
+html[data-theme="dark"] {
+  --card:   #131c2e;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+
+/* ============================================================
+   CONTAINER
+   ============================================================ */
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 18px 48px;
+}
+
+
+/* ============================================================
+   CARD — override de components.css
+   ============================================================ */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  margin-bottom: 16px;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
+
+.sub,
+.muted { color: var(--muted); font-size: 13px; }
+
+
+/* ============================================================
+   GRIDS (exclusivos desta página)
+   ============================================================ */
+.grid2    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+
+@media (max-width: 640px) {
+  .grid2    { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+}
+
+
+/* ============================================================
+   CAMPOS — override de components.css
+   ============================================================ */
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.field label,
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.field input,
+.field select,
+.input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: var(--field-bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.field input:focus,
+.field select:focus,
+.input:focus {
+  border-color: var(--brand, #7c3aed);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+
+.input.readonly {
+  background: var(--chip-bg);
+  color: var(--muted);
+  cursor: default;
+  pointer-events: none;
+}
+
+html[data-theme="dark"] .field input,
+html[data-theme="dark"] .field select,
+html[data-theme="dark"] .input {
+  background: var(--field-bg);
+  color: var(--text);
+  border-color: var(--field-border);
+}
+
+html[data-theme="dark"] .field select option {
+  background: #0a1426;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] input::placeholder { color: rgba(226,232,240,0.45); }
+
+
+/* ============================================================
+   BOTÕES — override de components.css
+   ============================================================ */
+.btn {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, transform 0.06s;
+}
+.btn:active { transform: translateY(1px); }
+
+.btn.primary {
+  background: var(--brand, #7c3aed);
+  border-color: var(--brand, #7c3aed);
+  color: #fff;
+}
+.btn.primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
+html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
+
+.btn.danger {
+  background: rgba(185,28,28,0.10);
+  border-color: rgba(185,28,28,0.30);
+  color: var(--danger);
+}
+.btn.danger:hover { background: rgba(185,28,28,0.18); }
+html[data-theme="dark"] .btn.danger { background: rgba(185,28,28,0.12); border-color: rgba(185,28,28,0.45); color: #f87171; }
+html[data-theme="dark"] .btn.danger:hover { background: #b91c1c; border-color: #b91c1c; color: #ffffff; }
+
+.btn.ghost,
+.btn.secondary {
+  background: var(--chip-bg);
+  border-color: var(--chip-border);
+  color: var(--chip-color);
+}
+.btn.ghost:hover,
+.btn.secondary:hover {
+  background: var(--brand-faded, #f5f3ff);
+  border-color: var(--brand, #7c3aed);
+  color: var(--brand-text, #6d28d9);
+}
+
+.btn.outline {
+  background: transparent;
+  border-color: var(--brand, #7c3aed);
+  color: var(--brand, #7c3aed);
+}
+.btn.outline:hover { background: var(--brand-faded, #f5f3ff); }
+html[data-theme="dark"] .btn.outline { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
+
+.btn.cancel { background: var(--card); border-color: var(--border); color: var(--muted); }
+.btn.small  { padding: 6px 10px; font-size: 12px; }
+
+
+/* ============================================================
+   CHIPS DE SÉRIE
+   ============================================================ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--chip-border);
+  background: var(--chip-bg);
+  color: var(--chip-color);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.chip button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font-weight: 900;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+
+/* ============================================================
+   LISTA DE TURMAS
+   ============================================================ */
+.list { display: flex; flex-direction: column; gap: 10px; }
+
+.item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius2);
+  padding: 12px 14px;
+  background: var(--card);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.item:hover { border-color: var(--brand); }
+
+.head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Coluna de botões do item de turma */
+.btns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: stretch;
+  min-width: 90px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+
+/* ============================================================
+   MISC
+   ============================================================ */
+.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--chip-color);
+}
+
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+.help {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+  min-height: 14px;
+}
+.help.err { color: var(--danger); font-weight: 700; }
+.help.ok  { color: #1f8f4a; font-weight: 700; }
+
+.warn {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(245,158,11,.10);
+  border: 1px solid rgba(245,158,11,.30);
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.ok-msg {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(22,163,74,0.10);
+  border: 1px solid rgba(22,163,74,0.25);
+  color: #15803d;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+html[data-theme="dark"] .ok-msg { color: #4ade80; }
+
+
+/* ============================================================
+   CAMPO BLOQUEADO (aluno encontrado)
+   ============================================================ */
+#bannerAlunoEncontrado { display: none; }
+#bannerAlunoEncontrado.visible { display: flex !important; }
+
+.field-locked input,
+.field-locked select,
+.field-locked .nat-input-real {
+  background: var(--chip-bg) !important;
+  color: var(--muted) !important;
+  cursor: default !important;
+  pointer-events: none;
+}
+.field-locked label::after { content: " 🔒"; font-size: 11px; opacity: .6; }
+
+
+/* ============================================================
+   NATURALIDADE — autocomplete
+   ============================================================ */
+.nat-wrap { position: relative; }
+
+.nat-ghost-layer {
+  position: absolute;
+  inset: 0;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: 'Nunito', inherit;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  color: transparent;
+}
+.nat-ghost-layer span.ghost-tail { color: #adb5bd; }
+
+.nat-input-real {
+  position: relative;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  font-family: 'Nunito', sans-serif;
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.nat-input-real:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--text); }
+
+.nat-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  z-index: 40;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15,23,42,.10);
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+}
+.nat-dropdown.open { display: block; }
+
+.nat-opt {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.nat-opt:hover,
+.nat-opt.active { background: var(--chip-bg); }
+
+.nat-opt .nat-uf {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--chip-color);
+  background: var(--chip-bg);
+  border-radius: 999px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 50;
+}
+.modal-backdrop.open { display: flex; }
+
+.modal {
+  width: min(1100px, 96vw);
+  max-height: 86vh;
+  overflow: auto;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 60px rgba(0,0,0,.25);
+}
+
+.modal-head {
+  position: sticky; top: 0;
+  background: var(--card);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.modal-body { padding: 14px; }
+</style>
+</head>
+<body>
+<script>window.Auth && window.Auth.requireAuth();</script>
+<div id="header-placeholder"></div>
+<main class="wrap">
+<div class="card">
+      <div class="grid2">
+        <div>
+          <h2 style="margin:0 0 10px">Cadastrar / editar turma</h2>
+
+          <div class="form-row">
+            <div>
+              <label class="label">Ano letivo</label>
+              <select id="anoSelect" class="input"></select>
+              <div class="help">Por padrão, usa o ano ativo detectado. Você pode cadastrar turmas de outros anos também.</div>
+            </div>
+
+            <div>
+              <label class="label">Turno</label>
+              <select id="turno" class="input">
+                <option value="MATUTINO">Matutino</option>
+                <option value="VESPERTINO">Vespertino</option>
+                <option value="NOTURNO">Noturno</option>
+                <option value="INTEGRAL">Integral</option>
+              </select>
+              <div class="help">Usado para montar o ID e o nome automático.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label class="label">Adicionar série</label>
+            <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
+              <select id="serieSelect" class="input">
+                <option value="">(selecione)</option>
+              </select>
+              <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
+              <button class="btn danger" id="btnClearSeries" type="button">Limpar séries</button>
+            </div>
+            <div id="chipsSeries" class="chips" style="margin-top:10px"></div>
+          </div>
+
+          <div class="form-row" style="margin-top:10px">
+            <div>
+              <label class="label">Nome da turma</label>
+              <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO e 2º ANO 2026 (MATUTINO)">
+              <div class="help">Preenche automaticamente com séries + ano + turno (você pode editar).</div>
+            </div>
+            <div>
+              <label class="label">Professor(a) (opcional)</label>
+              <select id="prof" class="input">
+                <option value="">— selecione —</option>
+              </select>
+              <div class="help" id="profHelp">Carregando professores...</div>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top:10px">
+            <div>
+              <label class="label">ID da turma (automático)</label>
+              <input id="turmaId" class="input readonly" readonly>
+              <div class="help">Formato: <span class="mono">ATUR|ANO|TURNO|SÉRIES</span> (opção A).</div>
+            </div>
+            
+          </div>
+
+          <div class="row" style="margin-top:14px;justify-content:space-between;gap:10px;align-items:center">
+            <div class="pill" id="dbInfo">DB: —</div>
+            <div class="row" style="gap:10px;justify-content:flex-end">
+              <button class="btn danger" id="btnResetForm" type="button">Limpar formulário</button>
+              <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
+            </div>
+          </div>
+
+          <div class="warn" style="margin-top:12px">
+            <strong>Dica:</strong> por enquanto esta tela cadastra/edita <em>apenas turmas</em>. No próximo passo, vamos vincular alunos via <span class="mono">matriculaId</span> (alunoId + turmaId) para cadastro/import coletivo.
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <h2 style="margin:0">Turmas cadastradas</h2>
+            <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
+            <span id="countTurmasLista" class="help" style="margin:0"></span>
+          </div>
+          <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Excluir</b> remove somente do banco do Ano Ativo.</div>
+          <div id="listaTurmas" class="list"></div>
+        </div>
+      </div>
+    </div>
+</main>
+
+
+
+    
+
+<script>
+(function(){
+  const KEYS = {
+    turmas: "anoAtivoTurmasDB_v1",
+    alunos: "anoAtivoAlunosDB_v1",
+    mats: "anoAtivoMatriculasDB_v1",
+    anoAtual: "configAnoAtivoAtual_v1",
+  };
+
+  // ---------- school-scoped storage (Ano Ativo) ----------
+  function _safeJSONParse(raw, fallback){
+    try{ return JSON.parse(raw); }catch(_){ return fallback; }
+  }
+  function _getSessionFallback(){
+    try{
+      if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
+    }catch(_){}
+    return _safeJSONParse(_getItem('auth_session_v2') || 'null', null);
+  }
+  function _getEffectiveSchoolId(){
+    const s = _getSessionFallback();
+    if (!s) return null;
+    const sid = (s.schoolId || '').toString();
+    if (sid.toUpperCase() !== 'ADMIN') return sid;
+    return (_getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
+  }
+  function _scopedKey(k){
+    const sid = _getEffectiveSchoolId();
+    if (!sid) return k; // sem sessão, usa legado
+    return `schools:${sid}:${k}`;
+  }
+  function _isAnoAtivoKey(k){
+    return Object.values(KEYS).includes(k);
+  }
+  function _lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+  function _lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } }
+  function _lsRemove(k){ try{ localStorage.removeItem(k); }catch(_){ } }
+
+  function _getItem(k){
+    if (_isAnoAtivoKey(k)) return _lsGet(_scopedKey(k));
+    return _lsGet(k);
+  }
+  function _setItem(k, v){
+    if (_isAnoAtivoKey(k)) _lsSet(_scopedKey(k), v);
+    else _lsSet(k, v);
+    // Persiste no Firestore em paralelo
+    if(_isAnoAtivoKey(k)){
+      const _MAP={'anoAtivoTurmasDB_v1':'anoAtivoTurmas','anoAtivoAlunosDB_v1':'anoAtivoAlunos','anoAtivoMatriculasDB_v1':'anoAtivoMatriculas','configAnoAtivoAtual_v1':null};
+      const col=_MAP[k];
+      if(col!==undefined){
+        try{
+          if(window.DB&&window.Auth&&window.Auth.getSession()){
+            if(col===null){ if(window.DB.escola) window.DB.escola.save({configAnoAtivo:v}).catch(()=>{}); }
+            else{
+              const parsed=JSON.parse(v); const fc=window.DB[col]; if(fc)
+              Array.isArray(parsed)?fc.saveAll(parsed).catch(()=>{}):fc.save(parsed).catch(()=>{});
+            }
+          }
+        }catch(_){}
+      }
+    }
+  }
+  function _removeItem(k){
+    if (_isAnoAtivoKey(k)) return _lsRemove(_scopedKey(k));
+    return _lsRemove(k);
+  }
+  // Migração: se houver DB legado (global) e ainda não existir o scoped, copia
+  (function migrate(){
+    try{
+      Object.values(KEYS).forEach(function(k){
+        if(!_isAnoAtivoKey(k)) return;
+        const scoped = _scopedKey(k);
+        if (_getItem(scoped) != null) return;
+        const legacy = _getItem(k);
+        if (legacy != null) _setItem(scoped, legacy);
+      });
+    }catch(_){}
+  })();
+
+
+  const $ = (id)=>document.getElementById(id);
+
+  /* ========================= */
+  /* Permissões               */
+  /* ========================= */
+  const _session = (window.Auth && typeof Auth.getSession === 'function')
+    ? Auth.getSession()
+    : null;
+  const _podeEditar = !!_session && _session.role === 'admin';
+
+  let seriesSel = [];
+  let editingTurmaId = null;
+  let nomeManual = false;
+
+  // ---------- storage helpers (compatível com outras páginas) ----------
+  function safeParseRaw(raw){
+    if(raw == null) return null;
+    try { return JSON.parse(raw); } catch(e) { return raw; }
+  }
+
+  function safeParse(key, fallback){
+    try{
+      const raw = _getItem(key);
+      if(!raw) return fallback;
+      const v = JSON.parse(raw);
+      // aceitar array ou objeto
+      if(Array.isArray(fallback) && v && !Array.isArray(v) && typeof v === "object") return Object.values(v);
+      return v;
+    }catch(e){
+      return fallback;
+    }
+  }
+
+  function save(key, value){
+    _setItem(key, JSON.stringify(value));
+  }
+
+  function getTurmas(){
+    const t = safeParse(KEYS.turmas, []);
+    const arr = Array.isArray(t) ? t : [];
+    return arr.filter(x => String(x?.turmaId||'').startsWith('ATUR|'));
+  }
+  function getAlunos(){
+    const a = safeParse(KEYS.alunos, []);
+    return Array.isArray(a) ? a : [];
+  }
+  function getMats(){
+    const m = safeParse(KEYS.mats, []);
+    return Array.isArray(m) ? m : [];
+  }
+
+  // ---------- ano ativo ----------
+  function extractYear(v){
+    if(v == null) return null;
+    if(typeof v === "number") return isNaN(v) ? null : v;
+    if(typeof v === "string"){
+      const n = parseInt(v.trim(), 10);
+      return isNaN(n) ? null : n;
+    }
+    if(typeof v === "object"){
+      const candKeys = ["anoAtivo","ano","anoLetivo","year","ano_atual","anoAtual"];
+      for(const k of candKeys){
+        if(k in v){
+          const n = parseInt(v[k], 10);
+          if(!isNaN(n)) return n;
+        }
+      }
+    }
+    return null;
+  }
+
+  function getAnoAtivoDefault(){
+    const raw = _getItem(KEYS.anoAtual);
+    const parsed = safeParseRaw(raw);
+    const n = extractYear(parsed);
+    if(n) return n;
+
+    // fallback: maior ano das turmas
+    const turmas = getTurmas();
+    let max = 0;
+    for(const t of turmas){
+      const a = parseInt(t?.anoLetivo, 10);
+      if(!isNaN(a)) max = Math.max(max, a);
+    }
+    return max || new Date().getFullYear();
+  }
+
+  function setAnoAtivoIfMissingOrCompat(ano){
+    const raw = _getItem(KEYS.anoAtual);
+    if(!raw){
+      save(KEYS.anoAtual, ano);
+      return;
+    }
+    const parsed = safeParseRaw(raw);
+    // se já é number/string válido, mantém (não sobrescreve)
+    const existingYear = extractYear(parsed);
+    if(existingYear) return;
+
+    // se for objeto, tenta preencher uma chave padrão
+    if(parsed && typeof parsed === "object"){
+      const out = {...parsed};
+      out.anoAtivo = ano;
+      save(KEYS.anoAtual, out);
+      return;
+    }
+
+    // fallback: grava número
+    save(KEYS.anoAtual, ano);
+  }
+
+  // ---------- UI builders ----------
+  function buildAnoOptions(){
+    const turmas = getTurmas();
+    const anos = new Set();
+
+    for(const t of turmas){
+      if(t && t.anoLetivo) anos.add(String(t.anoLetivo));
+    }
+
+    const anoAtivo = String(getAnoAtivoDefault());
+    anos.add(anoAtivo);
+
+    const base = parseInt(anoAtivo, 10);
+    if(!isNaN(base)){
+      for(let d=-1; d<=1; d++) anos.add(String(base + d));
+    }
+
+    const arr = Array.from(anos)
+      .map(x => parseInt(x,10))
+      .filter(n => !isNaN(n))
+      .sort((a,b)=>b-a)
+      .map(String);
+
+    const sel = $("anoSelect");
+    const filtroLista = $("filtroAnoLista");
+    if(!sel) return;
+
+    sel.innerHTML = "";
+    for(const a of arr){
+      const opt = document.createElement("option");
+      opt.value = a;
+      opt.textContent = a;
+      sel.appendChild(opt);
+    }
+    sel.value = anoAtivo;
+
+    // Popula o filtro da lista com os mesmos anos + opção "Todos"
+    if(filtroLista){
+      filtroLista.innerHTML = "";
+      const optTodos = document.createElement("option");
+      optTodos.value = "";
+      optTodos.textContent = "Todos os anos";
+      filtroLista.appendChild(optTodos);
+      for(const a of arr){
+        const opt = document.createElement("option");
+        opt.value = a;
+        opt.textContent = a;
+        filtroLista.appendChild(opt);
+      }
+      filtroLista.value = anoAtivo; // default = ano ativo
+      filtroLista.addEventListener("change", renderListaTurmas);
+    }
+  }
+
+  function serieOptions(){
+  return [
+
+    // Educação Infantil
+    "G1",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+
+    // Outros
+    "ALFABETIZAÇÃO",
+    "EIXO 1",
+    "EIXO 2",
+    "EIXO 3",
+    "EIXO 4",
+    "EIXO 5",
+    "MULTISERIADA",
+
+    // Fundamental
+    "1º ANO",
+    "2º ANO",
+    "3º ANO",
+    "4º ANO",
+    "5º ANO",
+    "6º ANO",
+    "7º ANO",
+    "8º ANO",
+    "9º ANO",
+
+    // Médio
+    "1º EM",
+    "2º EM",
+    "3º EM",
+
+  ];
+}
+
+  function fillSerieSelect(){
+    const sel = $("serieSelect");
+    if(!sel) return;
+    sel.innerHTML = '<option value="">(selecione)</option>';
+    for(const s of serieOptions()){
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      sel.appendChild(opt);
+    }
+  }
+
+  function normalizeSerie(s){
+    if(!s) return "";
+    return String(s).trim().toUpperCase()
+      .replace(/\s+/g," ")
+      .replace(/^EIXO\s*(\d)$/,"EIXO $1");
+  }
+
+  function turnoAbbrev(turno){
+    const t = String(turno||"").toUpperCase();
+    if(t.startsWith("MAT")) return "MAT";
+    if(t.startsWith("VES")) return "VES";
+    if(t.startsWith("NOT")) return "NOT";
+    if(t.startsWith("INT")) return "INT";
+    return t.substring(0,3) || "TUR";
+  }
+
+  function slugSerie(s){
+    return normalizeSerie(s)
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/[ºª]/g,"")
+      .replace(/\s+/g,"_")
+      .replace(/[^A-Z0-9_]/g,"");
+  }
+
+  function turmaIdBaseFromFull(id){
+    if(!id) return "";
+    const s = String(id);
+    const parts = s.split("|");
+    if(parts.length >= 5){
+      const last = parts[parts.length-1];
+      if(/^[A-Z]+$/.test(last)){
+        return parts.slice(0,-1).join("|");
+      }
+    }
+    return s;
+  }
+
+  function indexToLetters(n){
+    // 0->A, 1->B, ... 25->Z, 26->AA ...
+    let x = n;
+    let out = "";
+    while(true){
+      out = String.fromCharCode(65 + (x % 26)) + out;
+      x = Math.floor(x/26) - 1;
+      if(x < 0) break;
+    }
+    return out;
+  }
+
+  function lettersToIndex(s){
+    const str = String(s||"").toUpperCase().replace(/[^A-Z]/g,"");
+    if(!str) return null;
+    let n = 0;
+    for(let i=0;i<str.length;i++){
+      n = n*26 + (str.charCodeAt(i)-64);
+    }
+    return n-1;
+  }
+
+  function buildTurmaIdBase(){
+    const ano = $("anoSelect")?.value || String(getAnoAtivoDefault());
+    const turno = turnoAbbrev($("turno")?.value);
+    const seriesSlug = seriesSel.map(slugSerie).filter(Boolean).join("+") || "SEM_SERIE";
+    return `ATUR|${ano}|${turno}|${seriesSlug}`;
+  }
+
+  function sameBase(base, id){
+    if(!base || !id) return false;
+    return id === base || id.startsWith(base + "|");
+  }
+
+  function updateMatriculasTurmaId(oldId, newId){
+    if(!oldId || !newId || oldId === newId) return;
+    const mats = getMats();
+    if(!Array.isArray(mats) || !mats.length) return;
+
+    let changed = false;
+    for(const m of mats){
+      if(m && m.turmaId === oldId){
+        m.turmaId = newId;
+        changed = true;
+      }
+      if(m && typeof m.matriculaId === "string" && m.matriculaId.includes(oldId)){
+        // substituição simples para manter compatibilidade com vários formatos
+        m.matriculaId = m.matriculaId.split(oldId).join(newId);
+        changed = true;
+      }
+    }
+    if(changed) save(KEYS.matriculas, mats);
+  }
+
+  function ensureFirstGetsA(base, turmas){
+    // Se existe turma com ID "base" (sem sufixo) e vamos ter duplicidade,
+    // renomeia para "base|A" e ajusta matrículas.
+    const idx = turmas.findIndex(t => t && t.turmaId === base);
+    if(idx >= 0){
+      const newId = base + "|A";
+      turmas[idx].turmaId = newId;
+      updateMatriculasTurmaId(base, newId);
+    }
+    return turmas;
+  }
+
+  function pickNextIdForBase(base, turmas){
+    const used = new Set();
+    for(const t of turmas){
+      const id = t?.turmaId;
+      if(!sameBase(base, id)) continue;
+      if(id === base){
+        // sem sufixo -> trata como "A" quando há duplicidade
+        used.add(0);
+      } else {
+        const suf = id.slice(base.length + 1);
+        const ix = lettersToIndex(suf);
+        if(ix !== null) used.add(ix);
+      }
+    }
+    let n = 0;
+    while(used.has(n)) n++;
+    return base + "|" + indexToLetters(n);
+  }
+
+  function buildTurmaIdPreview(){
+    const base = buildTurmaIdBase();
+    const turmas = getTurmas();
+
+    if(editingTurmaId){
+      const baseEdit = turmaIdBaseFromFull(editingTurmaId);
+      if(baseEdit === base) return editingTurmaId;
+      // se mudou base durante edição, mostra o próximo ID disponível (sem mexer no DB ainda)
+      const others = turmas.filter(t => t && t.turmaId !== editingTurmaId);
+      const same = others.filter(t => sameBase(base, t.turmaId));
+      if(!same.length) return base;
+      return pickNextIdForBase(base, ensureFirstGetsA(base, [...others]));
+    }
+
+    const same = turmas.filter(t => sameBase(base, t.turmaId));
+    if(!same.length) return base; // primeira turma "igual" fica sem sufixo
+    return pickNextIdForBase(base, ensureFirstGetsA(base, [...turmas]));
+  }
+
+
+  function buildNomeAuto(){
+    const ano = $("anoSelect")?.value || String(getAnoAtivoDefault());
+    const turno = $("turno")?.value || "MATUTINO";
+    const sTxt = seriesSel.length ? seriesSel.join(" e ") : "";
+    if(!sTxt) return `Turma ${ano} (${turno})`;
+    return `${sTxt} ${ano} (${turno})`;
+  }
+
+  function renderChips(){
+    const box = $("chipsSeries");
+    if(!box) return;
+    box.innerHTML = "";
+    for(const s of seriesSel){
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = `${s} <button type="button" aria-label="remover">×</button>`;
+      chip.querySelector("button").addEventListener("click", ()=>{
+        seriesSel = seriesSel.filter(x=>x!==s);
+        syncDerived();
+        renderChips();
+      });
+      box.appendChild(chip);
+    }
+  }
+
+  function syncDerived(){
+    const turmaIdEl = $("turmaId");
+    if(turmaIdEl) turmaIdEl.value = buildTurmaIdPreview();
+    if(!nomeManual){
+      const nomeEl = $("nomeTurma");
+      if(nomeEl) nomeEl.value = buildNomeAuto();
+    }
+  }
+
+  function updateDbInfo(){
+    const turmas = getTurmas();
+    const alunos = getAlunos();
+    const mats = getMats();
+    const el = $("dbInfo");
+    if(el) el.textContent = `DB: turmas=${turmas.length} • alunos=${alunos.length} • matrículas=${mats.length}`;
+  }
+
+  function renderListaTurmas(){
+    const list = $("listaTurmas");
+    if(!list) return;
+
+    const filtroAno = $("filtroAnoLista")?.value || "";
+    const allTurmas = getTurmas().filter(t => String(t?.turmaId||'').startsWith('ATUR|'));
+    const turmas = filtroAno ? allTurmas.filter(t => String(t.anoLetivo||"") === filtroAno) : allTurmas;
+
+    // Atualiza contador
+    const countEl = $("countTurmasLista");
+    if(countEl) countEl.textContent = turmas.length ? `${turmas.length} turma(s)` : "";
+
+    if(!turmas.length){
+      list.innerHTML = '<div class="help">Nenhuma turma cadastrada ainda.</div>';
+      return;
+    }
+
+    turmas.sort((a,b)=>
+      (parseInt(b.anoLetivo||0,10) - parseInt(a.anoLetivo||0,10)) ||
+      String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR")
+    );
+
+    list.innerHTML = "";
+
+    for(const t of turmas){
+      const div = document.createElement("div");
+      div.className = "item";
+
+      const left = document.createElement("div");
+      left.className = "left";
+
+      const title = document.createElement("h4");
+      title.textContent = t.nome || "(sem nome)";
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      const seriesTxt = (Array.isArray(t.series) ? t.series : []).join(", ") || "—";
+
+      meta.innerHTML = `
+        <span class="badge small">Ano: ${t.anoLetivo||"—"}</span>
+        <span class="badge small">Turno: ${t.turno||"—"}</span>
+        <div style="margin-top:6px"><span class="mono">ID:</span> <span class="mono">${t.turmaId||"—"}</span></div>
+        <div style="margin-top:4px">Séries: ${seriesTxt}</div>
+        ${t.professor ? `<div style="margin-top:4px">Prof.: ${t.professor}</div>` : ""}
+      `;
+
+      left.appendChild(title);
+      left.appendChild(meta);
+
+      const right = document.createElement("div");
+      right.className = "btns";
+
+      if(_podeEditar){
+        const btnEdit = document.createElement("button");
+        btnEdit.className = "btn secondary";
+        btnEdit.type = "button";
+        btnEdit.textContent = "Editar";
+        btnEdit.addEventListener("click", ()=> loadTurma(t.turmaId));
+        right.appendChild(btnEdit);
+
+        const btnDel = document.createElement("button");
+        btnDel.className = "btn danger";
+        btnDel.type = "button";
+        btnDel.textContent = "Excluir";
+        btnDel.addEventListener("click", ()=>{
+          if(!confirm("Excluir esta turma do Ano Ativo? (não afeta o módulo de atas)")) return;
+          const arr = getTurmas().filter(x => x.turmaId !== t.turmaId);
+          save(KEYS.turmas, arr);
+          try{
+            if(window.DB && window.Auth && window.Auth.getSession())
+              window.DB.anoAtivoTurmas.removeWhere('turmaId', t.turmaId).catch(()=>{});
+          }catch(_){}
+          if(editingTurmaId === t.turmaId) resetForm();
+          renderListaTurmas();
+          updateDbInfo();
+        });
+        right.appendChild(btnDel);
+      }
+
+      div.appendChild(left);
+      div.appendChild(right);
+      list.appendChild(div);
+    }
+  }
+
+  function loadTurma(turmaId){
+    if(!turmaId) return;
+    const t = getTurmas().find(x => x.turmaId === turmaId);
+    if(!t) return;
+
+    editingTurmaId = turmaId;
+
+    const anoSel = $("anoSelect");
+    if(anoSel) anoSel.value = String(t.anoLetivo || getAnoAtivoDefault());
+
+    const turnoEl = $("turno");
+    if(turnoEl) turnoEl.value = t.turno || "MATUTINO";
+
+    const profEl = $("prof");
+
+    // Se o select de professores ainda não foi populado (só tem a opção padrão),
+    // garante a carga e depois define o valor
+    const profPromise = (profEl && profEl.options.length <= 1)
+      ? carregarProfessores()
+      : Promise.resolve();
+
+    profPromise.then(() => {
+      if (profEl) {
+        // Tenta selecionar pelo valor salvo
+        profEl.value = t.professor || "";
+        // Se o valor não existe no select (professor antigo digitado à mão), adiciona
+        if (t.professor && profEl.value !== t.professor) {
+          const opt = document.createElement("option");
+          opt.value = t.professor;
+          opt.textContent = t.professor + " (cadastro anterior)";
+          profEl.appendChild(opt);
+          profEl.value = t.professor;
+        }
+      }
+    });
+
+    seriesSel = (Array.isArray(t.series) ? t.series : []).map(normalizeSerie).filter(Boolean);
+
+    // nome: carregar como veio (mas não travar o auto)
+    const nomeEl = $("nomeTurma");
+    if(nomeEl){
+      nomeManual = true;
+      nomeEl.value = t.nome || buildNomeAuto();
+      nomeManual = false;
+    }
+
+    renderChips();
+    syncDerived();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  function resetForm(){
+    editingTurmaId = null;
+    seriesSel = [];
+    nomeManual = false;
+
+    const profEl = $("prof");
+    if(profEl) profEl.value = "";
+
+    buildAnoOptions();
+
+    const turnoEl = $("turno");
+    if(turnoEl) turnoEl.value = "MATUTINO";
+
+    const nomeEl = $("nomeTurma");
+    if(nomeEl) nomeEl.value = "";
+
+    renderChips();
+    syncDerived();
+  }
+
+  function salvarTurma(){
+    if(!_podeEditar) return;
+    const ano = parseInt($("anoSelect")?.value || getAnoAtivoDefault(), 10);
+    const turno = $("turno")?.value || "MATUTINO";
+    const nome = ($("nomeTurma")?.value || "").trim();
+    const professor = ($("prof")?.value || "").trim();
+
+    if(!seriesSel.length){
+      alert("Selecione pelo menos 1 série para cadastrar a turma.");
+      return;
+    }
+    if(!nome){
+      alert("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).");
+      return;
+    }
+
+    const base = buildTurmaIdBase();
+    let turmas = getTurmas();
+
+    // Se estamos editando, removemos o registro antigo antes de recalcular o ID (caso a base mude)
+    let oldId = null;
+    if(editingTurmaId){
+      oldId = editingTurmaId;
+      turmas = turmas.filter(t => t && t.turmaId !== oldId);
+    }
+
+    let turmaId;
+
+    const same = turmas.filter(t => sameBase(base, t.turmaId));
+    if(!same.length){
+      // primeira turma "igual" -> fica sem sufixo
+      turmaId = base;
+    } else {
+      // já existe turma com mesma base -> força A/B/C...
+      turmas = ensureFirstGetsA(base, turmas);
+      turmaId = pickNextIdForBase(base, turmas);
+    }
+
+    // Se está editando e a base não mudou, preserva o ID original
+    if(oldId){
+      const baseEdit = turmaIdBaseFromFull(oldId);
+      if(baseEdit === base){
+        turmaId = oldId;
+      } else {
+        // base mudou durante a edição: ajustar matrículas do antigo ID para o novo
+        updateMatriculasTurmaId(oldId, turmaId);
+      }
+    }
+
+    const payload = {
+      turmaId,
+      nome,
+      anoLetivo: ano,
+      series: [...seriesSel],
+      turno,
+      professor: professor || ""
+    };
+
+    // upsert
+    const idx = turmas.findIndex(x => x && x.turmaId === turmaId);
+    if(idx >= 0){
+      turmas[idx] = payload;
+    } else {
+      turmas.push(payload);
+    }
+
+    save(KEYS.turmas, turmas);
+    setAnoAtivoIfMissingOrCompat(ano);
+
+    renderListaTurmas();
+    updateDbInfo();
+    editingTurmaId = turmaId;
+    alert("Turma salva no banco do Ano Ativo!");
+  }
+
+  // ---------- professores do DB ----------
+  async function carregarProfessores() {
+    const sel = $("prof");
+    const help = $("profHelp");
+    if (!sel) return;
+
+    try {
+      await new Promise(res => {
+        if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        document.addEventListener('auth:ready', res, { once: true });
+      });
+
+      const dados = await window.DB.loadAll();
+      const funcionarios = Array.isArray(dados.funcionariosDB)
+        ? dados.funcionariosDB
+        : (Array.isArray(dados.dadosEscola?.funcionariosDB) ? dados.dadosEscola.funcionariosDB : []);
+
+      // Filtra quem tem função de professor/professora (case-insensitive)
+      const FUNCOES_PROF = ['PROFESSOR', 'PROFESSORA', 'PROFESSOR(A)'];
+      const profs = funcionarios.filter(f => {
+        const funcao = String(f.funcao || '').toUpperCase().trim();
+        return FUNCOES_PROF.some(fp => funcao.includes(fp));
+      });
+
+      // Preserva valor atual caso já esteja editando uma turma
+      const valorAtual = sel.value;
+
+      sel.innerHTML = '<option value="">— nenhum(a) —</option>';
+      profs
+        .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
+        .forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.nome || '';
+          opt.textContent = f.nome || '(sem nome)';
+          sel.appendChild(opt);
+        });
+
+      // Opção para nome digitado manualmente (caso a turma já tenha um professor não listado)
+      if (valorAtual && ![...sel.options].some(o => o.value === valorAtual)) {
+        const opt = document.createElement('option');
+        opt.value = valorAtual;
+        opt.textContent = valorAtual + ' (cadastro anterior)';
+        sel.appendChild(opt);
+      }
+      if (valorAtual) sel.value = valorAtual;
+
+      if (help) {
+        if (profs.length === 0) {
+          help.textContent = 'Nenhum professor(a) cadastrado no sistema ainda.';
+        } else {
+          help.textContent = `${profs.length} professor(a)(s) disponível(is) — cadastre mais em Funcionários.`;
+        }
+      }
+    } catch (e) {
+      console.warn('carregarProfessores:', e);
+      if (help) help.textContent = 'Erro ao carregar professores. Tente recarregar a página.';
+    }
+  }
+
+  // ---------- events ----------
+  $("btnAddSerie")?.addEventListener("click", ()=>{
+    const s = normalizeSerie($("serieSelect")?.value);
+    if(!s) return;
+    if(!seriesSel.includes(s)) seriesSel.push(s);
+    if($("serieSelect")) $("serieSelect").value = "";
+    syncDerived();
+    renderChips();
+  });
+
+  $("btnClearSeries")?.addEventListener("click", ()=>{
+    seriesSel = [];
+    syncDerived();
+    renderChips();
+  });
+
+  $("anoSelect")?.addEventListener("change", syncDerived);
+  $("turno")?.addEventListener("change", syncDerived);
+
+  $("nomeTurma")?.addEventListener("input", ()=>{ nomeManual = true; });
+
+  $("btnSalvar")?.addEventListener("click", salvarTurma);
+
+  $("btnResetForm")?.addEventListener("click", ()=>{
+    if(!confirm("Limpar o formulário?")) return;
+    resetForm();
+  });
+
+  // ---------- init ----------
+  buildAnoOptions();
+  fillSerieSelect();
+  resetForm();
+  renderListaTurmas();
+  updateDbInfo();
+  carregarProfessores();
+
+  // Restrição de acesso: USER só visualiza
+  if(!_podeEditar){
+    // Oculta o formulário de cadastro/edição inteiro
+    const formCard = document.querySelector('.card .grid2 > div:first-child');
+    if(formCard){
+      formCard.style.display = 'none';
+    }
+    // Aviso de somente leitura na lista
+    const listHeader = document.querySelector('.card .grid2 > div:last-child');
+    if(listHeader){
+      const aviso = document.createElement('div');
+      aviso.style.cssText = 'padding:10px 14px;border-radius:10px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.30);font-size:13px;margin-bottom:12px;';
+      aviso.innerHTML = '⚠️ <strong>Modo somente leitura.</strong> Apenas administradores podem cadastrar, editar ou excluir turmas.';
+      listHeader.insertBefore(aviso, listHeader.firstChild);
+    }
+  }
+})();
+</script>
+
+<script src="../header-logic.js"></script>
+
+<script>
+(function(){
+  async function bootAsync(){
+    try{
+      await new Promise(res=>{
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        document.addEventListener('auth:ready', res, {once:true});
+      });
+      const dados = await window.DB.loadAllAnoAtivo();
+      const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
+      if(sid){
+        const pre=(k)=>`schools:${sid}:${k}`;
+        if(dados.turmasDB)   localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify((Array.isArray(dados.turmasDB)?dados.turmasDB:[]).filter(t=>String(t?.turmaId||'').startsWith('ATUR|'))));
+        if(dados.alunosDB)   localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dados.alunosDB));
+        if(dados.matriculas) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dados.matriculas));
+        if(dados.dadosEscola?.configAnoAtivo)
+          localStorage.setItem(pre('configAnoAtivoAtual_v1'), JSON.stringify(dados.dadosEscola.configAnoAtivo));
+        // Re-renderiza a lista após Firestore carregar
+        if(typeof renderListaTurmas === 'function') renderListaTurmas();
+        if(typeof updateDbInfo === 'function') updateDbInfo();
+      }
+    }catch(e){ console.warn('Ano Ativo Firestore pré-carga:', e); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootAsync);
+  else bootAsync();
+})();
+</script>
+
+</body>
+</html>
