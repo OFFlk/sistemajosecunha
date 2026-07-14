@@ -275,7 +275,7 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 
     <div class="actions">
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
-      <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarScans()" style="display:none">Continuar →</button>
+      <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarScansAviso()" style="display:none">📄 Scans</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
       <button class="btn btn-primary" onclick="exportarPDF()">Exportar PDF</button>
     </div>
@@ -405,11 +405,19 @@ const DB = (() => {
       }
       const col = window.DB[colName];
       if(!col) return;
+      // Remove undefined recursivamente (Firebase rejeita undefined)
+      function limparUndef(v){
+        if(Array.isArray(v)) return v.map(limparUndef);
+        if(v !== null && typeof v === 'object')
+          return Object.fromEntries(Object.entries(v).filter(([,x])=>x!==undefined).map(([k,x])=>[k,limparUndef(x)]));
+        return v;
+      }
+      const clean = limparUndef(value);
       // Array → saveAll; objeto → save
-      if(Array.isArray(value)){
-        col.saveAll(value).catch(e=>console.warn(`Firestore ${colName} saveAll:`, e));
+      if(Array.isArray(clean)){
+        col.saveAll(clean).catch(e=>console.warn(`Firestore ${colName} saveAll:`, e));
       } else {
-        col.save(value).catch(e=>console.warn(`Firestore ${colName} save:`, e));
+        col.save(clean).catch(e=>console.warn(`Firestore ${colName} save:`, e));
       }
     }catch(e){ console.warn('writeFirestore erro:', e); }
   }
@@ -1622,7 +1630,7 @@ async function salvarNoBanco() {
   alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
 
   // ── Scans: libera o card e dispara upload da fila ──
-  if (window.initScans) window.initScans(idFinal);
+  if (window.initScans) window.initScans(idFinal, false); // false = criação, não busca scans
   if (window.uploadScansQueue) await window.uploadScansQueue();
 }
 
@@ -1768,14 +1776,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     else if(enviados.length) setStatus('ok', '✅ Scans enviados!');
   };
 
-  window.initScans = function(turmaId){
+  window.initScans = function(turmaId, modoEdit){
     if(!turmaId) return;
     _turmaId = String(turmaId);
     mostrarScans();
-    _carregarScans();
-    // Oculta o botão Continuar (turma já salva)
+    if(modoEdit) _carregarScans();
+    // Oculta o botão após inicializar
     const btn = document.getElementById('btnContinuarScans');
     if(btn) btn.style.display = 'none';
+  };
+
+  // Chamado pelo botão "Scans" no modo criação (antes de salvar)
+  window.mostrarScansAviso = function(){
+    mostrarScans();
+    if(!_turmaId){
+      setStatus('', '💡 Salve a turma primeiro para habilitar o envio de scans.');
+    }
   };
 
   async function _carregarScans(){
@@ -1825,7 +1841,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Mostra o card de scans
   window.mostrarScans = function(){
     const wrap = document.getElementById('scansWrap');
-    if(wrap){ wrap.style.display=''; wrap.scrollIntoView({behavior:'smooth',block:'start'}); }
+    if(!wrap) return;
+    wrap.style.display = 'block';
+    setTimeout(() => wrap.scrollIntoView({behavior:'smooth',block:'start'}), 50);
   };
 
   // Eventos de seleção/drop
@@ -1839,13 +1857,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); adicionarArquivos(e.dataTransfer.files); });
     }
 
-    // Modo edição: carrega scans automaticamente
+    // Modo edição: mostra card e carrega scans automaticamente
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('edit');
     if(editId){
-      window.initScans(editId);
+      window.initScans(editId, true);
     } else {
-      // Modo criação: mostra botão Continuar
+      // Modo criação: mostra botão "Scans"
       const btn = document.getElementById('btnContinuarScans');
       if(btn) btn.style.display = '';
     }
