@@ -672,23 +672,24 @@ function renderTheadDinamico() {
 /* =========================
    Escola (cabeçalho)
 ========================= */
-function carregarDadosEscola() {
+async function carregarDadosEscola() {
   const aviso = $("avisoEscola");
-  const rawObj = DB.read("dadosEscola", null);
-  const raw = rawObj ? JSON.stringify(rawObj) : null;
+  let escola = {};
+  try {
+    escola = await window.DB.escola.get() || {};
+  } catch(e) {
+    console.warn('[carregarDadosEscola]', e);
+  }
 
-  if (!raw) {
+  if (!escola || !Object.keys(escola).length) {
     if (aviso) aviso.style.display = "block";
     return;
   }
 
   if (aviso) aviso.style.display = "none";
 
-  let escola = {};
-  try { escola = JSON.parse(raw); } catch { escola = {}; }
-
   const elNome = $("nomeEscola");
-  const elEnd = $("enderecoEscola");
+  const elEnd  = $("enderecoEscola");
   const imgEscudo = $("escudo");
 
   if (elNome && escola.nome) elNome.textContent = escola.nome;
@@ -1247,17 +1248,51 @@ function exportarPDF() {
 /* =========================
    DB local (turmasDB)
 ========================= */
-function lerTurmasDB() {
-  try { return DB.read("turmasDB", []); }
-  catch { return []; }
+// ── Firebase: lerTurmasDB / salvarTurmasDB ──
+let _turmasCache = null;
+
+async function lerTurmasDB() {
+  if (_turmasCache) return _turmasCache;
+  try {
+    _turmasCache = await window.DB.turmas.list();
+    return _turmasCache;
+  } catch(e) {
+    console.warn('[lerTurmasDB]', e);
+    return [];
+  }
 }
-function salvarTurmasDB(arr) { DB.write("turmasDB", arr); }
+
+function _invalidarCacheTurmas() { _turmasCache = null; }
+
+async function salvarTurmasDB(turmaObj) {
+  try {
+    const limpo = limparUndefined(turmaObj);
+    await window.DB.turmas.save(limpo);
+    _invalidarCacheTurmas();
+  } catch(e) {
+    console.error('[salvarTurmasDB]', e);
+    throw e;
+  }
+}
 
 
 /* =========================
    DBs do sistema (alunos/aliases/atas/matrículas/metadados)
    - Mantém a mesma lógica do Admin "Configuração de IDs"
 ========================= */
+// Remove campos undefined recursivamente (Firebase rejeita undefined)
+function limparUndefined(obj) {
+  if (Array.isArray(obj)) return obj.map(limparUndefined);
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, limparUndefined(v)])
+    );
+  }
+  return obj;
+}
+
 function lerJSON(key, fallback){
   try{
     const raw = localStorage.getItem(key);
@@ -1318,116 +1353,81 @@ function statusFromResultado(res){
 }
 
 /**
- * Garante alunoId para os alunos desta turma (atualiza turmasDB, alunosDB, alunosAliasesDB)
- * e cria/atualiza bancos auxiliares (atasDB, matriculasDB, turmasMetaDB) para esta turma.
+ * Garante alunoId para os alunos desta turma e salva atas/matriculas no Firebase.
+ * Agora é async e salva direto no Firestore — sem localStorage.
  */
-function garantirIdsESistemaParaTurma(turmaObj){
+async function garantirIdsESistemaParaTurma(turmaObj){
   if (!turmaObj || !Array.isArray(turmaObj.alunos)) return;
 
   const now = new Date().toISOString();
 
-  // 1) alunoId via Identidade.findOrCreate — cross-módulo, sem duplicatas
+  // 1) alunoId via Identidade.findOrCreate (já é async e salva no Firebase)
   if(!window.Identidade){
     console.warn('[cadastro-turma] identidade-aluno.js não carregado');
   } else {
-    let alterouTurma = false;
     for (const al of turmaObj.alunos){
       const nomeRaw = String(al?.nome||"").trim();
       if (!nomeRaw) continue;
-      // arquivo de atas só tem nome; findOrCreate usa 3ª prioridade (nome normalizado)
-      const { alunoId } = window.Identidade.findOrCreate({ nomeOficial: nomeRaw, nome: nomeRaw });
-      if (String(al.alunoId||"") !== alunoId){
+      try {
+        const { alunoId } = await window.Identidade.findOrCreate({ nomeOficial: nomeRaw, nome: nomeRaw });
         al.alunoId = alunoId;
-        alterouTurma = true;
+      } catch(e) {
+        console.warn('[garantirIds] findOrCreate erro:', e);
       }
     }
-    if (alterouTurma){
-      const turmas = lerTurmasDB();
-      const tid = String(turmaObj.id || turmaObj.turmaId || "").trim();
-      const ix = turmas.findIndex(t => String(t?.id||t?.turmaId||"").trim() === tid);
-      if (ix >= 0){ turmas[ix] = turmaObj; salvarTurmasDB(turmas); }
-    }
-    // Identidade.findOrCreate já persistiu alunosDB — aliases não são mais necessários
+    // Atualiza turma no Firebase com alunoIds preenchidos
+    await salvarTurmasDB({ ...turmaObj, _id: turmaObj._id || turmaObj.id });
   }
 
-  // 2) bancos auxiliares: ata + meta + matrículas
+  // 2) bancos auxiliares: ata + matrículas (salvo direto no Firebase)
   const turmaId = String(turmaObj.id || turmaObj.turmaId || "").trim();
   if (!turmaId) return;
 
-  // garante campo turmaId
   turmaObj.turmaId = turmaId;
-
   const ataId = idAtaFromTurmaId(turmaId);
 
-  // atasDB (upsert)
-  const atas = lerAtasDB();
-  const ixAta = atas.findIndex(a => String(a?.id||"").trim() === ataId);
-  const ataObj = {
+  // ata (upsert no Firebase)
+  const ataObj = limparUndefined({
+    _id: ataId,
     id: ataId,
     turmaId,
-    anoLetivo: String(turmaObj?.anoLetivo||"").trim(),
-    turno: String(turmaObj?.turno||"").trim(),
-    seriesTurma: Array.isArray(turmaObj?.seriesTurma) ? turmaObj.seriesTurma : [],
-    serieTexto: String(turmaObj?.serieTexto||"").trim(),
+    anoLetivo:     String(turmaObj?.anoLetivo||"").trim(),
+    turno:         String(turmaObj?.turno||"").trim(),
+    seriesTurma:   Array.isArray(turmaObj?.seriesTurma) ? turmaObj.seriesTurma : [],
+    serieTexto:    String(turmaObj?.serieTexto||"").trim(),
     origemArquivo: String(turmaObj?.origemArquivo||"").trim(),
-    aba: String(turmaObj?.aba||"").trim(),
-    schemaId: String(turmaObj?.schemaId||"").trim(),
+    aba:           String(turmaObj?.aba||"").trim(),
+    schemaId:      String(turmaObj?.schemaId||"").trim(),
     schemaSnapshot: turmaObj?.schemaSnapshot || null,
-    criadoEm: turmaObj?.criadoEm || "",
-    atualizadoEm: now
-  };
-  if (ixAta >= 0) atas[ixAta] = ataObj; else atas.push(ataObj);
-  salvarAtasDB(atas);
-
-  // turmasMetaDB (upsert)
-  const metas = lerTurmasMetaDB();
-  const ixMeta = metas.findIndex(m => String(m?.turmaId||"").trim() === turmaId);
-  const metaObj = {
-    turmaId,
-    ataId,
-    anoLetivo: String(turmaObj?.anoLetivo||"").trim(),
-    turno: String(turmaObj?.turno||"").trim(),
-    seriesTurma: Array.isArray(turmaObj?.seriesTurma) ? turmaObj.seriesTurma : [],
-    serieTexto: String(turmaObj?.serieTexto||"").trim(),
-    origemArquivo: String(turmaObj?.origemArquivo||"").trim(),
-    aba: String(turmaObj?.aba||"").trim(),
-    alunos: Array.isArray(turmaObj?.alunos) ? turmaObj.alunos.length : 0,
-    atualizadoEm: now
-  };
-  if (ixMeta >= 0) metas[ixMeta] = metaObj; else metas.push(metaObj);
-  salvarTurmasMetaDB(metas);
-
-  // matriculasDB — cria/atualiza uma matrícula por (turmaId, alunoId)
-  const mats = lerMatriculasDB();
-  const matIndex = new Map();
-  mats.forEach((m, i)=>{
-    const mid = String(m?.id||"").trim();
-    if (mid) matIndex.set(mid, i);
+    criadoEm:      turmaObj?.criadoEm || now,
+    atualizadoEm:  now
   });
+  window.DB.atas.save(ataObj).catch(e => console.warn('[garantirIds] ata:', e));
 
+  // matrículas (batch no Firebase)
+  const matriculas = [];
   for (const a of (turmaObj.alunos || [])){
     const alunoId = String(a?.alunoId||"").trim();
     if (!alunoId) continue;
-
     const mid = idMatriculaFrom(turmaId, alunoId);
-    const obj = {
+    matriculas.push(limparUndefined({
+      _id: mid,
       id: mid,
       turmaId,
       ataId,
       alunoId,
-      nomeRaw: String(a?.nome||"").trim(),
-      serie: String(a?.serie||"").trim(),
-      resultado: String(a?.resultado||"").trim() || "Não informado",
-      status: statusFromResultado(a?.resultado),
+      nomeRaw:           String(a?.nome||"").trim(),
+      serie:             String(a?.serie||"").trim(),
+      resultado:         String(a?.resultado||"").trim() || "Não informado",
+      status:            statusFromResultado(a?.resultado),
       statusAtualizadoEm: now
-    };
-
-    const ix = matIndex.get(mid);
-    if (ix !== undefined) mats[ix] = { ...mats[ix], ...obj };
-    else mats.push(obj);
+    }));
+  }
+  if (matriculas.length) {
+    window.DB.matriculas.saveAll(matriculas).catch(e => console.warn('[garantirIds] matriculas:', e));
   }
 
-  salvarMatriculasDB(mats);
+  console.log(`✅ garantirIds concluído: ${matriculas.length} matrículas | ata: ${ataId}`);
 }
 
 
@@ -1452,11 +1452,11 @@ function montarIdPadraoTurma() {
 }
 
 /* ✅ Carregar turma robusto + schema snapshot */
-function carregarTurmaParaEdicao(id) {
-  const db = lerTurmasDB();
-  const turma = db.find(t => t.id === id);
+async function carregarTurmaParaEdicao(id) {
+  const db = await lerTurmasDB();
+  const turma = db.find(t => t.id === id || t._id === id);
 
-  if (!turma) { alert("Turma não encontrada no banco (turmasDB)."); return; }
+  if (!turma) { alert("Turma não encontrada no banco."); return; }
 
   // ✅ aplica snapshot do schema dessa turma
   SCHEMA_ATIVO = turma.schemaSnapshot ? normalizeSchema(turma.schemaSnapshot) : null;
@@ -1565,10 +1565,10 @@ async function _salvarNoBancoInterno() {
     return;
   }
 
-  const db = lerTurmasDB();
+  const db = await lerTurmasDB();
   const idFinal = modoEdicao ? idTurmaEditando : montarIdPadraoTurma();
 
-  const existente = db.find(t => t.id === idFinal);
+  const existente = db.find(t => t.id === idFinal || t._id === idFinal);
 
   const seriesLimpa = schema.serieAtiva ? dedupSeries(seriesTurma) : [];
 
@@ -1599,14 +1599,11 @@ async function _salvarNoBancoInterno() {
     criadoEm: existente?.criadoEm || new Date().toISOString()
   };
 
-  const idx = db.findIndex(t => t.id === idFinal);
-  if (idx >= 0) db[idx] = turmaObj;
-  else db.push(turmaObj);
+  // Salva direto no Firebase (upsert via _id)
+  await salvarTurmasDB({ ...turmaObj, _id: existente?._id || idFinal });
 
-  salvarTurmasDB(db);
-
-  // ✅ IDs e bancos do sistema (atas/matrículas/metadados) agora são gerados automaticamente
-  garantirIdsESistemaParaTurma(turmaObj);
+  // IDs e bancos do sistema (atas/matrículas) em background
+  garantirIdsESistemaParaTurma(turmaObj).catch(e => console.warn("[garantirIds]", e));
 
   // ── Scans: libera o card e dispara upload da fila (antes do alert para não travar) ──
   if (!modoEdicao && window.initScans) window.initScans(idFinal, false);
@@ -1620,27 +1617,8 @@ async function _salvarNoBancoInterno() {
    Boot
 ========================= */
 document.addEventListener("DOMContentLoaded", async () => {
-  // Pré-carrega dados do Firestore no localStorage antes de qualquer render
-  try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
-    const dados = await window.DB.loadAll();
-    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
-    if(sid){
-      const pre = (k)=>`schools:${sid}:${k}`;
-      if(dados.turmasDB)    localStorage.setItem(pre('turmasDB'),    JSON.stringify(dados.turmasDB));
-      if(dados.alunosDB)    localStorage.setItem(pre('alunosDB'),    JSON.stringify(dados.alunosDB));
-      if(dados.matriculas)  localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
-      if(dados.atasDB)      localStorage.setItem(pre('atasDB'),      JSON.stringify(dados.atasDB));
-      if(dados.dadosEscola && Object.keys(dados.dadosEscola).length)
-        localStorage.setItem(pre('dadosEscola'), JSON.stringify(dados.dadosEscola));
-    }
-  }catch(e){ console.warn('DOMContentLoaded Firestore pré-carga:', e); }
-
   // dados da escola (cabeçalho)
-  carregarDadosEscola();
+  await carregarDadosEscola();
 
   // ano
   preencherAnos();
@@ -1658,7 +1636,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // edição de turma (?edit=)
   const id = getQueryParam("edit");
-  if (id) carregarTurmaParaEdicao(id);
+  if (id) await carregarTurmaParaEdicao(id);
 });
 
 </script>
