@@ -128,6 +128,15 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 /* .btn.small */
 .btn.small { padding: 6px 11px; font-size: 12px; }
 
+/* ── Cards mesma altura no estado normal ── */
+#container.split.layout-normal {
+  align-items: stretch;
+}
+#container.split.layout-normal #card-esquerda,
+#container.split.layout-normal #card-direita {
+  align-self: stretch;
+}
+
 /* ── Hover do list-item no estado normal ── */
 #card-esquerda .list-item:not(.selected):hover {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
@@ -464,7 +473,7 @@ function formatarListaBonita(arr) {
 function preencherFiltroAno(turmas) {
   const sel = document.getElementById("fAno");
   const anos = Array.from(new Set(turmas.map(t => String(t.anoLetivo || "").trim()).filter(Boolean)))
-    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    .sort((a,b)=>b.localeCompare(a,'pt-BR')); // decrescente — ano mais recente primeiro
 
   const atual = sel.value;
   sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
@@ -474,6 +483,27 @@ function preencherFiltroAno(turmas) {
 /* =========================
    Render lista de turmas
 ========================= */
+
+/* ── Ordenação de turmas por série (numérica) + ano letivo (desc) ── */
+function numSerie(serie) {
+  // Extrai o primeiro número da série para ordenação numérica
+  // Ex: "1ª série" → 1, "9º ano" → 9, "Alfabetização" → 0
+  const m = String(serie || '').match(/\d+/);
+  return m ? parseInt(m[0]) : 0;
+}
+
+function ordenarTurmas(lista) {
+  return lista.slice().sort((a, b) => {
+    const nA = numSerie(a.serieTexto || (a.seriesTurma && a.seriesTurma[0]) || '');
+    const nB = numSerie(b.serieTexto || (b.seriesTurma && b.seriesTurma[0]) || '');
+    if (nA !== nB) return nA - nB; // série crescente
+    // mesmo número de série: ano letivo decrescente
+    const anoA = String(a.anoLetivo || '');
+    const anoB = String(b.anoLetivo || '');
+    return anoB.localeCompare(anoA, 'pt-BR');
+  });
+}
+
 function renderListaTurmas(lista) {
   const box = document.getElementById("listaTurmas");
   box.innerHTML = "";
@@ -717,7 +747,7 @@ function aplicarFiltros() {
     });
   }
 
-  renderListaTurmas(lista);
+  renderListaTurmas(ordenarTurmas(lista));
 }
 
 /* =========================
