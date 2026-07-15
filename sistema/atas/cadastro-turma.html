@@ -27,6 +27,14 @@
 <!-- PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<!-- PDF.js — converte PDF em imagens antes do upload -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
 
 <style>
 /* ── Variáveis sobrescritas por esta página ── */
@@ -181,6 +189,30 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 .scans-status.ok { color:#16a34a; }
 .scans-status.err{ color:#dc2626; }
 
+
+/* ── Badge de confirmação de exclusão de turma ── */
+.confirm-badge {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #991b1b;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+html[data-theme="dark"] .confirm-badge {
+  background: rgba(185,28,28,0.12);
+  border-color: #b91c1c;
+  color: #fca5a5;
+}
+.confirm-badge.show { display: flex; }
+.confirm-badge strong { flex: 1; }
+.confirm-badge-btns { display: flex; gap: 8px; }
+
 </style>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -255,11 +287,11 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 
     <!-- Drop zone -->
     <div class="scans-drop" id="scansDropZone">
-      <input type="file" id="scansFileInput" accept="image/*,application/pdf" multiple>
+      <input type="file" id="scansFileInput" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple>
       <div style="font-size:28px;margin-bottom:6px;">📁</div>
       <div class="scans-drop-txt">
         <strong>Clique para selecionar</strong> ou arraste aqui<br>
-        PDF ou imagem (JPG, PNG)
+        Imagem (JPG, PNG, WEBP) ou PDF — PDFs são convertidos em imagens
       </div>
     </div>
 
@@ -273,11 +305,20 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
     <!-- ✅ Agora o form é dinâmico -->
     <div class="form-grid" id="formGridDinamico"></div>
 
-    <div class="actions">
+    <div class="actions" style="flex-wrap:wrap; gap:8px;">
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
       <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarScansAviso()" style="display:none">📄 Scans</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
-      <button class="btn btn-primary" onclick="exportarPDF()">Exportar PDF</button>
+      <button class="btn btn-danger-outline" id="btnExcluirTurma" onclick="mostrarConfirmExclusao()" style="display:none; margin-left:auto;">🗑️ Excluir turma</button>
+    </div>
+
+    <!-- Badge de confirmação de exclusão -->
+    <div class="confirm-badge" id="confirmBadgeExclusao">
+      <strong>⚠️ Excluir esta turma e todos os seus scans? Essa ação é irreversível.</strong>
+      <div class="confirm-badge-btns">
+        <button class="btn btn-danger-outline btn-mini" onclick="confirmarExclusaoTurma()">Sim, excluir</button>
+        <button class="btn btn-secondary btn-mini" onclick="fecharConfirmExclusao()">Cancelar</button>
+      </div>
     </div>
 
     <div class="table-wrap"><table>
@@ -1527,6 +1568,10 @@ async function carregarTurmaParaEdicao(id) {
 
   modoEdicao = true;
   idTurmaEditando = turma.id;
+
+  // Modo edição: mostra botão excluir turma
+  const btnExcluir = document.getElementById('btnExcluirTurma');
+  if (btnExcluir) btnExcluir.style.display = 'inline-flex';
 }
 
 /* =========================
@@ -1642,15 +1687,102 @@ document.addEventListener("DOMContentLoaded", async () => {
 </script>
 
 
+
+/* =========================
+   Exclusão de turma
+========================= */
+function mostrarConfirmExclusao() {
+  const badge = document.getElementById('confirmBadgeExclusao');
+  if (badge) badge.classList.add('show');
+}
+
+function fecharConfirmExclusao() {
+  const badge = document.getElementById('confirmBadgeExclusao');
+  if (badge) badge.classList.remove('show');
+}
+
+async function confirmarExclusaoTurma() {
+  if (!modoEdicao || !idTurmaEditando) return;
+  fecharConfirmExclusao();
+
+  const btnExcluir = document.getElementById('btnExcluirTurma');
+  if (btnExcluir) { btnExcluir.disabled = true; btnExcluir.textContent = 'Excluindo…'; }
+
+  try {
+    // 1. Apaga todos os scans do Cloudinary
+    const scansResp = await fetch(`/api/atas-list?turmaId=${encodeURIComponent(idTurmaEditando)}`);
+    if (scansResp.ok) {
+      const scansData = await scansResp.json();
+      const files = scansData.files || [];
+      for (const f of files) {
+        await fetch('/api/atas-delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: f.fileId, resourceType: f.resourceType || 'image' }),
+        });
+      }
+      console.log(`🗑️ ${files.length} scan(s) removido(s) do Cloudinary`);
+    }
+
+    // 2. Remove a turma do Firebase
+    const db = await lerTurmasDB();
+    const turma = db.find(t => t.id === idTurmaEditando || t._id === idTurmaEditando);
+    if (turma?._id) {
+      await window.DB.turmas.remove(turma._id);
+      _invalidarCacheTurmas();
+      console.log('🗑️ Turma removida do Firebase:', idTurmaEditando);
+    }
+
+    alert('Turma excluída com sucesso.');
+    window.history.back();
+
+  } catch(err) {
+    console.error('[excluirTurma]', err);
+    alert('Erro ao excluir a turma: ' + err.message);
+    if (btnExcluir) { btnExcluir.disabled = false; btnExcluir.textContent = '🗑️ Excluir turma'; }
+  }
+}
+
 <script id="atas-scans-js">
 (function(){
   const API_UPLOAD = '/api/atas-upload';
   const API_LIST   = '/api/atas-list';
   const API_DELETE = '/api/atas-delete';
-  const MAX_MB     = 15;
+  const MAX_MB    = 15;
+  const MAX_PAGES = 20; // máx. páginas por PDF
 
   let _fila    = [];
   let _turmaId = null;
+
+  // Converte PDF em array de imagens JPEG via PDF.js (roda no cliente)
+  async function pdfParaImagens(file) {
+    if (typeof pdfjsLib === 'undefined') {
+      setStatus('err', '❌ PDF.js não carregou. Recarregue a página.');
+      return [];
+    }
+    setStatus('', `⏳ Convertendo "${file.name}"…`);
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    if (pdf.numPages > MAX_PAGES) {
+      setStatus('err', `❌ "${file.name}" tem ${pdf.numPages} páginas. Limite: ${MAX_PAGES}. Rejeitado.`);
+      return [];
+    }
+    const baseName = file.name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const imagens  = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page     = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas   = document.createElement('canvas');
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const base64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const fileName = `${baseName}_p${String(i).padStart(2,'0')}.jpg`;
+      imagens.push({ fileName, mimeType: 'image/jpeg', base64 });
+    }
+    setStatus('ok', `✅ "${file.name}" convertido: ${pdf.numPages} página(s)`);
+    return imagens;
+  }
 
   function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
@@ -1687,20 +1819,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function adicionarArquivos(files){
-    for(const f of Array.from(files)){
-      if(f.size > MAX_MB * 1024 * 1024){
+    for (const f of Array.from(files)) {
+      if (f.size > MAX_MB * 1024 * 1024) {
         setStatus('err', `❌ "${f.name}" excede ${MAX_MB} MB e foi ignorado.`);
         continue;
       }
-      const base64 = await new Promise((res,rej)=>{
-        const r = new FileReader();
-        r.onload  = e => res(e.target.result.split(',')[1]);
-        r.onerror = rej;
-        r.readAsDataURL(f);
-      });
-      _fila.push({ fileName: f.name, mimeType: f.type||'application/octet-stream', base64 });
+      const isPDF = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      if (isPDF) {
+        // PDF → converte cada página em imagem JPEG
+        const imagens = await pdfParaImagens(f);
+        imagens.forEach(img => _fila.push(img));
+      } else {
+        // Imagem → lê direto
+        const base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload  = e => res(e.target.result.split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+        _fila.push({ fileName: f.name, mimeType: f.type || 'image/jpeg', base64 });
+      }
     }
-    // Mostra o card se ainda estava oculto
     mostrarScans();
     renderFila();
   }
