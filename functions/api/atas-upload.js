@@ -40,11 +40,7 @@ async function sha256Hex(str) {
 async function cloudinaryUpload(env, fileBase64, mimeType, publicId, folder, resourceType) {
   const timestamp = Math.floor(Date.now() / 1000);
 
-  const extraParams = resourceType === 'raw'
-    ? { use_filename: true, unique_filename: false }
-    : {};
-
-  const allParams = { folder, public_id: publicId, timestamp, ...extraParams };
+  const allParams = { folder, public_id: publicId, timestamp };
   const sigStr = Object.keys(allParams)
     .sort()
     .map(k => `${k}=${allParams[k]}`)
@@ -61,7 +57,6 @@ async function cloudinaryUpload(env, fileBase64, mimeType, publicId, folder, res
     api_key: env.CLOUDINARY_API_KEY,
     signature,
     resource_type: resourceType,
-    ...extraParams,
   });
 
   const res = await fetch(
@@ -91,13 +86,12 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
-    const resourceType = mimeType.startsWith('image/') ? 'image' : 'raw';
-    const ext = getExt(fileName);
+    // Tudo chega como image/jpeg (PDFs são convertidos no cliente via PDF.js)
+    const resourceType = 'image';
     const folder = `atas/${slugTurma(turmaId)}`;
 
     const baseName = fileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const uniqueId = baseName + '_' + Date.now();
-    const publicId = resourceType === 'raw' && ext ? `${uniqueId}.${ext}` : uniqueId;
+    const publicId = baseName + '_' + Date.now();
 
     const result = await cloudinaryUpload(env, fileBase64, mimeType, publicId, folder, resourceType);
 

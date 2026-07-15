@@ -63,22 +63,7 @@ export async function onRequestGet({ request, env }) {
       });
     });
 
-    // Busca raw (PDFs)
-    const rawPath = `/v1_1/${env.CLOUDINARY_CLOUD_NAME}/resources/raw/upload?prefix=${encodeURIComponent(folder)}&max_results=50&type=upload`;
-    const rawRes = await cloudinaryRequest(env, rawPath);
-    (rawRes.resources || []).forEach(r => {
-      const ext = r.public_id.split('.').pop()?.toLowerCase();
-      const mime = ext === 'pdf' ? 'application/pdf' : 'application/octet-stream';
-      files.push({
-        fileId:      r.public_id,
-        fileName:    r.public_id.split('/').pop(),
-        mimeType:    mime,
-        resourceType: 'raw',
-        webViewLink: r.secure_url,
-        createdAt:   r.created_at,
-      });
-    });
-
+    // Tudo é imagem (PDFs convertidos no cliente antes do upload)
     // Ordena por data desc (mais recente primeiro)
     files.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
