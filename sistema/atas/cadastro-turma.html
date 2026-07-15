@@ -1562,6 +1562,7 @@ async function salvarNoBanco() {
   const seriesLimpa = schema.serieAtiva ? dedupSeries(seriesTurma) : [];
 
   const turmaObj = {
+    _id: existente?._id || idFinal, // _id garante upsert correto no Firestore
     id: idFinal,
     origemArquivo: existente?.origemArquivo || "MANUAL",
     aba: existente?.aba || "MANUAL",
@@ -1596,41 +1597,12 @@ async function salvarNoBanco() {
   // ✅ IDs e bancos do sistema (atas/matrículas/metadados) agora são gerados automaticamente
   garantirIdsESistemaParaTurma(turmaObj);
 
-  // ✅ CORREÇÃO: Salvar no Firebase (Firestore)
-  try {
-    if (window.DB && window.DB.turmas) {
-      // Remove campos undefined recursivamente (Firebase rejeita undefined)
-      function limparUndefined(obj) {
-        if (Array.isArray(obj)) return obj.map(limparUndefined);
-        if (obj !== null && typeof obj === 'object') {
-          return Object.fromEntries(
-            Object.entries(obj)
-              .filter(([, v]) => v !== undefined)
-              .map(([k, v]) => [k, limparUndefined(v)])
-          );
-        }
-        return obj;
-      }
-
-      const turmaFirebase = limparUndefined({ ...turmaObj });
-
-      // Se está editando, inclui o _id para atualizar o documento correto
-      if (modoEdicao && existente?._id) {
-        turmaFirebase._id = existente._id;
-      }
-
-      await window.DB.turmas.save(turmaFirebase);
-      console.log('✅ Turma salva no Firebase:', idFinal);
-    }
-  } catch (err) {
-    console.error('❌ Erro ao salvar no Firebase:', err);
-    alert('Turma salva localmente, mas houve erro ao sincronizar com a nuvem. Verifique sua conexão.');
-  }
-
+  // ✅ O writeFirestore (via writeBoth/salvarTurmasDB) já sincroniza com o Firebase
+  // automaticamente — não é necessário salvar manualmente aqui.
   alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
 
   // ── Scans: libera o card e dispara upload da fila ──
-  if (window.initScans) window.initScans(idFinal, false); // false = criação, não busca scans
+  if (!modoEdicao && window.initScans) window.initScans(idFinal, false);
   if (window.uploadScansQueue) await window.uploadScansQueue();
 }
 
@@ -1861,6 +1833,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const params = new URLSearchParams(window.location.search);
     const editId = params.get('edit');
     if(editId){
+      // Modo edição: mostra o botão e carrega scans
+      const btn = document.getElementById('btnContinuarScans');
+      if(btn) btn.style.display = '';
       window.initScans(editId, true);
     } else {
       // Modo criação: mostra botão "Scans"
