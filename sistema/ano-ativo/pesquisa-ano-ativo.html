@@ -1084,13 +1084,14 @@ function _atualizarListaAlunos(_tScope){
           </div>
         </div>
         <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+          <button class="btn-view" type="button" data-view-aluno="${a.alunoId}" title="Ver ficha completa do aluno">👁️ Visualizar</button>
           ${_podeEditar
             ? `<button class="btn-edit" type="button"
             data-edit-aluno="${a.alunoId}"
             data-edit-turma="${a.turmaId||''}"
             data-edit-ano="${anoSelecionadoOuAtivo()}"
             title="Editar dados do aluno">✏️ Editar</button>`
-            : `<div style="display:inline-flex;padding:6px 12px;font-size:12px;visibility:hidden;pointer-events:none;" aria-hidden="true">✏️ Editar</div>`}
+            : ``}
           <label class="check">
             <input type="checkbox" class="chkAluno" data-aluno="${a.alunoId}" checked />
             <span>Selecionar</span>
@@ -1113,6 +1114,12 @@ function _atualizarListaAlunos(_tScope){
       location.href = url;
     });
   });
+  document.querySelectorAll("[data-view-aluno]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.viewAluno;
+      if(id) abrirFichaAluno(id);
+    });
+  });
 }
 
 /* =========================
@@ -1126,6 +1133,30 @@ chkAllAlunos.addEventListener("change", ()=>{ setAllCheckboxes(".chkAluno", chkA
    Modal
 ========================= */
 function abrirModal(titulo, rows){ modalTitle.textContent = titulo; modalBody.innerHTML = rows; modalBackdrop.style.display = "flex"; }
+
+function abrirFichaAluno(alunoId){
+  const a = alunosOrdenados.find(x => x.alunoId === alunoId);
+  if(!a) return;
+
+  const cabecalho = `
+    <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--chip-bg);">
+      <b>${escapeHtml(a.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(a.alunoId||'—')}
+      &nbsp;•&nbsp; Situação: ${escapeHtml(a._status || a.status || 'ATIVO')}
+    </div>`;
+
+  const campos = COLS.map(c => {
+    let v = a[c.key] ?? '';
+    if(c.key === 'idade')   v = v || calcIdade(a.dataNascimento) || '';
+    if(c.key === 'corRaca' && !v) v = 'Não declarada';
+    return `<div style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
+      <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">${c.label}</div>
+      <div style="font-size:13px;margin-top:2px;">${escapeHtml(String(v || '—'))}</div>
+    </div>`;
+  }).join('');
+
+  const rows = `${cabecalho}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">${campos}</div>`;
+  abrirModal('Ficha do aluno', rows);
+}
 document.getElementById("btnFecharModal").addEventListener("click", ()=> modalBackdrop.style.display="none");
 modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) modalBackdrop.style.display="none"; });
 
