@@ -1753,9 +1753,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     _turmaId = String(turmaId);
     mostrarScans();
     if(modoEdit) _carregarScans();
-    // Oculta o botão após inicializar
-    const btn = document.getElementById('btnContinuarScans');
-    if(btn) btn.style.display = 'none';
+    // No modo criação, oculta o botão após salvar (card já aberto)
+    // No modo edição, mantém o botão visível para o usuário poder abrir/fechar
+    if(!modoEdit){
+      const btn = document.getElementById('btnContinuarScans');
+      if(btn) btn.style.display = 'none';
+    }
   };
 
   // Chamado pelo botão "Scans" no modo criação (antes de salvar)
@@ -1783,7 +1786,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const lista = document.getElementById('scansLista');
     if(!lista) return;
     const wrap = document.getElementById('scansWrap');
-    if(wrap) wrap.style.display = '';
+    if(wrap) wrap.style.display = 'block';
     const div = document.createElement('div');
     div.className = 'scans-item scan-existente';
     div.innerHTML =
