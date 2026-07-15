@@ -1533,6 +1533,17 @@ function carregarTurmaParaEdicao(id) {
    Salvar turma no banco
 ========================= */
 async function salvarNoBanco() {
+  // Anti-duplo-clique: desabilita o botão durante o save
+  const btnSalvar = document.querySelector('button[onclick="salvarNoBanco()"]');
+  if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando…'; }
+  try {
+    await _salvarNoBancoInterno();
+  } finally {
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar no banco'; }
+  }
+}
+
+async function _salvarNoBancoInterno() {
   const schema = getSchemaAtivoParaTela();
 
   const elAno = $("ano");
@@ -1597,13 +1608,12 @@ async function salvarNoBanco() {
   // ✅ IDs e bancos do sistema (atas/matrículas/metadados) agora são gerados automaticamente
   garantirIdsESistemaParaTurma(turmaObj);
 
-  // ✅ O writeFirestore (via writeBoth/salvarTurmasDB) já sincroniza com o Firebase
-  // automaticamente — não é necessário salvar manualmente aqui.
-  alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
-
-  // ── Scans: libera o card e dispara upload da fila ──
+  // ── Scans: libera o card e dispara upload da fila (antes do alert para não travar) ──
   if (!modoEdicao && window.initScans) window.initScans(idFinal, false);
   if (window.uploadScansQueue) await window.uploadScansQueue();
+
+  console.log('✅ Turma salva:', idFinal);
+  alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
 }
 
 /* =========================
