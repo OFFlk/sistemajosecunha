@@ -169,7 +169,7 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 .btn.small           { padding: 6px 11px; font-size: 12px; }
 
 /* ── Botão Editar ── */
-.btn-edit {
+.btn-edit, .btn-view {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -185,17 +185,17 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
   white-space: nowrap;
   transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
 }
-.btn-edit:hover {
+.btn-edit:hover, .btn-view:hover {
   background: var(--brand);
   border-color: var(--brand-hover);
   color: #fff;
 }
-html[data-theme="dark"] .btn-edit {
+html[data-theme="dark"] .btn-edit, html[data-theme="dark"] .btn-view {
   background: var(--brand-faded-d);
   border-color: var(--brand-border-d);
   color: var(--brand-text-d);
 }
-html[data-theme="dark"] .btn-edit:hover {
+html[data-theme="dark"] .btn-edit:hover, html[data-theme="dark"] .btn-view:hover {
   background: var(--brand-d);
   border-color: var(--brand-hover-d);
   color: #fff;
@@ -1135,8 +1135,11 @@ chkAllAlunos.addEventListener("change", ()=>{ setAllCheckboxes(".chkAluno", chkA
 function abrirModal(titulo, rows){ modalTitle.textContent = titulo; modalBody.innerHTML = rows; modalBackdrop.style.display = "flex"; }
 
 function abrirFichaAluno(alunoId){
-  const a = alunosOrdenados.find(x => x.alunoId === alunoId);
-  if(!a) return;
+  const raw = alunosOrdenados.find(x => x.alunoId === alunoId);
+  if(!raw) return;
+  // alunosOrdenados só passa por _enriquecerComMeta (turno/status/modelo);
+  // aqui garantimos também o cálculo de _neeResumo/etc via enriquecerAlunos.
+  const a = enriquecerAlunos([raw])[0];
 
   const cabecalho = `
     <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--chip-bg);">
@@ -1144,18 +1147,86 @@ function abrirFichaAluno(alunoId){
       &nbsp;•&nbsp; Situação: ${escapeHtml(a._status || a.status || 'ATIVO')}
     </div>`;
 
-  const campos = COLS.map(c => {
+  const camposExtras = [
+    {key:'rgOrgao', label:'RG - ÓRGÃO EMISSOR'},
+    {key:'pais',    label:'PAÍS'},
+    {key:'obs',     label:'OBSERVAÇÕES'},
+  ];
+
+  const campos = [...COLS.filter(c => c.key !== '_neeResumo'), ...camposExtras].map(c => {
     let v = a[c.key] ?? '';
     if(c.key === 'idade')   v = v || calcIdade(a.dataNascimento) || '';
     if(c.key === 'corRaca' && !v) v = 'Não declarada';
+    if(c.key === 'pais'    && !v) v = 'BR';
     return `<div style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
       <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">${c.label}</div>
       <div style="font-size:13px;margin-top:2px;">${escapeHtml(String(v || '—'))}</div>
     </div>`;
   }).join('');
 
-  const rows = `${cabecalho}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">${campos}</div>`;
+  const docsPlaceholderId = `docsFicha_${alunoId.replace(/[^a-zA-Z0-9_-]/g,'')}`;
+
+  const rows = `${cabecalho}
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">${campos}</div>
+    <div style="margin-top:16px;">
+      <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">NEE / Transtornos</div>
+      ${montarNeeDetalhado(a)}
+    </div>
+    <div style="margin-top:16px;">
+      <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Documentos</div>
+      <div id="${docsPlaceholderId}" style="font-size:13px;color:var(--muted);">Carregando documentos…</div>
+    </div>
+  `;
   abrirModal('Ficha do aluno', rows);
+  carregarDocsFicha(alunoId, docsPlaceholderId);
+}
+
+function montarNeeDetalhado(a){
+  const itens = [];
+  if(a.tea)              itens.push('🧩 TEA');
+  if(a.altasHabilidades) itens.push('⭐ Altas habilidades / superdotação');
+  if(a.defFisica)        itens.push('♿ Deficiência física');
+  if(a.defIntelectual)   itens.push('🧠 Deficiência intelectual');
+  if(a.defVisual)        itens.push('👁️ Deficiência visual' + (a.defVisualTipo ? ` (${a.defVisualTipo})` : ''));
+  if(a.defAuditiva)      itens.push('👂 Deficiência auditiva / surdez' + (a.defAuditivaTipo ? ` (${a.defAuditivaTipo})` : ''));
+  if(a.discalculia)      itens.push('🔢 Discalculia / raciocínio lógico-matemático');
+  if(a.disgrafia)        itens.push('✏️ Disgrafia / disortografia / escrita');
+  if(a.dislalia)         itens.push('🗣️ Dislalia / linguagem e comunicação');
+  if(a.dislexia)         itens.push('📖 Dislexia');
+  if(a.tdah)             itens.push('⚡ TDAH');
+  if(a.tpac)             itens.push('🔊 TPAC');
+
+  if(!itens.length){
+    return `<div style="font-size:13px;color:var(--muted);">Nenhuma</div>`;
+  }
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;">` +
+    itens.map(t => `<span style="padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--chip-bg);font-size:12px;">${escapeHtml(t)}</span>`).join('') +
+    `</div>`;
+}
+
+async function carregarDocsFicha(alunoId, targetId){
+  const el = document.getElementById(targetId);
+  if(!el) return;
+  try{
+    const resp = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(alunoId)}`);
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'Erro ao buscar documentos');
+    const files = data.files || [];
+    if(!files.length){
+      el.innerHTML = `<div style="font-size:13px;color:var(--muted);">Nenhum documento anexado</div>`;
+      return;
+    }
+    el.innerHTML = files.map(f => {
+      const icon = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);">
+        <span>${icon}</span>
+        <span style="flex:1;font-size:13px;">${escapeHtml(f.label||f.fileName)}</span>
+        <a href="${f.webViewLink}" target="_blank" rel="noopener" style="font-size:12px;font-weight:800;color:var(--brand);text-decoration:none;">👁️ Ver</a>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML = `<div style="font-size:13px;color:#b91c1c;">Erro ao carregar documentos.</div>`;
+  }
 }
 document.getElementById("btnFecharModal").addEventListener("click", ()=> modalBackdrop.style.display="none");
 modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) modalBackdrop.style.display="none"; });
