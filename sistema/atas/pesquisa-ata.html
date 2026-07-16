@@ -128,6 +128,14 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 /* .btn.small */
 .btn.small { padding: 6px 11px; font-size: 12px; }
 
+/* ── Sidebar expandida: mostra só título + série, oculta resto ── */
+.layout-expandido #card-esquerda .list-item .item-meta {
+  display: none;
+}
+.layout-expandido #card-esquerda .list-item .badges-row .badge:not(:last-child) {
+  display: none; /* oculta badge de turno, mantém só ano */
+}
+
 /* ── Cards mesma altura no estado normal ── */
 #container.split.layout-normal {
   align-items: stretch;
@@ -538,7 +546,7 @@ function renderListaTurmas(lista) {
           <span class="badge">${turnoTxt}</span>
           <span class="badge">${anoTxt}</span>
         </div>
-        <div class="muted">
+        <div class="muted item-meta">
           Série: <b>${serieTxt || "?"}</b> · ${alunosTxt} · Arquivo: ${t.origemArquivo || "?"}
         </div>
       </div>
