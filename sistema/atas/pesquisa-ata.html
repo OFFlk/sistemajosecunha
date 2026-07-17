@@ -128,12 +128,21 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 /* .btn.small */
 .btn.small { padding: 6px 11px; font-size: 12px; }
 
-/* ── Sidebar expandida: mostra só título + série, oculta resto ── */
+/* ── Sidebar expandida: compacta ao máximo ── */
 .layout-expandido #card-esquerda .list-item .item-meta {
-  display: none;
+  display: none !important; /* oculta metadados extras */
 }
-.layout-expandido #card-esquerda .list-item .badges-row .badge:not(:last-child) {
-  display: none; /* oculta badge de turno, mantém só ano */
+.layout-expandido #card-esquerda .list-item .badges-row {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.layout-expandido #card-esquerda .list-item .badges-row .badge {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  font-size: 10px;
+  padding: 1px 5px;
 }
 
 /* ── Cards mesma altura no estado normal ── */
@@ -543,11 +552,11 @@ function renderListaTurmas(lista) {
           <b>${titulo || "Turma"}</b>
         </div>
         <div class="badges-row">
-          <span class="badge">${turnoTxt}</span>
           <span class="badge">${anoTxt}</span>
+          <span class="badge badge-serie">${serieTxt || "?"}</span>
         </div>
         <div class="muted item-meta">
-          Série: <b>${serieTxt || "?"}</b> · ${alunosTxt} · Arquivo: ${t.origemArquivo || "?"}
+          ${turnoTxt} · ${alunosTxt}
         </div>
       </div>
       <div class="right" onclick="event.stopPropagation()">
