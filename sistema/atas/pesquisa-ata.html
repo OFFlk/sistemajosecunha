@@ -15,6 +15,7 @@
 </script>
 
 <!-- Firebase / Auth / DB -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -143,39 +144,6 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
   transition: transform 0.2s;
 }
 
-/* ── Loading overlay ── */
-#loadingOverlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg, #f3f0ff);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  transition: opacity 0.3s;
-}
-#loadingOverlay.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-.loading-spinner {
-  width: 44px;
-  height: 44px;
-  border: 4px solid color-mix(in srgb, var(--primary, #7c3aed) 20%, transparent);
-  border-top-color: var(--primary, #7c3aed);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-text {
-  font-size: 14px;
-  color: var(--primary, #7c3aed);
-  font-weight: 600;
-  opacity: 0.8;
-}
-
 /* ── Sidebar expandida: compacta ao máximo ── */
 .layout-expandido #card-esquerda .list-item .item-meta {
   display: none !important; /* oculta metadados extras */
@@ -262,12 +230,6 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 <!-- ============================================================
      CONTEÚDO PRINCIPAL
 ============================================================ -->
-<!-- Loading overlay -->
-<div id="loadingOverlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-text" id="loadingText">Carregando dados…</div>
-</div>
-
 <div class="wrap">
 
   <!-- Filtros -->
@@ -951,19 +913,13 @@ async function carregar() {
   document.getElementById("fSerie").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
 
-  esconderLoading();
+  Loading.esconder();
 }
 
 let _jaFoiPesquisado = false;
 let _ordemAsc = false; // false = mais recente primeiro (padrão)
 
-function esconderLoading() {
-  const ov = document.getElementById('loadingOverlay');
-  if (ov) {
-    ov.classList.add('hidden');
-    setTimeout(() => ov.style.display = 'none', 350);
-  }
-}
+// Loading gerenciado por loading-overlay.js
 
 document.addEventListener("DOMContentLoaded", carregar);
 </script>
