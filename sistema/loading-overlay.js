@@ -36,58 +36,49 @@
       pointer-events: none;
     }
 
-    /* Logo */
+    /* Logo unificada (com fundo branco arredondado intencional) */
     #_loadingOverlay ._lo-logo {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      border-radius: 24px;
+      margin-bottom: 40px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    }
+
+    /* Spinner com gradiente cônico usando cor do tema */
+    #_loadingOverlay ._lo-spinner {
       width: 72px;
       height: 72px;
-      object-fit: contain;
-      margin-bottom: 10px;
-      opacity: 0.9;
-    }
-
-    /* Nome do sistema */
-    #_loadingOverlay ._lo-nome {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text, #1e1b4b);
-      letter-spacing: 0.01em;
-      margin-bottom: 36px;
-      opacity: 0.75;
-    }
-
-    /* Spinner com gradiente cônico */
-    #_loadingOverlay ._lo-spinner {
-      width: 52px;
-      height: 52px;
       border-radius: 50%;
       background: conic-gradient(
         from 0deg,
         transparent 0%,
-        transparent 30%,
-        #6d28d9 60%,
-        #4f46e5 80%,
-        #818cf8 100%
+        transparent 25%,
+        var(--primary, #6d28d9) 65%,
+        color-mix(in srgb, var(--primary, #6d28d9) 60%, transparent) 85%,
+        transparent 100%
       );
       animation: _loSpin 0.9s linear infinite;
       position: relative;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
     /* Buraco central do spinner */
     #_loadingOverlay ._lo-spinner::after {
       content: '';
       position: absolute;
-      inset: 7px;
+      inset: 10px;
       border-radius: 50%;
       background: var(--bg, #f3f0ff);
     }
 
     /* Texto */
     #_loadingOverlay ._lo-texto {
-      font-size: 14px;
-      font-weight: 600;
+      font-size: 16px;
+      font-weight: 700;
       color: var(--primary, #6d28d9);
-      opacity: 0.8;
+      opacity: 0.85;
       letter-spacing: 0.01em;
     }
 
@@ -102,9 +93,6 @@
     [data-theme="dark"] #_loadingOverlay ._lo-spinner::after {
       background: var(--bg, #0f0e17);
     }
-    [data-theme="dark"] #_loadingOverlay ._lo-nome {
-      color: var(--text, #e0e7ff);
-    }
   `;
 
   /* ─── HTML ─── */
@@ -118,8 +106,7 @@
     const overlay = document.createElement('div');
     overlay.id = '_loadingOverlay';
     overlay.innerHTML = `
-      <img class="_lo-logo" src="/icon.png" alt="Logo" onerror="this.style.display='none'">
-      <div class="_lo-nome">Sistema Escolar</div>
+      <img class="_lo-logo" src="/SISTEMA_ESCOLAR.png" alt="Sistema Escolar" onerror="this.style.display='none'">
       <div class="_lo-spinner"></div>
       <div class="_lo-texto" id="_loadingTexto">Carregando dados…</div>
     `;
