@@ -128,6 +128,54 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 /* .btn.small */
 .btn.small { padding: 6px 11px; font-size: 12px; }
 
+/* ── Título TURMAS clicável (ordenador) ── */
+#sidebarTitulo {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#sidebarTitulo:hover { opacity: 0.75; }
+#sortIndicator {
+  font-size: 11px;
+  opacity: 0.6;
+  transition: transform 0.2s;
+}
+
+/* ── Loading overlay ── */
+#loadingOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg, #f3f0ff);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  transition: opacity 0.3s;
+}
+#loadingOverlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.loading-spinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid color-mix(in srgb, var(--primary, #7c3aed) 20%, transparent);
+  border-top-color: var(--primary, #7c3aed);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-size: 14px;
+  color: var(--primary, #7c3aed);
+  font-weight: 600;
+  opacity: 0.8;
+}
+
 /* ── Sidebar expandida: compacta ao máximo ── */
 .layout-expandido #card-esquerda .list-item .item-meta {
   display: none !important; /* oculta metadados extras */
@@ -214,6 +262,12 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 <!-- ============================================================
      CONTEÚDO PRINCIPAL
 ============================================================ -->
+<!-- Loading overlay -->
+<div id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Carregando dados…</div>
+</div>
+
 <div class="wrap">
 
   <!-- Filtros -->
@@ -286,7 +340,7 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 
   <!-- Lista de turmas -->
   <div id="card-esquerda" class="card">
-    <p class="section-title" id="sidebarTitulo" title="Clique para fechar os detalhes">Turmas</p>
+    <p class="section-title" id="sidebarTitulo" title="Clique para ordenar as turmas">TURMAS <span id="sortIndicator">↑</span></p>
     <div id="listaTurmas" class="list">
       <div class="list-item">
         <span class="muted">Nenhuma turma carregada.</span>
@@ -511,13 +565,17 @@ function numSerie(serie) {
 
 function ordenarTurmas(lista) {
   return lista.slice().sort((a, b) => {
-    const nA = numSerie(a.serieTexto || (a.seriesTurma && a.seriesTurma[0]) || '');
-    const nB = numSerie(b.serieTexto || (b.seriesTurma && b.seriesTurma[0]) || '');
-    if (nA !== nB) return nA - nB; // série crescente
-    // mesmo número de série: ano letivo decrescente
     const anoA = String(a.anoLetivo || '');
     const anoB = String(b.anoLetivo || '');
-    return anoB.localeCompare(anoA, 'pt-BR');
+    // ordena por ano letivo conforme _ordemAsc
+    const cmpAno = _ordemAsc
+      ? anoA.localeCompare(anoB, 'pt-BR')   // crescente: mais antigo primeiro
+      : anoB.localeCompare(anoA, 'pt-BR');   // decrescente: mais recente primeiro
+    if (cmpAno !== 0) return cmpAno;
+    // desempata por número de série (sempre crescente)
+    const nA = numSerie(a.serieTexto || (a.seriesTurma && a.seriesTurma[0]) || '');
+    const nB = numSerie(b.serieTexto || (b.seriesTurma && b.seriesTurma[0]) || '');
+    return nA - nB;
   });
 }
 
@@ -892,9 +950,20 @@ async function carregar() {
   document.getElementById("fTurno").onchange  = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fSerie").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
+
+  esconderLoading();
 }
 
 let _jaFoiPesquisado = false;
+let _ordemAsc = false; // false = mais recente primeiro (padrão)
+
+function esconderLoading() {
+  const ov = document.getElementById('loadingOverlay');
+  if (ov) {
+    ov.classList.add('hidden');
+    setTimeout(() => ov.style.display = 'none', 350);
+  }
+}
 
 document.addEventListener("DOMContentLoaded", carregar);
 </script>
@@ -1138,9 +1207,12 @@ function salvarNotas(){
   });
 })();
 
-// Clique no título da sidebar → fechar detalhes e voltar ao normal
+// Clique no título TURMAS → alterna ordem (recente/antigo)
 document.getElementById("sidebarTitulo").addEventListener("click", () => {
-  fecharTurma();
+  _ordemAsc = !_ordemAsc;
+  const ind = document.getElementById("sortIndicator");
+  if (ind) ind.textContent = _ordemAsc ? "↓" : "↑";
+  if (_jaFoiPesquisado) aplicarFiltros();
 });
 </script>
 
