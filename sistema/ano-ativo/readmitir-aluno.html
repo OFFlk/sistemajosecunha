@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../matricula-utils.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<!-- CSS exclusivo desta página -->
+<style>
+:root {
+  --card-bg:      #ffffff;
+  --card-border:  var(--brand-border, #ddd6fe);
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border, #ddd6fe);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  --danger:       #b91c1c;
+}
+html[data-theme="dark"] {
+  --card-bg:      #131c2e;
+  --card-border:  #2a3a5c;
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+}
+
+.wrap   { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+h1      { font-size: 24px; margin: 0 0 4px; font-weight: 800; }
+.sub    { color: var(--muted); font-size: 13px; margin: 0; }
+
+.panel      { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 18px; transition: background 0.3s, border-color 0.3s; }
+.panel h2   { font-size: 16px; margin: 0 0 14px; font-weight: 800; }
+
+.ficha-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--chip-bg);
+  margin-bottom: 14px;
+}
+.ficha-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+@media (max-width: 640px) { .ficha-grid { grid-template-columns: 1fr; } }
+.ficha-item { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.ficha-item .lbl { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.ficha-item .val { font-size: 13px; margin-top: 2px; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.field label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.field input, .field select {
+  padding: 10px 12px; border: 1px solid var(--field-border); border-radius: 10px;
+  background: var(--field-bg); color: var(--text); font-size: 14px;
+  font-family: 'Nunito', sans-serif; outline: none; transition: border-color 0.18s, box-shadow 0.18s;
+}
+.field input:disabled, .field select:disabled { opacity: .65; cursor: not-allowed; }
+.field input:focus, .field select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-faded); }
+
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+
+.warn { margin: 10px 0; padding: 12px 14px; border-radius: 10px; background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); font-size: 14px; }
+.ok   { margin: 10px 0; padding: 12px 14px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #16a34a; font-size: 14px; }
+html[data-theme="dark"] .ok { color: #4ade80; }
+.info { margin: 10px 0; padding: 12px 14px; border-radius: 10px; background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.25); color: #1d4ed8; font-size: 13px; }
+html[data-theme="dark"] .info { color: #93c5fd; }
+
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); margin-left: 4px; }
+
+.loading { font-size: 13px; color: var(--muted); padding: 20px 0; text-align: center; }
+</style>
+
+<title>Readmitir aluno</title>
+</head>
+<body>
+
+<script>window.Auth && window.Auth.requireRole && window.Auth.requireRole('admin');</script>
+
+<!-- Header via fetch -->
+<div id="header-placeholder"></div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div>
+      <h1>🔁 Readmitir aluno</h1>
+      <p class="sub">Cria uma matrícula ativa nova para um aluno atualmente inativo.</p>
+    </div>
+    <a class="btn ghost" href="pesquisa-ano-ativo.html">← Voltar à pesquisa</a>
+  </div>
+
+  <div id="conteudo">
+    <div class="loading">Carregando dados do aluno…</div>
+  </div>
+
+</div>
+
+<!-- 1. header-logic (sempre primeiro) -->
+<script src="../header-logic.js"></script>
+
+<!-- 2. Lógica específica desta página -->
+<script>
+(function(){
+'use strict';
+
+/* =========================
+   Util
+========================= */
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function normSerie(s){
+  if(!s) return "";
+  let t = String(s).trim().replace(/\s+/g,' ');
+  t = t.replace(/^EIXO\s*([12345])$/i, "EIXO $1");
+  return t.toUpperCase();
+}
+function calcIdade(dataStr){
+  if(!dataStr) return "";
+  const s = String(dataStr).trim();
+  let d=null;
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const m2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m1){ d = new Date(+m1[3], +m1[2]-1, +m1[1]); }
+  else if(m2){ d = new Date(+m2[1], +m2[2]-1, +m2[3]); }
+  else { const tmp = new Date(s); if(!isNaN(tmp)) d = tmp; }
+  if(!d || isNaN(d)) return "";
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - d.getFullYear();
+  const mm = hoje.getMonth() - d.getMonth();
+  if(mm < 0 || (mm === 0 && hoje.getDate() < d.getDate())) idade--;
+  return (idade>=0 && idade<=130) ? String(idade) : "";
+}
+function montarNeeDetalhado(a){
+  const itens = [];
+  if(a.tea)              itens.push('🧩 TEA');
+  if(a.altasHabilidades) itens.push('⭐ Altas habilidades / superdotação');
+  if(a.defFisica)        itens.push('♿ Deficiência física');
+  if(a.defIntelectual)   itens.push('🧠 Deficiência intelectual');
+  if(a.defVisual)        itens.push('👁️ Deficiência visual' + (a.defVisualTipo ? ` (${a.defVisualTipo})` : ''));
+  if(a.defAuditiva)      itens.push('👂 Deficiência auditiva / surdez' + (a.defAuditivaTipo ? ` (${a.defAuditivaTipo})` : ''));
+  if(a.discalculia)      itens.push('🔢 Discalculia');
+  if(a.disgrafia)        itens.push('✏️ Disgrafia / disortografia');
+  if(a.dislalia)         itens.push('🗣️ Dislalia');
+  if(a.dislexia)         itens.push('📖 Dislexia');
+  if(a.tdah)             itens.push('⚡ TDAH');
+  if(a.tpac)             itens.push('🔊 TPAC');
+  if(!itens.length) return `<div style="font-size:13px;color:var(--muted);">Nenhuma</div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;">` +
+    itens.map(t => `<span style="padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--chip-bg);font-size:12px;">${escapeHtml(t)}</span>`).join('') +
+    `</div>`;
+}
+
+/* =========================
+   Estado
+========================= */
+const params = new URLSearchParams(window.location.search);
+const alunoId = (params.get('alunoId') || '').trim();
+const conteudo = document.getElementById('conteudo');
+
+let alunos = [], turmas = [], mats = [], anoAtivo = '';
+
+function erro(msg){
+  conteudo.innerHTML = `<div class="panel"><div class="warn">${escapeHtml(msg)}</div></div>`;
+}
+
+async function init(){
+  if(!alunoId){
+    erro('Nenhum aluno informado. Acesse esta página a partir da pesquisa, pelo botão "🔁 Readmitir".');
+    return;
+  }
+
+  await new Promise(res=>{
+    if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+    document.addEventListener('auth:ready', res, {once:true});
+  });
+
+  try{
+    const dados = await window.DB.loadAllAnoAtivo();
+    alunos = Array.isArray(dados.alunosDB) ? dados.alunosDB : [];
+    mats   = Array.isArray(dados.matriculasDB) ? dados.matriculasDB : [];
+    turmas = Array.isArray(dados.turmasDB) ? dados.turmasDB : [];
+    anoAtivo = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+  }catch(e){
+    console.error(e);
+    erro('Erro ao carregar dados do Firestore. Tente novamente.');
+    return;
+  }
+
+  const aluno = alunos.find(a => (a.alunoId || a.id || '').toString().trim() === alunoId);
+  if(!aluno){
+    erro(`Aluno com ID "${alunoId}" não encontrado.`);
+    return;
+  }
+
+  if(!anoAtivo){
+    const anos = new Set();
+    mats.forEach(m => m.anoLetivo && anos.add(String(m.anoLetivo)));
+    turmas.forEach(t => t.anoLetivo && anos.add(String(t.anoLetivo)));
+    const arr = Array.from(anos).sort();
+    anoAtivo = arr.length ? arr[arr.length-1] : String(new Date().getFullYear());
+  }
+
+  renderFicha(aluno);
+  await renderFormulario(aluno);
+}
+
+function renderFicha(a){
+  const nasc = a.dataNascimento || '—';
+  const idade = a.idade || calcIdade(a.dataNascimento) || '—';
+
+  const camposFicha = [
+    {label:'CPF', v:a.cpf},
+    {label:'DATA DE NASCIMENTO', v:nasc},
+    {label:'IDADE', v:idade},
+    {label:'MÃE', v:a.mae},
+    {label:'PAI', v:a.pai},
+    {label:'NATURALIDADE', v:[a.naturalidadeCidade,a.naturalidadeUF].filter(Boolean).join('/') || a.naturalidade},
+    {label:'SEXO', v:a.sexo},
+    {label:'COR/RAÇA', v:a.corRaca || 'Não declarada'},
+  ];
+
+  const html = `
+    <div class="panel">
+      <h2>📋 Ficha do aluno <span class="badge">somente leitura</span></h2>
+      <div class="ficha-header">
+        <div><b>${escapeHtml(a.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(alunoId)}</div>
+      </div>
+      <div class="ficha-grid">
+        ${camposFicha.map(c => `
+          <div class="ficha-item">
+            <div class="lbl">${escapeHtml(c.label)}</div>
+            <div class="val">${escapeHtml(c.v || '—')}</div>
+          </div>`).join('')}
+      </div>
+      <div style="margin-top:14px;">
+        <div class="lbl" style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">NEE / Transtornos</div>
+        ${montarNeeDetalhado(a)}
+      </div>
+    </div>
+    <div id="painelFormulario"></div>
+  `;
+  conteudo.innerHTML = html;
+}
+
+async function renderFormulario(aluno){
+  const painel = document.getElementById('painelFormulario');
+  painel.innerHTML = `<div class="panel"><div class="loading">Verificando matrícula atual…</div></div>`;
+
+  const anosDisponiveis = Array.from(new Set(turmas.map(t => String(t.anoLetivo||'')).filter(Boolean)))
+    .sort((a,b)=>Number(a)-Number(b));
+  if(anoAtivo && !anosDisponiveis.includes(anoAtivo)) anosDisponiveis.push(anoAtivo);
+
+  await montarFormularioPara(painel, aluno, anoAtivo || anosDisponiveis[anosDisponiveis.length-1] || '', anosDisponiveis);
+}
+
+async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis){
+  const matAtual = await window.MatriculaUtils.getMatriculaAtual(alunoId, anoEscolhido);
+
+  if(matAtual && (matAtual.status||'').toUpperCase() === 'ATIVO'){
+    painel.innerHTML = `
+      <div class="panel">
+        <h2>Matrícula</h2>
+        <div class="warn">
+          Este aluno já possui uma matrícula <b>ATIVA</b> no ano letivo ${escapeHtml(anoEscolhido)}
+          (turma: ${escapeHtml(matAtual.turmaId || '—')}). Não é possível readmitir — se a intenção é
+          transferir de turma, use a edição de matrícula na tela de cadastro.
+        </div>
+      </div>`;
+    return;
+  }
+
+  const turmasDoAno = turmas.filter(t => String(t.anoLetivo||'') === String(anoEscolhido));
+
+  painel.innerHTML = `
+    <div class="panel">
+      <h2>Nova matrícula</h2>
+      ${matAtual ? `<div class="info">Última matrícula encontrada: <b>${escapeHtml(matAtual.status||'—')}</b>${matAtual.situacao ? ' • ' + escapeHtml(matAtual.situacao) : ''} em ${escapeHtml(matAtual.anoLetivo||'—')} (turma ${escapeHtml(matAtual.turmaId||'—')}). A readmissão cria uma matrícula nova, independente da situação anterior.</div>` : ''}
+
+      <div class="grid2">
+        <div class="field">
+          <label for="selAnoReadmissao">Ano letivo</label>
+          <select id="selAnoReadmissao">
+            ${anosDisponiveis.map(y => `<option value="${escapeHtml(y)}" ${y===anoEscolhido?'selected':''}>${escapeHtml(y)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label for="selTurmaReadmissao">Turma</label>
+          <select id="selTurmaReadmissao">
+            <option value="">(selecione)</option>
+            ${turmasDoAno.map(t => `<option value="${escapeHtml(t.turmaId)}">${escapeHtml(t.nome || t.turmaId)}${t.turno ? ' — ' + escapeHtml(t.turno) : ''}</option>`).join('')}
+          </select>
+          ${turmasDoAno.length===0 ? `<div class="help" style="color:var(--danger);font-size:12px;">Nenhuma turma cadastrada para este ano.</div>` : ''}
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="selSerieReadmissao">Série</label>
+          <select id="selSerieReadmissao" disabled>
+            <option value="">(selecione a turma primeiro)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="inpTurnoReadmissao">Turno</label>
+          <input id="inpTurnoReadmissao" type="text" disabled placeholder="(selecione a turma)"/>
+        </div>
+      </div>
+
+      <div id="avisoReadmissao"></div>
+
+      <div class="actions">
+        <button class="btn ghost" type="button" onclick="location.href='pesquisa-ano-ativo.html'">Cancelar</button>
+        <button class="btn primary" type="button" id="btnConfirmarReadmissao">✅ Confirmar readmissão</button>
+      </div>
+    </div>
+  `;
+
+  const selAno   = document.getElementById('selAnoReadmissao');
+  const selTurma = document.getElementById('selTurmaReadmissao');
+  const selSerie = document.getElementById('selSerieReadmissao');
+  const inpTurno = document.getElementById('inpTurnoReadmissao');
+  const aviso    = document.getElementById('avisoReadmissao');
+  const btn      = document.getElementById('btnConfirmarReadmissao');
+
+  // Ano mudou → recarrega a seção inteira (turmas do ano + recheca matrícula ATIVO)
+  selAno.addEventListener('change', () => {
+    montarFormularioPara(painel, aluno, selAno.value, anosDisponiveis);
+  });
+
+  selTurma.addEventListener('change', () => {
+    const t = turmasDoAno.find(x => x.turmaId === selTurma.value);
+    aviso.innerHTML = '';
+    if(!t){
+      selSerie.innerHTML = '<option value="">(selecione a turma primeiro)</option>';
+      selSerie.disabled = true;
+      inpTurno.value = '';
+      inpTurno.disabled = true;
+      return;
+    }
+    const series = Array.isArray(t.series) && t.series.length ? t.series : (t.serie ? [t.serie] : []);
+    if(series.length){
+      selSerie.innerHTML = series.map(s => `<option value="${escapeHtml(normSerie(s))}">${escapeHtml(normSerie(s))}</option>`).join('');
+      selSerie.disabled = series.length <= 1;
+    } else {
+      selSerie.innerHTML = '<option value="">—</option>';
+      selSerie.disabled = true;
+    }
+    inpTurno.value = t.turno || '';
+    inpTurno.disabled = true; // turno é herdado da turma, não editável aqui
+  });
+
+  btn.addEventListener('click', async () => {
+    aviso.innerHTML = '';
+    const ano = selAno.value;
+    const turmaId = selTurma.value;
+    const serie = selSerie.value;
+
+    if(!ano || !turmaId){
+      aviso.innerHTML = `<div class="warn">Selecione o ano letivo e a turma antes de confirmar.</div>`;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Salvando…';
+
+    try{
+      // Re-checagem final antes de gravar, evita corrida entre abrir a tela e confirmar
+      const existente = await window.MatriculaUtils.getMatriculaAtual(alunoId, ano);
+      if(existente && (existente.status||'').toUpperCase() === 'ATIVO'){
+        aviso.innerHTML = `<div class="warn">Uma matrícula ativa para este aluno neste ano foi criada enquanto você preenchia o formulário. Recarregue a página.</div>`;
+        btn.disabled = false;
+        btn.textContent = '✅ Confirmar readmissão';
+        return;
+      }
+
+      const turmaObj = turmasDoAno.find(x => x.turmaId === turmaId);
+      const matriculaId = window.MatriculaUtils.buildMatriculaId(turmaId, alunoId, ano);
+      const novaMatricula = window.MatriculaUtils.validarMatricula({
+        _id: matriculaId,
+        alunoId,
+        turmaId,
+        anoLetivo: String(ano),
+        serie: serie || '',
+        turno: (turmaObj && turmaObj.turno) || '',
+        modelo: (turmaObj && turmaObj.modelo) || 'REGULAR',
+        status: 'ATIVO',
+        situacao: null,
+      });
+
+      await window.DB.anoAtivoMatriculas.save(novaMatricula);
+
+      painel.innerHTML = `
+        <div class="panel">
+          <h2>Nova matrícula</h2>
+          <div class="ok">✅ Readmissão concluída! Matrícula criada em ${escapeHtml(ano)}, turma ${escapeHtml(turmaObj ? (turmaObj.nome||turmaId) : turmaId)}.</div>
+          <div class="actions">
+            <a class="btn primary" href="pesquisa-ano-ativo.html">Voltar à pesquisa</a>
+          </div>
+        </div>`;
+    }catch(e){
+      console.error(e);
+      aviso.innerHTML = `<div class="warn">Erro ao gravar matrícula: ${escapeHtml(e.message || String(e))}</div>`;
+      btn.disabled = false;
+      btn.textContent = '✅ Confirmar readmissão';
+    }
+  });
+}
+
+init();
+
+})();
+</script>
+
+</body>
+</html>
