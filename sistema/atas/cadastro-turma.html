@@ -1663,39 +1663,37 @@ async function _salvarNoBancoInterno() {
 /* =========================
    Boot
 ========================= */
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    // Aguarda Auth + DB prontos antes de qualquer coisa
-    await new Promise(res => {
-      if (window.Auth && window.Auth.db) return res();
-      document.addEventListener('auth:ready', res, { once: true });
-    });
+document.addEventListener("DOMContentLoaded", () => {
+  // Usa Auth.onReady — compatível com requireRole('admin')
+  window.Auth.onReady(async () => {
+    try {
+      // dados da escola (cabeçalho)
+      await carregarDadosEscola();
 
-    // dados da escola (cabeçalho)
-    await carregarDadosEscola();
+      // ano
+      preencherAnos();
 
-    // ano
-    preencherAnos();
+      // schemas
+      renderSelectSchemasCadastro();
+      SCHEMA_ATIVO = getSchemaById(schemaSelecionadoId) || loadSchemaConfig();
 
-    // schemas
-    renderSelectSchemasCadastro();
-    SCHEMA_ATIVO = getSchemaById(schemaSelecionadoId) || loadSchemaConfig();
+      // formulário e tabela
+      renderFormularioDinamico();
+      renderTheadDinamico();
 
-    // formulário e tabela
-    renderFormularioDinamico();
-    renderTheadDinamico();
+      // séries
+      iniciarSeriesTurma();
 
-    // séries
-    iniciarSeriesTurma();
+      // edição de turma (?edit=)
+      const id = getQueryParam("edit");
+      if (id) await carregarTurmaParaEdicao(id);
 
-    // edição de turma (?edit=)
-    const id = getQueryParam("edit");
-    if (id) await carregarTurmaParaEdicao(id);
-  } catch(e) {
-    console.error('[DOMContentLoaded]', e);
-  } finally {
-    Loading.esconder();
-  }
+    } catch(e) {
+      console.error('[DOMContentLoaded]', e);
+    } finally {
+      Loading.esconder();
+    }
+  });
 });
 
 </script>
