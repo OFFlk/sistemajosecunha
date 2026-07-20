@@ -14,6 +14,7 @@
 </script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../matricula-utils.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -2227,70 +2228,86 @@ function normSerie(s){
         }
       }catch(e){ console.warn('[edição] Erro ao buscar matrícula:', e); }
 
-      // ── Botão excluir matrícula (com semilock) ──
+      // ── Botão encerrar matrícula (com semilock) ──
       const _acE1 = document.querySelector('#wzEtapa1 .actions-wizard');
       if(_acE1){
-        const wrapExcluir = document.createElement('div');
-        wrapExcluir.style.cssText = 'width:100%;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;';
-        wrapExcluir.innerHTML =
+        const wrapEncerrar = document.createElement('div');
+        wrapEncerrar.style.cssText = 'width:100%;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;';
+        wrapEncerrar.innerHTML =
           '<details style="font-size:12px;color:var(--muted);">'+
-            '<summary style="cursor:pointer;font-weight:800;color:var(--danger,#b91c1c);">⚠️ Zona de perigo — Excluir matrícula</summary>'+
+            '<summary style="cursor:pointer;font-weight:800;color:var(--danger,#b91c1c);">⚠️ Zona de perigo — Encerrar matrícula</summary>'+
             '<div style="margin-top:8px;padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:10px;">'+
-              '<p style="margin:0 0 8px;font-size:12px;">Remove o vínculo do aluno com a turma atual. O cadastro do aluno é preservado e pode ser rematriculado depois.</p>'+
-              '<button id="btnExcluirMatricula" type="button" '+
+              '<p style="margin:0 0 8px;font-size:12px;">Encerra a matrícula do aluno na turma atual. O cadastro do aluno é preservado e ele pode ser readmitido depois.</p>'+
+              '<button id="btnEncerrarMatricula" type="button" '+
                 'style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:800;'+
                 'background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.35);'+
                 'color:#b91c1c;cursor:pointer;font-family:\'Nunito\',sans-serif;">'+
-                '🗑️ Excluir matrícula'+
+                '🚪 Encerrar matrícula'+
               '</button>'+
             '</div>'+
           '</details>';
-        _acE1.after(wrapExcluir);
+        _acE1.after(wrapEncerrar);
 
-        document.getElementById('btnExcluirMatricula')?.addEventListener('click', async () => {
-          const nomeAluno = aluno.nome || editId;
-          if(!confirm(`Excluir matrícula de "${nomeAluno}"?\n\nO cadastro do aluno será preservado.\nEsta ação não pode ser desfeita.`)) return;
+        // ── Modal de encerramento (3 opções: Transferido / Desistente / Faleceu) ──
+        const modalEncerrar = document.createElement('div');
+        modalEncerrar.className = 'modal-backdrop';
+        modalEncerrar.id = 'modalEncerrarMatricula';
+        modalEncerrar.innerHTML =
+          '<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">'+
+            '<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Encerrar matrícula</h3>'+
+            '<p style="margin:0 0 16px;font-size:13px;color:var(--muted);">Selecione o motivo do encerramento:</p>'+
+            '<div style="display:flex;flex-direction:column;gap:8px;">'+
+              '<button type="button" class="btn ghost" data-situacao="TRANSFERIDO" style="justify-content:flex-start;">🔁 Transferido</button>'+
+              '<button type="button" class="btn ghost" data-situacao="DESISTENTE" style="justify-content:flex-start;">🚫 Desistente</button>'+
+              '<button type="button" class="btn ghost" data-situacao="FALECIDO" style="justify-content:flex-start;">🕊️ Faleceu</button>'+
+            '</div>'+
+            '<div style="display:flex;justify-content:flex-end;margin-top:16px;">'+
+              '<button type="button" class="btn ghost" id="btnCancelarEncerramento">Cancelar</button>'+
+            '</div>'+
+          '</div>';
+        document.body.appendChild(modalEncerrar);
 
-          try{
-            // Move para turma fantasma
-            const TURMA_FANTASMA_ID = 'TURMA_INATIVA';
-            const TURMA_FANTASMA_NOME = 'Alunos sem turma';
+        function abrirModalEncerrar(){ modalEncerrar.style.display = 'flex'; }
+        function fecharModalEncerrar(){ modalEncerrar.style.display = 'none'; }
 
-            // Garante que a turma fantasma existe
-            const turmasExist = await window.DB.anoAtivoTurmas.list();
-            const fantasmaExiste = turmasExist.find(t => (t.turmaId||t._id) === TURMA_FANTASMA_ID);
-            if(!fantasmaExiste){
-              await window.DB.anoAtivoTurmas.save({
-                _id: TURMA_FANTASMA_ID,
-                turmaId: TURMA_FANTASMA_ID,
-                nome: TURMA_FANTASMA_NOME,
-                series: ['—'],
-                anoLetivo: new Date().getFullYear(),
-                turno: '—',
-                ativo: false,
-                isFantasma: true,
-              });
-            }
+        document.getElementById('btnEncerrarMatricula')?.addEventListener('click', abrirModalEncerrar);
+        document.getElementById('btnCancelarEncerramento')?.addEventListener('click', fecharModalEncerrar);
+        modalEncerrar.addEventListener('click', (ev) => { if(ev.target === modalEncerrar) fecharModalEncerrar(); });
 
-            // Atualiza matrícula do aluno para turma fantasma
-            const mats = await window.DB.anoAtivoMatriculas.list();
-            const matAluno = mats.find(m => m.alunoId === editId);
-            if(matAluno){
-              await window.DB.anoAtivoMatriculas.save({
+        modalEncerrar.querySelectorAll('button[data-situacao]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const situacaoEscolhida = btn.dataset.situacao;
+            const nomeAluno = aluno.nome || editId;
+            const rotulo = { TRANSFERIDO: 'Transferido', DESISTENTE: 'Desistente', FALECIDO: 'Faleceu' }[situacaoEscolhida];
+            if(!confirm(`Encerrar matrícula de "${nomeAluno}" como "${rotulo}"?\n\nO cadastro do aluno será preservado.\nEsta ação não pode ser desfeita.`)) return;
+
+            fecharModalEncerrar();
+
+            try{
+              const matAluno = (await window.DB.anoAtivoMatriculas.list()).find(m => m.alunoId === editId);
+
+              if(!matAluno){
+                _toastErro('❌ Nenhuma matrícula ativa encontrada para este aluno.');
+                return;
+              }
+
+              const matriculaAtualizada = window.MatriculaUtils.validarMatricula({
                 ...matAluno,
-                turmaId: TURMA_FANTASMA_ID,
                 status: 'INATIVO',
-                removidoEm: new Date().toISOString(),
+                situacao: situacaoEscolhida,
+                encerradoEm: new Date().toISOString(),
               });
+
+              await window.DB.anoAtivoMatriculas.save(matriculaAtualizada);
+
+              _toastSucesso('✅ Matrícula encerrada. Redirecionando…');
+              setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
+
+            }catch(e){
+              console.error('Erro ao encerrar matrícula:', e);
+              _toastErro('❌ Erro ao encerrar matrícula: ' + e.message);
             }
-
-            _toastSucesso('✅ Matrícula excluída. Redirecionando…');
-            setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
-
-          }catch(e){
-            console.error('Erro ao excluir matrícula:', e);
-            _toastErro('❌ Erro ao excluir matrícula: ' + e.message);
-          }
+          });
         });
       }
 
