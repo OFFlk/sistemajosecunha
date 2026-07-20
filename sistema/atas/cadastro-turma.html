@@ -1665,6 +1665,12 @@ async function _salvarNoBancoInterno() {
 ========================= */
 document.addEventListener("DOMContentLoaded", async () => {
   try {
+    // Aguarda Auth + DB prontos antes de qualquer coisa
+    await new Promise(res => {
+      if (window.Auth && window.Auth.db) return res();
+      document.addEventListener('auth:ready', res, { once: true });
+    });
+
     // dados da escola (cabeçalho)
     await carregarDadosEscola();
 
@@ -1686,7 +1692,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const id = getQueryParam("edit");
     if (id) await carregarTurmaParaEdicao(id);
 
-    // Aguarda catálogo de alunos (identidade-aluno.js) terminar de carregar
+    // Aguarda catálogo de alunos terminar de carregar
     if (window.Identidade && window.Identidade.pronto) {
       await window.Identidade.pronto;
     }
