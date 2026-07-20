@@ -1664,28 +1664,32 @@ async function _salvarNoBancoInterno() {
    Boot
 ========================= */
 document.addEventListener("DOMContentLoaded", async () => {
-  // dados da escola (cabeçalho)
-  await carregarDadosEscola();
+  try {
+    // dados da escola (cabeçalho)
+    await carregarDadosEscola();
 
-  // ano
-  preencherAnos();
+    // ano
+    preencherAnos();
 
-  // schemas
-  renderSelectSchemasCadastro();
-  SCHEMA_ATIVO = getSchemaById(schemaSelecionadoId) || loadSchemaConfig();
+    // schemas
+    renderSelectSchemasCadastro();
+    SCHEMA_ATIVO = getSchemaById(schemaSelecionadoId) || loadSchemaConfig();
 
-  // formulário e tabela
-  renderFormularioDinamico();
-  renderTheadDinamico();
+    // formulário e tabela
+    renderFormularioDinamico();
+    renderTheadDinamico();
 
-  // séries
-  iniciarSeriesTurma();
+    // séries
+    iniciarSeriesTurma();
 
-  // edição de turma (?edit=)
-  const id = getQueryParam("edit");
-  if (id) await carregarTurmaParaEdicao(id);
-
-  Loading.esconder();
+    // edição de turma (?edit=)
+    const id = getQueryParam("edit");
+    if (id) await carregarTurmaParaEdicao(id);
+  } catch(e) {
+    console.error('[DOMContentLoaded]', e);
+  } finally {
+    Loading.esconder(); // sempre esconde, mesmo se der erro
+  }
 });
 
 </script>
