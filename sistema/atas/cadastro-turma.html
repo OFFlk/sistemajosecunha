@@ -273,6 +273,7 @@ html[data-theme="dark"] .confirm-badge {
           <option>MATUTINO</option>
           <option>VESPERTINO</option>
           <option>NOTURNO</option>
+          <option>INTEGRAL</option>
         </select>
       </div>
     </div>
@@ -283,7 +284,10 @@ html[data-theme="dark"] .confirm-badge {
        SCANS DO LIVRO DE ATAS
   ═══════════════════════════════════════ -->
   <div class="card scans-wrap" id="scansWrap">
-    <h3 style="margin-top:0;">📄 Scans do Livro de Atas <span style="font-size:13px;font-weight:400;color:var(--muted);">— opcional</span></h3>
+    <h3 style="margin-top:0; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>📄 Scans do Livro de Atas <span style="font-size:13px;font-weight:400;color:var(--muted);">— opcional</span></span>
+      <button type="button" onclick="esconderScans()" title="Fechar" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;">✕</button>
+    </h3>
     <div class="scans-status" id="scansStatus"></div>
 
     <!-- Drop zone -->
@@ -308,7 +312,7 @@ html[data-theme="dark"] .confirm-badge {
 
     <div class="actions" style="flex-wrap:wrap; gap:8px;">
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
-      <button class="btn btn-secondary" id="btnContinuarScans" onclick="mostrarScansAviso()" style="display:none">📄 Scans</button>
+      <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
       <button class="btn btn-danger-outline" id="btnExcluirTurma" onclick="mostrarConfirmExclusao()" style="display:none; margin-left:auto;">🗑️ Excluir turma</button>
     </div>
@@ -1957,6 +1961,24 @@ async function confirmarExclusaoTurma() {
     if(!wrap) return;
     wrap.style.display = 'block';
     setTimeout(() => wrap.scrollIntoView({behavior:'smooth',block:'start'}), 50);
+  };
+
+  // Esconde o card de scans
+  window.esconderScans = function(){
+    const wrap = document.getElementById('scansWrap');
+    if(!wrap) return;
+    wrap.style.display = 'none';
+  };
+
+  // Alterna entre mostrar/esconder (usado pelo botão "📄 Scans")
+  window.toggleScans = function(){
+    const wrap = document.getElementById('scansWrap');
+    if(!wrap) return;
+    if(wrap.style.display === 'block'){
+      esconderScans();
+    } else {
+      window.mostrarScansAviso();
+    }
   };
 
   // Eventos de seleção/drop
