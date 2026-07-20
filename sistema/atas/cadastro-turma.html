@@ -1685,10 +1685,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     // edição de turma (?edit=)
     const id = getQueryParam("edit");
     if (id) await carregarTurmaParaEdicao(id);
+
+    // Aguarda catálogo de alunos (identidade-aluno.js) terminar de carregar
+    if (window.Identidade && window.Identidade.pronto) {
+      await window.Identidade.pronto;
+    }
   } catch(e) {
     console.error('[DOMContentLoaded]', e);
   } finally {
-    Loading.esconder(); // sempre esconde, mesmo se der erro
+    Loading.esconder();
   }
 });
 
