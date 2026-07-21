@@ -1086,11 +1086,15 @@ function _atualizarListaAlunos(_tScope){
         <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
           <button class="btn-view" type="button" data-view-aluno="${a.alunoId}" title="Ver ficha completa do aluno">👁️ Visualizar</button>
           ${_podeEditar
-            ? `<button class="btn-edit" type="button"
+            ? (a._status === 'INATIVO'
+              ? `<button class="btn-edit" type="button"
+            data-readmitir-aluno="${a.alunoId}"
+            title="Readmitir aluno">🔁 Readmitir</button>`
+              : `<button class="btn-edit" type="button"
             data-edit-aluno="${a.alunoId}"
             data-edit-turma="${a.turmaId||''}"
             data-edit-ano="${anoSelecionadoOuAtivo()}"
-            title="Editar dados do aluno">✏️ Editar</button>`
+            title="Editar dados do aluno">✏️ Editar</button>`)
             : ``}
           <label class="check">
             <input type="checkbox" class="chkAluno" data-aluno="${a.alunoId}" checked />
@@ -1110,6 +1114,15 @@ function _atualizarListaAlunos(_tScope){
       let url = `cadastro-aluno-ativo.html?editar=${encodeURIComponent(id)}`;
       if(turma) url += `&turmaId=${encodeURIComponent(turma)}`;
       if(ano)   url += `&anoLetivo=${encodeURIComponent(ano)}`;
+      document.__pesquisaDestino = url;
+      location.href = url;
+    });
+  });
+  document.querySelectorAll("[data-readmitir-aluno]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const id = btn.dataset.readmitirAluno;
+      if(!id) return;
+      const url = `readmitir-aluno.html?alunoId=${encodeURIComponent(id)}`;
       document.__pesquisaDestino = url;
       location.href = url;
     });
