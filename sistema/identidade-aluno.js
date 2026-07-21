@@ -172,6 +172,43 @@
     return 'ALU-' + String(max + 1).padStart(6, '0');
   }
 
+  /**
+   * Vincula dados novos a um alunoId JÁ DECIDIDO (por exemplo, o aluno que o
+   * usuário selecionou manualmente num dropdown de busca por nome).
+   *
+   * Diferente de findOrCreate(), esta função NÃO redescobre o match por
+   * heurística (CPF / nome+nascimento / nome único) — ela confia inteiramente
+   * na decisão explícita de quem chamou. Isso evita o cenário em que a UI
+   * mostra "aluno vinculado" mas o merge automático, ao rodar de novo com
+   * outros critérios, discorda e cria um ID novo (ex.: dois alunos com o
+   * mesmo nome e sem data de nascimento cadastrada nas atas — a busca por
+   * nome único do findOrCreate se recusa a escolher entre eles, mas o
+   * usuário já tinha escolhido um específico no dropdown).
+   *
+   * @param {string} alunoId  ID já existente no catálogo (ex.: vindo de um
+   *                          candidato selecionado na busca por nome)
+   * @param {Object} campos   Dados novos a mesclar (não sobrescreve campos
+   *                          já preenchidos — mesma regra de _mesclar())
+   * @returns {Promise<{ alunoId, aluno, isNew }>}
+   */
+  async function vincularExplicito(alunoId, campos) {
+    await _garantirCarregado();
+
+    const idNorm = _str(alunoId);
+    if (!idNorm) throw new Error('Identidade.vincularExplicito: alunoId obrigatório.');
+
+    const todos = lerTodos();
+    const existente = todos.find(a => a.alunoId === idNorm);
+    if (!existente) {
+      throw new Error(`Identidade.vincularExplicito: alunoId "${idNorm}" não encontrado no catálogo.`);
+    }
+
+    const candidato = normalizar(campos) || {};
+    const atualizado = _mesclar(existente, candidato);
+    _salvarNoArr(atualizado);
+    return { alunoId: atualizado.alunoId, aluno: atualizado, isNew: false };
+  }
+
   /* ────────────────────────────────────────────
      Persistência no Firestore
   ──────────────────────────────────────────── */
@@ -324,6 +361,12 @@
 
     /** Busca ou cria aluno. ASYNC — sempre aguarde com await. */
     findOrCreate,
+
+    /**
+     * Vincula dados a um alunoId já decidido explicitamente (ex.: seleção
+     * manual num dropdown), sem redescobrir o match por heurística. ASYNC.
+     */
+    vincularExplicito,
 
     /** Normaliza qualquer objeto de aluno para o schema unificado. */
     normalizar,
