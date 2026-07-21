@@ -1865,6 +1865,13 @@ function normSerie(s){
       else alunosCache.push(dadosAtualizados);
       save(KEYS.alunos, alunosCache);
     }catch(e){ console.warn('Cache aluno update:', e); }
+  } else if(window._alunoIdVinculado){
+    // Usuário já escolheu explicitamente um aluno das atas (dropdown de nome
+    // ou CPF encontrado) — vincula direto, sem deixar a heurística de
+    // findOrCreate redescobrir (e possivelmente discordar) o match.
+    const result = await window.Identidade.vincularExplicito(window._alunoIdVinculado, dadosAluno);
+    alunoId = result.alunoId;
+    isNew = result.isNew;
   } else {
     const result = await window.Identidade.findOrCreate(dadosAluno);
     alunoId = result.alunoId;
@@ -2956,6 +2963,12 @@ function normSerie(s){
       }
       _alunoEncontrado = a;
       window._alunoEncontrado = a;
+      // Trava o alunoId explicitamente — inserirAluno() usa isso para vincular
+      // direto (Identidade.vincularExplicito), sem redescobrir o match por
+      // heurística. Evita o caso de dois alunos com mesmo nome nas atas onde
+      // a heurística por nome único falharia e criaria um ID novo, mesmo com
+      // o usuário já tendo escolhido um específico aqui.
+      window._alunoIdVinculado = a.alunoId;
     }
 
     function limparBanner(){
@@ -2963,6 +2976,7 @@ function normSerie(s){
       setLocked(false);
       _alunoEncontrado = null;
       window._alunoEncontrado = null;
+      window._alunoIdVinculado = null;
     }
 
     function buscarPorCpf(digits){
