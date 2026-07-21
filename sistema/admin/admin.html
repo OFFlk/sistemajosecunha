@@ -3,83 +3,40 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (manter — evita flash de tema errado) -->
 <script>
 (function(){
-  const t = localStorage.getItem('ui_theme_v1') || 'light';
-  document.documentElement.setAttribute('data-theme', t);
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
 })();
 </script>
+
+<!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script>window.Auth && (Auth.requireRole ? Auth.requireRole('admin') : Auth.requireAuth());</script>
 <script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<title>Admin • Hub</title>
-<!-- ── ARQUIVOS CSS ORGANIZADOS ── -->
+
+<!-- CSS globais -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<!-- CSS específico desta página -->
 <link rel="stylesheet" href="/css/hub.css">
 <link rel="stylesheet" href="/css/admin.css">
+
+<title>Admin • Hub</title>
 </head>
 <body>
 
-<div class="l-bar"></div>
-
-<header class="app-header">
-  <div class="app-header-inner">
-    <div class="brand">
-      <div class="mark">AD</div>
-      <div>
-        <div class="brand-title">Admin <span class="v-badge">v1</span></div>
-        <div class="brand-sub">// ferramentas de manutenção e configuração</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <div class="header-context" id="headerContext"></div>
-      <button class="theme-toggle" id="themeToggle" type="button">
-        <span id="themeIcon">🌙</span><span id="themeText">Escuro</span>
-      </button>
-      <button class="theme-toggle-compact" id="themeToggleCompact" type="button" title="Alternar tema">
-        <span id="themeIconCompact">🌙</span>
-      </button>
-      <a class="btn-home" href="../index.html">
-        <span class="b-icon">🏠</span><span class="b-label">Início</span>
-      </a>
-    </div>
-  </div>
-</header>
-
-
-<!-- Script tema -->
-<script>
-(function(){
-  function applyTheme(theme){
-    const t = (theme === 'dark') ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', t);
-    localStorage.setItem('ui_theme_v1', t);
-    if (window.ThemeColors) ThemeColors.apply(ThemeColors.get());
-    const emoji = (t === 'dark') ? '☀️' : '🌙';
-    const label = (t === 'dark') ? 'Claro' : 'Escuro';
-    ['themeIcon','themeIconCompact'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = emoji; });
-    const text = document.getElementById('themeText'); if(text) text.textContent = label;
-  }
-  function init(){
-    const btn  = document.getElementById('themeToggle');
-    const btnC = document.getElementById('themeToggleCompact');
-    if (!btn) return;
-    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
-    const compact = !!document.querySelector('.btn-back') && !!document.querySelector('.btn-home');
-    btn.style.display  = compact ? 'none' : 'inline-flex';
-    if (btnC) btnC.style.display = compact ? 'inline-flex' : 'none';
-    function toggle(){ applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
-    btn.addEventListener('click', toggle);
-    if (btnC) btnC.addEventListener('click', toggle);
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
-</script>
-
+<div id="header-placeholder"></div>
 
 <div class="container">
 
@@ -179,60 +136,10 @@
   sistema interno de gestão escolar · desenvolvido sob medida
 </footer>
 
+<!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
+<script src="../header-logic.js"></script>
 
-<!-- Script chip usuário -->
-<script>
-(function(){
-  function safeParse(json, fallback){ try{ const v = JSON.parse(json); return (v==null?fallback:v); }catch(_){ return fallback; } }
-  function getSession(){ if(window.Auth && typeof Auth.getSession==='function') return Auth.getSession(); return safeParse(localStorage.getItem('auth_session_v2')||'null',null); }
-  function listSchools(){ if(window.Auth && typeof Auth.listSchools==='function') return Auth.listSchools()||[]; return safeParse(localStorage.getItem('auth_schools_v1')||'[]',[]); }
-  function getActiveSchoolId(session){ if(!session) return null; const sid=(session.schoolId||'').toString(); if(sid.toUpperCase()!=='ADMIN') return sid; return (localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN'; }
-
-  function renderHeaderContext(){
-    const host = document.getElementById('headerContext');
-    if(!host) return;
-    const s = getSession(); host.innerHTML=''; if(!s) return;
-    const email=(s.email||'').toString(), name=(s.name||s.displayName||'').toString()||(email?email.split('@')[0]:'Usuário'), role=(s.role||'').toString(), schoolId=(s.schoolId||'').toString();
-
-    const user = document.createElement('div');
-    user.className='ctx-chip ctx-clickable'; user.setAttribute('role','button'); user.setAttribute('tabindex','0'); user.setAttribute('aria-haspopup','true'); user.setAttribute('aria-expanded','false');
-    const photoURL = s.photoURL||null;
-    user.innerHTML=`<div class="avatar">${photoURL?`<img src="${photoURL}" style="width:100%;height:100%;border-radius:999px;object-fit:cover;" onerror="this.parentElement.textContent='👤'">`:'👤'}</div><div class="text"><div class="name"></div><div class="sub"></div></div><div class="ctx-menu" id="userMenu"><button type="button" class="menu-btn" id="btnPerfil">👤 Meu perfil</button><button type="button" class="menu-btn danger" id="btnLogout">🚪 Sair</button></div>`;
-    user.querySelector('.name').textContent=name; user.querySelector('.sub').textContent=email||(role?role:'');
-
-    const menu=user.querySelector('#userMenu');
-    function closeMenu(){ menu.classList.remove('open'); user.setAttribute('aria-expanded','false'); }
-    function toggleMenu(){ const open=menu.classList.toggle('open'); user.setAttribute('aria-expanded',open?'true':'false'); }
-    user.addEventListener('click',function(ev){ if(ev.target&&(ev.target.id==='btnLogout'||ev.target.closest('.ctx-menu'))) return; ev.stopPropagation(); toggleMenu(); });
-    user.addEventListener('keydown',function(ev){ if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();toggleMenu();} if(ev.key==='Escape') closeMenu(); });
-    document.addEventListener('click',closeMenu);
-    document.addEventListener('keydown',function(ev){ if(ev.key==='Escape') closeMenu(); });
-    user.querySelector('#btnPerfil').addEventListener('click',function(ev){ ev.preventDefault();ev.stopPropagation();window.location.href='/perfil.html'; });
-    user.querySelector('#btnLogout').addEventListener('click',function(ev){ ev.preventDefault();ev.stopPropagation(); try{ if(window.Auth&&typeof Auth.logout==='function') Auth.logout(); else{localStorage.removeItem('auth_session_v2');localStorage.removeItem('auth_return_to_v2');} }catch(_){} window.location.href='/login.html'; });
-    host.appendChild(user);
-
-    const schools=listSchools(), effective=getActiveSchoolId(s);
-    const matched=schools.find(x=>(x&&(x.schoolId||'').toString()===effective))||schools.find(x=>(x&&(x.id||'').toString()===effective));
-    const schoolName=matched?(matched.displayName||matched.name||matched.nome||'').toString().trim():'';
-    const wrap=document.createElement('div'); wrap.className='school-pill';
-    const lbl=document.createElement('span'); lbl.textContent='◈'; wrap.appendChild(lbl);
-    if(schoolId.toUpperCase()==='ADMIN'&&Array.isArray(schools)&&schools.length){
-      const sel=document.createElement('select');
-      const optAll=document.createElement('option'); optAll.value='ADMIN'; optAll.textContent='Todas as escolas (ADMIN)'; sel.appendChild(optAll);
-      const seen=new Set();
-      schools.map(x=>({schoolId:(x.schoolId||x.id||'').toString(),name:(x.displayName||x.name||x.nome||'').toString()})).filter(o=>o.schoolId&&o.schoolId!=='ADMIN'&&!seen.has(o.schoolId)&&seen.add(o.schoolId)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).forEach(o=>{ const opt=document.createElement('option'); opt.value=o.schoolId; opt.textContent = o.name || o.schoolId; sel.appendChild(opt); });
-      sel.value=effective; sel.addEventListener('change',function(){ if(sel.value==='ADMIN') localStorage.removeItem('admin_active_school_v1'); else localStorage.setItem('admin_active_school_v1',sel.value); location.reload(); }); wrap.appendChild(sel);
-    } else { const span=document.createElement('span'); span.textContent=schoolName||schoolId; wrap.appendChild(span); }
-    host.appendChild(wrap);
-  }
-
-  function boot(){ try{ renderHeaderContext(); }catch(e){ console.warn('headerContext:',e); } }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
-  document.addEventListener('auth:ready',boot); document.addEventListener('auth:sessionChanged',boot);
-})();
-</script>
-
-
+<!-- 2. Script específico da página -->
 <!-- Script Backup visibilidade + Ano Ativo + Status -->
 <script>
 (function(){
