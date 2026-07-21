@@ -586,22 +586,6 @@ html[data-theme="dark"] .wz-etapa2-aviso { color: #fde047; }
 .modo-readonly-overlay {
   position: absolute; inset: 0; z-index: 10; cursor: not-allowed;
 }
-.banner-readmitir {
-  display: none; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 12px 16px; margin-bottom: 14px;
-  background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.30); border-radius: 12px;
-}
-.banner-readmitir.show { display: flex; }
-.banner-readmitir-text { flex: 1; font-size: 13px; font-weight: 700; color: #b91c1c; }
-html[data-theme="dark"] .banner-readmitir-text { color: #fca5a5; }
-.banner-readmitir-btn {
-  padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 800;
-  background: var(--brand,#7c3aed); border: none; color: #fff;
-  cursor: pointer !important; pointer-events: all !important;
-  font-family: 'Nunito', sans-serif; transition: opacity .15s;
-}
-.banner-readmitir-btn:hover { opacity: .85; }
-
 /* ── Fila de docs — separador fixo ── */
 .docs-fila-sep-fixo {
   font-size: 12px; font-weight: 700; color: var(--muted);
@@ -779,19 +763,10 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 <input id="anoLetivo" max="2100" min="2000" type="number"/>
 <div class="subnote">Preenchido automaticamente a partir da turma/ano ativo.</div>
 </div>
-<div>
-<label for="statusPadrao">Status padrão da matrícula</label>
-<select id="statusPadrao">
-<option value="">VAZIO</option>
-<option value="ATIVO" selected>ATIVO</option>
-<option value="INATIVO">INATIVO</option>
-<option value="APROVADO">APROVADO</option>
-<option value="REPROVADO">REPROVADO</option>
-<option value="TRANSFERIDO">TRANSFERIDO</option>
-<option value="DESISTENTE">DESISTENTE</option>
-<option value="FALECIDO">FALECIDO</option>
-</select>
-<div class="subnote">Você pode ajustar por aluno depois (futuro).</div>
+<div id="wrapStatusPadrao">
+<label for="statusPadrao" id="labelStatusPadrao">Status padrão da matrícula</label>
+<select id="statusPadrao"></select>
+<div class="subnote" id="subnoteStatusPadrao">Você pode ajustar por aluno depois (futuro).</div>
 </div>
 </div>
 </section>
@@ -837,17 +812,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   </div>
   <button class="modo-edicao-banner-btn" type="button" onclick="window.location.href=window.location.pathname">
     + Novo cadastro
-  </button>
-</div>
-
-<!-- Banner aluno inativo / readmissão -->
-<div class="banner-readmitir" id="bannerReadmitir">
-  <span style="font-size:20px;">🔒</span>
-  <div class="banner-readmitir-text" id="bannerReadmitirText">
-    Aluno inativo — cadastro em modo somente leitura
-  </div>
-  <button class="banner-readmitir-btn" id="btnReadmitir" type="button">
-    ✅ Readmitir aluno
   </button>
 </div>
 
@@ -910,18 +874,9 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <small class="help" id="nomeLookupMsg" aria-live="polite"></small>
   </div>
 
-  <div class="field">
-    <label for="statusAluno">Status</label>
-    <select id="statusAluno">
-      <option value="">VAZIO</option>
-      <option value="ATIVO">ATIVO</option>
-      <option value="INATIVO">INATIVO</option>
-      <option value="APROVADO">APROVADO</option>
-      <option value="REPROVADO">REPROVADO</option>
-      <option value="TRANSFERIDO">TRANSFERIDO</option>
-      <option value="DESISTENTE">DESISTENTE</option>
-      <option value="FALECIDO">FALECIDO</option>
-    </select>
+  <div class="field" id="fieldStatusAluno">
+    <label for="statusAluno" id="labelStatusAluno">Situação</label>
+    <select id="statusAluno"></select>
   </div>
 
   <div class="field">
@@ -996,23 +951,18 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   </div>
 
   <div class="field" style="grid-column:1/-1;">
-    <label>Turno <span class="req">*</span></label>
-    <div class="turno-group" id="turnoGroup">
-      <button type="button" class="turno-btn" data-turno="MATUTINO" onclick="_selectTurno('MATUTINO')">🌤️ Matutino</button>
-      <button type="button" class="turno-btn" data-turno="VESPERTINO" onclick="_selectTurno('VESPERTINO')">☀️ Vespertino</button>
-      <button type="button" class="turno-btn" data-turno="NOTURNO" onclick="_selectTurno('NOTURNO')">🌙 Noturno</button>
-    </div>
-    <div id="integralBox">
-      <span style="font-size:13px; font-weight:700; color:var(--text);">📚 Frequenta o Integral?</span>
+    <label>📚 Frequenta o Integral? <span class="req">*</span></label>
+    <div id="integralBox" class="visible">
       <div class="integral-toggle">
         <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">✅ Sim</button>
         <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">❌ Não</button>
       </div>
       <span id="integralBadge">📚 Modelo Integral</span>
       <span style="font-size:12px; color:var(--muted); flex:1;">
-        Aluno que frequenta o Integral estuda o ensino regular no turno marcado e recebe atividades de contraturno.
+        Aluno que frequenta o Integral estuda o ensino regular no turno da turma e recebe atividades de contraturno.
       </span>
     </div>
+    <!-- Turno não é mais definido aqui — vem da turma selecionada (cadastro de turma). -->
     <input type="hidden" id="turnoSelecionado" value="" />
     <input type="hidden" id="modeloEnsino" value="" />
     <small class="help" id="turnoMsg" aria-live="polite"></small>
@@ -1122,7 +1072,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 <div class="grid-3">
   <div class="field">
     <label for="compRG">RG</label>
-    <input id="compRG" placeholder="0000000-0"/>
+    <input id="compRG" placeholder="00.000.000-00"/>
   </div>
   <div class="field">
     <label for="compRGOrgao">Órgão emissor</label>
@@ -1514,6 +1464,58 @@ function normSerie(s){
     return new Date().getFullYear();
   }
 
+  function isAnoAtivo(anoValor){
+    const a = String(anoValor||"").trim();
+    if(!a) return true; // sem ano escolhido ainda: assume ativo (comportamento padrão/mais comum)
+    return a === String(getAnoAtivoDefault());
+  }
+
+  // Opções válidas de "situação" (só se aplicam a matrícula INATIVO, anos não-ativos)
+  const SITUACOES_OPCOES = [
+    { v: 'TRANSFERIDO', t: 'TRANSFERIDO' },
+    { v: 'DESISTENTE',  t: 'DESISTENTE'  },
+    { v: 'FALECIDO',    t: 'FALECIDO'    },
+    { v: 'APROVADO',    t: 'APROVADO'    },
+    { v: 'REPROVADO',   t: 'REPROVADO'   },
+  ];
+
+  // Status/Situação só fazem sentido para registros de anos NÃO ativos —
+  // no ano ativo a matrícula é sempre ATIVO/situação=null, então os campos
+  // somem. Em anos anteriores, viram "Situação"/"Situação padrão" com as
+  // 5 opções válidas (nunca ATIVO/INATIVO/VAZIO soltos).
+  function _atualizarCamposStatusSituacao(){
+    const wrapPadrao  = document.getElementById('wrapStatusPadrao');
+    const labelPadrao  = document.getElementById('labelStatusPadrao');
+    const fieldAluno  = document.getElementById('fieldStatusAluno');
+    const labelAluno  = document.getElementById('labelStatusAluno');
+    if(!wrapPadrao || !fieldAluno || !statusPadrao || !statusAluno) return;
+
+    const ativo = isAnoAtivo(anoLetivo.value);
+
+    if(ativo){
+      wrapPadrao.style.display = 'none';
+      fieldAluno.style.display = 'none';
+      statusPadrao.innerHTML = '';
+      statusAluno.innerHTML = '';
+      return;
+    }
+
+    wrapPadrao.style.display = '';
+    fieldAluno.style.display = '';
+    if(labelPadrao) labelPadrao.textContent = 'Situação padrão da matrícula';
+    if(labelAluno)  labelAluno.textContent  = 'Situação';
+
+    const optsHtml = '<option value="">— selecione —</option>' +
+      SITUACOES_OPCOES.map(o => `<option value="${o.v}">${o.t}</option>`).join('');
+
+    const padraoAnterior = statusPadrao.value;
+    const alunoAnterior  = statusAluno.value;
+    statusPadrao.innerHTML = optsHtml;
+    statusAluno.innerHTML  = optsHtml;
+    if(SITUACOES_OPCOES.some(o => o.v === padraoAnterior)) statusPadrao.value = padraoAnterior;
+    if(SITUACOES_OPCOES.some(o => o.v === alunoAnterior))  statusAluno.value  = alunoAnterior;
+  }
+
   function loadTurmaOptions(){
     const anoFiltro = String(anoLetivo?.value || getAnoAtivoDefault());
     const allTurmas = getTurmas();
@@ -1581,10 +1583,13 @@ function normSerie(s){
 
   function refreshTurmaInfo(preserveSerieValue){
     const t = getSelectedTurma();
+    const turnoHidden = document.getElementById('turnoSelecionado');
     if(!t){
       turmaInfo.textContent = "Selecione uma turma para carregar os alunos.";
       // Não sobrescreve anoLetivo — o usuário controla esse campo
       loadSerieOptionsForTurma(null, false);
+      if(turnoHidden) turnoHidden.value = '';
+      _atualizarCamposStatusSituacao();
       return;
     }
     const tid = t.turmaId || t.id;
@@ -1594,7 +1599,10 @@ function normSerie(s){
     turmaInfo.textContent = `ID: ${tid} • Ano: ${t.anoLetivo || getAnoAtivoDefault()} • Turno: ${turno} • Séries: ${series}${prof ? " • Prof.: " + prof : ""}`;
     // Preenche o anoLetivo a partir da turma SOMENTE se o campo estiver vazio
     if(!anoLetivo.value) anoLetivo.value = t.anoLetivo || getAnoAtivoDefault();
+    // Turno não é mais escolhido no cadastro de aluno — é herdado da turma selecionada.
+    if(turnoHidden) turnoHidden.value = t.turno ? String(t.turno).toUpperCase() : '';
     loadSerieOptionsForTurma(t, !!preserveSerieValue);
+    _atualizarCamposStatusSituacao();
   }
 
   function renderMatriculados(){
@@ -1653,11 +1661,7 @@ function normSerie(s){
     // limpa banner de auto-fill se estiver ativo
     if(window._limparAutoFill) window._limparAutoFill();
     serieAluno.value = serieAluno.value || "";
-    if(statusAluno){
-      statusAluno.value = (statusPadrao && statusPadrao.value) ? statusPadrao.value : "";
-      statusAluno.dataset.auto = "1";
-      statusAluno.dataset.lastDefault = (statusPadrao && statusPadrao.value) ? statusPadrao.value : "";
-    }
+    _atualizarCamposStatusSituacao();
     nome.value = "";
     cpf.value = "";
     nasc.value = "";
@@ -1668,14 +1672,9 @@ function normSerie(s){
     naturalidadeUF.value = "";
     sexo.value = "";
     corRaca.value = "";
-    // reset turno + integral
-    const turnoHidden = document.getElementById('turnoSelecionado');
-    if(turnoHidden) turnoHidden.value = '';
+    // reset integral (turno é resetado junto com a turma, em refreshTurmaInfo)
     const modeloHidden = document.getElementById('modeloEnsino');
     if(modeloHidden) modeloHidden.value = '';
-    document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('selected'));
-    const integralBox = document.getElementById('integralBox');
-    if(integralBox) integralBox.classList.remove('visible');
     document.getElementById('btnIntegralSim')?.classList.remove('selected-sim');
     document.getElementById('btnIntegralNao')?.classList.remove('selected-nao');
     const badge = document.getElementById('integralBadge');
@@ -1744,7 +1743,8 @@ function normSerie(s){
   const sexoVal   = (sexo.value || "").trim();
   const corVal    = (corRaca.value || "NÃO DECLARADA").trim() || "NÃO DECLARADA";
   const ano       = (anoLetivo.value || "").trim();
-  const status    = ((statusAluno ? statusAluno.value : (statusPadrao ? statusPadrao.value : "")) || "").toString().trim();
+  const anoEhAtivo = isAnoAtivo(ano);
+  const situacaoEscolhida = ((statusAluno ? statusAluno.value : (statusPadrao ? statusPadrao.value : "")) || "").toString().trim();
   const turno     = (document.getElementById('turnoSelecionado')?.value || "").trim();
   const modelo    = (document.getElementById('modeloEnsino')?.value || "").trim();
 
@@ -1762,12 +1762,8 @@ function normSerie(s){
   if(!natCidade || !natUF) return setMsg("Informe a naturalidade (cidade e UF).", "err");
   if(!sexoVal)  return setMsg("Selecione o sexo.", "err");
   if(!ano)      return setMsg("Informe o ano letivo.", "err");
-  if(!turno){
-    const turnoMsg = document.getElementById('turnoMsg');
-    if(turnoMsg){ turnoMsg.textContent = 'Selecione o turno do aluno.'; turnoMsg.className = 'help err'; }
-    return setMsg("Selecione o turno do aluno.", "err");
-  }
-  if((turno === 'MATUTINO' || turno === 'VESPERTINO') && !modelo){
+  if(!anoEhAtivo && !situacaoEscolhida) return setMsg("Selecione a situação da matrícula (ano não é o ativo).", "err");
+  if(!modelo){
     const turnoMsg = document.getElementById('turnoMsg');
     if(turnoMsg){ turnoMsg.textContent = 'Informe se o aluno frequenta o Integral.'; turnoMsg.className = 'help err'; }
     return setMsg("Informe se o aluno frequenta o Integral.", "err");
@@ -1888,7 +1884,7 @@ function normSerie(s){
   if(matExistente) return setMsg(`Aluno já matriculado nessa turma em ${ano}.`, "err");
 
   const modeloFinal = modelo || 'REGULAR';
-  const novaMatricula = {
+  let novaMatricula = {
     matriculaId,
     turmaId: tid,
     alunoId,
@@ -1896,9 +1892,18 @@ function normSerie(s){
     serie,
     turno,
     modelo: modeloFinal,
-    status,
+    status: anoEhAtivo ? 'ATIVO' : 'INATIVO',
+    situacao: anoEhAtivo ? null : situacaoEscolhida,
     criadoEm: new Date().toISOString()
   };
+
+  if(window.MatriculaUtils){
+    try{
+      novaMatricula = window.MatriculaUtils.validarMatricula(novaMatricula);
+    }catch(e){
+      return setMsg(e.message, "err");
+    }
+  }
 
   // Salva no Firestore diretamente com ID determinístico (upsert seguro)
   try{
@@ -1948,7 +1953,6 @@ function normSerie(s){
   async function _atualizarAluno(){
     const alunoId       = window._modoEdicaoId;
     const alunoOriginal = window._modoEdicaoAluno || {};
-    const emReadmissao  = !!window._modoReadmissao;
 
     const dadosComp = {
       mae:          normalizeName(document.getElementById('mae')?.value || ''),
@@ -1958,7 +1962,6 @@ function normSerie(s){
       corRaca:      (document.getElementById('corRaca')?.value || 'NÃO DECLARADA').trim(),
       naturalidadeCidade: normalizeCity(document.getElementById('naturalidadeCidade')?.value || ''),
       naturalidadeUF:     (document.getElementById('naturalidadeUF')?.value || '').trim().toUpperCase(),
-      statusAluno:  (document.getElementById('statusAluno')?.value || '').trim(),
       turno:        (document.getElementById('turnoSelecionado')?.value || '').trim(),
       modeloEnsino: (document.getElementById('modeloEnsino')?.value || '').trim(),
       ...(window._neeGetDados ? window._neeGetDados() : {}),
@@ -1979,56 +1982,15 @@ function normSerie(s){
     if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
     if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
 
-    // ── Readmissão: valida turma/série/turno ANTES de salvar qualquer coisa ──
-    let novaMatricula = null;
-    if(emReadmissao){
-      const turmaSel = getSelectedTurma();
-      const serie    = (document.getElementById('serieAluno')?.value || '').trim();
-      const ano      = (document.getElementById('anoLetivo')?.value || '').trim();
-      const turno    = dadosComp.turno;
-      const modelo   = dadosComp.modeloEnsino || 'REGULAR';
-
-      if(!turmaSel) return _toastErro('⚠️ Selecione a turma para readmissão.');
-      if(!serie)    return _toastErro('⚠️ Selecione a série do aluno.');
-      if(!ano)      return _toastErro('⚠️ Informe o ano letivo.');
-      if(!turno)    return _toastErro('⚠️ Selecione o turno do aluno.');
-
-      const tid = turmaSel.turmaId || turmaSel.id;
-      const matriculaId = `MAT|${tid}|${alunoId}|${ano}`;
-
-      // Evita duplicar matrícula ativa na mesma turma+ano
-      try{
-        const matsExistentes = await window.DB.anoAtivoMatriculas.list();
-        const jaAtiva = matsExistentes.find(m =>
-          m.turmaId === tid && m.alunoId === alunoId &&
-          String(m.anoLetivo) === String(ano) && (m.status||'').toUpperCase() !== 'INATIVO'
-        );
-        if(jaAtiva) return _toastErro(`⚠️ Aluno já matriculado nessa turma em ${ano}.`);
-      }catch(e){ console.warn('Checagem de matrícula existente:', e); }
-
-      novaMatricula = {
-        _id: matriculaId, matriculaId, turmaId: tid, alunoId,
-        anoLetivo: ano, serie, turno, modelo, status: 'ATIVO',
-        criadoEm: new Date().toISOString()
-      };
-    }
-
     try{
       setMsg('Salvando…','');
       await window.DB.anoAtivoAlunos.save({ _id: alunoId, alunoId, ...alunoOriginal, ...dadosComp });
-
-      if(novaMatricula){
-        await window.DB.anoAtivoMatriculas.save(novaMatricula);
-        window._modoReadmissao = false;
-      }
 
       if(window.initDocs)        window.initDocs(alunoId);
       if(window.uploadDocsQueue) await window.uploadDocsQueue();
 
       // Toast fixo visível em qualquer etapa
-      _toastSucesso(emReadmissao
-        ? '✅ Aluno readmitido e matriculado com sucesso! Redirecionando…'
-        : '✅ Dados atualizados com sucesso! Redirecionando…');
+      _toastSucesso('✅ Dados atualizados com sucesso! Redirecionando…');
 
       // Redireciona para pesquisa após 2s
       setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
@@ -2148,62 +2110,10 @@ function normSerie(s){
         });
       });
 
-      // ── Verifica se aluno está inativo (TURMA_INATIVA) ──
-      const eInativo = aluno.turmaId === 'TURMA_INATIVA' ||
-                       (aluno.status || '').toUpperCase() === 'INATIVO';
+      // Nota: alunos inativos (status INATIVO na matrícula) não são mais
+      // detectados/tratados aqui. Readmissão acontece em readmitir-aluno.html;
+      // este cadastro trata apenas edição de aluno ativo.
 
-      if(eInativo){
-        // Modo somente leitura
-        document.getElementById('bannerReadmitir')?.classList.add('show');
-        const bannerText = document.getElementById('bannerReadmitirText');
-        if(bannerText) bannerText.textContent = `Aluno inativo: ${aluno.nome || editId} — cadastro em modo somente leitura`;
-
-        // Bloqueia toda a etapa 1 e 2
-        ['wzEtapa1','wzEtapa2'].forEach(id => {
-          const el = document.getElementById(id);
-          if(el) el.style.cssText += 'pointer-events:none;opacity:.6;user-select:none;';
-        });
-        // Bloqueia botões de ação
-        ['btnInserir','btnSalvarEtapa1','btnProximo'].forEach(id => {
-          const el = document.getElementById(id);
-          if(el){ el.disabled = true; el.style.pointerEvents = 'none'; }
-        });
-
-        // Botão readmitir — único interagível
-        const btnReadmitir = document.getElementById('btnReadmitir');
-        if(btnReadmitir){
-          btnReadmitir.style.pointerEvents = 'all';
-          btnReadmitir.addEventListener('click', () => {
-            window._modoReadmissao = true;
-            // Desbloqueia tudo
-            ['wzEtapa1','wzEtapa2'].forEach(id => {
-              const el = document.getElementById(id);
-              if(el){ el.style.pointerEvents=''; el.style.opacity=''; el.style.userSelect=''; }
-            });
-            ['btnInserir','btnSalvarEtapa1','btnProximo'].forEach(id => {
-              const el = document.getElementById(id);
-              if(el){ el.disabled=false; el.style.pointerEvents=''; }
-            });
-            // Limpa turma/série/turno para preenchimento obrigatório
-            const turmaEl = document.getElementById('turmaSelect');
-            if(turmaEl){ turmaEl.value=''; turmaEl.dispatchEvent(new Event('change')); }
-            const turnoHidden = document.getElementById('turnoSelecionado');
-            if(turnoHidden) turnoHidden.value='';
-            document.querySelectorAll('.turno-btn').forEach(b=>b.classList.remove('sel','selected'));
-            document.getElementById('integralBox')?.classList.remove('visible');
-            document.getElementById('modeloEnsino') && (document.getElementById('modeloEnsino').value='');
-
-            // Remove overlay do banner
-            document.getElementById('bannerReadmitir')?.classList.remove('show');
-            document.getElementById('bannerModoEdicao')?.classList.add('show');
-            if(bannerText) bannerText.textContent = `Readmitindo: ${aluno.nome || editId} — preencha turma, série e turno`;
-
-            _toastSucesso('✅ Campos desbloqueados — preencha turma, série e turno');
-          });
-        }
-
-        // Ainda preenche os campos para visualização (somente leitura)
-      }
       // Busca via matrícula do aluno no ano ativo
       try{
         const mats = await window.DB.anoAtivoMatriculas.list();
@@ -2321,7 +2231,6 @@ function normSerie(s){
       _pre('corRaca',            aluno.corRaca || 'NÃO DECLARADA');
       _pre('naturalidadeCidade', aluno.naturalidadeCidade || '');
       _pre('naturalidadeUF',     aluno.naturalidadeUF || '');
-      _pre('statusAluno',        aluno.statusAluno || '');
 
       // Pai não informado
       if(aluno.pai === '--'){
@@ -2331,21 +2240,10 @@ function normSerie(s){
         if(paiEl){ paiEl.value = ''; paiEl.disabled = true; }
       }
 
-      // Turno — seleciona botão e preenche hidden
+      // Turno — não é mais editável aqui (vem da turma); só preenche o hidden de referência
       if(aluno.turno){
-        const t = aluno.turno.toUpperCase();
-        document.querySelectorAll('.turno-btn').forEach(btn => {
-          if((btn.dataset.turno || '').toUpperCase() === t){
-            btn.classList.add('selected');
-          }
-        });
         const turnoHidden = document.getElementById('turnoSelecionado');
-        if(turnoHidden) turnoHidden.value = t;
-        // Mostra caixa de integral se aplicável
-        if(t !== 'NOTURNO'){
-          const integralBox = document.getElementById('integralBox');
-          if(integralBox) integralBox.classList.add('visible');
-        }
+        if(turnoHidden) turnoHidden.value = aluno.turno.toUpperCase();
       }
 
       // Modelo integral
@@ -2448,7 +2346,7 @@ function normSerie(s){
       if(!(document.getElementById('naturalidadeCidade')?.value||'').trim()) return false;
       if(!(document.getElementById('naturalidadeUF')?.value||'').trim()) return false;
       if(!(document.getElementById('sexo')?.value||'').trim()) return false;
-      if(!(document.getElementById('turnoSelecionado')?.value||'').trim()) return false;
+      if(!(document.getElementById('modeloEnsino')?.value||'').trim()) return false;
       return true;
     }
 
@@ -2467,10 +2365,8 @@ function normSerie(s){
       if(!(document.getElementById('pai')?.value||'').trim() && !paiNaoInf?.checked){ _toastErro('⚠️ Informe o nome do pai ou marque "Pai não informado".'); return false; }
       if(!(document.getElementById('naturalidadeCidade')?.value||'').trim() || !(document.getElementById('naturalidadeUF')?.value||'').trim()){ _toastErro('⚠️ Informe a naturalidade (cidade e UF).'); return false; }
       if(!(document.getElementById('sexo')?.value||'').trim()){ _toastErro('⚠️ Selecione o sexo.'); return false; }
-      const turnoV = (document.getElementById('turnoSelecionado')?.value||'').trim();
-      if(!turnoV){ _toastErro('⚠️ Selecione o turno do aluno.'); return false; }
       const modeloV = (document.getElementById('modeloEnsino')?.value||'').trim();
-      if((turnoV==='MATUTINO'||turnoV==='VESPERTINO')&&!modeloV){ _toastErro('⚠️ Informe se o aluno frequenta o Integral.'); return false; }
+      if(!modeloV){ _toastErro('⚠️ Informe se o aluno frequenta o Integral.'); return false; }
       return true;
     }
 
@@ -2699,42 +2595,69 @@ function normSerie(s){
     });
   })();
 
-  // ── RG — máscara e limite ────────────────────────────────────────────────
+  // ── RG — máscara 00.000.000-00 (até 10 caracteres, último bloco aceita X) ──
   (function(){
     const rgEl = document.getElementById('compRG');
     if(!rgEl) return;
-    // Máscara simples: até 9 dígitos + 1 dígito verificador (letra ou número)
-    // Formato: 0000000-0  ou  00.000.000-0
+
+    function maskRG(raw){
+      const v = raw.replace(/[^\dXx]/g,'').toUpperCase().slice(0,10);
+      let out = v.slice(0,2);
+      if(v.length > 2) out += '.' + v.slice(2,5);
+      if(v.length > 5) out += '.' + v.slice(5,8);
+      if(v.length > 8) out += '-' + v.slice(8,10);
+      return out;
+    }
+
     rgEl.addEventListener('input', function(){
-      let v = this.value.replace(/[^\dXx]/g,'').toUpperCase().slice(0,9);
-      if(v.length > 1) v = v.slice(0,-1) + '-' + v.slice(-1);
-      this.value = v;
+      this.value = maskRG(this.value);
     });
-    rgEl.setAttribute('maxlength','10');
-    rgEl.setAttribute('placeholder','0000000-0');
+    // Sem maxlength no HTML: o navegador trunca o texto colado ANTES do
+    // evento "input" rodar, cortando o RG na primeira parte. A máscara acima
+    // já limita a 10 dígitos — deixa ela controlar o tamanho.
+    rgEl.removeAttribute('maxlength');
+    rgEl.setAttribute('placeholder', '00.000.000-00');
   })();
 
-  // ── Certidão de nascimento — verificador comprimento ─────────────────────
+  // ── Certidão de nascimento — máscara padrão CNM (32 dígitos) ─────────────
+  // Formato: NNNNNN NN NN NNNN N NNNNN NNN NNNNNNN-NN
+  // Ex.: 230341 01 55 2017 1 64903 434 3980960-16
   (function(){
     const cnEl  = document.getElementById('compCertidao');
     const cnMsg = document.createElement('small');
     cnMsg.className = 'help'; cnMsg.style.display='block';
     cnEl?.parentNode?.appendChild(cnMsg);
     if(!cnEl) return;
+
+    const SEGMENTOS = [6,2,2,4,1,5,3,7,2];
+    const SEPARADORES = [' ',' ',' ',' ',' ',' ',' ','-']; // entre os segmentos (o último não tem separador depois)
+
+    function maskCertidao(raw){
+      const digits = raw.replace(/\D/g,'').slice(0,32);
+      let out = '';
+      let pos = 0;
+      for(let i = 0; i < SEGMENTOS.length && pos < digits.length; i++){
+        const tamanho = SEGMENTOS[i];
+        const bloco = digits.slice(pos, pos + tamanho);
+        out += bloco;
+        pos += tamanho;
+        if(pos < digits.length && i < SEPARADORES.length) out += SEPARADORES[i];
+      }
+      return out;
+    }
+
+    cnEl.setAttribute('placeholder', '230341 01 55 2017 1 64903 434 3980960-16');
+    cnEl.removeAttribute('maxlength'); // evita truncar paste antes da máscara rodar
+
     cnEl.addEventListener('input', function(){
+      this.value = maskCertidao(this.value);
       const v = this.value.replace(/\D/g,'');
-      if(!v){ cnMsg.textContent=''; return; }
+      if(!v){ cnMsg.textContent=''; cnMsg.className = 'help'; return; }
       if(v.length === 32){
-        cnMsg.textContent = '✅ Formato CNM (32 dígitos)';
+        cnMsg.textContent = '✅ Formato CNM completo (32 dígitos)';
         cnMsg.className = 'help ok';
-      } else if(v.length > 20){
-        cnMsg.textContent = `${v.length} dígitos — verifique o documento`;
-        cnMsg.className = 'help';
-      } else if(v.length < 6){
-        cnMsg.textContent = 'Número muito curto — verifique';
-        cnMsg.className = 'help err';
       } else {
-        cnMsg.textContent = `${v.length} dígitos`;
+        cnMsg.textContent = `${v.length}/32 dígitos`;
         cnMsg.className = 'help';
       }
     });
@@ -2850,41 +2773,7 @@ function normSerie(s){
     incluirCidadeEndereco: true
   });
 
-  // ── Turno + Integral toggle ──────────────────────────────────────────────
-  window._selectTurno = function(turno){
-    document.querySelectorAll('.turno-btn').forEach(b => {
-      b.classList.toggle('selected', b.dataset.turno === turno);
-    });
-    const hidden = document.getElementById('turnoSelecionado');
-    if(hidden) hidden.value = turno;
-
-    // Integral só existe para Matutino e Vespertino
-    const integralBox = document.getElementById('integralBox');
-    const modeloHidden = document.getElementById('modeloEnsino');
-    if(integralBox){
-      if(turno === 'MATUTINO' || turno === 'VESPERTINO'){
-        integralBox.classList.add('visible');
-      } else {
-        integralBox.classList.remove('visible');
-        // Noturno → sempre Regular, reseta estado integral
-        _resetIntegral();
-        if(modeloHidden) modeloHidden.value = 'REGULAR';
-      }
-    }
-
-    const turnoMsg = document.getElementById('turnoMsg');
-    if(turnoMsg){ turnoMsg.textContent = ''; turnoMsg.className = 'help'; }
-  };
-
-  function _resetIntegral(){
-    document.getElementById('btnIntegralSim')?.classList.remove('selected-sim');
-    document.getElementById('btnIntegralNao')?.classList.remove('selected-nao');
-    const badge = document.getElementById('integralBadge');
-    if(badge) badge.classList.remove('visible');
-    const modeloHidden = document.getElementById('modeloEnsino');
-    if(modeloHidden) modeloHidden.value = '';
-  }
-
+  // ── Integral toggle (turno agora vem da turma selecionada) ──────────────
   window._setIntegral = function(sim){
     const modeloHidden = document.getElementById('modeloEnsino');
     const badge = document.getElementById('integralBadge');
@@ -2925,31 +2814,13 @@ function normSerie(s){
     applyCpfMask();
   }
 
-  // Status do aluno (por inserção): segue o padrão, a menos que você altere manualmente
+  // Situação da matrícula (por inserção): esconde/mostra + segue a "Situação
+  // padrão" quando o ano letivo não é o ativo (ver _atualizarCamposStatusSituacao)
   if(statusPadrao && statusAluno){
-    const applyDefaultStatus = () => {
-      const v = (statusPadrao.value || "").toString();
-      statusAluno.value = v;
-      statusAluno.dataset.auto = "1";
-      statusAluno.dataset.lastDefault = v;
-    };
-
-    statusAluno.addEventListener("change", () => {
-      statusAluno.dataset.auto = "0";
-    });
-
     statusPadrao.addEventListener("change", () => {
-      const last = statusAluno.dataset.lastDefault || "";
-      const auto = statusAluno.dataset.auto === "1";
-      if(auto || statusAluno.value === last){
-        applyDefaultStatus();
-      }else{
-        // só atualiza o lastDefault para não "grudar" no antigo
-        statusAluno.dataset.lastDefault = (statusPadrao.value || "").toString();
-      }
+      if(!statusAluno.value) statusAluno.value = statusPadrao.value;
     });
-
-    applyDefaultStatus();
+    _atualizarCamposStatusSituacao();
   }
 
 
@@ -3279,6 +3150,7 @@ function normSerie(s){
     loadSerieOptionsForTurma(null);
     turmaInfo.textContent = "Selecione uma turma para carregar os alunos.";
     tbody.innerHTML = '<tr><td colspan="13" class="muted">Selecione uma turma para carregar.</td></tr>';
+    _atualizarCamposStatusSituacao();
   });
 
   // init run — aguarda Firestore antes de popular a UI
