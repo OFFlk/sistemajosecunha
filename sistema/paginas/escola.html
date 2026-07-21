@@ -14,6 +14,7 @@
 </script>
 
 <!-- Scripts globais -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../theme-colors.js"></script>
@@ -303,6 +304,8 @@ function preencherFormEscola(escola) {
   } catch(e) {
     console.warn('Erro ao carregar dados da escola do Firestore:', e);
   }
+
+  Loading.esconder(); // ← linha adicionada
 })();
 
 // Garante INEP numérico mesmo quando ainda não existe dados salvos
