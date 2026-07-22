@@ -4,22 +4,35 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (manter — evita flash de tema errado) -->
 <script>
 (function(){
-  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
-  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
   document.documentElement.setAttribute('data-theme', theme);
 })();
 </script>
+
+<!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<!-- PDF -->
+
+<!-- Bibliotecas específicas desta página (geração de PDF) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-<title>Histórico por Aluno</title>
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<!-- CSS específico desta página (só o que não está nos globais) -->
 <style>
 /* ===== Variáveis do sistema ===== */
 :root{
@@ -69,56 +82,8 @@ html[data-theme="dark"]{
   --school-bg:    var(--brand-faded-d);
   --school-color: var(--brand-text-d);
 }
-*, *::before, *::after{ box-sizing:border-box; }
-body{
-  margin:0;
-  font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto, Arial;
-  background: var(--bg);
-  color: var(--ink);
-  min-height: 100vh;
-  transition: background 0.3s, color 0.3s;
-}
-html[data-theme="dark"] body{
-  background:
-    radial-gradient(ellipse 800px 400px at 20% 0%, rgba(124,58,237,0.10) 0%, transparent 70%),
-    radial-gradient(ellipse 600px 400px at 80% 60%, rgba(59,130,246,0.06) 0%, transparent 70%),
-    var(--bg);
-}
 
-/* ===== Header padrão ===== */
-.l-bar { height: 2px; background: linear-gradient(90deg, var(--brand, #7c3aed), #3b82f6, #06b6d4); position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
-.app-header { position: sticky; top: 2px; z-index: 99; width: 100%; background: #ffffff; border-bottom: 1px solid var(--brand-border, #ddd6fe); transition: background 0.3s, border-color 0.3s; }
-html[data-theme="dark"] .app-header { background: #0c1120; border-color: #1e2540; }
-.app-header-inner { width: 100%; padding: 0 36px; height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.mark { width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); border: 1px solid var(--brand-border, #ddd6fe); font-weight: 800; font-size: 20px; transition: all 0.3s; }
-.brand-title { font-weight: 800; font-size: 16px; color: #1e1b4b; letter-spacing: -0.2px; font-family: 'Nunito', sans-serif; transition: color 0.3s; }
-html[data-theme="dark"] .brand-title { color: #e2e8f0; }
-.brand-sub { font-size: 13px; color: var(--brand-text, #6d28d9); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50vw; font-family: 'Nunito', sans-serif; }
-html[data-theme="dark"] .brand-sub { color: var(--brand-text-d, #c4b5fd); }
-.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; justify-content: flex-end; }
-@media(max-width:640px){ .header-actions{ flex-wrap: wrap; } .brand{ min-width: 0; } }
-.theme-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--brand-border, #ddd6fe); background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s, color 0.18s, border-color 0.18s; }
-html[data-theme="dark"] .theme-toggle { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-.theme-toggle:hover { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
-.theme-toggle-compact { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; border: 1px solid var(--brand-border, #ddd6fe); background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 15px; cursor: pointer; font-family: 'Nunito', sans-serif; transition: background 0.18s, color 0.18s, border-color 0.18s; }
-html[data-theme="dark"] .theme-toggle-compact { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-.theme-toggle-compact:hover { background: var(--brand, #7c3aed); color: #fff; border-color: var(--brand, #7c3aed); }
-.btn-back { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; border: 1px solid var(--brand-border, #ddd6fe); text-decoration: none; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: border-color 0.18s, box-shadow 0.18s; }
-html[data-theme="dark"] .btn-back { border-color: var(--brand-border-d, #7c3aed); }
-.btn-back:hover { border-color: var(--brand, #7c3aed); box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
-.btn-back .b-icon { padding: 8px 10px; background: var(--brand-faded, #f5f3ff); color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; border-right: 1px solid var(--brand-border, #ddd6fe); display: flex; align-items: center; }
-html[data-theme="dark"] .btn-back .b-icon { background: var(--brand-faded-d, rgba(124,58,237,0.28)); color: var(--brand-text-d, #c4b5fd); border-color: var(--brand-border-d, #7c3aed); }
-.btn-back .b-label { padding: 8px 13px; color: var(--brand-text, #6d28d9); font-size: 13px; font-weight: 800; display: flex; align-items: center; }
-html[data-theme="dark"] .btn-back .b-label { color: var(--brand-text-d, #c4b5fd); }
-.btn-home { display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden; border: 1px solid var(--brand, #7c3aed); background: var(--brand, #7c3aed); text-decoration: none; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s, border-color 0.18s; }
-html[data-theme="dark"] .btn-home { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
-.btn-home:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
-html[data-theme="dark"] .btn-home:hover { background: var(--brand-hover-d, #6d28d9); }
-.btn-home .b-icon { padding: 8px 10px; background: rgba(0,0,0,0.15); color: #fff; font-size: 13px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; }
-.btn-home .b-label { padding: 8px 13px; color: #fff; font-size: 13px; font-weight: 800; display: flex; align-items: center; }
-
-/* ===== Layout ===== */
+/* ===== Layout desta página ===== */
 .container{ max-width:1100px; margin:22px auto 48px; padding:0 18px; }
 .top-actions{ display:flex; gap:10px; justify-content:flex-end; margin-bottom:14px; flex-wrap:wrap; }
 
@@ -193,7 +158,6 @@ html[data-theme="dark"] .btn-serie { border-color: var(--brand-d, #7c3aed); colo
   margin-bottom:16px;
 }
 
-
 /* ===== Formulário ===== */
 .row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
 @media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
@@ -229,33 +193,8 @@ th.th-nome{ width:220px; }
 td.col-nome{ text-align:left; padding-left:8px; word-break:break-word; }
 th.th-nota, td.col-nota{ width:42px; font-size:11px; }
 
-
-
 .hidden{ display:none !important; }
 
-/* ===== Contexto (usuário + escola) no header ===== */
-.header-context { display: flex; gap: 8px; align-items: center; margin-right: 4px; flex-wrap: wrap; }
-.ctx-chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--chip-bg); font-size: 13px; color: var(--chip-name); max-width: 280px; transition: all 0.3s; }
-.ctx-chip .avatar { width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; background: var(--mark-bg); border: 1px solid var(--chip-border); flex: 0 0 auto; overflow: hidden; font-size: 12px; }
-.ctx-chip .text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
-.ctx-chip .name { font-weight: 700; font-size: 13px; color: var(--chip-name); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ctx-chip .sub  { font-size: 11px; color: var(--sub-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.school-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--chip-border); background: var(--school-bg); color: var(--school-color); font-weight: 700; font-size: 13px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.3s; }
-.school-pill select { border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--school-color); border-radius: 6px; padding: 4px 8px; font-weight: 700; font-size: 12px; outline: none; width: 100%; min-width: 0; max-width: 100%; font-family: 'Nunito', sans-serif; }
-.ctx-chip.ctx-clickable { cursor: pointer; user-select: none; position: relative; }
-.ctx-chip.ctx-clickable:focus { outline: 2px solid rgba(0,0,0,0.15); outline-offset: 2px; }
-.ctx-menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 200px; padding: 6px; border-radius: 12px; border: 1px solid var(--chip-border); background: var(--card); backdrop-filter: blur(8px); box-shadow: 0 14px 28px rgba(0,0,0,0.14); display: none; z-index: 80; }
-html[data-theme="dark"] .ctx-menu { background: #0f1829; border-color: #1e2540; }
-.ctx-menu.open { display: block; }
-.ctx-menu .menu-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif; cursor: pointer; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--ink); margin-bottom: 4px; transition: filter 0.15s; }
-.ctx-menu .menu-btn:last-child { margin-bottom: 0; }
-.ctx-menu .menu-btn:hover { filter: brightness(0.95); }
-.ctx-menu .menu-btn.danger { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
-html[data-theme="dark"] .ctx-menu .menu-btn.danger { color: #fca5a5; }
-
-
-
-.hidden{ display:none !important; }
 /* ===== Complementos específicos: Histórico por Aluno ===== */
 .split{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; align-items:start;}
 @media (max-width: 980px){ .split{grid-template-columns:1fr;} }
@@ -290,36 +229,12 @@ html[data-theme="dark"] .badge.bad{ color:#fca5a5; }
 html[data-theme="dark"] .badge.star{ color:#fbbf24; }
 html[data-theme="dark"] .badge.info{ color:#93c5fd; }
 </style>
+
+<title>Histórico por Aluno</title>
 </head>
 <body>
-<body>
-<div class="l-bar"></div>
-<header class="app-header">
-  <div class="app-header-inner">
-    <div class="brand">
-      <div class="mark">📜</div>
-      <div>
-        <div class="brand-title">Histórico por aluno</div>
-        <div class="brand-sub">// pesquise um aluno e visualize o histórico consolidado</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <div class="header-context" id="headerContext"></div>
-      <button class="theme-toggle" id="themeToggle" type="button">
-        <span id="themeIcon">🌙</span><span id="themeText">Escuro</span>
-      </button>
-      <button class="theme-toggle-compact" id="themeToggleCompact" type="button">
-        <span id="themeIconCompact">🌙</span>
-      </button>
-      <a class="btn-back" href="atas.html">
-        <span class="b-icon">◀︎</span><span class="b-label">Atas</span>
-      </a>
-      <a class="btn-home" href="../index.html">
-        <span class="b-icon">🏠</span><span class="b-label">Início</span>
-      </a>
-    </div>
-  </div>
-</header>
+
+<div id="header-placeholder"></div>
 
 <div class="container">
 <div class="card">
@@ -369,6 +284,10 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
   </div>
 </div>
 
+<!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
+<script src="../header-logic.js"></script>
+
+<!-- 2. Script específico da página (lógica de busca, detalhes e exportação PDF) -->
 <script>
 /* =========================
    Helpers / DB
@@ -1044,208 +963,5 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 </script>
 
-<script>
-(function(){
-  function applyTheme(theme){
-    const t = (theme === 'dark') ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', t);
-    localStorage.setItem('ui_theme_v1', t);
-    if (window.ThemeColors) ThemeColors.apply(ThemeColors.get());
-    const emoji = (t === 'dark') ? '☀️' : '🌙';
-    const label = (t === 'dark') ? 'Claro' : 'Escuro';
-    ['themeIcon','themeIconCompact'].forEach(function(id){ const el=document.getElementById(id); if(el) el.textContent=emoji; });
-    const text = document.getElementById('themeText'); if(text) text.textContent=label;
-  }
-  function init(){
-    const btn  = document.getElementById('themeToggle');
-    const btnC = document.getElementById('themeToggleCompact');
-    if (!btn) return;
-    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
-    const compact = !!document.querySelector('.btn-back') && !!document.querySelector('.btn-home');
-    btn.style.display  = compact ? 'none' : 'inline-flex';
-    if (btnC) btnC.style.display = compact ? 'inline-flex' : 'none';
-    function toggle(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); }
-    btn.addEventListener('click', toggle);
-    if (btnC) btnC.addEventListener('click', toggle);
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
-</script>
-
-
-<!-- =============================================
-     SCRIPT 2 — Chip de usuário + chip de escola
-     Renderiza após o Firebase resolver (auth:ready)
-     e re-renderiza se a sessão mudar.
-============================================= -->
-<script>
-(function(){
-  function safeParse(json, fallback){
-    try{ const v = JSON.parse(json); return (v == null ? fallback : v); }catch(_){ return fallback; }
-  }
-
-  function getSession(){
-    if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
-    return safeParse(localStorage.getItem('auth_session_v2') || 'null', null);
-  }
-
-  function listSchools(){
-    if (window.Auth && typeof Auth.listSchools === 'function') return Auth.listSchools() || [];
-    return safeParse(localStorage.getItem('auth_schools_v1') || '[]', []);
-  }
-
-  function getActiveSchoolId(session){
-    if (!session) return null;
-    const sid = (session.schoolId || '').toString();
-    if (sid.toUpperCase() !== 'ADMIN') return sid;
-    return (localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
-  }
-
-  function renderHeaderContext(){
-    const host = document.getElementById('headerContext');
-    if (!host) return;
-
-    const s = getSession();
-    host.innerHTML = '';
-    if (!s) return;
-
-    const email    = (s.email || '').toString();
-    const name     = (s.name || s.displayName || '').toString() || (email ? email.split('@')[0] : 'Usuário');
-    const role     = (s.role || '').toString();
-    const schoolId = (s.schoolId || '').toString();
-
-    /* ── Chip do usuário (clicável com dropdown) ── */
-    const user = document.createElement('div');
-    user.className = 'ctx-chip ctx-clickable';
-    user.setAttribute('role','button');
-    user.setAttribute('tabindex','0');
-    user.setAttribute('aria-haspopup','true');
-    user.setAttribute('aria-expanded','false');
-    const photoURL = s.photoURL || null;
-    user.innerHTML = `
-      <div class="avatar" id="userAvatar">${photoURL ? `<img src="${photoURL}" style="width:100%;height:100%;border-radius:999px;object-fit:cover;" onerror="this.parentElement.textContent='👤'">` : '👤'}</div>
-      <div class="text">
-        <div class="name"></div>
-        <div class="sub"></div>
-      </div>
-      <div class="ctx-menu" id="userMenu">
-        <button type="button" class="btn menu-btn" id="btnPerfil">👤 Meu perfil</button>
-        <button type="button" class="btn menu-btn danger" id="btnLogout">🚪 Sair</button>
-      </div>
-    `;
-    user.querySelector('.name').textContent = name;
-    user.querySelector('.sub').textContent  = email || (role ? role : '');
-
-    const menu      = user.querySelector('#userMenu');
-    const btnLogout = user.querySelector('#btnLogout');
-
-    function closeMenu(){
-      menu.classList.remove('open');
-      user.setAttribute('aria-expanded','false');
-    }
-    function toggleMenu(){
-      const open = menu.classList.toggle('open');
-      user.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-
-    user.addEventListener('click', function(ev){
-      if (ev.target && (ev.target.id === 'btnLogout' || ev.target.closest('.ctx-menu'))) return;
-      ev.stopPropagation();
-      toggleMenu();
-    });
-    user.addEventListener('keydown', function(ev){
-      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleMenu(); }
-      if (ev.key === 'Escape') closeMenu();
-    });
-    document.addEventListener('click', closeMenu);
-    document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeMenu(); });
-
-    const btnPerfil = user.querySelector('#btnPerfil');
-    if (btnPerfil) btnPerfil.addEventListener('click', function(ev){
-      ev.preventDefault(); ev.stopPropagation();
-      window.location.href = '/perfil.html';
-    });
-
-    btnLogout.addEventListener('click', function(ev){
-      ev.preventDefault(); ev.stopPropagation();
-      try{
-        if (window.Auth && typeof Auth.logout === 'function') Auth.logout();
-        else {
-          localStorage.removeItem('auth_session_v2');
-          localStorage.removeItem('auth_return_to_v2');
-        }
-      }catch(_){}
-      window.location.href = '/login.html';
-    });
-
-    host.appendChild(user);
-
-    /* ── Chip da escola ── */
-    const schools   = listSchools();
-    const effective = getActiveSchoolId(s);
-    const matched   = schools.find(x => (x && (x.schoolId||'').toString() === effective))
-                   || schools.find(x => (x && (x.id||'').toString()       === effective));
-    const schoolName = matched ? (matched.displayName || matched.name || matched.nome || '').toString().trim() : '';
-
-    const wrap = document.createElement('div');
-    wrap.className = 'school-pill';
-
-    const label = document.createElement('span');
-    label.textContent = '◈';
-    wrap.appendChild(label);
-
-    /* Admin global → select para trocar escola ativa */
-    if (schoolId.toUpperCase() === 'ADMIN' && Array.isArray(schools) && schools.length){
-      const sel = document.createElement('select');
-      // Opção "Todas as escolas"
-      const optAll = document.createElement('option');
-      optAll.value = 'ADMIN';
-      optAll.textContent = 'Todas as escolas (ADMIN)';
-      sel.appendChild(optAll);
-
-      const seen = new Set();
-      schools
-        .map(x => ({ schoolId:(x.schoolId||x.id||'').toString(), name:(x.displayName||x.name||x.nome||'').toString() }))
-        .filter(o => o.schoolId && o.schoolId !== 'ADMIN' && !seen.has(o.schoolId) && seen.add(o.schoolId))
-        .sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'))
-        .forEach(o => {
-          const opt = document.createElement('option');
-          opt.value       = o.schoolId;
-          opt.textContent = o.name || o.schoolId;
-          sel.appendChild(opt);
-        });
-
-      sel.value = effective;
-      sel.addEventListener('change', function(){
-        if (sel.value === 'ADMIN') localStorage.removeItem('admin_active_school_v1');
-        else localStorage.setItem('admin_active_school_v1', sel.value);
-        location.reload();
-      });
-      wrap.appendChild(sel);
-    } else {
-      const span = document.createElement('span');
-      span.textContent = schoolName || schoolId;
-      wrap.appendChild(span);
-    }
-
-    host.appendChild(wrap);
-  }
-
-  function boot(){
-    try{ renderHeaderContext(); }catch(e){ console.warn('headerContext:', e); }
-  }
-
-  // Renderiza imediatamente (cache do localStorage)
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
-
-  // ✅ Re-renderiza quando Firebase resolver o perfil (dados frescos do Firestore)
-  document.addEventListener('auth:ready', boot);
-  // ✅ Re-renderiza se a sessão mudar (logout em outra aba, troca de usuário)
-  document.addEventListener('auth:sessionChanged', boot);
-
-})();
-</script>
 </body>
 </html>
