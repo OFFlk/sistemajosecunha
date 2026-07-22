@@ -1086,7 +1086,7 @@ function _atualizarListaAlunos(_tScope){
         <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
           <button class="btn-view" type="button" data-view-aluno="${a.alunoId}" title="Ver ficha completa do aluno">👁️ Visualizar</button>
           ${_podeEditar
-            ? (a._status === 'INATIVO'
+            ? (a._status === 'INATIVO' && String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim()
               ? `<button class="btn-edit" type="button"
             data-readmitir-aluno="${a.alunoId}"
             title="Readmitir aluno">🔁 Readmitir</button>`
