@@ -267,6 +267,19 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
 <!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
 <script src="../header-logic.js"></script>
 
+<!-- Reaplica a cor de marca da escola (ThemeColors) — esta chamada existia no
+     script de tema original e NÃO é coberta pelo header-logic.js. Sem ela,
+     o chip da escola no header fica com a cor de fallback em vez da cor
+     configurada para a escola. -->
+<script>
+(function(){
+  function reaplicarCorMarca(){ if (window.ThemeColors) ThemeColors.apply(ThemeColors.get()); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', reaplicarCorMarca);
+  else reaplicarCorMarca();
+  document.addEventListener('auth:ready', reaplicarCorMarca);
+})();
+</script>
+
 <!-- 2. Script específico da página (lógica de busca, detalhes e exportação PDF) -->
 <script>
 /* =========================
