@@ -275,6 +275,34 @@
         location.reload();
       });
       wrap.appendChild(sel);
+
+      // Aplica cores do tema nas <option> — navegadores ignoram CSS em <option>,
+      // então o único jeito confiável é setar o inline style de cada uma.
+      (function setupSelectOptionColors(selectEl) {
+        function styleOpts() {
+          var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+          if (!dark) {
+            Array.prototype.forEach.call(selectEl.options, function (o) {
+              o.style.background = '';
+              o.style.color = '';
+            });
+            return;
+          }
+          var key = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
+          var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
+                        || { '--brand-text-d': '#c4b5fd' };
+          var bg = '#0f1829';
+          var color = palette['--brand-text-d'] || '#c4b5fd';
+          Array.prototype.forEach.call(selectEl.options, function (o) {
+            o.style.background = bg;
+            o.style.color = color;
+          });
+        }
+        styleOpts();
+        new MutationObserver(styleOpts)
+          .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        document.addEventListener('colorchange', styleOpts);
+      })(sel);
     } else {
       var span = document.createElement('span');
       var sessionSchoolName = (s.schoolName || '').toString().trim();
