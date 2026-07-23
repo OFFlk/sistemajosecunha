@@ -1664,6 +1664,10 @@ function normSerie(s){
     if(turnoMsg){ turnoMsg.textContent = 'Informe se o aluno frequenta o Integral.'; turnoMsg.className = 'help err'; }
     return setMsg("Informe se o aluno frequenta o Integral.", "err");
   }
+  if(window._neeValidar){
+    const erroNee = window._neeValidar();
+    if(erroNee) return setMsg(erroNee, "err");
+  }
 
   const naturalidade = natCidade + "/" + natUF.toUpperCase();
   const idade = calcAge(nascVal);
@@ -1818,7 +1822,6 @@ function normSerie(s){
   // Atualiza apenas o cache local em memória (sem chamar saveAll no Firestore de novo)
   mats.push(novaMatricula);
   localStorage.setItem(_k(KEYS.mats), JSON.stringify(mats));
-  save(KEYS.anoAtual, parseInt(ano,10) || ano);
 
   // Garante que o aluno recém-cadastrado está no cache local de alunos,
   // para que renderMatriculados() o encontre imediatamente sem recarregar a página.
@@ -1884,6 +1887,10 @@ function normSerie(s){
     if(!dadosComp.mae)           return _toastErro('⚠️ Informe o nome da mãe.');
     if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
     if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
+    if(window._neeValidar){
+      const erroNee = window._neeValidar();
+      if(erroNee) return _toastErro('⚠️ ' + erroNee);
+    }
 
     try{
       setMsg('Salvando…','');
@@ -2017,11 +2024,36 @@ function normSerie(s){
       // detectados/tratados aqui. Readmissão acontece em readmitir-aluno.html;
       // este cadastro trata apenas edição de aluno ativo.
 
-      // Busca via matrícula do aluno no ano ativo
+      // Busca a matrícula EXATA que estava sendo visualizada na pesquisa.
+      // pesquisa-ano-ativo.html já manda turmaId/anoLetivo na URL — antes,
+      // eles eram ignorados e pegávamos qualquer matrícula do aluno (find()
+      // sem critério de ano), o que fazia o formulário abrir sem turma e
+      // com o ano ativo default quando o aluno tinha matrícula em mais de
+      // um ano letivo.
       try{
+        const qsTurmaId   = params.get('turmaId');
+        const qsAnoLetivo = params.get('anoLetivo');
         const mats = await window.DB.anoAtivoMatriculas.list();
-        const matAluno = mats.find(m => m.alunoId === editId);
+        const matsDoAluno = mats.filter(m => m.alunoId === editId);
+
+        let matAluno = null;
+        if(qsTurmaId){
+          matAluno = matsDoAluno.find(m =>
+            m.turmaId === qsTurmaId &&
+            (!qsAnoLetivo || String(m.anoLetivo) === String(qsAnoLetivo))
+          );
+        }
+        if(!matAluno) matAluno = matsDoAluno[0]; // fallback: link direto sem esses params
+
         if(matAluno && matAluno.turmaId){
+          // Preenche o ano letivo ANTES de mexer na turma: loadTurmaOptions()
+          // filtra as turmas disponíveis pelo anoLetivo atual do formulário,
+          // então se isso não rodar primeiro a turma do ano certo nem aparece
+          // nas opções.
+          if(matAluno.anoLetivo != null){
+            anoLetivo.value = matAluno.anoLetivo;
+            anoLetivo.dispatchEvent(new Event('change'));
+          }
           // Aguarda o select ser populado (pode não estar ainda)
           const _tentarSetar = (tentativas = 0) => {
             const opt = turmaSelect.querySelector(`option[value="${matAluno.turmaId}"]`);
@@ -2433,6 +2465,35 @@ function normSerie(s){
         tdah:               _neeE.tdah,
         tpac:               _neeE.tpac,
       };
+    };
+
+    // Valida a regra: Não = passa; Sim + pelo menos 1 marcação = passa
+    // (visual/auditiva exigem também a sub-marcação — baixa visão/surdez/etc.);
+    // Sim sozinho, sem nenhuma marcação = NÃO passa.
+    window._neeValidar = function(){
+      if(_neeE.def === true){
+        if(_neeE.visual && !_neeE.visualSub){
+          return 'Selecione o tipo de deficiência visual (baixa visão, cegueira ou visão monocular).';
+        }
+        if(_neeE.auditiva && !_neeE.auditivaSub){
+          return 'Selecione o tipo de deficiência auditiva/surdez (deficiência auditiva, surdez ou surdocegueira).';
+        }
+        const algumaMarcacao =
+          _neeE.tea || _neeE.altas || _neeE.fisica || _neeE.intelectual ||
+          (_neeE.visual && _neeE.visualSub) || (_neeE.auditiva && _neeE.auditivaSub);
+        if(!algumaMarcacao){
+          return 'Marque ao menos uma deficiência/TEA/altas habilidades, já que "Sim" foi selecionado.';
+        }
+      }
+      if(_neeE.trans === true){
+        const algumTranstorno =
+          _neeE.discalculia || _neeE.disgrafia || _neeE.dislalia ||
+          _neeE.dislexia || _neeE.tdah || _neeE.tpac;
+        if(!algumTranstorno){
+          return 'Marque ao menos um transtorno, já que "Sim" foi selecionado.';
+        }
+      }
+      return null;
     };
 
     window._neeLimparTudo = function(){
