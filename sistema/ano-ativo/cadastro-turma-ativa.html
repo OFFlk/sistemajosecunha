@@ -98,9 +98,65 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .grid2    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 
+/* Dois cards lado a lado (form / lista), no lugar de um card único */
+.split-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .split-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 640px) {
   .grid2    { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
+}
+
+/* Seções internas do formulário */
+.form-section { margin-top: 18px; }
+.form-section:first-of-type { margin-top: 4px; }
+.form-section-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-section-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ID da turma como badge compacto, não um campo de formulário inteiro */
+.id-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.id-badge-row .label-inline {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.id-badge {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  color: var(--chip-color);
 }
 
 
@@ -232,6 +288,12 @@ html[data-theme="dark"] .btn.outline { border-color: var(--brand-d, #7c3aed); co
 .btn.cancel { background: var(--card); border-color: var(--border); color: var(--muted); }
 .btn.small  { padding: 6px 10px; font-size: 12px; }
 
+/* Item da lista sendo editado no momento */
+.item.editing {
+  border-color: var(--brand, #7c3aed);
+  box-shadow: 0 0 0 3px var(--brand-faded, rgba(124,58,237,0.12));
+}
+
 
 /* ============================================================
    CHIPS DE SÉRIE
@@ -361,6 +423,18 @@ html[data-theme="dark"] .btn.outline { border-color: var(--brand-d, #7c3aed); co
   font-size: 13px;
   margin-top: 12px;
 }
+
+/* Nota informativa (não é um alerta real — reserva o âmbar de .warn pra avisos de verdade) */
+.info-note {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 12px;
+}
+.info-note strong { color: var(--text); }
 
 .ok-msg {
   padding: 10px 12px;
@@ -506,90 +580,96 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 <script>window.Auth && window.Auth.requireAuth();</script>
 <div id="header-placeholder"></div>
 <main class="wrap">
-<div class="card">
-      <div class="grid2">
-        <div>
-          <h2 style="margin:0 0 10px">Cadastrar / editar turma</h2>
+  <div class="split-grid">
 
-          <div class="form-row">
-            <div>
-              <label class="label">Ano letivo</label>
-              <select id="anoSelect" class="input"></select>
-              <div class="help">Por padrão, usa o ano ativo detectado. Você pode cadastrar turmas de outros anos também.</div>
-            </div>
+    <div class="card">
+      <h2 style="margin:0 0 10px">Cadastrar / editar turma</h2>
 
-            <div>
-              <label class="label">Turno</label>
-              <select id="turno" class="input">
-                <option value="MATUTINO">Matutino</option>
-                <option value="VESPERTINO">Vespertino</option>
-                <option value="NOTURNO">Noturno</option>
-                <option value="INTEGRAL">Integral</option>
-              </select>
-              <div class="help">Usado para montar o ID e o nome automático.</div>
-            </div>
+      <div class="form-section">
+        <div class="form-section-label">Dados da turma</div>
+        <div class="form-row">
+          <div>
+            <label class="label">Ano letivo</label>
+            <select id="anoSelect" class="input"></select>
+            <div class="help">Por padrão, usa o ano ativo detectado. Você pode cadastrar turmas de outros anos também.</div>
           </div>
 
-          <div style="margin-top:10px">
-            <label class="label">Adicionar série</label>
-            <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
-              <select id="serieSelect" class="input">
-                <option value="">(selecione)</option>
-              </select>
-              <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
-              <button class="btn danger" id="btnClearSeries" type="button">Limpar séries</button>
-            </div>
-            <div id="chipsSeries" class="chips" style="margin-top:10px"></div>
+          <div>
+            <label class="label">Turno</label>
+            <select id="turno" class="input">
+              <option value="MATUTINO">Matutino</option>
+              <option value="VESPERTINO">Vespertino</option>
+              <option value="NOTURNO">Noturno</option>
+              <option value="INTEGRAL">Integral</option>
+            </select>
+            <div class="help">Usado para montar o ID e o nome automático.</div>
           </div>
-
-          <div class="form-row" style="margin-top:10px">
-            <div>
-              <label class="label">Nome da turma</label>
-              <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO e 2º ANO 2026 (MATUTINO)">
-              <div class="help">Preenche automaticamente com séries + ano + turno (você pode editar).</div>
-            </div>
-            <div>
-              <label class="label">Professor(a) (opcional)</label>
-              <select id="prof" class="input">
-                <option value="">— selecione —</option>
-              </select>
-              <div class="help" id="profHelp">Carregando professores...</div>
-            </div>
-          </div>
-
-          <div class="form-row" style="margin-top:10px">
-            <div>
-              <label class="label">ID da turma (automático)</label>
-              <input id="turmaId" class="input readonly" readonly>
-              <div class="help">Formato: <span class="mono">ATUR|ANO|TURNO|SÉRIES</span> (opção A).</div>
-            </div>
-            
-          </div>
-
-          <div class="row" style="margin-top:14px;justify-content:space-between;gap:10px;align-items:center">
-            <div class="pill" id="dbInfo">DB: —</div>
-            <div class="row" style="gap:10px;justify-content:flex-end">
-              <button class="btn danger" id="btnResetForm" type="button">Limpar formulário</button>
-              <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
-            </div>
-          </div>
-
-          <div class="warn" style="margin-top:12px">
-            <strong>Dica:</strong> por enquanto esta tela cadastra/edita <em>apenas turmas</em>. No próximo passo, vamos vincular alunos via <span class="mono">matriculaId</span> (alunoId + turmaId) para cadastro/import coletivo.
-          </div>
-        </div>
-
-        <div>
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-            <h2 style="margin:0">Turmas cadastradas</h2>
-            <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
-            <span id="countTurmasLista" class="help" style="margin:0"></span>
-          </div>
-          <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Excluir</b> remove somente do banco do Ano Ativo.</div>
-          <div id="listaTurmas" class="list"></div>
         </div>
       </div>
+
+      <div class="form-section">
+        <div class="form-section-label">Séries</div>
+        <label class="label">Adicionar série</label>
+        <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
+          <select id="serieSelect" class="input">
+            <option value="">(selecione)</option>
+          </select>
+          <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
+          <button class="btn ghost" id="btnClearSeries" type="button">Limpar séries</button>
+        </div>
+        <div id="chipsSeries" class="chips" style="margin-top:10px"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-label">Identificação</div>
+        <div class="form-row">
+          <div>
+            <label class="label">Nome da turma</label>
+            <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO e 2º ANO 2026 (MATUTINO)">
+            <div class="help">Preenche automaticamente com séries + ano + turno (você pode editar).</div>
+          </div>
+          <div>
+            <label class="label">Professor(a) (opcional)</label>
+            <select id="prof" class="input">
+              <option value="">— selecione —</option>
+            </select>
+            <div class="help" id="profHelp">Carregando professores...</div>
+          </div>
+        </div>
+
+        <!-- ID da turma: mantido como input (usado pelo script), mas escondido visualmente -->
+        <input id="turmaId" class="input readonly" readonly style="display:none">
+        <div class="id-badge-row">
+          <span class="label-inline">ID da turma:</span>
+          <span class="id-badge" id="turmaIdBadge">—</span>
+        </div>
+        <div class="help">Formato: <span class="mono">ATUR|ANO|TURNO|SÉRIES</span> (opção A).</div>
+      </div>
+
+      <div class="row" style="margin-top:18px;justify-content:space-between;gap:10px;align-items:center">
+        <div class="pill" id="dbInfo">DB: —</div>
+        <div class="row" style="gap:10px;justify-content:flex-end">
+          <button class="btn ghost" id="btnResetForm" type="button">Limpar formulário</button>
+          <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
+        </div>
+      </div>
+
+      <div class="info-note">
+        <strong>Dica:</strong> por enquanto esta tela cadastra/edita <em>apenas turmas</em>. No próximo passo, vamos vincular alunos via <span class="mono">matriculaId</span> (alunoId + turmaId) para cadastro/import coletivo.
+      </div>
     </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <h2 style="margin:0">Turmas cadastradas</h2>
+        <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
+        <span id="countTurmasLista" class="help" style="margin:0"></span>
+      </div>
+      <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Excluir</b> remove somente do banco do Ano Ativo.</div>
+      <div id="listaTurmas" class="list"></div>
+    </div>
+
+  </div>
 </main>
 
 
@@ -1059,7 +1139,10 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
   function syncDerived(){
     const turmaIdEl = $("turmaId");
-    if(turmaIdEl) turmaIdEl.value = buildTurmaIdPreview();
+    const previewId = buildTurmaIdPreview();
+    if(turmaIdEl) turmaIdEl.value = previewId;
+    const turmaIdBadge = $("turmaIdBadge");
+    if(turmaIdBadge) turmaIdBadge.textContent = previewId || "—";
     if(!nomeManual){
       const nomeEl = $("nomeTurma");
       if(nomeEl) nomeEl.value = buildNomeAuto();
@@ -1100,7 +1183,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
     for(const t of turmas){
       const div = document.createElement("div");
-      div.className = "item";
+      div.className = "item" + (editingTurmaId === t.turmaId ? " editing" : "");
 
       const left = document.createElement("div");
       left.className = "left";
@@ -1208,6 +1291,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
     renderChips();
     syncDerived();
+    renderListaTurmas();
     window.scrollTo({top:0, behavior:"smooth"});
   }
 
@@ -1229,6 +1313,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
     renderChips();
     syncDerived();
+    renderListaTurmas();
   }
 
   function salvarTurma(){
