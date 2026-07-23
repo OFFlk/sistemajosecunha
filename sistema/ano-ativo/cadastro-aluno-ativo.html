@@ -15,6 +15,7 @@
 </script>
 
 <!-- Scripts globais -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../matricula-utils.js"></script>
@@ -282,7 +283,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
   padding: 14px 18px; margin-bottom: 16px;
   transition: background 0.3s, border-color 0.3s;
 }
-.wz-step { display: flex; align-items: center; gap: 10px; flex: 1; }
+.wz-step { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
 .wz-step-num {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -1314,13 +1315,33 @@ function normSerie(s){
     return Array.isArray(mats) ? mats : [];
   }
 
+  function _validarEnderecoTudoOuNada(){
+    const campos = {
+      zona:       (document.getElementById('compZona')?.value||'').trim(),
+      cep:        (document.getElementById('compCEP')?.value||'').trim(),
+      logradouro: (document.getElementById('compLogradouro')?.value||'').trim(),
+      uf:         (document.getElementById('compUF')?.value||'').trim(),
+      cidade:     (document.getElementById('compCidade')?.value||'').trim(),
+    };
+    const valores = Object.values(campos);
+    const algumPreenchido  = valores.some(v => v);
+    const todosPreenchidos = valores.every(v => v);
+    if(algumPreenchido && !todosPreenchidos){
+      return 'Endereço incompleto: se preencher um campo do endereço (zona, CEP, logradouro, UF ou cidade), os demais também precisam ser preenchidos.';
+    }
+    return null;
+  }
+
   function setMsg(text, kind){
+    // O span "msgForm" antigo ficava fora de vista quando a página estava
+    // rolada — some sempre e vira toast fixo (independe de scroll).
     const el = document.getElementById("msgForm");
-    if(!el) return;
+    if(el) el.style.display = "none";
     const t = (text||"").toString();
-    el.textContent = t;
-    el.style.display = t ? "block" : "none";
-    el.style.color = kind === "err" ? "#b91c1c" : (kind==="ok" ? "#166534" : "var(--muted)");
+    if(!t) return;
+    if(kind === "err") _toastErro('⚠️ ' + t);
+    else if(kind === "ok") _toastSucesso('✅ ' + t);
+    else _toastErro(t);
   }
 
   // ---------- UI refs ----------
@@ -1668,6 +1689,8 @@ function normSerie(s){
     const erroNee = window._neeValidar();
     if(erroNee) return setMsg(erroNee, "err");
   }
+  const erroEndereco = _validarEnderecoTudoOuNada();
+  if(erroEndereco) return setMsg(erroEndereco, "err");
 
   const naturalidade = natCidade + "/" + natUF.toUpperCase();
   const idade = calcAge(nascVal);
@@ -1891,6 +1914,8 @@ function normSerie(s){
       const erroNee = window._neeValidar();
       if(erroNee) return _toastErro('⚠️ ' + erroNee);
     }
+    const erroEndereco = _validarEnderecoTudoOuNada();
+    if(erroEndereco) return _toastErro('⚠️ ' + erroEndereco);
 
     try{
       setMsg('Salvando…','');
@@ -1911,27 +1936,41 @@ function normSerie(s){
     }
   }
 
-  // Toast fixo — aparece no centro da tela independente do scroll
+  // Toast fixo — aparece no centro/base da tela, independente do scroll
   function _toastSucesso(msg){
-    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)');
+    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
   }
   function _toastErro(msg){
-    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)');
+    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
   }
-  function _showToast(msg, bg, shadow){
+  function _showToast(msg, bg, shadow, duration){
     const existing = document.getElementById('_toastGlobal');
     if(existing) existing.remove();
     const toast = document.createElement('div');
     toast.id = '_toastGlobal';
     toast.style.cssText =
       `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
       `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-      `font-size:14px;font-weight:800;padding:12px 24px;border-radius:12px;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
       `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-      `animation:fadeSlide .25s ease;white-space:nowrap;max-width:90vw;text-align:center;`;
-    toast.textContent = msg;
+      `animation:fadeSlide .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2500);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
   }
 
   // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──────────────────────────────
@@ -2344,6 +2383,16 @@ function normSerie(s){
     };
     document.getElementById('btnProximo')?.addEventListener('click', irEtapa2);
     document.getElementById('btnVoltar')?.addEventListener('click', voltarEtapa1);
+
+    // Navegação livre clicando no número/nome da etapa no stepper (como no Educacenso)
+    document.getElementById('wzStep1')?.addEventListener('click', () => {
+      if(document.getElementById('wzEtapa1')?.classList.contains('ativa')) return;
+      voltarEtapa1();
+    });
+    document.getElementById('wzStep2')?.addEventListener('click', () => {
+      if(document.getElementById('wzEtapa2')?.classList.contains('ativa')) return;
+      irEtapa2();
+    });
 
     // "Salvar" na etapa 1 dispara inserirAluno direto (sem ir para etapa 2)
     document.getElementById('btnSalvarEtapa1')?.addEventListener('click', inserirAluno);
@@ -3149,6 +3198,7 @@ function normSerie(s){
     loadTurmaOptions();
     refreshTurmaInfo();
     renderMatriculados();
+    Loading.esconder();
   })();
 
 })();
