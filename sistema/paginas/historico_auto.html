@@ -125,17 +125,9 @@ html[data-theme="dark"] .btn-serie:hover { background: var(--brand-faded-d, rgba
 @media(max-width:540px){ .row{grid-template-columns:1fr;} }
 .campo{ display:flex; flex-direction:column; min-width:0; }
 label{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block; }
-input, select {
-  padding: 10px 12px; font-size: 14px; width: 100%;
-  border: 1px solid var(--field-border); border-radius: 10px;
-  background: var(--field-bg); color: var(--ink);
-  outline: none; font-family: 'Nunito', sans-serif;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-input:focus, select:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
-html[data-theme="dark"] input, html[data-theme="dark"] select {
-  background: var(--field-bg); color: var(--ink); border-color: var(--field-border);
-}
+/* input/select consolidados mais abaixo, escopados a .wrap (evita vazar pro
+   <select> do header/school-pill) — este bloco duplicava o de baixo e
+   ainda tinha o mesmo bug de seletor solto, então foi removido */
 .form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
 .actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
 
@@ -172,36 +164,39 @@ th.th-nota, td.col-nota{ width:42px; font-size:11px; }
 .grid2 { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:10px; }
 @media(max-width:760px){ .grid2{ grid-template-columns:1fr; } }
 label { font-size:13px; color:var(--text); font-weight:700; margin-bottom:6px; display:block; }
-input, select, textarea {
+/* Escopado a .wrap: o header (fetch de header-component.html) fica FORA do
+   .wrap, então esses seletores nunca tocam no <select> do school-pill nem
+   nos <button> do menu do usuário (theme-toggle, menu-btn). */
+.wrap input, .wrap select, .wrap textarea {
   width:100%; box-sizing:border-box;
   border:1px solid var(--field-border); border-radius:10px;
   background:var(--field-bg); color:var(--ink);
   outline:none; font-size:14px; font-family:'Nunito',sans-serif;
   padding:10px 12px; transition:border-color 0.15s, box-shadow 0.15s;
 }
-input:focus, select:focus, textarea:focus { border-color:var(--brand,#7c3aed); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
-html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea {
+.wrap input:focus, .wrap select:focus, .wrap textarea:focus { border-color:var(--brand,#7c3aed); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
+html[data-theme="dark"] .wrap input, html[data-theme="dark"] .wrap select, html[data-theme="dark"] .wrap textarea {
   background:var(--field-bg); border-color:var(--brand-border-d, var(--brand-border, #7c3aed)); color:var(--ink);
 }
-html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder { color:rgba(226,232,240,0.45); }
-textarea { min-height:180px; font-family:Consolas,monospace; font-size:12px; }
+html[data-theme="dark"] .wrap input::placeholder, html[data-theme="dark"] .wrap textarea::placeholder { color:rgba(226,232,240,0.45); }
+.wrap textarea { min-height:180px; font-family:Consolas,monospace; font-size:12px; }
 .mini-input { border-radius:8px; padding:6px 8px; font-size:12px; border:1px solid var(--field-border); }
-button, .btn {
+.wrap button, .wrap .btn {
   border:1px solid var(--border); cursor:pointer; padding:9px 14px; border-radius:10px;
   font-weight:700; background:var(--card); color:var(--ink);
   text-decoration:none; display:inline-flex; align-items:center; gap:7px;
   font-family:'Nunito',sans-serif; font-size:14px; white-space:nowrap;
   transition:background 0.18s, border-color 0.18s;
 }
-button:not(.gray):not(.out):not(.theme-toggle):not(.theme-toggle-compact), .btn:not(.gray):not(.out) { background:var(--brand,#7c3aed); border-color:var(--brand,#7c3aed); color:#fff; }
-button:not(.gray):not(.out):not(.theme-toggle):not(.theme-toggle-compact):hover, .btn:not(.gray):not(.out):hover { background:var(--brand-hover,#6d28d9); border-color:var(--brand-hover,#6d28d9); }
-html[data-theme="dark"] button:not(.gray):not(.out):not(.theme-toggle):not(.theme-toggle-compact), html[data-theme="dark"] .btn:not(.gray):not(.out) { background:var(--brand-d,#7c3aed); border-color:var(--brand-d,#7c3aed); }
-button.gray, .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
-button.gray:hover, .btn.gray:hover { background:var(--brand-faded,#f5f3ff); border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
-button.out, .btn.out { background:transparent; border:1px solid var(--brand,#7c3aed); color:var(--brand,#7c3aed); }
-button.out:hover, .btn.out:hover { background:var(--brand-faded,#f5f3ff); }
-html[data-theme="dark"] button.out, html[data-theme="dark"] .btn.out { border-color:var(--brand-d,#7c3aed); color:var(--brand-d,#7c3aed); }
-html[data-theme="dark"] button.gray, html[data-theme="dark"] .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
+.wrap button:not(.gray):not(.out), .wrap .btn:not(.gray):not(.out) { background:var(--brand,#7c3aed); border-color:var(--brand,#7c3aed); color:#fff; }
+.wrap button:not(.gray):not(.out):hover, .wrap .btn:not(.gray):not(.out):hover { background:var(--brand-hover,#6d28d9); border-color:var(--brand-hover,#6d28d9); }
+html[data-theme="dark"] .wrap button:not(.gray):not(.out), html[data-theme="dark"] .wrap .btn:not(.gray):not(.out) { background:var(--brand-d,#7c3aed); border-color:var(--brand-d,#7c3aed); }
+.wrap button.gray, .wrap .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
+.wrap button.gray:hover, .wrap .btn.gray:hover { background:var(--brand-faded,#f5f3ff); border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
+.wrap button.out, .wrap .btn.out { background:transparent; border:1px solid var(--brand,#7c3aed); color:var(--brand,#7c3aed); }
+.wrap button.out:hover, .wrap .btn.out:hover { background:var(--brand-faded,#f5f3ff); }
+html[data-theme="dark"] .wrap button.out, html[data-theme="dark"] .wrap .btn.out { border-color:var(--brand-d,#7c3aed); color:var(--brand-d,#7c3aed); }
+html[data-theme="dark"] .wrap button.gray, html[data-theme="dark"] .wrap .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
 .toolbar { display:flex; gap:8px; flex-wrap:wrap; }
 table { width:100%; border-collapse:collapse; font-size:12px; }
 th, td { border:1px solid var(--border); padding:6px; vertical-align:top; }
@@ -2051,59 +2046,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 </script>
 
 
-<!-- =============================================
-     SCRIPT — Tema claro/escuro
-============================================= -->
-
-
-<!-- =============================================
-     SCRIPT — Chip de usuário + chip de escola
-============================================= -->
-<!-- =============================================
-     SCRIPT 2 — Chip de usuário + chip de escola
-     Renderiza após o Firebase resolver (auth:ready)
-     e re-renderiza se a sessão mudar.
-============================================= -->
+<!-- header-logic (monta header, tema, chip, auth guard) -->
 <script src="../header-logic.js"></script>
-<script>
-(function(){
-  function safeParse(json, fallback){
-    try{ const v = JSON.parse(json); return (v == null ? fallback : v); }catch(_){ return fallback; }
-  }
-
-  function getSession(){
-    if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
-    return safeParse(localStorage.getItem('auth_session_v2') || 'null', null);
-  }
-
-  function listSchools(){
-    if (window.Auth && typeof Auth.listSchools === 'function') return Auth.listSchools() || [];
-    return safeParse(localStorage.getItem('auth_schools_v1') || '[]', []);
-  }
-
-  function getActiveSchoolId(session){
-    if (!session) return null;
-    const sid = (session.schoolId || '').toString();
-    if (sid.toUpperCase() !== 'ADMIN') return sid;
-    return (localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
-  }
-
-
-  function boot(){
-    try{
- }catch(e){ console.warn('headerContext:', e); }
-  }
-
-  // Renderiza imediatamente (cache do localStorage)
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
-
-  // ✅ Re-renderiza quando Firebase resolver o perfil (dados frescos do Firestore)
-  document.addEventListener('auth:ready', boot);
-  // ✅ Re-renderiza se a sessão mudar (logout em outra aba, troca de usuário)
-  document.addEventListener('auth:sessionChanged', boot);
-
-})();
-</script>
 </body>
 </html>
