@@ -144,15 +144,19 @@ html[data-theme="dark"] .btn-serie { border-color: var(--brand-d, #7c3aed); colo
 @media(max-width:540px){ .row{grid-template-columns:1fr;} }
 .campo{ display:flex; flex-direction:column; min-width:0; }
 label{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block; }
-input, select {
+/* Esta página não tem nenhum <select> próprio — o único <select> do DOM é o
+   do school-pill no header (fetch de header-component.html). Por isso o
+   seletor aqui mira só em "input", nunca em "select", evitando reproduzir
+   o vazamento que pegava o select do header no tema escuro. */
+input {
   padding: 10px 12px; font-size: 14px; width: 100%;
   border: 1px solid var(--field-border); border-radius: 10px;
   background: var(--field-bg); color: var(--ink);
   outline: none; font-family: 'Nunito', sans-serif;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-input:focus, select:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
-html[data-theme="dark"] input, html[data-theme="dark"] select {
+input:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+html[data-theme="dark"] input {
   background: var(--field-bg); color: var(--ink); border-color: var(--field-border);
 }
 .form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
