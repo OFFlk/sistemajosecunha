@@ -69,6 +69,19 @@ h1      { font-size: 26px; margin: 0 0 4px; font-weight: 800; }
 .statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 .chips      { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chip       { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-bg); background: var(--chip-bg); color: var(--chip-color); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+
+/* Badge do ano ativo */
+.pill-ano-ativo {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--brand-faded); border: 1.5px solid var(--brand-border, #ddd6fe);
+  color: var(--brand-text); padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 800; white-space: nowrap;
+}
+.pill-ano-ativo b { font-weight: 900; }
+html[data-theme="dark"] .pill-ano-ativo {
+  background: var(--brand-faded-d); border-color: var(--brand-border-d);
+  color: var(--brand-text-d);
+}
 .chip button { border: 0; background: transparent; cursor: pointer; color: var(--chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
 .divider    { height: 1px; background: var(--line); margin: 14px 0; }
 .right-col  { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
@@ -310,7 +323,7 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
       </div>
 
       <div class="right-col" style="justify-content:flex-end;padding-top:22px;">
-        <div class="pill">ano ativo: <b id="lblAnoAtivo">—</b></div>
+        <div class="pill pill-ano-ativo">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
       </div>
     </div>
 
@@ -831,6 +844,10 @@ function turmasFiltradas(){
   const ano = anoSelecionadoOuAtivo();
   const setSeries = new Set(seriesSelecionadas.map(s => normSerie(s)));
   return turmas.filter(t=>{
+    // Turma legada usada como "bucket" pra alunos aguardando readmissão —
+    // hoje isso já é coberto pelo filtro de situação, não precisa aparecer
+    // como card de turma na pesquisa.
+    if((t.nome||'').trim().toLowerCase() === 'alunos sem turmas') return false;
     if(!(!ano || String(t.anoLetivo) === String(ano))) return false;
     if(setSeries.size === 0) return true;
     const seriesDaTurma = new Set();
