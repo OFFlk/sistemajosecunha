@@ -15,6 +15,7 @@
 </script>
 
 <!-- Scripts globais -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script>window.Auth && window.Auth.requireRole ? Auth.requireRole('admin') : Auth.requireAuth();</script>
@@ -475,6 +476,8 @@
     } catch(e){
       document.getElementById("dbMeta").innerHTML = '<span style="color:var(--danger-color)">⚠️ Não foi possível ler o Firestore. Verifique o login.</span>';
     }
+
+    Loading.esconder(); // ← linha adicionada
   }
 
   document.addEventListener("DOMContentLoaded", renderMeta);
