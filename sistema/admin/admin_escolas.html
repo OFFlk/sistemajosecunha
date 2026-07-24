@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/admin_escolas.css">
 
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 </head>
@@ -415,6 +416,8 @@
     }
     await renderSchoolRows();
     refreshApprovals();
+
+    Loading.esconder(); // ← linha adicionada
   }, { once: true });
 
   document.addEventListener('auth:sessionChanged', renderSchoolRows);

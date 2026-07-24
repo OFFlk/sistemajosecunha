@@ -11,6 +11,7 @@
   document.documentElement.setAttribute('data-theme', theme);
 })();
 </script>
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../theme-colors.js"></script>
@@ -360,6 +361,8 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
   document.addEventListener('auth:ready', async function(){
     await populateSchoolSelect();
     await refresh();
+
+    Loading.esconder(); // ← linha adicionada
   }, { once: true });
 
 })();
