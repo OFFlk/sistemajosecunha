@@ -111,14 +111,13 @@
       <div class="_lo-texto" id="_loadingTexto">Carregando dados…</div>
     `;
 
-    // Insere no início do body (ou cria body se ainda não existe)
-    if (document.body) {
-      document.body.insertBefore(overlay, document.body.firstChild);
-    } else {
-      document.addEventListener('DOMContentLoaded', () => {
-        document.body.insertBefore(overlay, document.body.firstChild);
-      });
-    }
+    // Anexa direto no <html> (documentElement), que já existe assim que o
+    // parser chega neste <script> — mesmo com o script no <head>, antes do
+    // <body> ser criado. Como o overlay é position:fixed, funciona igual
+    // estando fora do <body>. Antes, esperava o <body> existir (ou o
+    // DOMContentLoaded, que só dispara depois da página inteira ser
+    // parseada) — nesse intervalo o conteúdo cru da página piscava na tela.
+    document.documentElement.appendChild(overlay);
 
     return overlay;
   }
