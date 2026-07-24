@@ -15,6 +15,7 @@
 </script>
 
 <!-- Scripts globais -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script>window.Auth && (Auth.requireRole ? Auth.requireRole('admin') : Auth.requireAuth());</script>
@@ -201,7 +202,10 @@ async function renderMeta(){
   document.getElementById('dbWarn').style.display=gerouAux?'none':'block';
 }
 
-document.addEventListener('DOMContentLoaded',function(){ renderMeta(); initAnoAtivo(); });
+document.addEventListener('DOMContentLoaded', async function(){
+  await Promise.all([renderMeta(), initAnoAtivo()]);
+  Loading.esconder(); // ← linha adicionada
+});
 </script>
 
 </body>
