@@ -106,17 +106,19 @@
 
   /* Form */
   label{display:block;font-weight:700;margin-bottom:6px;font-size:13px;}
-  input,select,textarea{
+  /* Escopado a .container: o header (fetch de header-component.html) fica
+     FORA do .container, então isso nunca toca no <select> do school-pill. */
+  .container input,.container select,.container textarea{
     width:100%;padding:10px 14px;border-radius:10px;
     border:1px solid var(--border);
     background:var(--card);color:var(--text);
     outline:none;font-family:'Nunito',system-ui,sans-serif;font-size:14px;
     transition:border-color 0.15s,box-shadow 0.15s;
   }
-  html[data-theme="dark"] input,html[data-theme="dark"] select,html[data-theme="dark"] textarea{
+  html[data-theme="dark"] .container input,html[data-theme="dark"] .container select,html[data-theme="dark"] .container textarea{
     background:#0a1426;border-color:#1e2540;
   }
-  input:focus,select:focus,textarea:focus{
+  .container input:focus,.container select:focus,.container textarea:focus{
     border-color:var(--brand,#7c3aed);
     box-shadow:0 0 0 3px rgba(0,0,0,0.06);
   }
@@ -175,7 +177,7 @@
     border-color: rgba(255,255,255,.16) !important;
   }
 
-  html[data-theme="dark"] select option{
+  html[data-theme="dark"] .container select option{
     background: #0b1220;
     color: rgba(226,232,240,.92);
   }
