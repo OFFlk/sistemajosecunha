@@ -342,17 +342,31 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
             <option value="INTEGRAL">📚 Integral</option>
           </select>
         </div>
-        <div class="field" style="min-width:160px;margin:0;">
-          <label for="selStatus">Filtrar por status</label>
-          <select id="selStatus">
-            <option value="">Todos os status</option>
-            <option value="ATIVO" selected>ATIVO</option>
-            <option value="INATIVO">INATIVO</option>
-            <option value="APROVADO">APROVADO</option>
-            <option value="REPROVADO">REPROVADO</option>
-            <option value="TRANSFERIDO">TRANSFERIDO</option>
-            <option value="DESISTENTE">DESISTENTE</option>
-            <option value="FALECIDO">FALECIDO</option>
+        <div class="field" id="blocoStatusAtivo" style="min-width:230px;margin:0;">
+          <label for="chkReadmissao" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="chkReadmissao" style="width:auto;margin:0;">
+            🔁 Somente readmissão (inativos)
+          </label>
+          <select id="selSituacao" style="display:none;margin-top:6px;width:100%;">
+            <option value="">Todas as situações</option>
+            <option value="TRANSFERIDO">Transferido</option>
+            <option value="DESISTENTE">Desistente</option>
+            <option value="FALECIDO">Faleceu</option>
+          </select>
+        </div>
+        <div class="field" id="blocoStatusPassado" style="min-width:200px;margin:0;display:none;">
+          <label for="selSituacaoPassado">Filtrar por situação</label>
+          <select id="selSituacaoPassado">
+            <option value="">Todas as situações</option>
+            <optgroup label="Concluíram o ano">
+              <option value="APROVADO">Aprovado</option>
+              <option value="REPROVADO">Reprovado</option>
+            </optgroup>
+            <optgroup label="Saíram durante o ano">
+              <option value="TRANSFERIDO">Transferido</option>
+              <option value="DESISTENTE">Desistente</option>
+              <option value="FALECIDO">Faleceu</option>
+            </optgroup>
           </select>
         </div>
       </div>
@@ -502,9 +516,22 @@ function _turnoFiltroAtual(){
   const el = document.getElementById('selTurno');
   return el ? (el.value || '') : '';
 }
-function _statusFiltroAtual(){
-  const el = document.getElementById('selStatus');
-  return el ? (el.value || '') : '';
+function _blocoStatusAtualizarVisibilidade(){
+  const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
+  const blocoAtivo = document.getElementById('blocoStatusAtivo');
+  const blocoPassado = document.getElementById('blocoStatusPassado');
+  if(blocoAtivo)   blocoAtivo.style.display   = ehAtivo ? '' : 'none';
+  if(blocoPassado) blocoPassado.style.display = ehAtivo ? 'none' : '';
+}
+function _statusSituacaoFiltroAtual(){
+  const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
+  if(ehAtivo){
+    const marcado = document.getElementById('chkReadmissao')?.checked;
+    if(!marcado) return { status: 'ATIVO', situacao: '' };
+    return { status: 'INATIVO', situacao: document.getElementById('selSituacao')?.value || '' };
+  }
+  // Ano passado: toda matrícula já é INATIVO por definição — só a situação importa
+  return { status: '', situacao: document.getElementById('selSituacaoPassado')?.value || '' };
 }
 function _modeloFiltroAtual(){
   const el = document.getElementById('selModelo');
@@ -802,8 +829,9 @@ function _aplicarFiltrosComuns(list){
   if(turnoFiltro) list = list.filter(a => (a._turno||'').toUpperCase() === turnoFiltro);
   const modeloFiltro = _modeloFiltroAtual();
   if(modeloFiltro) list = list.filter(a => (a._modelo||'REGULAR').toUpperCase() === modeloFiltro);
-  const statusFiltro = _statusFiltroAtual();
+  const { status: statusFiltro, situacao: situacaoFiltro } = _statusSituacaoFiltroAtual();
   if(statusFiltro) list = list.filter(a => (a._status||'ATIVO') === statusFiltro);
+  if(situacaoFiltro) list = list.filter(a => (a._situacao||'') === situacaoFiltro);
   const q = normText(inpBusca.value.trim());
   if(q) list = list.filter(a=> normText(`${a.nome} ${a.alunoId} ${a.cpf} ${a.serie}`).includes(q));
   return list;
@@ -832,6 +860,7 @@ function _enriquecerComMeta(list){
       ...a,
       _turno:  (mat && mat.turno)  ? mat.turno.toUpperCase()  : (a.turno||''),
       _status: (mat && mat.status) ? mat.status.toUpperCase() : (a.status||'ATIVO').toUpperCase(),
+      _situacao: (mat && mat.situacao) ? mat.situacao.toUpperCase() : '',
       _modelo: (mat && mat.modelo) ? mat.modelo.toUpperCase() : 'REGULAR',
     };
   });
@@ -1677,10 +1706,16 @@ document.getElementById("btnAddSerie").addEventListener("click", ()=>{
 });
 document.getElementById("btnLimparSeries").addEventListener("click", ()=>{ seriesSelecionadas = []; renderChips(); atualizarListas(); });
 inpBusca.addEventListener("input", ()=>{ atualizarListaAlunos(); });
-selAno.addEventListener("change", ()=>{ _jaFoiPesquisado = true; atualizarListas(); });
+selAno.addEventListener("change", ()=>{ _jaFoiPesquisado = true; _blocoStatusAtualizarVisibilidade(); atualizarListas(); });
 document.getElementById("selTurno").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 document.getElementById("selModelo").addEventListener("change", ()=>{ atualizarListaAlunos(); });
-document.getElementById("selStatus").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
+  const sel = document.getElementById("selSituacao");
+  if(sel) sel.style.display = e.target.checked ? "" : "none";
+  atualizarListaAlunos();
+});
+document.getElementById("selSituacao").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("selSituacaoPassado").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 
 sortField.addEventListener("change", ()=>{ currentSortField = sortField.value; atualizarListaAlunos(); });
 btnToggleSort.addEventListener("click", ()=>{
@@ -1893,7 +1928,9 @@ function salvarEstadoPagina(){
     sortOrder: currentSortOrder,
     turnoFiltro: document.getElementById("selTurno")?.value || '',
     modeloFiltro: document.getElementById("selModelo")?.value || '',
-    statusFiltro: document.getElementById("selStatus")?.value || '',
+    readmissaoMarcado: document.getElementById("chkReadmissao")?.checked || false,
+    situacaoFiltro: document.getElementById("selSituacao")?.value || '',
+    situacaoPassadoFiltro: document.getElementById("selSituacaoPassado")?.value || '',
     modoFiltro: document.querySelector('input[name="modoFiltro"]:checked')?.value || 'turma',
     turmaSort: currentTurmaSort
   };
@@ -1915,7 +1952,13 @@ function restaurarEstadoPagina(){
     if(estado.sortOrder) currentSortOrder = estado.sortOrder;
     if(estado.turnoFiltro) document.getElementById("selTurno").value = estado.turnoFiltro;
     if(estado.modeloFiltro) document.getElementById("selModelo").value = estado.modeloFiltro;
-    if(estado.statusFiltro) document.getElementById("selStatus").value = estado.statusFiltro;
+    if(estado.readmissaoMarcado){
+      const chk = document.getElementById("chkReadmissao");
+      if(chk){ chk.checked = true; const sel = document.getElementById("selSituacao"); if(sel) sel.style.display = ""; }
+    }
+    if(estado.situacaoFiltro) document.getElementById("selSituacao").value = estado.situacaoFiltro;
+    if(estado.situacaoPassadoFiltro) document.getElementById("selSituacaoPassado").value = estado.situacaoPassadoFiltro;
+    _blocoStatusAtualizarVisibilidade();
     if(estado.modoFiltro){
       const radio = document.querySelector(`input[name="modoFiltro"][value="${estado.modoFiltro}"]`);
       if(radio) radio.checked = true;
@@ -1963,6 +2006,7 @@ function restaurarEstadoPagina(){
   
   if(!estadoRestaurado){
     renderChips();
+    _blocoStatusAtualizarVisibilidade();
     if(anoAtivo && selAno.value){
       _jaFoiPesquisado = true;
       atualizarListas();
