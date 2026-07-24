@@ -222,6 +222,10 @@ html[data-theme="dark"] .turno-btn.selected { background: var(--chip-bg); border
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 .integral-toggle { display: flex; gap: 6px; }
 .integral-btn {
   padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
@@ -1954,7 +1958,7 @@ function normSerie(s){
       `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
       `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
       `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-      `animation:fadeSlide .25s ease;max-width:min(90vw,480px);text-align:left;`;
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
     const span = document.createElement('span');
     span.textContent = msg;
     span.style.cssText = 'flex:1;line-height:1.4;';
