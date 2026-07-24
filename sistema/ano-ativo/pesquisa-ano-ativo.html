@@ -354,19 +354,15 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
             <option value="FALECIDO">Faleceu</option>
           </select>
         </div>
-        <div class="field" id="blocoStatusPassado" style="min-width:200px;margin:0;display:none;">
-          <label for="selSituacaoPassado">Filtrar por situação</label>
-          <select id="selSituacaoPassado">
-            <option value="">Todas as situações</option>
-            <optgroup label="Concluíram o ano">
-              <option value="APROVADO">Aprovado</option>
-              <option value="REPROVADO">Reprovado</option>
-            </optgroup>
-            <optgroup label="Saíram durante o ano">
-              <option value="TRANSFERIDO">Transferido</option>
-              <option value="DESISTENTE">Desistente</option>
-              <option value="FALECIDO">Faleceu</option>
-            </optgroup>
+        <div class="field" id="blocoStatusPassado" style="min-width:230px;margin:0;display:none;">
+          <label for="chkNaoConcluintes" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="chkNaoConcluintes" style="width:auto;margin:0;">
+            🚪 Não concluíram o ano
+          </label>
+          <select id="selSituacaoPassado" style="margin-top:6px;width:100%;">
+            <option value="">Todas (concluíram o ano)</option>
+            <option value="APROVADO">Aprovado</option>
+            <option value="REPROVADO">Reprovado</option>
           </select>
         </div>
       </div>
@@ -527,11 +523,34 @@ function _statusSituacaoFiltroAtual(){
   const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
   if(ehAtivo){
     const marcado = document.getElementById('chkReadmissao')?.checked;
-    if(!marcado) return { status: 'ATIVO', situacao: '' };
-    return { status: 'INATIVO', situacao: document.getElementById('selSituacao')?.value || '' };
+    if(!marcado) return { status: 'ATIVO', situacao: '', situacaoIn: null };
+    return { status: 'INATIVO', situacao: document.getElementById('selSituacao')?.value || '', situacaoIn: null };
   }
-  // Ano passado: toda matrícula já é INATIVO por definição — só a situação importa
-  return { status: '', situacao: document.getElementById('selSituacaoPassado')?.value || '' };
+  // Ano passado: sem conceito de status (sempre INATIVO) — só a situação importa.
+  // Checkbox alterna entre o universo "concluíram" (aprovado/reprovado) e
+  // "não concluíram" (transferido/desistente/faleceu); com "Todas" selecionado
+  // no select, filtra o GRUPO inteiro de uma vez (sem precisar ir situação por
+  // situação e anotar manualmente).
+  const naoConcluintes = document.getElementById('chkNaoConcluintes')?.checked;
+  const selVal = document.getElementById('selSituacaoPassado')?.value || '';
+  const grupo = naoConcluintes ? ['TRANSFERIDO','DESISTENTE','FALECIDO'] : ['APROVADO','REPROVADO'];
+  return { status: '', situacao: selVal, situacaoIn: selVal ? null : grupo };
+}
+function _atualizarOpcoesSituacaoPassado(){
+  const sel = document.getElementById('selSituacaoPassado');
+  if(!sel) return;
+  const naoConcluintes = document.getElementById('chkNaoConcluintes')?.checked;
+  const valorAtual = sel.value;
+  sel.innerHTML = naoConcluintes
+    ? `<option value="">Todas (não concluíram)</option>
+       <option value="TRANSFERIDO">Transferido</option>
+       <option value="DESISTENTE">Desistente</option>
+       <option value="FALECIDO">Faleceu</option>`
+    : `<option value="">Todas (concluíram o ano)</option>
+       <option value="APROVADO">Aprovado</option>
+       <option value="REPROVADO">Reprovado</option>`;
+  // Mantém o valor escolhido se ele ainda existir entre as novas opções
+  sel.value = [...sel.options].some(o => o.value === valorAtual) ? valorAtual : '';
 }
 function _modeloFiltroAtual(){
   const el = document.getElementById('selModelo');
@@ -829,9 +848,10 @@ function _aplicarFiltrosComuns(list){
   if(turnoFiltro) list = list.filter(a => (a._turno||'').toUpperCase() === turnoFiltro);
   const modeloFiltro = _modeloFiltroAtual();
   if(modeloFiltro) list = list.filter(a => (a._modelo||'REGULAR').toUpperCase() === modeloFiltro);
-  const { status: statusFiltro, situacao: situacaoFiltro } = _statusSituacaoFiltroAtual();
+  const { status: statusFiltro, situacao: situacaoFiltro, situacaoIn } = _statusSituacaoFiltroAtual();
   if(statusFiltro) list = list.filter(a => (a._status||'ATIVO') === statusFiltro);
   if(situacaoFiltro) list = list.filter(a => (a._situacao||'') === situacaoFiltro);
+  else if(situacaoIn) list = list.filter(a => situacaoIn.includes(a._situacao||''));
   const q = normText(inpBusca.value.trim());
   if(q) list = list.filter(a=> normText(`${a.nome} ${a.alunoId} ${a.cpf} ${a.serie}`).includes(q));
   return list;
@@ -1715,6 +1735,10 @@ document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
   atualizarListaAlunos();
 });
 document.getElementById("selSituacao").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
+  _atualizarOpcoesSituacaoPassado();
+  atualizarListaAlunos();
+});
 document.getElementById("selSituacaoPassado").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 
 sortField.addEventListener("change", ()=>{ currentSortField = sortField.value; atualizarListaAlunos(); });
@@ -1930,6 +1954,7 @@ function salvarEstadoPagina(){
     modeloFiltro: document.getElementById("selModelo")?.value || '',
     readmissaoMarcado: document.getElementById("chkReadmissao")?.checked || false,
     situacaoFiltro: document.getElementById("selSituacao")?.value || '',
+    naoConcluintesMarcado: document.getElementById("chkNaoConcluintes")?.checked || false,
     situacaoPassadoFiltro: document.getElementById("selSituacaoPassado")?.value || '',
     modoFiltro: document.querySelector('input[name="modoFiltro"]:checked')?.value || 'turma',
     turmaSort: currentTurmaSort
@@ -1957,6 +1982,11 @@ function restaurarEstadoPagina(){
       if(chk){ chk.checked = true; const sel = document.getElementById("selSituacao"); if(sel) sel.style.display = ""; }
     }
     if(estado.situacaoFiltro) document.getElementById("selSituacao").value = estado.situacaoFiltro;
+    if(estado.naoConcluintesMarcado){
+      const chk = document.getElementById("chkNaoConcluintes");
+      if(chk) chk.checked = true;
+    }
+    _atualizarOpcoesSituacaoPassado();
     if(estado.situacaoPassadoFiltro) document.getElementById("selSituacaoPassado").value = estado.situacaoPassadoFiltro;
     _blocoStatusAtualizarVisibilidade();
     if(estado.modoFiltro){
