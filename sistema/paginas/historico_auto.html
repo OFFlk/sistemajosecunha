@@ -10,6 +10,7 @@
   document.documentElement.setAttribute('data-theme', saved);
 })();
 </script>
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -1865,6 +1866,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('qAluno').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); pesquisar(); }});
   // autoSearch já adicionado pelo oninput no input, mas garante também aqui
   document.getElementById('qAluno').addEventListener('input', ev=>{ if((ev.target.value||'').trim().length>=3) pesquisar(); });
+
+  Loading.esconder(); // ← linha adicionada
 });
 </script>
 
