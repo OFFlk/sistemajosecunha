@@ -550,7 +550,7 @@ function _normalizarAlunosDB(arr){
   return arr.map(a => ({...a, id: a.id||a.alunoId||'', nomeOficial: a.nomeOficial||a.nome||''}));
 }
 
-function carregarDB(){
+async function carregarDB(){
   // 1) Carrega do localStorage IMEDIATAMENTE — UI disponível em < 100ms
   state.db = {
     dadosEscola:  getLS(__getDadosEscolaKey(), {}) || getLS('dadosEscola', {}),
@@ -563,29 +563,27 @@ function carregarDB(){
   _atualizarDbInfo();
   _prePopulaEscolaFields();
 
-  // 2) Atualiza do Firestore em background (não bloqueia a UI)
+  // 2) Atualiza do Firestore (aguardado pelo chamador, mas não bloqueia a UI —
+  //    os campos já foram pré-preenchidos com o cache acima)
   if(window.DB && typeof DB.loadAll === 'function'){
-    (async ()=>{
-      try{
-        // Espera Auth ficar pronto (mas não mais que 8s)
-        await new Promise(res=>{
-          if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-          if(!window.Auth) return res();
-          const t = setTimeout(res, 8000);
-          document.addEventListener('auth:ready', ()=>{ clearTimeout(t); res(); }, {once:true});
-        });
-        const dados = await DB.loadAll();
-        if(dados && Array.isArray(dados.turmasDB)){
-          dados.alunosDB = _normalizarAlunosDB(dados.alunosDB);
-          state.db = dados;
-          construirIndex();
-          _atualizarDbInfo();
-          _prePopulaEscolaFields();
-        }
-      }catch(e){ console.warn('carregarDB Firestore:', e); }
-    })();
+    try{
+      // Espera Auth ficar pronto (mas não mais que 8s)
+      await new Promise(res=>{
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        if(!window.Auth) return res();
+        const t = setTimeout(res, 8000);
+        document.addEventListener('auth:ready', ()=>{ clearTimeout(t); res(); }, {once:true});
+      });
+      const dados = await DB.loadAll();
+      if(dados && Array.isArray(dados.turmasDB)){
+        dados.alunosDB = _normalizarAlunosDB(dados.alunosDB);
+        state.db = dados;
+        construirIndex();
+        _atualizarDbInfo();
+        _prePopulaEscolaFields();
+      }
+    }catch(e){ console.warn('carregarDB Firestore:', e); }
   }
-  // Retorna síncrono — chamador não precisa de await
 }
 function construirIndex(){
   const map=new Map();
@@ -1855,9 +1853,9 @@ async function importarDump(){
 }
 function onFormatoMudou(){ renderTimeline(); renderResumoEditavel(); refreshSaida(); }
 
-document.addEventListener('DOMContentLoaded', ()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
   const d=new Date(); document.getElementById('inData').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  carregarDB(); // síncrono para localStorage, atualiza do Firestore em background
+  await carregarDB(); // aguarda cache local + Firestore antes de liberar a tela
   chInitUI();
   carregarExportOpts();
   renderHistoricoExport();
