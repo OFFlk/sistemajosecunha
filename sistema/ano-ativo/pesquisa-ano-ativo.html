@@ -124,7 +124,7 @@ html[data-theme="dark"] .item.selecionavel:has(.chkAluno:checked) {
 }
 .item.selecionavel .selo-selecionado {
   display: none;
-  position: absolute; top: 10px; right: 10px;
+  position: absolute; bottom: 10px; right: 10px;
   width: 22px; height: 22px; border-radius: 50%;
   background: var(--brand, #6d28d9); color: #fff;
   align-items: center; justify-content: center;
@@ -347,12 +347,9 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
         <div style="display:flex;gap:8px;align-items:stretch;">
           <input id="inpBusca" type="text" placeholder="Ex.: 000, Maria, ALU-000123..." style="flex:1;"/>
           <button class="btn primary" id="btnAtualizar" style="white-space:nowrap;flex-shrink:0;">🔍 Pesquisar</button>
+          <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;">🧹 Limpar filtros</button>
         </div>
         <div class="help">&nbsp;</div>
-      </div>
-
-      <div class="right-col" style="justify-content:flex-end;padding-top:22px;">
-        <div class="pill pill-ano-ativo">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
       </div>
     </div>
 
@@ -407,7 +404,7 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
             <option value="REPROVADO">Reprovado</option>
           </select>
         </div>
-        <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;align-self:center;">🧹 Limpar filtros</button>
+        <div class="pill pill-ano-ativo" style="flex-shrink:0;align-self:center;">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
       </div>
 
       <!-- radio modoFiltro oculto mas mantido para não quebrar o JS -->
