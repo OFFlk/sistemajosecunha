@@ -69,8 +69,9 @@
   const POR_PAG    = 20;
   let _anoAtivo    = '';   // controlado pelo select
 
-  // Ordenação: { col: string|null, dir: 1 (asc) | -1 (desc) | 0 (none) }
-  let sortState = { col: null, dir: 0 };
+  // Ordenação: campo selecionado no <select> + botão de alternar direção
+  let currentSortField = 'nome';
+  let currentSortOrder = 'asc'; // 'asc' | 'desc'
 
   /* ══════════════════════════════════════════
      Exportar dados filtrados para outras funções
@@ -208,7 +209,8 @@
   const chkVes     = document.getElementById('fVes');
   const chkNot     = document.getElementById('fNot');
   const turnoHint  = document.getElementById('turnoHint');
-  const tbody      = document.getElementById('tbodyPesquisa');
+  const lista      = document.getElementById('listaFuncionarios');
+  const countEl    = document.getElementById('countFuncionarios');
   const pillTotal  = document.getElementById('pillTotal');
   const subRes     = document.getElementById('subResultados');
   const statsRow   = document.getElementById('statsRow');
@@ -216,6 +218,8 @@
   const pagInfo    = document.getElementById('pagInfo');
   const btnAnterior = document.getElementById('btnPagAnterior');
   const btnProximo  = document.getElementById('btnPagProximo');
+  const sortFieldEl = document.getElementById('sortField');
+  const btnToggleSort = document.getElementById('btnToggleSort');
 
   /* ── Turno toggles visual ── */
   [chkMat, chkVes, chkNot].forEach(chk => {
@@ -292,7 +296,7 @@
     pagAtual = 1;
     aplicarOrdenacao();
     atualizarStats();
-    renderTabela();
+    renderLista();
   }
 
   /* ══════════════════════════════════════════
@@ -307,9 +311,8 @@
   }
 
   function aplicarOrdenacao(){
-    if(!sortState.col || sortState.dir === 0) return;
-    const col = sortState.col;
-    const dir = sortState.dir;
+    const col = currentSortField;
+    const dir = currentSortOrder === 'asc' ? 1 : -1;
     filtrados.sort((a, b) => {
       const va = getSortVal(a, col);
       const vb = getSortVal(b, col);
@@ -322,32 +325,17 @@
     });
   }
 
-  function initSortHeaders(){
-    document.querySelectorAll('th.sortable').forEach(th => {
-      th.addEventListener('click', function(){
-        const col = th.dataset.col;
-        if(sortState.col !== col){
-          sortState = { col, dir: 1 };
-        } else {
-          // ciclo: 1 (asc) → -1 (desc) → 0 (none)
-          if(sortState.dir === 1)       sortState.dir = -1;
-          else if(sortState.dir === -1) sortState = { col: null, dir: 0 };
-          else                          sortState = { col, dir: 1 };
-        }
-        // atualiza visual dos headers
-        document.querySelectorAll('th.sortable').forEach(h => {
-          h.classList.remove('asc','desc');
-          h.querySelector('.sort-icon').textContent = '↕';
-        });
-        if(sortState.col && sortState.dir !== 0){
-          th.classList.add(sortState.dir === 1 ? 'asc' : 'desc');
-          th.querySelector('.sort-icon').textContent = sortState.dir === 1 ? '↑' : '↓';
-        }
-        aplicarOrdenacao();
-        renderTabela();
-      });
-    });
-  }
+  sortFieldEl.addEventListener('change', function(){
+    currentSortField = sortFieldEl.value;
+    aplicarOrdenacao();
+    renderLista();
+  });
+  btnToggleSort.addEventListener('click', function(){
+    currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+    btnToggleSort.textContent = currentSortOrder === 'asc' ? '↑↓' : '↓↑';
+    aplicarOrdenacao();
+    renderLista();
+  });
 
   /* ══════════════════════════════════════════
      Stats
@@ -380,42 +368,49 @@
   }
 
   /* ══════════════════════════════════════════
-     Render tabela
+     Render lista (cards) — padrão do sistema
   ══════════════════════════════════════════ */
-  function renderTabela(){
+  function renderLista(){
     const query    = elBusca.value.trim();
     const inicio   = (pagAtual - 1) * POR_PAG;
     const pagina   = filtrados.slice(inicio, inicio + POR_PAG);
     const totalPags = Math.ceil(filtrados.length / POR_PAG);
 
+    countEl.textContent = filtrados.length;
+
     if(!filtrados.length){
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="13">Nenhum funcionário encontrado com os filtros aplicados.</td></tr>';
+      lista.innerHTML = '<div class="muted">Nenhum funcionário encontrado para os filtros aplicados.</div>';
       pagRow.style.display = 'none';
       return;
     }
 
-    tbody.innerHTML = '';
+    lista.innerHTML = '';
     pagina.forEach(f => {
-      const nat = [f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
-      const tr  = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="nome-cell">${highlight(f.nome, query)||'—'}</td>
-        <td>${highlight(f.cpf, query)||'—'}</td>
-        <td>${highlight(f.rgCnh, query)||'—'}</td>
-        <td>${escapeHtml(formatDate(f.dataNascimento)||'—')}</td>
-        <td>${escapeHtml(calcAge(f.dataNascimento)||'—')}</td>
-        <td>${escapeHtml(SEXO_LABEL[f.sexo]||f.sexo||'—')}</td>
-        <td>${highlight(nat, query)}</td>
-        <td>${escapeHtml(f.corRaca||'—')}</td>
-        <td>${highlight(f.funcao, query)||'—'}</td>
-        <td>${escapeHtml(f.cargaHoraria||'—')}</td>
-        <td style="white-space:nowrap;">${escapeHtml(turnosTexto(f.turnos))}</td>
-        <td class="status-cell"><span class="badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span></td>
-        <td class="acoes-cell">
-          <a class="btn-editar-func" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
-        </td>
+      const nat   = [f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
+      const nasc  = formatDate(f.dataNascimento) || '—';
+      const idade = calcAge(f.dataNascimento) || '—';
+      const el    = document.createElement('div');
+      el.className = 'item';
+      el.innerHTML = `
+        <div class="left">
+          <div class="title">
+            <span>${highlight(f.nome, query) || 'Sem nome'}</span>
+            <span class="badge">${highlight(f.funcao, query) || 'Sem função'}</span>
+            ${f.cargaHoraria ? `<span class="badge">${escapeHtml(f.cargaHoraria)}H</span>` : ''}
+            <span class="badge badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span>
+          </div>
+          <div class="meta">
+            CPF: ${highlight(f.cpf, query) || '—'} • RG/CNH: ${highlight(f.rgCnh, query) || '—'} •
+            Nasc: ${escapeHtml(nasc)} • Idade: ${escapeHtml(idade)} • Sexo: ${escapeHtml(SEXO_LABEL[f.sexo]||f.sexo||'—')}
+            <br>Naturalidade: ${highlight(nat, query)} • Cor/Raça: ${escapeHtml(f.corRaca||'—')} •
+            Turnos: ${escapeHtml(turnosTexto(f.turnos))}
+          </div>
+        </div>
+        <div class="right">
+          <a class="btn-edit" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
+        </div>
       `;
-      tbody.appendChild(tr);
+      lista.appendChild(el);
     });
 
     if(totalPags > 1){
@@ -458,17 +453,16 @@
   });
 
   btnAnterior.addEventListener('click', function(){
-    if(pagAtual > 1){ pagAtual--; renderTabela(); window.scrollTo({top:0,behavior:'smooth'}); }
+    if(pagAtual > 1){ pagAtual--; renderLista(); window.scrollTo({top:0,behavior:'smooth'}); }
   });
   btnProximo.addEventListener('click', function(){
     const totalPags = Math.ceil(filtrados.length / POR_PAG);
-    if(pagAtual < totalPags){ pagAtual++; renderTabela(); window.scrollTo({top:0,behavior:'smooth'}); }
+    if(pagAtual < totalPags){ pagAtual++; renderLista(); window.scrollTo({top:0,behavior:'smooth'}); }
   });
 
   /* ══════════════════════════════════════════
      Init
   ══════════════════════════════════════════ */
-  initSortHeaders();
   (async function init(){
     await carregarDB();
     await carregarAnoAtivo();
