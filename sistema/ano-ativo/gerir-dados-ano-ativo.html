@@ -16,6 +16,7 @@
 <!-- página exclusiva de ADMIN -->
 <script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -214,6 +215,74 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
     </div>
   </div>
 
+  <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secExcluirAluno')">
+      <h3 style="margin-top:0;">🗑️ Excluir aluno (registro pontual)</h3>
+      <span class="sec-toggle" id="togSecExcluirAluno">▼</span>
+    </div>
+    <div class="sec-body" id="secExcluirAluno">
+      <p class="muted">
+        Remove um único aluno: os dados pessoais (<b>anoAtivoAlunos</b>) e <b>todas</b> as
+        matrículas dele (<b>anoAtivoMatriculas</b>, de qualquer ano — não só o ano ativo),
+        além dos documentos anexados. Útil pra limpar dados de teste sem afetar o resto.
+        <b>Ação irreversível — não há como desfazer.</b>
+      </p>
+      <div class="row-btns">
+        <input type="text" id="inpAlunoIdExcluir" placeholder="alunoId (ex.: ALU-000123)"
+          style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
+          font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
+        <button class="btn btn-gray" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
+      </div>
+
+      <div id="previewAluno" style="display:none;margin-top:14px;">
+        <div id="previewAlunoInfo"></div>
+        <div id="previewAlunoMats" style="margin-top:8px;"></div>
+        <div id="previewAlunoDocs" style="margin-top:8px;"></div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:700;cursor:pointer;">
+          <input type="checkbox" id="chkApagarCatalogo" style="width:auto;margin:0;">
+          <span id="chkApagarCatalogoTxt">Também remover do catálogo/atas (coleção <code>alunos</code>)</span>
+        </label>
+        <div class="row-btns" style="margin-top:14px;">
+          <button class="btn btn-danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
+        </div>
+      </div>
+
+      <div class="console" id="logExcluirAluno" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── EXCLUSÃO PONTUAL: TURMA ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secExcluirTurma')">
+      <h3 style="margin-top:0;">🗑️ Excluir turma (registro pontual)</h3>
+      <span class="sec-toggle" id="togSecExcluirTurma">▼</span>
+    </div>
+    <div class="sec-body" id="secExcluirTurma">
+      <p class="muted">
+        Remove uma única turma (<b>anoAtivoTurmas</b>) e qualquer matrícula
+        (<b>anoAtivoMatriculas</b>) que ainda aponte pra ela, evitando matrícula órfã
+        apontando pra uma turma que não existe mais. <b>Ação irreversível.</b>
+      </p>
+      <div class="row-btns">
+        <input type="text" id="inpTurmaIdExcluir" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)"
+          style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
+          font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
+        <button class="btn btn-gray" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
+      </div>
+
+      <div id="previewTurma" style="display:none;margin-top:14px;">
+        <div id="previewTurmaInfo"></div>
+        <div id="previewTurmaMats" style="margin-top:8px;"></div>
+        <div class="row-btns" style="margin-top:14px;">
+          <button class="btn btn-danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
+        </div>
+      </div>
+
+      <div class="console" id="logExcluirTurma" style="display:none;"></div>
+    </div>
+  </div>
+
   <!-- ── EXPORTAR ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secExport')">
@@ -273,7 +342,9 @@ document.addEventListener('auth:ready', function () {
     [
       'btnAnalisar', 'btnMigrar',
       'btnAnalisarAlunos', 'btnMigrarAlunos',
-      'btnExportJSON', 'lblImportJSON'
+      'btnExportJSON', 'lblImportJSON',
+      'btnBuscarAluno', 'btnExcluirAluno',
+      'btnBuscarTurma', 'btnExcluirTurma'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
@@ -284,6 +355,10 @@ document.addEventListener('auth:ready', function () {
     window.analisarMigracaoAlunos = () => {};
     window.exportarJSON           = () => {};
     window.importarJSON           = () => {};
+    window.buscarAlunoExcluir       = () => {};
+    window.executarExclusaoAluno    = () => {};
+    window.buscarTurmaExcluir       = () => {};
+    window.executarExclusaoTurma    = () => {};
   }
 
   inicializar();
@@ -763,6 +838,261 @@ async function importarJSON(event) {
   };
 
   reader.readAsText(file);
+}
+
+/* =============================================
+   EXCLUSÃO PONTUAL — ALUNO
+============================================= */
+let _alunoParaExcluir = null; // { aluno, mats, docs, noCatalogo }
+
+async function buscarAlunoExcluir() {
+  if (!IS_ADMIN) return;
+  const alunoId = document.getElementById('inpAlunoIdExcluir').value.trim();
+  document.getElementById('previewAluno').style.display = 'none';
+  clearLogEl('logExcluirAluno');
+  _alunoParaExcluir = null;
+
+  if (!alunoId) { logEl('⚠️ Informe o alunoId.', 'logExcluirAluno'); return; }
+
+  const btn = document.getElementById('btnBuscarAluno');
+  btn.disabled = true; btn.textContent = 'Buscando...';
+
+  try {
+    await waitAuth();
+    const [alunos, mats] = await Promise.all([
+      window.DB.anoAtivoAlunos.list(),
+      window.DB.anoAtivoMatriculas.list(),
+    ]);
+
+    const aluno = alunos.find(a => (a.alunoId || a._id) === alunoId);
+    if (!aluno) {
+      logEl(`❌ Nenhum aluno encontrado com alunoId "${alunoId}" em anoAtivoAlunos.`, 'logExcluirAluno');
+      return;
+    }
+
+    const matsDoAluno = mats.filter(m => m.alunoId === alunoId);
+
+    // Catálogo/atas — não trava a busca se falhar, só perde essa informação
+    let noCatalogo = false;
+    try {
+      await window.Identidade.pronto;
+      noCatalogo = window.Identidade.lerTodos().some(a => a.alunoId === alunoId);
+    } catch (e) { /* segue sem essa info */ }
+
+    // Documentos anexados — idem
+    let docs = [];
+    try {
+      const r = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(alunoId)}`);
+      const d = await r.json();
+      if (r.ok) docs = d.files || [];
+    } catch (e) { /* segue sem essa info */ }
+
+    _alunoParaExcluir = { aluno, mats: matsDoAluno, docs, noCatalogo };
+
+    const info = document.getElementById('previewAlunoInfo');
+    info.className = 'migr-item warn';
+    info.innerHTML = `<span class="badge warn">ALUNO</span> <b>${esc(aluno.nome || aluno.NOME || alunoId)}</b>` +
+      (aluno.cpf ? ' — CPF: ' + esc(aluno.cpf) : '') +
+      ` <span class="muted">(${esc(alunoId)})</span>`;
+
+    const matsEl = document.getElementById('previewAlunoMats');
+    if (matsDoAluno.length) {
+      matsEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">${matsDoAluno.length} matrícula(s) serão apagadas:</b>` +
+        matsDoAluno.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Ano ${esc(m.anoLetivo||'?')} · Turma ${esc(m.turmaId||'—')} · ${esc(m.status||'ATIVO')}${m.situacao ? ' ('+esc(m.situacao)+')' : ''}</div>`).join('');
+    } else {
+      matsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhuma matrícula encontrada pra esse aluno.</div>`;
+    }
+
+    const docsEl = document.getElementById('previewAlunoDocs');
+    if (docs.length) {
+      docsEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">${docs.length} documento(s) anexado(s) serão apagados:</b>` +
+        docs.map(f => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> ${esc(f.label || f.fileName)}</div>`).join('');
+    } else {
+      docsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum documento anexado encontrado.</div>`;
+    }
+
+    const chk = document.getElementById('chkApagarCatalogo');
+    const chkTxt = document.getElementById('chkApagarCatalogoTxt');
+    chk.checked = false;
+    if (noCatalogo) {
+      chk.disabled = false;
+      chkTxt.innerHTML = 'Também remover do catálogo/atas (coleção <code>alunos</code>)';
+    } else {
+      chk.disabled = true;
+      chkTxt.innerHTML = '<span class="muted">Não há registro deste aluno no catálogo/atas — nada a remover desse lado.</span>';
+    }
+
+    document.getElementById('previewAluno').style.display = 'block';
+    logEl(`✅ Aluno encontrado. Revise antes de excluir.`, 'logExcluirAluno');
+
+  } catch (e) {
+    logEl('❌ Erro ao buscar: ' + e.message, 'logExcluirAluno');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Buscar';
+  }
+}
+
+async function executarExclusaoAluno() {
+  if (!IS_ADMIN || !_alunoParaExcluir) return;
+  const { aluno, mats, docs } = _alunoParaExcluir;
+  const alunoId = aluno.alunoId || aluno._id;
+  const apagarCatalogo = document.getElementById('chkApagarCatalogo').checked;
+
+  if (!confirm(
+    `Excluir definitivamente o aluno "${aluno.nome || alunoId}"?\n\n` +
+    `- ${mats.length} matrícula(s)\n` +
+    `- ${docs.length} documento(s) anexado(s)\n` +
+    (apagarCatalogo ? '- Registro no catálogo/atas\n' : '') +
+    `\nEsta ação NÃO PODE ser desfeita.`
+  )) return;
+
+  const btn = document.getElementById('btnExcluirAluno');
+  btn.disabled = true; btn.textContent = 'Excluindo...';
+  clearLogEl('logExcluirAluno');
+
+  try {
+    logEl(`Excluindo aluno ${alunoId}...`, 'logExcluirAluno');
+
+    for (const m of mats) {
+      await window.DB.anoAtivoMatriculas.remove(m._id);
+      logEl(`  ✅ Matrícula ${m._id} apagada.`, 'logExcluirAluno');
+    }
+
+    await window.DB.anoAtivoAlunos.remove(alunoId);
+    logEl(`  ✅ Dados pessoais apagados (anoAtivoAlunos).`, 'logExcluirAluno');
+
+    if (apagarCatalogo) {
+      try {
+        await window.Identidade.remover(alunoId);
+        logEl(`  ✅ Registro removido do catálogo/atas.`, 'logExcluirAluno');
+      } catch (e) {
+        logEl(`  ⚠️ Falha ao remover do catálogo: ${e.message}`, 'logExcluirAluno');
+      }
+    }
+
+    for (const f of docs) {
+      try {
+        const r = await fetch('/api/drive-delete', {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: f.fileId, resourceType: f.resourceType || 'image' }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'erro desconhecido');
+        logEl(`  ✅ Documento "${f.label || f.fileName}" apagado.`, 'logExcluirAluno');
+      } catch (e) {
+        logEl(`  ⚠️ Falha ao apagar documento "${f.label || f.fileName}": ${e.message}`, 'logExcluirAluno');
+      }
+    }
+
+    logEl('', 'logExcluirAluno');
+    logEl('🎉 Exclusão concluída.', 'logExcluirAluno');
+
+    document.getElementById('previewAluno').style.display = 'none';
+    document.getElementById('inpAlunoIdExcluir').value = '';
+    _alunoParaExcluir = null;
+    await inicializar();
+
+  } catch (e) {
+    logEl('❌ Erro durante a exclusão: ' + e.message, 'logExcluirAluno');
+  } finally {
+    btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
+  }
+}
+
+/* =============================================
+   EXCLUSÃO PONTUAL — TURMA
+============================================= */
+let _turmaParaExcluir = null; // { turma, mats }
+
+async function buscarTurmaExcluir() {
+  if (!IS_ADMIN) return;
+  const turmaId = document.getElementById('inpTurmaIdExcluir').value.trim();
+  document.getElementById('previewTurma').style.display = 'none';
+  clearLogEl('logExcluirTurma');
+  _turmaParaExcluir = null;
+
+  if (!turmaId) { logEl('⚠️ Informe o turmaId.', 'logExcluirTurma'); return; }
+
+  const btn = document.getElementById('btnBuscarTurma');
+  btn.disabled = true; btn.textContent = 'Buscando...';
+
+  try {
+    await waitAuth();
+    const [turmas, mats] = await Promise.all([
+      window.DB.anoAtivoTurmas.list(),
+      window.DB.anoAtivoMatriculas.list(),
+    ]);
+
+    const turma = turmas.find(t => (t.turmaId || t._id) === turmaId);
+    if (!turma) {
+      logEl(`❌ Nenhuma turma encontrada com turmaId "${turmaId}" em anoAtivoTurmas.`, 'logExcluirTurma');
+      return;
+    }
+
+    const matsDaTurma = mats.filter(m => m.turmaId === turmaId);
+    _turmaParaExcluir = { turma, mats: matsDaTurma };
+
+    const info = document.getElementById('previewTurmaInfo');
+    info.className = 'migr-item warn';
+    info.innerHTML = `<span class="badge warn">TURMA</span> <b>${esc(turma.nome || turmaId)}</b> · Ano ${esc(turma.anoLetivo || '?')} <span class="muted">(${esc(turmaId)})</span>`;
+
+    const matsEl = document.getElementById('previewTurmaMats');
+    if (matsDaTurma.length) {
+      matsEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">⚠️ ${matsDaTurma.length} matrícula(s) apontam pra essa turma e também serão apagadas:</b>` +
+        matsDaTurma.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Aluno ${esc(m.alunoId||'—')} · Ano ${esc(m.anoLetivo||'?')} · ${esc(m.status||'ATIVO')}</div>`).join('');
+    } else {
+      matsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhuma matrícula aponta pra essa turma.</div>`;
+    }
+
+    document.getElementById('previewTurma').style.display = 'block';
+    logEl(`✅ Turma encontrada. Revise antes de excluir.`, 'logExcluirTurma');
+
+  } catch (e) {
+    logEl('❌ Erro ao buscar: ' + e.message, 'logExcluirTurma');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Buscar';
+  }
+}
+
+async function executarExclusaoTurma() {
+  if (!IS_ADMIN || !_turmaParaExcluir) return;
+  const { turma, mats } = _turmaParaExcluir;
+  const turmaId = turma.turmaId || turma._id;
+
+  if (!confirm(
+    `Excluir definitivamente a turma "${turma.nome || turmaId}"?\n\n` +
+    `- ${mats.length} matrícula(s) que apontam pra ela\n\n` +
+    `Esta ação NÃO PODE ser desfeita.`
+  )) return;
+
+  const btn = document.getElementById('btnExcluirTurma');
+  btn.disabled = true; btn.textContent = 'Excluindo...';
+  clearLogEl('logExcluirTurma');
+
+  try {
+    logEl(`Excluindo turma ${turmaId}...`, 'logExcluirTurma');
+
+    for (const m of mats) {
+      await window.DB.anoAtivoMatriculas.remove(m._id);
+      logEl(`  ✅ Matrícula ${m._id} apagada.`, 'logExcluirTurma');
+    }
+
+    await window.DB.anoAtivoTurmas.remove(turmaId);
+    logEl(`  ✅ Turma apagada (anoAtivoTurmas).`, 'logExcluirTurma');
+
+    logEl('', 'logExcluirTurma');
+    logEl('🎉 Exclusão concluída.', 'logExcluirTurma');
+
+    document.getElementById('previewTurma').style.display = 'none';
+    document.getElementById('inpTurmaIdExcluir').value = '';
+    _turmaParaExcluir = null;
+    await inicializar();
+
+  } catch (e) {
+    logEl('❌ Erro durante a exclusão: ' + e.message, 'logExcluirTurma');
+  } finally {
+    btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
+  }
 }
 </script>
 
