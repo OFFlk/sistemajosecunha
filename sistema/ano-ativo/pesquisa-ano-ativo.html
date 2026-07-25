@@ -106,6 +106,35 @@ html[data-theme="dark"] .pill-ano-ativo {
 .item .title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 800; font-size: 14px; }
 .item .meta  { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
+/* Seleção pelo card inteiro — a checkbox continua existindo e funcional
+   (mesma lógica de sempre), só que fica escondida; o card em si vira o
+   controle visual e o clique alterna o checked dela. */
+.item.selecionavel { cursor: pointer; position: relative; }
+.item.selecionavel .check-all,
+.item.selecionavel .check { display: none; }
+.item.selecionavel:has(.chkTurma:checked),
+.item.selecionavel:has(.chkAluno:checked) {
+  background: var(--brand-faded);
+  border-color: var(--brand-hover, var(--brand-border));
+}
+html[data-theme="dark"] .item.selecionavel:has(.chkTurma:checked),
+html[data-theme="dark"] .item.selecionavel:has(.chkAluno:checked) {
+  background: var(--brand-faded-d);
+  border-color: var(--brand-border-d);
+}
+.item.selecionavel .selo-selecionado {
+  display: none;
+  position: absolute; top: 10px; right: 10px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--brand, #6d28d9); color: #fff;
+  align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 900; line-height: 1;
+}
+.item.selecionavel:has(.chkTurma:checked) .selo-selecionado,
+.item.selecionavel:has(.chkAluno:checked) .selo-selecionado {
+  display: flex;
+}
+
 /* ── Badge neutro e separador ── */
 .badge-neutral  { background: var(--chip-neutral-bg); color: var(--chip-neutral-color); border-color: var(--chip-neutral-border); }
 .separator-line { border: none; border-top: 1px solid rgba(148,163,184,0.3); margin: 8px 0; }
@@ -1012,7 +1041,7 @@ function atualizarListas(){
 
     tScope.forEach(t=>{
       const el = document.createElement("div");
-      el.className="item";
+      el.className="item selecionavel";
       const titulo = t.nome || `${t.serie || "Turma"} ${t.anoLetivo || ""}`.trim();
       const matsT = matsPorTurma.get(t.turmaId) || [];
       const qtdAlunos = matsT.length;
@@ -1023,6 +1052,7 @@ function atualizarListas(){
       const qtdIntegral = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
       const modeloBadge = qtdIntegral > 0 ? `<span class="badge badge-integral">📚 ${qtdIntegral} integral</span>` : '';
       el.innerHTML = `
+        <div class="selo-selecionado">✓</div>
         <div class="left" style="flex:1;min-width:0;">
           <div class="title" style="font-size:14px;font-weight:800;">${titulo}</div>
           <hr class="separator-line">
@@ -1051,10 +1081,27 @@ function atualizarListas(){
   lblInfo.textContent = anoUso ? `filtrando ano: ${anoUso}` : "filtrando: todos os anos";
 }
 
+function _bindCliqueSelecao(container, checkboxSelector){
+  container.querySelectorAll('.item.selecionavel').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      // Não alterna seleção se o clique foi num botão/link/checkbox, ou se
+      // o usuário estava arrastando pra copiar algum texto do card (CPF,
+      // nome, ID etc.) — só um clique "seco" em área vazia conta.
+      if(e.target.closest('button, a, input, label')) return;
+      if((window.getSelection()?.toString() || '').length > 0) return;
+      const chk = el.querySelector(checkboxSelector);
+      if(!chk) return;
+      chk.checked = !chk.checked;
+      chk.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
+}
+
 function bindTurmaSelectionHandlers(){
   document.querySelectorAll('.chkTurma').forEach(c=>{
     c.addEventListener('change', ()=>{ syncCheckAllTurmas(); atualizarListaAlunos(); });
   });
+  _bindCliqueSelecao(listaTurmas, '.chkTurma');
   syncCheckAllTurmas();
 }
 
@@ -1099,7 +1146,7 @@ function _atualizarListaAlunos(_tScope){
   } else {
     aScope.forEach(a=>{
       const el=document.createElement("div");
-      el.className="item";
+      el.className="item selecionavel";
       const nasc = a.dataNascimento || "—";
       const idade = a.idade || calcIdade(a.dataNascimento) || "—";
       const turnoDesc  = a._turno  ? `${_turnoEmoji(a._turno)} ${a._turno}` : "—";
@@ -1134,6 +1181,7 @@ function _atualizarListaAlunos(_tScope){
         ? `<span class="badge" style="background:rgba(124,58,237,0.10);border-color:rgba(124,58,237,0.30);color:#6d28d9;">♿ ${neeList.join(', ')}</span>`
         : '';
       el.innerHTML = `
+        <div class="selo-selecionado">✓</div>
         <div class="left">
           <div class="title" style="flex-direction:column;align-items:flex-start;gap:4px;">
             <span style="font-weight:800;font-size:14px;">${a.nome || "Sem nome"}</span>
@@ -1174,6 +1222,7 @@ function _atualizarListaAlunos(_tScope){
     });
   }
   document.querySelectorAll(".chkAluno").forEach(c=>{ c.addEventListener("change", ()=>{ syncCheckAllAlunos(); }); });
+  _bindCliqueSelecao(listaAlunos, '.chkAluno');
   syncCheckAllAlunos();
   document.querySelectorAll("[data-edit-aluno]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
