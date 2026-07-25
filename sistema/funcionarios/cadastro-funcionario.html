@@ -16,6 +16,16 @@
 <script src="../db.firebase.js"></script>
 <script src="../theme-colors.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Biblioteca específica desta página (conversão de PDF em imagens no upload de documentos) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if(typeof pdfjsLib !== 'undefined'){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+
 <title>Cadastro de Funcionários • Ano Ativo</title>
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
@@ -143,6 +153,67 @@
 
 /* ── Actions do wizard ── */
 .actions-left{margin-right:auto;display:flex;gap:8px;}
+</style>
+<style id="drive-docs-css">
+/* ── Drop area ── */
+.docs-drop-area {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 20px 16px;
+  text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s; background: var(--field-bg);
+}
+.docs-drop-area:hover, .docs-drop-area.over {
+  border-color: var(--brand, #7c3aed); background: var(--chip-bg);
+}
+.docs-drop-area input[type="file"] { display: none; }
+.docs-drop-icon { font-size: 26px; margin-bottom: 4px; }
+.docs-drop-text { font-size: 13px; font-weight: 700; color: var(--muted); }
+.docs-drop-text span { color: var(--brand-text, #6d28d9); cursor: pointer; text-decoration: underline; }
+
+/* ── Fila de arquivos pendentes ── */
+.docs-fila-sep-fixo {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  padding: 6px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
+}
+.docs-fila-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card);
+}
+.docs-fila-icon { font-size: 18px; flex-shrink: 0; }
+.docs-fila-info { flex: 1; min-width: 0; }
+.docs-fila-nome { font-size: 13px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs-fila-label {
+  width: 100%; margin-top: 4px; padding: 5px 8px;
+  border: 1px solid var(--field-border); border-radius: 8px;
+  background: var(--field-bg); color: var(--text);
+  font-size: 12px; font-family: 'Nunito', sans-serif; outline: none;
+}
+.docs-fila-label:focus { border-color: var(--brand, #7c3aed); }
+.docs-fila-size { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.docs-fila-rm {
+  background: none; border: none; cursor: pointer;
+  font-size: 15px; color: var(--muted); padding: 0 2px; line-height: 1;
+  transition: color .15s;
+}
+.docs-fila-rm:hover { color: #b91c1c; }
+
+/* ── Status ── */
+.docs-status {
+  display: none; font-size: 12px; font-weight: 700;
+  padding: 6px 12px; border-radius: 8px; margin-top: 8px;
+}
+.docs-status.show   { display: block; }
+.docs-status.ok     { background: rgba(22,163,74,.10); color: #166534; border: 1px solid rgba(22,163,74,.30); }
+.docs-status.err    { background: rgba(239,68,68,.08); color: #b91c1c; border: 1px solid rgba(239,68,68,.30); }
+.docs-status.loading{ background: var(--chip-bg); color: var(--brand-text,#6d28d9); border: 1px solid var(--border); }
+html[data-theme="dark"] .docs-status.ok  { color: #4ade80; }
+html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
+
+/* ── Barra de progresso por arquivo ── */
+.docs-prog-wrap { height: 3px; border-radius: 999px; background: var(--border); margin-top: 4px; overflow: hidden; display: none; }
+.docs-prog-wrap.show { display: block; }
+.docs-prog-bar  { height: 100%; border-radius: 999px; background: var(--brand,#7c3aed); width: 0%; transition: width .3s; }
 </style>
 </head>
 
@@ -718,6 +789,30 @@
       </div>
     </section>
 
+    <!-- Documentos — fila de arquivos, upload junto ao salvar -->
+    <section class="card">
+      <h3 style="margin:0 0 10px;">📎 Documentos <span style="font-size:12px;font-weight:600;color:var(--muted);">(opcional)</span></h3>
+
+      <div class="docs-drop-area" id="docsDropArea">
+        <input type="file" id="docsFileInput" multiple
+          accept=".pdf,.jpg,.jpeg,.png,.webp"/>
+        <div class="docs-drop-icon">📂</div>
+        <div class="docs-drop-text">
+          Arraste arquivos aqui ou <span onclick="document.getElementById('docsFileInput').click()">clique para selecionar</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Imagens (JPG, PNG, WEBP) ou PDF — PDFs são convertidos em imagens — máx. 10 MB · PDFs máx. 12 páginas</div>
+      </div>
+
+      <div class="docs-fila-sep-fixo" id="docsFilaSepFixo" style="display:none;">
+        Arquivos selecionados serão enviados ao salvar
+      </div>
+      <div id="docsFilaWrap" style="display:none;margin-top:0;">
+        <div id="docsFilaLista" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <div class="docs-status" id="docsStatus"></div>
+    </section>
+
     <!-- Ações etapa 2 -->
     <section class="card">
       <div id="erroSalvar" class="erro-salvar" style="display:none;"></div>
@@ -807,6 +902,11 @@
   let funcionarios = [];
   let _funcoesExtras = [];
   let _editandoId = null;
+  let _editandoViaURL = false; // true quando a edição veio de ?editar=ID na URL
+
+  // Página de pesquisa pra onde volta ao cancelar/concluir edição via URL.
+  // Ajuste aqui se o nome do arquivo de pesquisa de funcionários for diferente.
+  const PAGINA_PESQUISA = 'pesquisa-funcionarios.html';
 
   const WIZ = {
     def: null,
@@ -1578,10 +1678,14 @@
     document.getElementById('erroSalvar').style.display='none';
 
     _editandoId = null;
+    _editandoViaURL = false;
   }
 
   document.getElementById('btnLimpar').addEventListener('click', limparFormulario);
-  document.getElementById('btnCancelarEdicao').addEventListener('click', limparFormulario);
+  document.getElementById('btnCancelarEdicao').addEventListener('click', function(){
+    if(_editandoViaURL){ location.href = PAGINA_PESQUISA; return; }
+    limparFormulario();
+  });
 
   /* ════════════════════════════════════════
      Salvar funcionário (etapa 2)
@@ -1702,6 +1806,10 @@
       if(typeof window._natCacheInvalidate === 'function') window._natCacheInvalidate();
       atualizarPill();
 
+      // Envia a fila de documentos pendentes (upload junto ao salvar)
+      if(window.initDocsFuncionario)        window.initDocsFuncionario(funcId);
+      if(window.uploadDocsQueueFuncionario) await window.uploadDocsQueueFuncionario();
+
       // Exibe resumo
       const escOpts = document.getElementById('escolaridade').options;
       const escLabel = escOpts[escOpts.selectedIndex]?.text || '—';
@@ -1712,6 +1820,13 @@
         `<div class="resumo-item"><strong>Escolaridade</strong>${escLabel}</div>`;
       document.getElementById('resumoFinal').classList.add('show');
       window.scrollTo({top:0,behavior:'smooth'});
+
+      // Edição via URL (?editar=ID): volta pra pesquisa após concluir
+      if(_editandoViaURL){
+        document.getElementById('resumoGrid').insertAdjacentHTML('afterend',
+          '<div class="lista-vazia" style="grid-column:1/-1;">Redirecionando para a pesquisa…</div>');
+        setTimeout(() => { location.href = PAGINA_PESQUISA; }, 1800);
+      }
     } catch(e){
       console.error(e);
       mostrarErroSalvar('❌ Erro ao salvar: ' + (e.message||e));
@@ -1735,9 +1850,10 @@
      Editar funcionário (chamado externamente
      se necessário no futuro)
   ════════════════════════════════════════ */
-  function iniciarEdicao(f){
+  function iniciarEdicao(f, viaURL){
     limparFormulario();
     _editandoId = f.funcId;
+    _editandoViaURL = !!viaURL;
 
     // Etapa 1
     document.getElementById('cpf').value = f.cpf||''; document.getElementById('cpf').dispatchEvent(new Event('input'));
@@ -1806,6 +1922,9 @@
     document.getElementById('btnCancelarEdicao').style.display = 'inline-block';
     document.getElementById('btnSalvar').textContent = '💾 Atualizar funcionário';
     document.getElementById('formCard')?.scrollIntoView({ behavior:'smooth', block:'start' });
+
+    // ── Documentos já anexados a este funcionário ──
+    if(window.initDocsFuncionario) window.initDocsFuncionario(f.funcId);
   }
 
   // Expõe para uso externo (ex: integração futura com tabela)
@@ -1913,7 +2032,273 @@
     });
     await carregarAnoAtivo();
     await carregarDB();
+
+    // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──
+    const editId = new URLSearchParams(window.location.search).get('editar');
+    if(editId){
+      const alvo = funcionarios.find(f => f.funcId === editId);
+      if(alvo){
+        iniciarEdicao(alvo, true);
+      } else {
+        const msg = document.getElementById('msgForm');
+        if(msg){
+          msg.textContent = '⚠️ Funcionário não encontrado ou sem permissão de acesso.';
+          msg.style.display = '';
+        }
+      }
+    }
   })();
+
+})();
+</script>
+
+<!-- ══ Documentos do funcionário — upload/list/delete de imagens ══
+     Function própria deste módulo (padrão: uma function por módulo).
+     Endpoints abaixo são placeholders — ajustar quando as functions
+     reais de backend forem enviadas/criadas para o módulo de funcionários. -->
+<script id="drive-docs-funcionario-js">
+(function(){
+  const API_UPLOAD = '/api/drive-upload-funcionario'; // TODO: confirmar rota real
+  const API_LIST    = '/api/drive-list-funcionario';   // TODO: confirmar rota real
+  const API_DELETE  = '/api/drive-delete-funcionario'; // TODO: confirmar rota real
+  const MAX_MB     = 10;
+  const MAX_PAGES  = 12;
+
+  let _fila        = [];
+  let _funcionarioId = null;
+
+  function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
+  function fmtSize(b){
+    if(b<1024) return b+' B';
+    if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+  }
+  function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function setStatus(kind, text){
+    const el = document.getElementById('docsStatus');
+    if(!el) return;
+    el.className = 'docs-status'+(text?' show '+kind:'');
+    el.textContent = text;
+    if(kind==='ok'&&text) setTimeout(()=>{ el.className='docs-status'; el.textContent=''; }, 4000);
+  }
+
+  function renderFila(){
+    const wrap  = document.getElementById('docsFilaWrap');
+    const lista = document.getElementById('docsFilaLista');
+    const sep   = document.getElementById('docsFilaSepFixo');
+    if(!wrap||!lista) return;
+    lista.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
+    const temExistente = lista.querySelector('.docs-existente');
+    if(!_fila.length){
+      wrap.style.display  = temExistente ? '' : 'none';
+      if(sep) sep.style.display = 'none';
+      return;
+    }
+    wrap.style.display = '';
+    if(sep) sep.style.display = '';
+
+    _fila.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'docs-fila-item docs-fila-pendente';
+      const previewSrc  = item.base64 ? `data:${item.mimeType};base64,${item.base64}` : '';
+      const previewHtml = previewSrc
+        ? `<img src="${previewSrc}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;" />`
+        : `<span class="docs-fila-icon">${iconForMime(item.mimeType)}</span>`;
+      div.innerHTML =
+        previewHtml+
+        '<div class="docs-fila-info">'+
+          `<div class="docs-fila-nome">${escHtml(item._fileName||item.file.name)}</div>`+
+          `<input class="docs-fila-label" type="text" placeholder="Rótulo opcional…" value="${escHtml(item.label)}" data-idx="${idx}"/>`+
+          `<div class="docs-prog-wrap" id="docsProgItem${idx}"><div class="docs-prog-bar"></div></div>`+
+        '</div>'+
+        `<span class="docs-fila-size">${fmtSize(item._size||item.file.size)}</span>`+
+        `<button class="docs-fila-rm docs-fila-pendente" data-idx="${idx}" title="Remover">✕</button>`;
+      lista.insertBefore(div, lista.querySelector('.docs-existente')||null);
+    });
+
+    lista.querySelectorAll('.docs-fila-label').forEach(inp => {
+      inp.addEventListener('input', e => { _fila[parseInt(e.target.dataset.idx)].label = e.target.value; });
+    });
+    lista.querySelectorAll('button.docs-fila-rm.docs-fila-pendente').forEach(btn => {
+      btn.addEventListener('click', e => {
+        _fila.splice(parseInt(e.currentTarget.dataset.idx), 1);
+        lista.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
+        renderFila();
+      });
+    });
+  }
+
+  async function pdfParaImagens(file){
+    if(typeof pdfjsLib === 'undefined'){
+      setStatus('err','❌ PDF.js não carregado. Recarregue a página.');
+      return [];
+    }
+    setStatus('loading', `⏳ Convertendo "${file.name}"…`);
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    if(pdf.numPages > MAX_PAGES){
+      setStatus('err', `❌ "${file.name}" tem ${pdf.numPages} páginas. Limite: ${MAX_PAGES}. Arquivo rejeitado.`);
+      return [];
+    }
+    const baseName = file.name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const imagens  = [];
+    for(let i = 1; i <= pdf.numPages; i++){
+      const page     = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas   = document.createElement('canvas');
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const base64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const fileName = `${baseName}_p${i}.jpg`;
+      imagens.push({
+        file:        new File([new Uint8Array(0)], fileName, { type: 'image/jpeg' }),
+        label:       '',
+        base64,
+        mimeType:    'image/jpeg',
+        isConverted: true,
+        _fileName:   fileName,
+        _size:       Math.round(base64.length * 0.75),
+      });
+    }
+    setStatus('ok', `✅ "${file.name}" convertido: ${pdf.numPages} página(s)`);
+    return imagens;
+  }
+
+  async function adicionarArquivos(files){
+    const lista = document.getElementById('docsFilaLista');
+    lista?.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
+    for(const f of Array.from(files)){
+      if(f.size > MAX_MB * 1024 * 1024){
+        setStatus('err', `❌ "${f.name}" excede ${MAX_MB} MB e foi ignorado.`);
+        continue;
+      }
+      const isPDF = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      if(isPDF){
+        const imagens = await pdfParaImagens(f);
+        imagens.forEach(img => _fila.push(img));
+      } else {
+        const base64 = await new Promise((res,rej) => {
+          const r = new FileReader();
+          r.onload  = e => res(e.target.result.split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+        _fila.push({ file: f, label: '', base64, mimeType: f.type||'image/jpeg', isConverted: false });
+      }
+    }
+    renderFila();
+  }
+
+  async function uploadItem(item, idx){
+    const progWrap = document.getElementById(`docsProgItem${idx}`);
+    const progBar  = progWrap?.querySelector('.docs-prog-bar');
+    progWrap?.classList.add('show');
+    let pct = 0;
+    const iv = setInterval(()=>{ pct=Math.min(pct+Math.random()*20,85); if(progBar) progBar.style.width=pct+'%'; }, 300);
+    try{
+      const base64   = item.base64 || await new Promise((res,rej)=>{
+        const r = new FileReader(); r.onload=e=>res(e.target.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(item.file);
+      });
+      const fileName = item._fileName || item.file.name;
+      const mimeType = item.mimeType  || item.file.type || 'image/jpeg';
+      const resp = await fetch(API_UPLOAD, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funcionarioId: _funcionarioId, fileName, mimeType, fileBase64: base64, label: item.label||fileName }),
+      });
+      clearInterval(iv);
+      if(progBar) progBar.style.width='100%';
+      if(!resp.ok){ const d=await resp.json(); throw new Error(d.error||'Erro no servidor'); }
+      setTimeout(()=>progWrap?.classList.remove('show'), 500);
+      return { ok: true };
+    } catch(err){
+      clearInterval(iv);
+      progWrap?.classList.remove('show');
+      return { ok: false, name: item._fileName||item.file.name, error: err.message };
+    }
+  }
+
+  window.uploadDocsQueueFuncionario = async function(){
+    if(!_fila.length || !_funcionarioId) return;
+    setStatus('loading', `⏳ Enviando ${_fila.length} imagem(ns)…`);
+    const erros = [];
+    for(let i=0; i<_fila.length; i++){
+      const res = await uploadItem(_fila[i], i);
+      if(!res.ok) erros.push(res.name+': '+res.error);
+    }
+    _fila = [];
+    document.getElementById('docsFilaLista')?.querySelectorAll('.docs-fila-pendente').forEach(el=>el.remove());
+    if(erros.length){ setStatus('err', `⚠️ ${erros.length} arquivo(s) falharam: ${erros.join(' | ')}`); }
+    else { setStatus('ok', '✅ Todos os documentos enviados!'); }
+  };
+
+  window.initDocsFuncionario = function(funcionarioId){
+    if(!funcionarioId) return;
+    _funcionarioId = String(funcionarioId);
+    _carregarDocs();
+  };
+
+  async function _carregarDocs(){
+    if(!_funcionarioId) return;
+    const wrap  = document.getElementById('docsFilaWrap');
+    const lista = document.getElementById('docsFilaLista');
+    if(!lista) return;
+    lista.querySelectorAll('.docs-existente').forEach(el => el.remove());
+    try{
+      const resp = await fetch(`${API_LIST}?funcionarioId=${encodeURIComponent(_funcionarioId)}`);
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error);
+      const files = data.files || [];
+      if(!files.length) return;
+      wrap && (wrap.style.display = '');
+      const sep = document.createElement('div');
+      sep.className = 'docs-existente';
+      sep.style.cssText = 'font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:6px;';
+      sep.textContent = 'Documentos já anexados';
+      lista.appendChild(sep);
+      files.forEach(f => {
+        const icon     = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
+        const data_fmt = f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR') : '';
+        const item     = document.createElement('div');
+        item.className = 'docs-fila-item docs-existente';
+        item.style.cssText = 'opacity:.85;';
+        item.innerHTML =
+          `<span class="docs-fila-icon">${icon}</span>`+
+          '<div class="docs-fila-info">'+
+            `<div class="docs-fila-nome">${escHtml(f.label||f.fileName)}</div>`+
+            `<div style="font-size:11px;color:var(--muted)">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
+          '</div>'+
+          `<a href="${f.webViewLink}" target="_blank" rel="noopener"`+
+            ` style="padding:4px 10px;border-radius:8px;font-size:12px;font-weight:800;border:1px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;white-space:nowrap;">👁️ Ver</a>`+
+          `<button class="docs-fila-rm" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Remover">🗑️</button>`;
+        lista.appendChild(item);
+      });
+      lista.querySelectorAll('.docs-existente .docs-fila-rm').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if(!confirm(`Remover "${btn.dataset.name}"?\n\nEssa ação não pode ser desfeita.`)) return;
+          setStatus('loading','⏳ Removendo…');
+          try{
+            const r = await fetch(API_DELETE,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:btn.dataset.fileid,resourceType:btn.dataset.restype||'image'})});
+            const d = await r.json();
+            if(!r.ok) throw new Error(d.error);
+            btn.closest('.docs-existente').remove();
+            setStatus('ok','✅ Documento removido.');
+          }catch(e){ setStatus('err','❌ Erro ao remover: '+e.message); }
+        });
+      });
+    }catch(err){ console.warn('[docs-funcionario] Erro ao carregar:', err.message); }
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const fileInput = document.getElementById('docsFileInput');
+    const dropArea  = document.getElementById('docsDropArea');
+    fileInput?.addEventListener('change', e => { adicionarArquivos(e.target.files); fileInput.value=''; });
+    dropArea?.addEventListener('dragover',  e => { e.preventDefault(); dropArea.classList.add('over'); });
+    dropArea?.addEventListener('dragleave', ()  => dropArea.classList.remove('over'));
+    dropArea?.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('over'); adicionarArquivos(e.dataTransfer.files); });
+    dropArea?.addEventListener('click', e => { if(e.target.tagName !== 'SPAN') fileInput?.click(); });
+  });
 
 })();
 </script>
