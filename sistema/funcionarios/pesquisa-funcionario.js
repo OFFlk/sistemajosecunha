@@ -389,7 +389,7 @@
     const totalPags = Math.ceil(filtrados.length / POR_PAG);
 
     if(!filtrados.length){
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="12">Nenhum funcionário encontrado com os filtros aplicados.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="13">Nenhum funcionário encontrado com os filtros aplicados.</td></tr>';
       pagRow.style.display = 'none';
       return;
     }
@@ -411,6 +411,7 @@
         <td>${escapeHtml(f.cargaHoraria||'—')}</td>
         <td style="white-space:nowrap;">${escapeHtml(turnosTexto(f.turnos))}</td>
         <td class="status-cell"><span class="badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span></td>
+        <td class="acoes-cell"><a class="btn-editar-func" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a></td>
       `;
       tbody.appendChild(tr);
     });

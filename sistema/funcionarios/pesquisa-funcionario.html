@@ -29,6 +29,20 @@
 <link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/pesquisa-funcionario.css">
 
+<style>
+/* ── Coluna de ações (editar) — inline pois não mexe no CSS externo do módulo ── */
+th.col-acoes { white-space: nowrap; text-align: center; }
+td.acoes-cell { white-space: nowrap; text-align: center; }
+.btn-editar-func {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;
+  border: 1px solid var(--primary, #7c3aed); background: var(--chip-bg, #f5f3ff);
+  color: var(--primary, #7c3aed); text-decoration: none; cursor: pointer;
+  font-family: 'Nunito', sans-serif; transition: background .15s, color .15s;
+}
+.btn-editar-func:hover { background: var(--primary, #7c3aed); color: #fff; }
+</style>
+
 <title>Pesquisa de Funcionários • Ano Ativo</title>
 </head>
 
@@ -172,10 +186,11 @@
             <th class="sortable" data-col="cargaHoraria" data-type="str">C.H. <span class="sort-icon">↕</span></th>
             <th class="sortable" data-col="_nTurnos" data-type="num">Turnos <span class="sort-icon">↕</span></th>
             <th class="sortable" data-col="status" data-type="str">Vínculo <span class="sort-icon">↕</span></th>
+            <th class="col-acoes">Ações</th>
           </tr>
         </thead>
         <tbody id="tbodyPesquisa">
-          <tr class="empty-row"><td colspan="12">Carregando...</td></tr>
+          <tr class="empty-row"><td colspan="13">Carregando...</td></tr>
         </tbody>
       </table>
     </div>
