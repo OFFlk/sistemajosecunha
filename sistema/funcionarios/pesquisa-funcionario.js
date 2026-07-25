@@ -379,7 +379,7 @@
     countEl.textContent = filtrados.length;
 
     if(!filtrados.length){
-      lista.innerHTML = '<div class="muted">Nenhum funcionário encontrado para os filtros aplicados.</div>';
+      lista.innerHTML = '<div class="muted" style="grid-column:1/-1;">Nenhum funcionário encontrado para os filtros aplicados.</div>';
       pagRow.style.display = 'none';
       return;
     }
