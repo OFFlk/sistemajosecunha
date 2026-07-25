@@ -378,6 +378,7 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
             <option value="REPROVADO">Reprovado</option>
           </select>
         </div>
+        <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;align-self:center;">🧹 Limpar filtros</button>
       </div>
 
       <!-- radio modoFiltro oculto mas mantido para não quebrar o JS -->
@@ -1743,6 +1744,20 @@ document.getElementById("btnAddSerie").addEventListener("click", ()=>{
   selSerieAdd.value = "";
 });
 document.getElementById("btnLimparSeries").addEventListener("click", ()=>{ seriesSelecionadas = []; renderChips(); atualizarListas(); });
+document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
+  inpBusca.value = "";
+  document.getElementById("selTurno").value = "";
+  document.getElementById("selModelo").value = "";
+  document.getElementById("chkReadmissao").checked = false;
+  const selSit = document.getElementById("selSituacao");
+  selSit.value = "";
+  selSit.style.display = "none";
+  document.getElementById("chkNaoConcluintes").checked = false;
+  _atualizarOpcoesSituacaoPassado();
+  seriesSelecionadas = [];
+  renderChips();
+  atualizarListas();
+});
 inpBusca.addEventListener("input", ()=>{ atualizarListaAlunos(); });
 selAno.addEventListener("change", ()=>{ _jaFoiPesquisado = true; _blocoStatusAtualizarVisibilidade(); atualizarListas(); });
 document.getElementById("selTurno").addEventListener("change", ()=>{ atualizarListaAlunos(); });
