@@ -411,7 +411,9 @@
         <td>${escapeHtml(f.cargaHoraria||'—')}</td>
         <td style="white-space:nowrap;">${escapeHtml(turnosTexto(f.turnos))}</td>
         <td class="status-cell"><span class="badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span></td>
-        <td class="acoes-cell"><a class="btn-editar-func" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a></td>
+        <td class="acoes-cell">
+          <a class="btn-editar-func" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
+        </td>
       `;
       tbody.appendChild(tr);
     });

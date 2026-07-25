@@ -813,6 +813,20 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       <div class="docs-status" id="docsStatus"></div>
     </section>
 
+    <!-- Zona de perigo — só aparece em modo edição (?editar=ID) -->
+    <section class="card" id="zonaPerigo" style="display:none;border:1px solid rgba(220,38,38,.35);background:rgba(220,38,38,.04);">
+      <h3 style="margin:0 0 4px;color:#dc2626;">⚠️ Zona de perigo</h3>
+      <p style="margin:0 0 12px;font-size:13px;color:var(--muted);">
+        Excluir este funcionário remove o cadastro do banco de dados e todos os
+        documentos anexados no Cloudinary. Essa ação é permanente e não pode ser desfeita.
+      </p>
+      <button type="button" id="btnExcluirFuncionario" class="btn"
+        style="border:1px solid #dc2626;background:rgba(220,38,38,.08);color:#dc2626;font-weight:800;">
+        🗑️ Excluir funcionário permanentemente
+      </button>
+      <div id="excluirStatus" style="display:none;font-size:12px;font-weight:700;margin-top:10px;padding:8px 12px;border-radius:8px;"></div>
+    </section>
+
     <!-- Ações etapa 2 -->
     <section class="card">
       <div id="erroSalvar" class="erro-salvar" style="display:none;"></div>
@@ -1651,6 +1665,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     document.getElementById('msgOk').style.display='none';
     document.getElementById('editBanner').style.display='none';
     document.getElementById('btnCancelarEdicao').style.display='none';
+    document.getElementById('zonaPerigo').style.display='none';
 
     // NEE
     WIZ.def = null;
@@ -1684,6 +1699,59 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   document.getElementById('btnCancelarEdicao').addEventListener('click', function(){
     if(_editandoViaURL){ location.href = PAGINA_PESQUISA; return; }
     limparFormulario();
+  });
+
+  document.getElementById('btnExcluirFuncionario').addEventListener('click', async function(){
+    if(!_editandoId) return;
+    const funcId = _editandoId;
+    const nome   = document.getElementById('nome').value.trim() || 'este funcionário';
+    const statusEl = document.getElementById('excluirStatus');
+    const btn = this;
+
+    const digitado = prompt(
+      `Isso vai excluir "${nome}" e todos os documentos anexados, permanentemente.\n\n` +
+      `Digite EXCLUIR (em maiúsculas) para confirmar:`
+    );
+    if(digitado !== 'EXCLUIR'){
+      if(digitado !== null) alert('Confirmação incorreta. Nada foi excluído.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Excluindo...';
+    statusEl.style.display = 'none';
+
+    try{
+      // 1) Apaga a pasta de documentos no Cloudinary (melhor esforço —
+      //    se falhar, avisa mas continua removendo o cadastro do DB)
+      try{
+        const resp = await fetch(`/api/drive-delete-pasta-funcionario?funcionarioId=${encodeURIComponent(funcId)}`, { method:'DELETE' });
+        const data = await resp.json();
+        if(!resp.ok) throw new Error(data.error || 'Falha ao apagar documentos');
+      }catch(errCloud){
+        console.warn('Falha ao apagar documentos no Cloudinary:', errCloud.message);
+        alert('Aviso: não foi possível confirmar a exclusão dos documentos no Cloudinary (' + errCloud.message + '). O cadastro será removido mesmo assim — verifique a pasta manualmente se necessário.');
+      }
+
+      // 2) Remove do array local e salva no DB
+      const idx = funcionarios.findIndex(f => f.funcId === funcId);
+      if(idx === -1) throw new Error('Funcionário não encontrado na lista local.');
+      funcionarios.splice(idx, 1);
+      await salvarDB();
+
+      // 3) Feedback e redireciona pra pesquisa
+      statusEl.className = '';
+      statusEl.style.cssText = 'display:block;font-size:12px;font-weight:700;margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(22,163,74,.10);color:#166534;border:1px solid rgba(22,163,74,.30);';
+      statusEl.textContent = '✅ Funcionário excluído. Redirecionando...';
+      setTimeout(() => { location.href = PAGINA_PESQUISA; }, 1500);
+
+    }catch(err){
+      console.error('Erro ao excluir funcionário:', err);
+      statusEl.style.cssText = 'display:block;font-size:12px;font-weight:700;margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(239,68,68,.08);color:#b91c1c;border:1px solid rgba(239,68,68,.30);';
+      statusEl.textContent = '❌ Erro ao excluir: ' + err.message;
+      btn.disabled = false;
+      btn.textContent = '🗑️ Excluir funcionário permanentemente';
+    }
   });
 
   /* ════════════════════════════════════════
@@ -1921,6 +1989,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     document.getElementById('btnCancelarEdicao').style.display = 'inline-block';
     document.getElementById('btnSalvar').textContent = '💾 Atualizar funcionário';
     document.getElementById('formCard')?.scrollIntoView({ behavior:'smooth', block:'start' });
+    document.getElementById('zonaPerigo').style.display = 'block';
 
     // ── Documentos já anexados a este funcionário ──
     if(window.initDocsFuncionario) window.initDocsFuncionario(f.funcId);
@@ -2053,13 +2122,13 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
 <!-- ══ Documentos do funcionário — upload/list/delete de imagens ══
      Function própria deste módulo (padrão: uma function por módulo).
-     Endpoints: /api/drive-upload-funcionario, /api/drive-list-funcionario,
-     /api/drive-delete-funcionario (functions/api/*.js — Cloudflare Pages Functions). -->
+     Endpoints abaixo são placeholders — ajustar quando as functions
+     reais de backend forem enviadas/criadas para o módulo de funcionários. -->
 <script id="drive-docs-funcionario-js">
 (function(){
-  const API_UPLOAD = '/api/drive-upload-funcionario';
-  const API_LIST    = '/api/drive-list-funcionario';
-  const API_DELETE  = '/api/drive-delete-funcionario';
+  const API_UPLOAD = '/api/drive-upload-funcionario'; // TODO: confirmar rota real
+  const API_LIST    = '/api/drive-list-funcionario';   // TODO: confirmar rota real
+  const API_DELETE  = '/api/drive-delete-funcionario'; // TODO: confirmar rota real
   const MAX_MB     = 10;
   const MAX_PAGES  = 12;
 
