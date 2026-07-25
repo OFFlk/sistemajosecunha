@@ -846,8 +846,9 @@ function turmasFiltradas(){
   return turmas.filter(t=>{
     // Turma legada usada como "bucket" pra alunos aguardando readmissão —
     // hoje isso já é coberto pelo filtro de situação, não precisa aparecer
-    // como card de turma na pesquisa.
-    if((t.nome||'').trim().toLowerCase() === 'alunos sem turmas') return false;
+    // como card de turma na pesquisa. Comparação pelo turmaId fixo (mais
+    // confiável que o nome, que pode variar/ter sido digitado diferente).
+    if((t.turmaId||'').trim().toUpperCase() === 'TURMA_INATIVA') return false;
     if(!(!ano || String(t.anoLetivo) === String(ano))) return false;
     if(setSeries.size === 0) return true;
     const seriesDaTurma = new Set();
