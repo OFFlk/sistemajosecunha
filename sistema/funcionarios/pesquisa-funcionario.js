@@ -124,7 +124,6 @@
 
       atualizarAnoEfetivo();
       popularSelects();
-      atualizarPill();
     }catch(e){
       console.warn('carregarAnoAtivo:', e);
       anoAtivoMsg.textContent = 'Não foi possível carregar o ano ativo.';
@@ -134,7 +133,6 @@
   selectAnoAtivo.addEventListener('change', function(){
     atualizarAnoEfetivo();
     popularSelects();
-    atualizarPill();
     aplicarFiltros();
   });
 
@@ -212,7 +210,6 @@
   const turnoHint  = document.getElementById('turnoHint');
   const lista      = document.getElementById('listaFuncionarios');
   const countEl    = document.getElementById('countFuncionarios');
-  const pillTotal  = document.getElementById('pillTotal');
   const subRes     = document.getElementById('subResultados');
   const statsRow   = document.getElementById('statsRow');
   const pagRow     = document.getElementById('pagRow');
@@ -341,12 +338,6 @@
   /* ══════════════════════════════════════════
      Stats
   ══════════════════════════════════════════ */
-  function atualizarPill(){
-    const base = getFuncionariosDoAno();
-    const label = _anoAtivo ? ` (${_anoAtivo})` : '';
-    pillTotal.textContent = `Total${label}: ${base.length} funcionário(s)`;
-  }
-
   function atualizarStats(){
     const total = filtrados.length;
     document.getElementById('statExib').textContent = total;
@@ -619,5 +610,6 @@
     await carregarAnoAtivo();
     // garantia: aplicarFiltros depois de ambos estarem prontos
     aplicarFiltros();
+    if(window.Loading) Loading.esconder();
   })();
 })();

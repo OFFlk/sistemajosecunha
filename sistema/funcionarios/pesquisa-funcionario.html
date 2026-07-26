@@ -16,6 +16,7 @@
 </script>
 
 <!-- ══ Firebase & System Scripts ══ -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../theme-colors.js"></script>
@@ -130,18 +131,17 @@
         <p class="sub">Busque por nome, CPF, função ou filtre por status e turno</p>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <div class="pill" id="pillTotal">Total: —</div>
+        <div class="pill pill-ano-ativo">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
       </div>
     </div>
 
     <!-- Ano Ativo -->
     <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
-      <div class="field" style="min-width:220px;margin:0;">
+      <div class="field" style="width:220px;flex:0 0 220px;margin:0;">
         <label for="selectAnoAtivo">Ano letivo</label>
-        <select id="selectAnoAtivo"></select>
+        <select id="selectAnoAtivo" style="width:100%;"></select>
         <div class="help" id="anoAtivoMsg">Por padrão, usa o ano ativo detectado.</div>
       </div>
-      <div class="pill pill-ano-ativo">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
     </div>
 
     <!-- Grid de Filtros -->
