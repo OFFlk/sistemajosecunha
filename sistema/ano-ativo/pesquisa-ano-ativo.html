@@ -1277,15 +1277,24 @@ chkAllAlunos.addEventListener("change", ()=>{ setAllCheckboxes(".chkAluno", chkA
 ========================= */
 function abrirModal(titulo, rows){ modalTitle.textContent = titulo; modalBody.innerHTML = rows; modalBackdrop.style.display = "flex"; }
 
-function abrirFichaAluno(alunoId){
+async function abrirFichaAluno(alunoId){
   const raw = alunosOrdenados.find(x => x.alunoId === alunoId);
   if(!raw) return;
+  // A lista em memória (alunosOrdenados) só é buscada uma vez, no carregamento
+  // da página — se algo mudou no Firestore depois disso (ex.: foto enviada
+  // numa aba/sessão de cadastro separada), o "raw" fica desatualizado. Como a
+  // ficha é justamente onde a pessoa quer ver o dado mais atual, buscamos o
+  // documento do aluno fresco aqui, e mesclamos por cima do "raw" (que já traz
+  // turno/status/situação calculados a partir da matrícula).
+  let fresco = null;
+  try{ fresco = await window.DB.anoAtivoAlunos.get(alunoId); }catch(e){ /* segue só com o raw */ }
+  const base = fresco ? { ...raw, ...fresco } : raw;
   // alunosOrdenados só passa por _enriquecerComMeta (turno/status/modelo);
   // aqui garantimos também o cálculo de _neeResumo/etc via enriquecerAlunos.
-  const a = enriquecerAlunos([raw])[0];
+  const a = enriquecerAlunos([base])[0];
 
   const fotoHtml = a.fotoUrl
-    ? `<img src="${escapeHtml(a.fotoUrl)}" alt="Foto do aluno" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--line);">`
+    ? `<img src="${escapeHtml(a.fotoUrl)}" alt="Foto do aluno" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--line);" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:'🧑',style:'width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--line);'}))">`
     : `<div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--line);">🧑</div>`;
 
   const cabecalho = `
@@ -1361,7 +1370,9 @@ async function carregarDocsFicha(alunoId, targetId){
     const resp = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(alunoId)}`);
     const data = await resp.json();
     if(!resp.ok) throw new Error(data.error || 'Erro ao buscar documentos');
-    const files = data.files || [];
+    // A foto de perfil vive na mesma pasta do Cloudinary, mas tem exibição
+    // própria no cabeçalho da ficha — não deve aparecer aqui como documento.
+    const files = (data.files || []).filter(f => f.fileName !== 'foto_perfil.jpg');
     if(!files.length){
       el.innerHTML = `<div style="font-size:13px;color:var(--muted);">Nenhum documento anexado</div>`;
       return;

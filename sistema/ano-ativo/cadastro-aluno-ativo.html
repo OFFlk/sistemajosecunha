@@ -1604,6 +1604,7 @@ function normSerie(s){
   function clearFields(){
     // limpa banner de auto-fill se estiver ativo
     if(window._limparAutoFill) window._limparAutoFill();
+    if(window.limparFoto) window.limparFoto();
     serieAluno.value = serieAluno.value || "";
     _atualizarCamposStatusSituacao();
     nome.value = "";
@@ -3346,6 +3347,20 @@ function normSerie(s){
     }
   });
 
+  // Reseta o widget de foto pro estado vazio — chamado por clearFields()
+  // depois de salvar um cadastro novo, senão a foto continua no slot e
+  // seria reenviada junto do próximo aluno cadastrado.
+  window.limparFoto = function(){
+    _fotoPendente = null;
+    _fotoAlunoId  = null;
+    inpFoto.value = '';
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    _setStatus('');
+  };
+
   // Chamado por inserirAluno() logo depois que o alunoId de um cadastro
   // NOVO é confirmado — envia a foto que ficou esperando.
   window.enviarFotoPendente = async function(alunoId){
@@ -3549,7 +3564,9 @@ function normSerie(s){
       const resp = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(_alunoId)}`);
       const data = await resp.json();
       if(!resp.ok) throw new Error(data.error);
-      const files = data.files || [];
+      // A foto de perfil vive na mesma pasta do Cloudinary, mas tem seu
+      // próprio widget — não deve aparecer aqui como documento anexado.
+      const files = (data.files || []).filter(f => f.fileName !== 'foto_perfil.jpg');
       if(!files.length) return;
       wrap && (wrap.style.display = '');
       const sep = document.createElement('div');
