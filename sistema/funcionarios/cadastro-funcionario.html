@@ -2107,30 +2107,33 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
      Init
   ════════════════════════════════════════ */
   (async function(){
-    // Aguarda auth UMA única vez — o evento dispara uma única vez e seria consumido
-    // pela primeira função, deixando carregarDB travado para sempre
-    await new Promise(res => {
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, { once: true });
-    });
-    await carregarAnoAtivo();
-    await carregarDB();
+    try{
+      // Aguarda auth UMA única vez — o evento dispara uma única vez e seria consumido
+      // pela primeira função, deixando carregarDB travado para sempre
+      await new Promise(res => {
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        document.addEventListener('auth:ready', res, { once: true });
+      });
+      await carregarAnoAtivo();
+      await carregarDB();
 
-    // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──
-    const editId = new URLSearchParams(window.location.search).get('editar');
-    if(editId){
-      const alvo = funcionarios.find(f => f.funcId === editId);
-      if(alvo){
-        iniciarEdicao(alvo, true);
-      } else {
-        const msg = document.getElementById('msgForm');
-        if(msg){
-          msg.textContent = '⚠️ Funcionário não encontrado ou sem permissão de acesso.';
-          msg.style.display = '';
+      // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──
+      const editId = new URLSearchParams(window.location.search).get('editar');
+      if(editId){
+        const alvo = funcionarios.find(f => f.funcId === editId);
+        if(alvo){
+          iniciarEdicao(alvo, true);
+        } else {
+          const msg = document.getElementById('msgForm');
+          if(msg){
+            msg.textContent = '⚠️ Funcionário não encontrado ou sem permissão de acesso.';
+            msg.style.display = '';
+          }
         }
       }
+    } finally {
+      if(window.Loading) Loading.esconder();
     }
-    if(window.Loading) Loading.esconder();
   })();
 
 })();

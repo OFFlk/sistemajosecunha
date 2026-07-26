@@ -511,9 +511,13 @@
       blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Pós-graduações</div>` +
         f.posGraduacoes.map(p => `<div style="font-size:13px;">• ${escapeHtml(p.area||'—')}${p.ano?' · '+escapeHtml(String(p.ano)):''}</div>`).join(''));
     }
-    if(Array.isArray(f.complementacoes) && f.complementacoes.length){
+    // Complementações — array novo OU o campo único legado (registros mais antigos)
+    const complementacoes = Array.isArray(f.complementacoes) && f.complementacoes.length
+      ? f.complementacoes
+      : (f.complementacaoPedagogica && f.complementacaoNome ? [{ nome: f.complementacaoNome }] : []);
+    if(complementacoes.length){
       blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Complementações pedagógicas</div>` +
-        f.complementacoes.map(c => `<div style="font-size:13px;">• ${escapeHtml(c.nome||'—')}${c.ano?' · '+escapeHtml(String(c.ano)):''}</div>`).join(''));
+        complementacoes.map(c => `<div style="font-size:13px;">• ${escapeHtml(c.nome||'—')}${c.ano?' · '+escapeHtml(String(c.ano)):''}</div>`).join(''));
     }
     if(Array.isArray(f.outrosCursos) && f.outrosCursos.length){
       blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Outros cursos</div>` +
@@ -606,10 +610,13 @@
      Init
   ══════════════════════════════════════════ */
   (async function init(){
-    await carregarDB();
-    await carregarAnoAtivo();
-    // garantia: aplicarFiltros depois de ambos estarem prontos
-    aplicarFiltros();
-    if(window.Loading) Loading.esconder();
+    try{
+      await carregarDB();
+      await carregarAnoAtivo();
+      // garantia: aplicarFiltros depois de ambos estarem prontos
+      aplicarFiltros();
+    } finally {
+      if(window.Loading) Loading.esconder();
+    }
   })();
 })();
