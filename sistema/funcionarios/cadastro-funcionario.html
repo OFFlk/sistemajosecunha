@@ -225,13 +225,12 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 <main class="wrap">
 
   <!-- Ano letivo — editável, permite cadastrar em anos passados (padrão do aluno) -->
-  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px;">
-    <div class="field" style="width:160px;flex:0 0 160px;margin:0;">
+  <div style="margin-bottom:16px;">
+    <div class="field" style="width:160px;margin:0;">
       <label for="anoLetivo">Ano letivo</label>
       <input id="anoLetivo" type="number" min="2000" max="2100"/>
       <small class="help" id="anoAtivoMsg">Preenchido automaticamente a partir do ano ativo.</small>
     </div>
-    <span class="chip" id="pillAnoAtivo" style="margin-top:22px;">📅 ano ativo: —</span>
   </div>
 
   <!-- STEPPER -->
@@ -940,7 +939,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   ════════════════════════════════════════ */
   const anoLetivoInput = document.getElementById('anoLetivo');
   const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
-  const pillAnoAtivo   = document.getElementById('pillAnoAtivo');
   let anoAtivoReal = new Date().getFullYear(); // ano ativo real do sistema (fixo, só leitura)
   let anoAtivo     = new Date().getFullYear(); // ano em que o cadastro será salvo (editável)
 
@@ -953,7 +951,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       console.warn('carregarAnoAtivo:', e);
       anoAtivoReal = new Date().getFullYear();
     }
-    if(pillAnoAtivo) pillAnoAtivo.textContent = `📅 ano ativo: ${anoAtivoReal}`;
     // Preenche o campo com o ano ativo por padrão, mas o usuário pode trocar
     // livremente para cadastrar um funcionário em um ano letivo anterior.
     if(!anoLetivoInput.value){
