@@ -65,8 +65,6 @@
   ══════════════════════════════════════════ */
   let funcionarios = [];
   let filtrados    = [];
-  let pagAtual     = 1;
-  const POR_PAG    = 20;
   let _anoAtivo    = '';   // controlado pelo select
 
   // Ordenação: campo selecionado no <select> + botão de alternar direção
@@ -76,10 +74,21 @@
   /* ══════════════════════════════════════════
      Exportar dados filtrados para outras funções
   ══════════════════════════════════════════ */
+  function funcionariosMarcadosIds(){
+    return new Set(Array.from(document.querySelectorAll('.chkFuncionario:checked')).map(c => c.dataset.func));
+  }
+
   window.PesquisaFuncionarios = {
     getFiltrados: () => filtrados,
     getTodos: () => funcionarios,
-    getAnoAtivo: () => _anoAtivo
+    getAnoAtivo: () => _anoAtivo,
+    getSelecionados: funcionariosMarcadosIds,
+    // Regra de exportação: nenhum marcado -> todos os filtrados (na ordem
+    // atual); 1+ marcados -> só os marcados (mantendo a ordem de filtrados).
+    getParaExportar: () => {
+      const ids = funcionariosMarcadosIds();
+      return ids.size ? filtrados.filter(f => ids.has(f.funcId)) : filtrados;
+    }
   };
 
   /* ══════════════════════════════════════════
@@ -212,12 +221,10 @@
   const countEl    = document.getElementById('countFuncionarios');
   const subRes     = document.getElementById('subResultados');
   const statsRow   = document.getElementById('statsRow');
-  const pagRow     = document.getElementById('pagRow');
-  const pagInfo    = document.getElementById('pagInfo');
-  const btnAnterior = document.getElementById('btnPagAnterior');
-  const btnProximo  = document.getElementById('btnPagProximo');
   const sortFieldEl = document.getElementById('sortField');
   const btnToggleSort = document.getElementById('btnToggleSort');
+  const chkAllFuncionarios  = document.getElementById('chkAllFuncionarios');
+  const countSelecionadosEl = document.getElementById('countSelecionados');
 
   /* ── Turno toggles visual ── */
   [chkMat, chkVes, chkNot].forEach(chk => {
@@ -291,7 +298,6 @@
       return true;
     });
 
-    pagAtual = 1;
     aplicarOrdenacao();
     atualizarStats();
     renderLista();
@@ -360,30 +366,30 @@
   }
 
   /* ══════════════════════════════════════════
-     Render lista (cards) — padrão do sistema
+     Render lista (cards) — padrão do sistema, sem paginação
+     (lista sempre exibe todos os filtrados, igual ao módulo de aluno)
   ══════════════════════════════════════════ */
   function renderLista(){
-    const query    = elBusca.value.trim();
-    const inicio   = (pagAtual - 1) * POR_PAG;
-    const pagina   = filtrados.slice(inicio, inicio + POR_PAG);
-    const totalPags = Math.ceil(filtrados.length / POR_PAG);
+    const query = elBusca.value.trim();
 
     countEl.textContent = filtrados.length;
 
     if(!filtrados.length){
       lista.innerHTML = '<div class="muted" style="grid-column:1/-1;">Nenhum funcionário encontrado para os filtros aplicados.</div>';
-      pagRow.style.display = 'none';
+      syncCheckAllFuncionarios();
+      atualizarContadorSelecionados();
       return;
     }
 
     lista.innerHTML = '';
-    pagina.forEach(f => {
+    filtrados.forEach(f => {
       const nat   = [f.naturalidadeCidade || f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
       const nasc  = formatDate(f.dataNascimento) || '—';
       const idade = calcAge(f.dataNascimento) || '—';
       const el    = document.createElement('div');
-      el.className = 'item';
+      el.className = 'item selecionavel';
       el.innerHTML = `
+        <div class="selo-selecionado">✓</div>
         <div class="left">
           <div class="title">
             <span class="nome">${highlight(f.nome, query) || 'Sem nome'}</span>
@@ -403,22 +409,71 @@
         <div class="right">
           <a class="btn-edit" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
           <button type="button" class="btn-view" data-view-func="${escapeHtml(f.funcId)}">👁️ Visualizar</button>
+          <label class="check">
+            <input type="checkbox" class="chkFuncionario" data-func="${escapeHtml(f.funcId)}" />
+            <span>Selecionar</span>
+          </label>
         </div>
       `;
       lista.appendChild(el);
     });
 
-    if(totalPags > 1){
-      pagRow.style.display = 'flex';
-      pagInfo.textContent = `Página ${pagAtual} de ${totalPags}`;
-      btnAnterior.disabled = pagAtual <= 1;
-      btnAnterior.style.opacity = pagAtual <= 1 ? '0.4' : '1';
-      btnProximo.disabled  = pagAtual >= totalPags;
-      btnProximo.style.opacity  = pagAtual >= totalPags ? '0.4' : '1';
-    } else {
-      pagRow.style.display = 'none';
-    }
+    bindFuncionarioSelectionHandlers();
   }
+
+  /* ══════════════════════════════════════════
+     Seleção (checkbox) — mesmo padrão do módulo de aluno:
+     checkbox escondido, clique em qualquer área vazia do card alterna,
+     selo-selecionado (✓) aparece quando marcado, estado lido direto do DOM
+     (sem Set — a lista inteira já está sempre renderizada, sem paginação).
+     Nenhum card vem marcado por padrão.
+  ══════════════════════════════════════════ */
+  function bindFuncionarioSelectionHandlers(){
+    document.querySelectorAll('.chkFuncionario').forEach(c => {
+      c.addEventListener('change', function(){
+        syncCheckAllFuncionarios();
+        atualizarContadorSelecionados();
+      });
+    });
+    lista.querySelectorAll('.item.selecionavel').forEach(el => {
+      el.addEventListener('click', function(e){
+        // só conta clique "seco" em área vazia — não em botão/link/checkbox,
+        // nem quando o usuário só estava selecionando texto do card.
+        if(e.target.closest('button, a, input, label')) return;
+        if((window.getSelection()?.toString() || '').length > 0) return;
+        const chk = el.querySelector('.chkFuncionario');
+        if(!chk) return;
+        chk.checked = !chk.checked;
+        chk.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+    syncCheckAllFuncionarios();
+    atualizarContadorSelecionados();
+  }
+
+  function syncCheckAllFuncionarios(){
+    const chks = Array.from(document.querySelectorAll('.chkFuncionario'));
+    if(!chks.length){
+      chkAllFuncionarios.checked = false;
+      chkAllFuncionarios.indeterminate = false;
+      return;
+    }
+    const checked = chks.filter(c => c.checked).length;
+    chkAllFuncionarios.checked = checked === chks.length;
+    chkAllFuncionarios.indeterminate = checked > 0 && checked < chks.length;
+  }
+
+  function atualizarContadorSelecionados(){
+    const n = document.querySelectorAll('.chkFuncionario:checked').length;
+    countSelecionadosEl.textContent = `${n} selecionado(s)`;
+    countSelecionadosEl.style.display = n > 0 ? 'inline-block' : 'none';
+  }
+
+  chkAllFuncionarios.addEventListener('change', function(){
+    document.querySelectorAll('.chkFuncionario').forEach(c => { c.checked = chkAllFuncionarios.checked; });
+    syncCheckAllFuncionarios();
+    atualizarContadorSelecionados();
+  });
 
   /* ══════════════════════════════════════════
      Eventos
@@ -444,14 +499,6 @@
     btnToggleSort.textContent = '↑↓';
     atualizarTurnoHint();
     aplicarFiltros(); // ano permanece o mesmo
-  });
-
-  btnAnterior.addEventListener('click', function(){
-    if(pagAtual > 1){ pagAtual--; renderLista(); window.scrollTo({top:0,behavior:'smooth'}); }
-  });
-  btnProximo.addEventListener('click', function(){
-    const totalPags = Math.ceil(filtrados.length / POR_PAG);
-    if(pagAtual < totalPags){ pagAtual++; renderLista(); window.scrollTo({top:0,behavior:'smooth'}); }
   });
 
   /* ══════════════════════════════════════════
