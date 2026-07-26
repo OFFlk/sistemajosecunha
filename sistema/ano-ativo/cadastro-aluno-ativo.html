@@ -700,6 +700,29 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 </div>
 <div class="warn" id="msgForm" style="display:none"></div>
 
+<!-- Foto do aluno -->
+<div id="fotoAlunoBox" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:14px;
+  border:1.5px dashed var(--border,#ddd6fe);border-radius:14px;background:var(--card);">
+  <div id="fotoAlunoPreviewWrap" style="width:88px;height:88px;border-radius:50%;overflow:hidden;
+    background:var(--chip-bg,#f3f0ff);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    border:2px solid var(--border,#ddd6fe);">
+    <img id="fotoAlunoPreview" src="" alt="Foto do aluno" style="display:none;width:100%;height:100%;object-fit:cover;">
+    <span id="fotoAlunoPlaceholder" style="font-size:30px;">🧑</span>
+  </div>
+  <div style="flex:1;min-width:0;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Foto do aluno (opcional)</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+      Aparece na ficha individual (PDF) e na visualização na pesquisa. Comprimida automaticamente antes de enviar.
+    </div>
+    <input type="file" id="inpFotoAluno" accept="image/*" style="display:none;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn small" id="btnEscolherFoto" onclick="document.getElementById('inpFotoAluno').click()">📷 Escolher foto</button>
+      <button type="button" class="btn small" id="btnRemoverFoto" style="display:none;">🗑️ Remover</button>
+    </div>
+    <div id="fotoAlunoStatus" style="font-size:12px;margin-top:6px;"></div>
+  </div>
+</div>
+
 <!-- Banner modo edição -->
 <div class="modo-edicao-banner" id="bannerModoEdicao">
   <span class="modo-edicao-banner-icon">✏️</span>
@@ -1876,6 +1899,7 @@ function normSerie(s){
   setMsg(msg, "ok");
   if(window.initDocs) window.initDocs(alunoId);
   if(window.uploadDocsQueue) await window.uploadDocsQueue();
+  if(window.enviarFotoPendente) await window.enviarFotoPendente(alunoId);
   clearFields();
   if(window._natRebuild) window._natRebuild();
 }
@@ -2290,6 +2314,9 @@ function normSerie(s){
 
       // ── Documentos ──
       if(window.initDocs) window.initDocs(editId);
+
+      // ── Foto ──
+      if(window.initFoto) window.initFoto(editId, aluno.fotoUrl || '');
 
       window._modoEdicaoId    = editId;
       window._modoEdicaoAluno = aluno;
@@ -3205,6 +3232,129 @@ function normSerie(s){
     Loading.esconder();
   })();
 
+})();
+</script>
+
+<script id="foto-aluno-js">
+(function(){
+  const inpFoto      = document.getElementById('inpFotoAluno');
+  const previewImg    = document.getElementById('fotoAlunoPreview');
+  const placeholder   = document.getElementById('fotoAlunoPlaceholder');
+  const btnRemover    = document.getElementById('btnRemoverFoto');
+  const statusEl      = document.getElementById('fotoAlunoStatus');
+  if(!inpFoto) return;
+
+  let _fotoPendente = null; // { base64, mimeType } — cadastro novo, aguardando alunoId
+  let _fotoAlunoId  = null; // conhecido de cara em modo edição
+
+  function _setStatus(txt, cor){
+    statusEl.textContent = txt || '';
+    statusEl.style.color = cor || 'var(--muted)';
+  }
+
+  // Chamado no modo edição, com a foto já existente (se houver)
+  window.initFoto = function(alunoId, fotoUrlExistente){
+    _fotoAlunoId = alunoId ? String(alunoId) : null;
+    if(fotoUrlExistente){
+      previewImg.src = fotoUrlExistente;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+    }
+  };
+
+  // Redimensiona no canvas (máx. 480px no maior lado) e reexporta em JPEG
+  // qualidade 0.75 — mantém a foto pequena no Cloudinary sem perder muito
+  // de identificação visual.
+  function _comprimir(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = e => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const MAX = 480;
+          let { width, height } = img;
+          if(width > height && width > MAX){ height = Math.round(height * MAX / width); width = MAX; }
+          else if(height >= width && height > MAX){ width = Math.round(width * MAX / height); height = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', preview: dataUrl });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function _enviarFoto(alunoId, base64, mimeType){
+    _setStatus('Enviando foto...');
+    try{
+      const resp = await fetch('/api/drive-upload', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ alunoId, fileName: 'foto_perfil.jpg', mimeType, fileBase64: base64, label: 'Foto de perfil' }),
+      });
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
+      await window.DB.anoAtivoAlunos.save({ _id: alunoId, fotoUrl: data.webViewLink, fotoFileId: data.fileId });
+      _setStatus('✅ Foto salva.', '#166534');
+    }catch(e){
+      _setStatus('❌ Falha ao enviar foto: ' + e.message, '#b91c1c');
+    }
+  }
+
+  inpFoto.addEventListener('change', async () => {
+    const file = inpFoto.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){
+      _setStatus('⚠️ Selecione um arquivo de imagem.', '#b91c1c');
+      return;
+    }
+    _setStatus('Comprimindo...');
+    try{
+      const { base64, mimeType, preview } = await _comprimir(file);
+      previewImg.src = preview;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+
+      if(_fotoAlunoId){
+        await _enviarFoto(_fotoAlunoId, base64, mimeType);
+      } else {
+        _fotoPendente = { base64, mimeType };
+        _setStatus('Foto pronta — será enviada ao salvar o aluno.', '#166534');
+      }
+    }catch(e){
+      _setStatus('❌ Falha ao processar a foto: ' + e.message, '#b91c1c');
+    }
+  });
+
+  btnRemover.addEventListener('click', async () => {
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    inpFoto.value = '';
+    _fotoPendente = null;
+    _setStatus('');
+    if(_fotoAlunoId){
+      try{ await window.DB.anoAtivoAlunos.save({ _id: _fotoAlunoId, fotoUrl: null, fotoFileId: null }); }
+      catch(e){ console.warn('Erro ao remover foto:', e); }
+    }
+  });
+
+  // Chamado por inserirAluno() logo depois que o alunoId de um cadastro
+  // NOVO é confirmado — envia a foto que ficou esperando.
+  window.enviarFotoPendente = async function(alunoId){
+    if(!_fotoPendente) return;
+    _fotoAlunoId = String(alunoId);
+    const { base64, mimeType } = _fotoPendente;
+    _fotoPendente = null;
+    await _enviarFoto(alunoId, base64, mimeType);
+  };
 })();
 </script>
 

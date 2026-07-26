@@ -1284,10 +1284,17 @@ function abrirFichaAluno(alunoId){
   // aqui garantimos também o cálculo de _neeResumo/etc via enriquecerAlunos.
   const a = enriquecerAlunos([raw])[0];
 
+  const fotoHtml = a.fotoUrl
+    ? `<img src="${escapeHtml(a.fotoUrl)}" alt="Foto do aluno" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--line);">`
+    : `<div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--line);">🧑</div>`;
+
   const cabecalho = `
-    <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--chip-bg);">
-      <b>${escapeHtml(a.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(a.alunoId||'—')}
-      &nbsp;•&nbsp; Situação: ${escapeHtml(a._status || a.status || 'ATIVO')}
+    <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--chip-bg);display:flex;align-items:center;gap:12px;">
+      ${fotoHtml}
+      <div>
+        <b>${escapeHtml(a.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(a.alunoId||'—')}
+        &nbsp;•&nbsp; Situação: ${escapeHtml(a._status || a.status || 'ATIVO')}
+      </div>
     </div>`;
 
   const camposExtras = [
@@ -1841,11 +1848,29 @@ function exportCsvCompleto(alunosList){
 
 // Ficha individual — uma página por aluno, TODOS os dados em formato de
 // ficha (rótulo: valor), pra imprimir/arquivar um aluno de cada vez.
+function _fetchImagemComoDataUrl(url){
+  return fetch(url)
+    .then(r => r.blob())
+    .then(blob => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }))
+    .catch(() => null); // sem foto ou falha de rede — ficha segue sem ela
+}
+
 function exportFichasIndividuais(titulo, alunosList){
   if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
   const { jsPDF } = window.jspdf || {};
   if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
-  _carregarDadosEscola().then(escola => {
+  _carregarDadosEscola().then(async escola => {
+    // Busca todas as fotos em paralelo antes de montar as páginas
+    const comFoto = alunosList.filter(a => a.fotoUrl);
+    const pares = await Promise.all(comFoto.map(a => _fetchImagemComoDataUrl(a.fotoUrl)));
+    const fotoDataUrls = {};
+    comFoto.forEach((a, i) => { if(pares[i]) fotoDataUrls[a.alunoId] = pares[i]; });
+
     const doc = new jsPDF({orientation:"p", unit:"pt", format:"a4"});
     const pw = doc.internal.pageSize.getWidth();
 
@@ -1873,12 +1898,21 @@ function exportFichasIndividuais(titulo, alunosList){
       let y = _desenharCabecalhoEscola(doc, escola, titulo, pw);
 
       const bX = 20, bW = pw - 40, colW = bW / 2;
+      const fotoDataUrl = fotoDataUrls[a.alunoId];
+      const fotoSize = 40;
+      const bannerW = fotoDataUrl ? bW - fotoSize - 10 : bW;
 
-      // Faixa com o nome do aluno em destaque
+      // Faixa com o nome do aluno em destaque (encolhe se houver foto)
       doc.setFillColor(11, 63, 191);
-      doc.roundedRect(bX, y, bW, 26, 3, 3, 'F');
+      doc.roundedRect(bX, y, bannerW, 26, 3, 3, 'F');
       doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(255);
-      doc.text((a.nome||'—').toUpperCase(), bX + 10, y + 17);
+      doc.text((a.nome||'—').toUpperCase(), bX + 10, y + 17, { maxWidth: bannerW - 20 });
+
+      if(fotoDataUrl){
+        try{
+          doc.addImage(fotoDataUrl, 'JPEG', bX + bannerW + 10, y - 7, fotoSize, fotoSize, undefined, 'FAST');
+        }catch(e){ /* imagem corrompida/formato inesperado — segue sem travar a ficha */ }
+      }
       y += 26 + 14;
 
       secoes.forEach(sec => {
