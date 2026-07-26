@@ -351,7 +351,7 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
           <input id="inpBusca" type="text" placeholder="Ex.: 000, Maria, ALU-000123..." style="flex:1;"/>
           <button class="btn primary" id="btnAtualizar" style="white-space:nowrap;flex-shrink:0;">🔍 Pesquisar</button>
           <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;">🧹 Limpar filtros</button>
-          <div class="pill pill-ano-ativo" style="flex-shrink:0;">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
+          <div class="pill pill-ano-ativo" style="flex-shrink:0;margin-left:auto;">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
         </div>
         <div class="help">&nbsp;</div>
       </div>
@@ -469,6 +469,9 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
               <button class="btn" id="btnExportLista" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📋 Lista de alunos</button>
               <button class="btn" id="btnExportTurma" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">🏫 Separado por turma</button>
               <button class="btn" id="btnExportSerie" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📚 Separado por série</button>
+              <div style="height:1px;background:var(--card-border);margin:6px 0;"></div>
+              <button class="btn" id="btnExportFichas" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Fichas individuais (1 por página)</button>
+              <button class="btn" id="btnExportCsv" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 CSV completo (todos os dados)</button>
             </div>
           </div>
         </div>
@@ -1403,6 +1406,7 @@ function enriquecerAlunos(lista){
       turmaId:    turmaIdResolvido,
       _turno:     (matMeta && matMeta.turno)  ? matMeta.turno.toUpperCase()  : (a.turno  || ''),
       _status:    (matMeta && matMeta.status) ? matMeta.status.toUpperCase() : (a.status || 'ATIVO').toUpperCase(),
+      _situacao:  (matMeta && matMeta.situacao) ? matMeta.situacao.toUpperCase() : '',
       _modelo:    (matMeta && matMeta.modelo) ? matMeta.modelo.toUpperCase() : 'REGULAR',
       _neeResumo: neeItens.join(', ') || '—',
     };
@@ -1422,6 +1426,15 @@ const COLS = [
   {key:"cidade", label:"CIDADE"},
   // NEE
   {key:"_neeResumo", label:"NEE / TRANSTORNOS"},
+];
+// Versão enxuta usada nos exports em TABELA (PDF) — a tabela de 20 colunas
+// não cabe de forma legível numa página, então essa é só o essencial do
+// dia a dia. Quem precisar de tudo usa o CSV completo ou a ficha individual.
+const COLS_ESSENCIAIS = [
+  {key:"serie", label:"SÉRIE"}, {key:"nome", label:"NOME"}, {key:"cpf", label:"CPF"},
+  {key:"dataNascimento", label:"NASCIMENTO"}, {key:"idade", label:"IDADE"},
+  {key:"mae", label:"MÃE"}, {key:"pai", label:"PAI"},
+  {key:"_turno", label:"TURNO"}, {key:"_modelo", label:"MODELO"},
 ];
 const COLS_TURMAS = [
   {key:"turmaId", label:"ID TURMA"}, {key:"nome", label:"NOME"}, {key:"series", label:"SÉRIE(S)"},
@@ -1560,8 +1573,9 @@ function _desenharCabecalhoEscola(doc, escola, titulo, pageWidth){
   return y;
 }
 
-function _bodyAlunos(lista){
-  return lista.map(a => COLS.map(c => {
+function _bodyAlunos(lista, cols){
+  cols = cols || COLS;
+  return lista.map(a => cols.map(c => {
     let v = a[c.key] ?? "";
     if(c.key==="idade")   v = v || calcIdade(a.dataNascimento) || "";
     if(c.key==="corRaca" && !v) v = "Não declarada";
@@ -1574,21 +1588,44 @@ const _TABLE_STYLES = {
   headStyles: { fillColor: [11,63,191], textColor: 255, fontStyle: 'bold', fontSize: 8.5, cellPadding: {top:4,bottom:4,left:4,right:4} },
   alternateRowStyles: { fillColor: [243,246,255] },
   bodyStyles: { textColor: [30,30,50] },
-  columnStyles: {
-    0: { cellWidth: 60 },
-    1: { cellWidth: 107 },
-    2: { cellWidth: 82 },
-    3: { cellWidth: 82 },
-    4: { cellWidth: 35 },
-    5: { cellWidth: 97 },
-    6: { cellWidth: 97 },
-    7: { cellWidth: 66 },
-    8: { cellWidth: 35 },
-    9: { cellWidth: 47 },
-    10:{ cellWidth: 50 },
-    11:{ cellWidth: 44 },
-  },
   margin: { left: 20, right: 20 },
+};
+
+// Larguras dedicadas ao export ESSENCIAL de alunos (9 colunas — bem mais
+// espaço por coluna do que a tabela completa de 20 teria).
+const _TABLE_STYLES_ESSENCIAIS = {
+  ..._TABLE_STYLES,
+  columnStyles: {
+    0: { cellWidth: 55  }, // SÉRIE
+    1: { cellWidth: 150 }, // NOME
+    2: { cellWidth: 90  }, // CPF
+    3: { cellWidth: 75  }, // NASCIMENTO
+    4: { cellWidth: 40  }, // IDADE
+    5: { cellWidth: 130 }, // MÃE
+    6: { cellWidth: 130 }, // PAI
+    7: { cellWidth: 70  }, // TURNO
+    8: { cellWidth: 62  }, // MODELO
+  },
+};
+
+// Larguras dedicadas ao export de TURMAS — as colunas são bem diferentes das
+// de aluno (ID longo, nome, contadores curtos), então reaproveitar as larguras
+// do _TABLE_STYLES (afinadas pra COLS de aluno) deixava tudo desproporcional.
+// Colunas de COLS_TURMAS: ID TURMA, NOME, SÉRIE(S), TURNO, PROFESSOR(A),
+// ANO LETIVO, QTD ALUNOS, INTEGRAL, REGULAR.
+const _TABLE_STYLES_TURMAS = {
+  ..._TABLE_STYLES,
+  columnStyles: {
+    0: { cellWidth: 130 }, // ID TURMA
+    1: { cellWidth: 130 }, // NOME
+    2: { cellWidth: 90  }, // SÉRIE(S)
+    3: { cellWidth: 70  }, // TURNO
+    4: { cellWidth: 130 }, // PROFESSOR(A)
+    5: { cellWidth: 60  }, // ANO LETIVO
+    6: { cellWidth: 55  }, // QTD ALUNOS
+    7: { cellWidth: 55  }, // INTEGRAL
+    8: { cellWidth: 55  }, // REGULAR
+  },
 };
 
 // Monta nome de arquivo: [prefixo]_[escola]_[DD-MM-AAAA]
@@ -1643,7 +1680,7 @@ function exportTurmasPdf(titulo, turmasList){
         return String(t[col.key] ?? "");
       });
     });
-    doc.autoTable({ head, body, startY, ..._TABLE_STYLES });
+    doc.autoTable({ head, body, startY, ..._TABLE_STYLES_TURMAS });
     doc.save(_buildFilename('Turmas', escola));
   });
 }
@@ -1658,7 +1695,7 @@ function exportPdf(titulo, alunosList){
     const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
     const pw = doc.internal.pageSize.getWidth();
     const startY = _desenharCabecalhoEscola(doc, escola, titulo, pw);
-    doc.autoTable({ head:[COLS.map(c=>c.label)], body:_bodyAlunos(alunosList), startY, ..._TABLE_STYLES });
+    doc.autoTable({ head:[COLS_ESSENCIAIS.map(c=>c.label)], body:_bodyAlunos(alunosList, COLS_ESSENCIAIS), startY, ..._TABLE_STYLES_ESSENCIAIS });
     doc.save(_buildFilename('Relacao', escola));
   });
 }
@@ -1727,7 +1764,7 @@ function exportPdfPorTurma(titulo, alunosList){
       doc.text(meta, bX + 10, y + 22);
       y += bH + 6;
 
-      doc.autoTable({ head:[COLS.map(c=>c.label)], body:_bodyAlunos(g.alunos), startY: y, ..._TABLE_STYLES });
+      doc.autoTable({ head:[COLS_ESSENCIAIS.map(c=>c.label)], body:_bodyAlunos(g.alunos, COLS_ESSENCIAIS), startY: y, ..._TABLE_STYLES_ESSENCIAIS });
     });
 
     doc.save(_buildFilename('Turma', escola));
@@ -1772,10 +1809,118 @@ function exportPdfPorSerie(titulo, alunosList){
       doc.text(`${g.alunos.length} aluno(s)`, bX + 10, y + 19);
       y += bH + 6;
 
-      doc.autoTable({ head:[COLS.map(c=>c.label)], body:_bodyAlunos(g.alunos), startY: y, ..._TABLE_STYLES });
+      doc.autoTable({ head:[COLS_ESSENCIAIS.map(c=>c.label)], body:_bodyAlunos(g.alunos, COLS_ESSENCIAIS), startY: y, ..._TABLE_STYLES_ESSENCIAIS });
     });
 
     doc.save(_buildFilename('Serie', escola));
+  });
+}
+
+// Export CSV completo — TODOS os campos (os 20 de COLS), sem formatação
+// nenhuma, pra quem precisa conferir dado a dado ou importar em outro
+// sistema/planilha. Abre certinho no Excel em pt-BR (separador ; + BOM
+// UTF-8 pra acentuação não quebrar).
+function exportCsvCompleto(alunosList){
+  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  const linhas = [COLS.map(c => c.label), ..._bodyAlunos(alunosList, COLS)];
+  const csv = linhas
+    .map(cols => cols.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(';'))
+    .join('\r\n');
+  _carregarDadosEscola().then(escola => {
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = _buildFilename('Completo', escola).replace(/\.pdf$/, '.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  });
+}
+
+// Ficha individual — uma página por aluno, TODOS os dados em formato de
+// ficha (rótulo: valor), pra imprimir/arquivar um aluno de cada vez.
+function exportFichasIndividuais(titulo, alunosList){
+  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  const { jsPDF } = window.jspdf || {};
+  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  _carregarDadosEscola().then(escola => {
+    const doc = new jsPDF({orientation:"p", unit:"pt", format:"a4"});
+    const pw = doc.internal.pageSize.getWidth();
+
+    const secoes = [
+      { titulo: 'Identificação', campos: [
+        ['Nome', 'nome'], ['Série', 'serie'], ['CPF', 'cpf'],
+        ['Nascimento', 'dataNascimento'], ['Idade', '_idadeCalc'],
+        ['Sexo', 'sexo'], ['Cor/Raça', 'corRaca'], ['Naturalidade', 'naturalidade'],
+        ['RG', 'rg'], ['Certidão de nascimento', 'certidao'],
+      ]},
+      { titulo: 'Filiação', campos: [ ['Mãe', 'mae'], ['Pai', 'pai'] ] },
+      { titulo: 'Matrícula', campos: [
+        ['Turno', '_turno'], ['Modelo', '_modelo'],
+        ['Status', '_status'], ['Situação', '_situacao'],
+      ]},
+      { titulo: 'Endereço', campos: [
+        ['País', 'pais'], ['Zona', 'zona'], ['CEP', 'cep'],
+        ['Logradouro', 'logradouro'], ['UF', 'endUF'], ['Cidade', 'cidade'],
+      ]},
+    ];
+
+    alunosList.forEach((a, i) => {
+      if(i > 0) doc.addPage();
+      a._idadeCalc = a.idade || calcIdade(a.dataNascimento) || '';
+      let y = _desenharCabecalhoEscola(doc, escola, titulo, pw);
+
+      const bX = 20, bW = pw - 40, colW = bW / 2;
+
+      // Faixa com o nome do aluno em destaque
+      doc.setFillColor(11, 63, 191);
+      doc.roundedRect(bX, y, bW, 26, 3, 3, 'F');
+      doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(255);
+      doc.text((a.nome||'—').toUpperCase(), bX + 10, y + 17);
+      y += 26 + 14;
+
+      secoes.forEach(sec => {
+        doc.setFontSize(9.5); doc.setFont(undefined,'bold'); doc.setTextColor(11,63,191);
+        doc.text(sec.titulo.toUpperCase(), bX, y);
+        y += 4;
+        doc.setDrawColor(210,220,240); doc.setLineWidth(0.6);
+        doc.line(bX, y, bX + bW, y);
+        y += 14;
+
+        doc.setFontSize(9); doc.setTextColor(30,30,50);
+        for(let idx=0; idx<sec.campos.length; idx+=2){
+          for(let c=0; c<2; c++){
+            const campo = sec.campos[idx+c];
+            if(!campo) continue;
+            const [label, key] = campo;
+            const valor = String(a[key] ?? '').trim() || '—';
+            const colX = bX + c * colW;
+            doc.setFont(undefined,'bold');
+            doc.text(`${label}:`, colX, y);
+            const labelW = doc.getTextWidth(`${label}: `);
+            doc.setFont(undefined,'normal');
+            doc.text(valor, colX + labelW + 2, y, { maxWidth: colW - labelW - 14 });
+          }
+          y += 16;
+        }
+        y += 12;
+      });
+
+      // NEE / Transtornos
+      doc.setFontSize(9.5); doc.setFont(undefined,'bold'); doc.setTextColor(11,63,191);
+      doc.text('NEE / TRANSTORNOS', bX, y);
+      y += 4;
+      doc.setDrawColor(210,220,240); doc.setLineWidth(0.6);
+      doc.line(bX, y, bX + bW, y);
+      y += 14;
+      doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(30,30,50);
+      const neeTxt = (a._neeResumo && a._neeResumo !== '—') ? a._neeResumo : 'Nenhuma';
+      doc.text(neeTxt, bX, y, { maxWidth: bW });
+    });
+
+    doc.save(_buildFilename('Fichas', escola));
   });
 }
 
@@ -1898,6 +2043,22 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
     const selA = alunosSelecionados();
     if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
     exportPdfPorSerie(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Série`, selA);
+  });
+
+  // Opção 4 — Fichas individuais (uma página por aluno, todos os dados)
+  document.getElementById("btnExportFichas").addEventListener("click", ()=>{
+    drop.style.display = "none";
+    const selA = alunosSelecionados();
+    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    exportFichasIndividuais(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Ficha Individual`, selA);
+  });
+
+  // Opção 5 — CSV completo (todos os dados, sem formatação)
+  document.getElementById("btnExportCsv").addEventListener("click", ()=>{
+    drop.style.display = "none";
+    const selA = alunosSelecionados();
+    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    exportCsvCompleto(selA);
   });
 })();
 
