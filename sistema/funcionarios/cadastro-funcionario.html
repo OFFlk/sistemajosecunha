@@ -224,14 +224,14 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
 <main class="wrap">
 
-  <!-- Chip de Ano Ativo -->
-  <div class="ano-chip-wrap">
-    <span class="ano-chip">📅 Ano Ativo:
-      <select id="selectAnoAtivo">
-        <option value="">—</option>
-      </select>
-    </span>
-    <small class="help" style="margin:0;" id="anoAtivoMsg"></small>
+  <!-- Ano letivo — editável, permite cadastrar em anos passados (padrão do aluno) -->
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px;">
+    <div class="field" style="width:160px;flex:0 0 160px;margin:0;">
+      <label for="anoLetivo">Ano letivo</label>
+      <input id="anoLetivo" type="number" min="2000" max="2100"/>
+      <small class="help" id="anoAtivoMsg">Preenchido automaticamente a partir do ano ativo.</small>
+    </div>
+    <span class="chip" id="pillAnoAtivo" style="margin-top:22px;">📅 ano ativo: —</span>
   </div>
 
   <!-- STEPPER -->
@@ -936,28 +936,35 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   };
 
   /* ════════════════════════════════════════
-     Ano Ativo
+     Ano Ativo / Ano letivo (editável — permite cadastro em anos passados)
   ════════════════════════════════════════ */
-  const selectAnoAtivo = document.getElementById('selectAnoAtivo');
+  const anoLetivoInput = document.getElementById('anoLetivo');
   const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
-  let anoAtivo = new Date().getFullYear();
+  const pillAnoAtivo   = document.getElementById('pillAnoAtivo');
+  let anoAtivoReal = new Date().getFullYear(); // ano ativo real do sistema (fixo, só leitura)
+  let anoAtivo     = new Date().getFullYear(); // ano em que o cadastro será salvo (editável)
 
   async function carregarAnoAtivo(){
     try{
       const dados = await window.DB.loadAll();
       const ano = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
-      anoAtivo = ano && !isNaN(Number(ano)) ? parseInt(ano, 10) : new Date().getFullYear();
+      anoAtivoReal = ano && !isNaN(Number(ano)) ? parseInt(ano, 10) : new Date().getFullYear();
     } catch(e){
       console.warn('carregarAnoAtivo:', e);
-      anoAtivo = new Date().getFullYear();
+      anoAtivoReal = new Date().getFullYear();
     }
-    selectAnoAtivo.innerHTML = `<option value="${anoAtivo}">${anoAtivo}</option>`;
-    selectAnoAtivo.value = anoAtivo;
-    anoAtivoMsg.textContent = `Carregando no ano ${anoAtivo}`;
+    if(pillAnoAtivo) pillAnoAtivo.textContent = `📅 ano ativo: ${anoAtivoReal}`;
+    // Preenche o campo com o ano ativo por padrão, mas o usuário pode trocar
+    // livremente para cadastrar um funcionário em um ano letivo anterior.
+    if(!anoLetivoInput.value){
+      anoLetivoInput.value = anoAtivoReal;
+      anoAtivo = anoAtivoReal;
+    }
   }
 
-  selectAnoAtivo.addEventListener('change', function(){
-    anoAtivo = parseInt(selectAnoAtivo.value, 10);
+  anoLetivoInput.addEventListener('change', function(){
+    const v = parseInt(anoLetivoInput.value, 10);
+    anoAtivo = !isNaN(v) ? v : anoAtivoReal;
     atualizarPill();
   });
 
@@ -1643,6 +1650,10 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
      Limpar formulário completo
   ════════════════════════════════════════ */
   function limparFormulario(){
+    // Ano letivo — volta pro ano ativo padrão
+    anoLetivoInput.value = anoAtivoReal;
+    anoAtivo = anoAtivoReal;
+
     // Etapa 1
     ['cpf','rgCnh','nome','nasc','mae','pai','natCidade','natUFText'].forEach(id => {
       const el = document.getElementById(id); if(el) el.value='';
@@ -1922,6 +1933,12 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     limparFormulario();
     _editandoId = f.funcId;
     _editandoViaURL = !!viaURL;
+
+    // Ano letivo do registro — preserva o ano original, não sobrescreve com o ano ativo
+    const anoDoRegistro = parseInt(f.anoLetivo, 10);
+    anoAtivo = !isNaN(anoDoRegistro) ? anoDoRegistro : anoAtivoReal;
+    anoLetivoInput.value = anoAtivo;
+    atualizarPill();
 
     // Etapa 1
     document.getElementById('cpf').value = f.cpf||''; document.getElementById('cpf').dispatchEvent(new Event('input'));
