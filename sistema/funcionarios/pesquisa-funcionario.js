@@ -83,25 +83,16 @@
   };
 
   /* ══════════════════════════════════════════
-     Ano Ativo — Firestore
+     Ano Ativo — Firestore (mesmo padrão de pesquisa-ano-ativo)
   ══════════════════════════════════════════ */
   const selectAnoAtivo = document.getElementById('selectAnoAtivo');
   const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
+  const lblAnoAtivo    = document.getElementById('lblAnoAtivo');
+  let anoAtivoReal = ''; // ano ativo real, configurado no sistema
 
-  (function populaSelectAnos(){
-    const cy = new Date().getFullYear();
-    selectAnoAtivo.innerHTML = '';
-    // opção "Todos os anos"
-    const optTodos = document.createElement('option');
-    optTodos.value = ''; optTodos.textContent = 'Todos os anos';
-    selectAnoAtivo.appendChild(optTodos);
-    for(let y = cy + 1; y >= 2020; y--){
-      const opt = document.createElement('option');
-      opt.value = String(y); opt.textContent = String(y);
-      selectAnoAtivo.appendChild(opt);
-    }
-    selectAnoAtivo.value = '';
-  })();
+  function atualizarAnoEfetivo(){
+    _anoAtivo = selectAnoAtivo.value || anoAtivoReal;
+  }
 
   async function carregarAnoAtivo(){
     try{
@@ -110,15 +101,28 @@
         document.addEventListener('auth:ready', res, {once:true});
       });
       const dados = await window.DB.loadAll();
-      const ano = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
-      if(ano && !isNaN(Number(ano))){
-        selectAnoAtivo.value = ano;
-        _anoAtivo = ano;
-        anoAtivoMsg.textContent = `Ano ativo: ${ano}.`;
-      } else {
-        _anoAtivo = '';
-        anoAtivoMsg.textContent = 'Ano ativo não definido — mostrando todos.';
-      }
+      anoAtivoReal = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+      lblAnoAtivo.textContent = anoAtivoReal || '—';
+
+      // Monta as opções do select só com anos que realmente têm dados
+      // (mesma lógica de pesquisa-ano-ativo: nada de intervalo fixo)
+      const anosSet = new Set();
+      funcionarios.forEach(f => { if(f.anoLetivo) anosSet.add(String(f.anoLetivo).trim()); });
+      if(anoAtivoReal) anosSet.add(anoAtivoReal);
+      const anos = Array.from(anosSet).filter(Boolean).sort((a,b) => Number(a) - Number(b));
+
+      selectAnoAtivo.innerHTML = '';
+      const optAuto = document.createElement('option');
+      optAuto.value = ''; optAuto.textContent = '(usar ano ativo)';
+      selectAnoAtivo.appendChild(optAuto);
+      anos.forEach(y => {
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y;
+        selectAnoAtivo.appendChild(o);
+      });
+      selectAnoAtivo.value = '';
+
+      atualizarAnoEfetivo();
       popularSelects();
       atualizarPill();
     }catch(e){
@@ -128,10 +132,7 @@
   }
 
   selectAnoAtivo.addEventListener('change', function(){
-    _anoAtivo = selectAnoAtivo.value;
-    anoAtivoMsg.textContent = _anoAtivo
-      ? `Filtrando pelo ano ${_anoAtivo}.`
-      : 'Exibindo funcionários de todos os anos.';
+    atualizarAnoEfetivo();
     popularSelects();
     atualizarPill();
     aplicarFiltros();
@@ -386,7 +387,7 @@
 
     lista.innerHTML = '';
     pagina.forEach(f => {
-      const nat   = [f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
+      const nat   = [f.naturalidadeCidade || f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
       const nasc  = formatDate(f.dataNascimento) || '—';
       const idade = calcAge(f.dataNascimento) || '—';
       const el    = document.createElement('div');
@@ -394,10 +395,12 @@
       el.innerHTML = `
         <div class="left">
           <div class="title">
-            <span>${highlight(f.nome, query) || 'Sem nome'}</span>
-            <span class="badge">${highlight(f.funcao, query) || 'Sem função'}</span>
-            ${f.cargaHoraria ? `<span class="badge">${escapeHtml(f.cargaHoraria)}H</span>` : ''}
-            <span class="badge badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span>
+            <span class="nome">${highlight(f.nome, query) || 'Sem nome'}</span>
+            <div class="badges">
+              <span class="badge">${highlight(f.funcao, query) || 'Sem função'}</span>
+              ${f.cargaHoraria ? `<span class="badge">${escapeHtml(f.cargaHoraria)}H</span>` : ''}
+              <span class="badge badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span>
+            </div>
           </div>
           <div class="meta">
             CPF: ${highlight(f.cpf, query) || '—'} • RG/CNH: ${highlight(f.rgCnh, query) || '—'} •
@@ -408,6 +411,7 @@
         </div>
         <div class="right">
           <a class="btn-edit" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
+          <button type="button" class="btn-view" data-view-func="${escapeHtml(f.funcId)}">👁️ Visualizar</button>
         </div>
       `;
       lista.appendChild(el);
@@ -443,11 +447,10 @@
     chkMat.checked = false; document.getElementById('lblFMat').classList.remove('checked');
     chkVes.checked = false; document.getElementById('lblFVes').classList.remove('checked');
     chkNot.checked = false; document.getElementById('lblFNot').classList.remove('checked');
-    sortState = { col: null, dir: 0 };
-    document.querySelectorAll('th.sortable').forEach(h => {
-      h.classList.remove('asc','desc');
-      h.querySelector('.sort-icon').textContent = '↕';
-    });
+    currentSortField = 'nome';
+    currentSortOrder  = 'asc';
+    sortFieldEl.value = 'nome';
+    btnToggleSort.textContent = '↑↓';
     atualizarTurnoHint();
     aplicarFiltros(); // ano permanece o mesmo
   });
@@ -458,6 +461,154 @@
   btnProximo.addEventListener('click', function(){
     const totalPags = Math.ceil(filtrados.length / POR_PAG);
     if(pagAtual < totalPags){ pagAtual++; renderLista(); window.scrollTo({top:0,behavior:'smooth'}); }
+  });
+
+  /* ══════════════════════════════════════════
+     Modal — Ficha do funcionário
+  ══════════════════════════════════════════ */
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  const modalTitle     = document.getElementById('modalTitle');
+  const modalBody       = document.getElementById('modalBody');
+
+  const ESCOLARIDADE_LABEL = {
+    SEM_ESCOLARIDADE:    'Sem escolaridade',
+    FUND_INCOMPLETO:     'Ensino fundamental incompleto',
+    FUND_COMPLETO:       'Ensino fundamental completo',
+    MEDIO_INCOMPLETO:    'Ensino médio incompleto',
+    MEDIO_COMPLETO:      'Ensino médio completo',
+    SUPERIOR_INCOMPLETO: 'Ensino superior incompleto',
+    SUPERIOR_COMPLETO:   'Ensino superior completo',
+  };
+
+  function abrirModal(titulo, htmlBody){
+    modalTitle.textContent = titulo;
+    modalBody.innerHTML = htmlBody;
+    modalBackdrop.classList.add('open');
+  }
+  function fecharModal(){
+    modalBackdrop.classList.remove('open');
+  }
+  document.getElementById('btnFecharModal').addEventListener('click', fecharModal);
+  modalBackdrop.addEventListener('click', function(e){
+    if(e.target === modalBackdrop) fecharModal();
+  });
+
+  function montarNeeDetalhado(f){
+    const d = f.deficiencia || {};
+    const itens = [];
+    if(d.tea)              itens.push('🧩 TEA');
+    if(d.altasHabilidades) itens.push('⭐ Altas habilidades / superdotação');
+    if(d.defFisica)        itens.push('♿ Deficiência física');
+    if(d.defIntelectual)   itens.push('🧠 Deficiência intelectual');
+    if(d.defVisual)        itens.push('👁️ Deficiência visual' + (d.defVisualSub ? ` (${escapeHtml(d.defVisualSub)})` : ''));
+    if(d.defAuditiva)      itens.push('👂 Deficiência auditiva / surdez' + (d.defAuditivaSub ? ` (${escapeHtml(d.defAuditivaSub)})` : ''));
+    if(!itens.length){
+      return `<div style="font-size:13px;color:var(--muted);">Nenhuma</div>`;
+    }
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;">` +
+      itens.map(t => `<span class="badge">${t}</span>`).join('') +
+      `</div>`;
+  }
+
+  function montarFormacao(f){
+    const blocos = [];
+    if(Array.isArray(f.graduacoes) && f.graduacoes.length){
+      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Graduações</div>` +
+        f.graduacoes.map(g => `<div style="font-size:13px;">• ${escapeHtml(g.curso||g.nome||'—')}${g.ano?' · '+escapeHtml(String(g.ano)):''}</div>`).join(''));
+    }
+    if(Array.isArray(f.posGraduacoes) && f.posGraduacoes.length){
+      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Pós-graduações</div>` +
+        f.posGraduacoes.map(p => `<div style="font-size:13px;">• ${escapeHtml(p.area||'—')}${p.ano?' · '+escapeHtml(String(p.ano)):''}</div>`).join(''));
+    }
+    if(Array.isArray(f.complementacoes) && f.complementacoes.length){
+      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Complementações pedagógicas</div>` +
+        f.complementacoes.map(c => `<div style="font-size:13px;">• ${escapeHtml(c.nome||'—')}${c.ano?' · '+escapeHtml(String(c.ano)):''}</div>`).join(''));
+    }
+    if(Array.isArray(f.outrosCursos) && f.outrosCursos.length){
+      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Outros cursos</div>` +
+        f.outrosCursos.map(o => `<div style="font-size:13px;">• ${escapeHtml(o.nome||o.curso||'—')}</div>`).join(''));
+    }
+    return blocos.length ? blocos.join('') : `<div style="font-size:13px;color:var(--muted);">Nenhuma formação adicional registrada.</div>`;
+  }
+
+  function abrirFichaFuncionario(funcId){
+    const f = funcionarios.find(x => x.funcId === funcId);
+    if(!f) return;
+    const nat  = [f.naturalidadeCidade || f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
+    const nasc = formatDate(f.dataNascimento) || '—';
+    const idade = calcAge(f.dataNascimento) || '—';
+
+    const cabecalho = `
+      <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--card-border,var(--border));border-radius:10px;background:var(--chip-bg);">
+        <b>${escapeHtml(f.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(f.funcId||'—')}
+        &nbsp;•&nbsp; Vínculo: ${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}
+      </div>`;
+
+    const camposBasicos = [
+      ['CPF', f.cpf], ['RG/CNH', f.rgCnh], ['Nascimento', nasc], ['Idade', idade],
+      ['Sexo', SEXO_LABEL[f.sexo]||f.sexo], ['Cor/Raça', f.corRaca],
+      ['Naturalidade', nat], ['Mãe', f.filiacaoMae], ['Pai', f.filiacaoPai],
+      ['Função', f.funcao], ['Carga horária', f.cargaHoraria ? f.cargaHoraria+'H' : ''],
+      ['Turnos', turnosTexto(f.turnos)],
+      ['CEP', f.cep], ['Cidade', f.endCidade], ['UF', f.endUF], ['Zona', f.zonaResidencia],
+      ['Escolaridade', ESCOLARIDADE_LABEL[f.escolaridade] || f.escolaridade],
+    ];
+    const campos = camposBasicos.map(([label, v]) => `
+      <div style="padding:8px 10px;border:1px solid var(--card-border,var(--border));border-radius:8px;">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(label)}</div>
+        <div style="font-size:13px;margin-top:2px;">${escapeHtml(String(v || '—'))}</div>
+      </div>`).join('');
+
+    const docsPlaceholderId = `docsFicha_${funcId.replace(/[^a-zA-Z0-9_-]/g,'')}`;
+
+    const rows = `${cabecalho}
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">${campos}</div>
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">NEE / Deficiência</div>
+        ${montarNeeDetalhado(f)}
+      </div>
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Formação</div>
+        ${montarFormacao(f)}
+      </div>
+      <div style="margin-top:16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Documentos</div>
+        <div id="${docsPlaceholderId}" style="font-size:13px;color:var(--muted);">Carregando documentos…</div>
+      </div>
+    `;
+    abrirModal('Ficha do funcionário', rows);
+    carregarDocsFicha(funcId, docsPlaceholderId);
+  }
+
+  async function carregarDocsFicha(funcId, targetId){
+    const el = document.getElementById(targetId);
+    if(!el) return;
+    try{
+      const resp = await fetch(`/api/drive-list-funcionario?funcionarioId=${encodeURIComponent(funcId)}`);
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error || 'Erro ao buscar documentos');
+      const files = data.files || [];
+      if(!files.length){
+        el.innerHTML = `<div style="font-size:13px;color:var(--muted);">Nenhum documento anexado</div>`;
+        return;
+      }
+      el.innerHTML = files.map(f => {
+        const icon = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--card-border,var(--border));">
+          <span>${icon}</span>
+          <span style="flex:1;font-size:13px;">${escapeHtml(f.label||f.fileName)}</span>
+          <a href="${f.webViewLink}" target="_blank" rel="noopener" style="font-size:12px;font-weight:800;color:var(--primary,#7c3aed);text-decoration:none;">👁️ Ver</a>
+        </div>`;
+      }).join('');
+    }catch(e){
+      el.innerHTML = `<div style="font-size:13px;color:#b91c1c;">Erro ao carregar documentos.</div>`;
+    }
+  }
+
+  lista.addEventListener('click', function(e){
+    const btn = e.target.closest('[data-view-func]');
+    if(!btn) return;
+    abrirFichaFuncionario(btn.dataset.viewFunc);
   });
 
   /* ══════════════════════════════════════════
