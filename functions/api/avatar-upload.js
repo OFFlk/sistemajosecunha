@@ -6,13 +6,21 @@
  *   entidadeId: alunoId hoje; futuramente também funcionarioId
  * Retorna: { fotoUrl, fotoFileId }
  *
- * Diferente de drive-upload.js (documentos soltos, nome único por envio):
- * usa um public_id FIXO por entidade (sem timestamp) + overwrite:true —
- * reenviar uma foto nova substitui a antiga automaticamente no Cloudinary,
- * sem acumular versões velhas do avatar. Fica numa pasta própria
- * (avatares/...), separada da pasta de documentos — o avatar nunca aparece
- * na listagem de documentos (/api/drive-list), então não precisa de nenhum
- * filtro por nome do lado do frontend.
+ * public_id é FIXO por entidade (sem timestamp) + overwrite:true — reenviar
+ * uma foto nova substitui a antiga automaticamente no Cloudinary, sem
+ * acumular versões velhas do avatar.
+ *
+ * invalidate:true é essencial: sem isso, o CDN do Cloudinary continua
+ * servindo a versão antiga da imagem em cache mesmo depois do overwrite,
+ * já que o public_id (e portanto a URL de entrega) não muda entre uploads.
+ *
+ * asset_folder é enviado à parte pra contas em "Dynamic Folder Mode" (padrão
+ * em contas Cloudinary criadas a partir de meados de 2024): nesse modo, as
+ * barras do public_id NÃO definem sozinhas a pasta exibida no Media Library
+ * — é preciso mandar esse parâmetro explicitamente, senão o Cloudinary joga
+ * o asset solto na raiz mesmo com um public_id "avatares/alunos/ALU-000874".
+ * Isso é só organização visual no painel, não afeta a URL de entrega — mas
+ * já resolvemos aqui pra evitar confusão depois.
  */
 
 function corsHeaders() {
@@ -61,14 +69,19 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
-    // public_id FIXO (sem timestamp/nome de arquivo) — é isso que garante
-    // que reenviar uma foto substitui a anterior em vez de criar outra.
     const publicId = `${pasta}/${entidadeId}`;
     const timestamp = Math.floor(Date.now() / 1000);
-    // invalidate:true é essencial aqui: sem isso o CDN do Cloudinary continua
-    // servindo a versão antiga da imagem em cache mesmo depois do overwrite,
-    // já que o public_id (e portanto a URL de entrega) não muda entre uploads.
-    const allParams = { invalidate: true, overwrite: true, public_id: publicId, timestamp };
+
+    // Todo parâmetro que vai no body (exceto file, api_key, signature e
+    // cloud_name) precisa entrar aqui, em ordem alfabética das chaves, pra
+    // assinatura bater com o que o Cloudinary espera.
+    const allParams = {
+      asset_folder: pasta,
+      invalidate: true,
+      overwrite: true,
+      public_id: publicId,
+      timestamp,
+    };
     const sigStr = Object.keys(allParams)
       .sort()
       .map(k => `${k}=${allParams[k]}`)
@@ -79,6 +92,7 @@ export async function onRequestPost({ request, env }) {
     const body = JSON.stringify({
       file: dataUri,
       public_id: publicId,
+      asset_folder: pasta,
       overwrite: true,
       invalidate: true,
       timestamp,
@@ -86,12 +100,20 @@ export async function onRequestPost({ request, env }) {
       signature,
     });
 
+    console.log('[avatar-upload] enviando pro Cloudinary:', { publicId, pasta, timestamp });
+
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/image/upload`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
     );
     const result = await res.json();
-    if (result.error) throw new Error(result.error.message);
+
+    if (result.error) {
+      console.error('[avatar-upload] Cloudinary retornou erro:', result.error);
+      throw new Error(result.error.message);
+    }
+
+    console.log('[avatar-upload] sucesso:', { public_id: result.public_id, version: result.version, url: result.secure_url });
 
     return new Response(JSON.stringify({
       fotoUrl: result.secure_url,
@@ -99,7 +121,7 @@ export async function onRequestPost({ request, env }) {
     }), { status: 200, headers });
 
   } catch (err) {
-    console.error('[avatar-upload]', err.message || err);
+    console.error('[avatar-upload] erro:', err.message || err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers });
   }
 }
