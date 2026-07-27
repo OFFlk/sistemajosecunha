@@ -2317,7 +2317,7 @@ function normSerie(s){
       if(window.initDocs) window.initDocs(editId);
 
       // ── Foto ──
-      if(window.initFoto) window.initFoto(editId, aluno.fotoUrl || '');
+      if(window.initFoto) window.initFoto(editId, aluno.fotoUrl || '', aluno.fotoFileId || '');
 
       window._modoEdicaoId    = editId;
       window._modoEdicaoAluno = aluno;
@@ -3247,6 +3247,7 @@ function normSerie(s){
 
   let _fotoPendente = null; // { base64, mimeType } — cadastro novo, aguardando alunoId
   let _fotoAlunoId  = null; // conhecido de cara em modo edição
+  let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
 
   function _setStatus(txt, cor){
     statusEl.textContent = txt || '';
@@ -3254,8 +3255,10 @@ function normSerie(s){
   }
 
   // Chamado no modo edição, com a foto já existente (se houver)
-  window.initFoto = function(alunoId, fotoUrlExistente){
+  window.initFoto = function(alunoId, fotoUrlExistente, fotoFileIdExistente){
+    console.log('[foto-aluno] initFoto chamado com:', alunoId, fotoUrlExistente);
     _fotoAlunoId = alunoId ? String(alunoId) : null;
+    _fotoFileIdAtual = fotoFileIdExistente || null;
     if(fotoUrlExistente){
       previewImg.src = fotoUrlExistente;
       previewImg.style.display = 'block';
@@ -3294,15 +3297,20 @@ function normSerie(s){
   async function _enviarFoto(alunoId, base64, mimeType){
     _setStatus('Enviando foto...');
     try{
-      const resp = await fetch('/api/drive-upload', {
+      const resp = await fetch('/api/avatar-upload', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ alunoId, fileName: 'foto_perfil.jpg', mimeType, fileBase64: base64, label: 'Foto de perfil' }),
+        body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, fileBase64: base64, mimeType }),
       });
       const data = await resp.json();
+      console.log('[foto-aluno] resposta do upload:', resp.status, data);
       if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
-      await window.DB.anoAtivoAlunos.save({ _id: alunoId, fotoUrl: data.webViewLink, fotoFileId: data.fileId });
+      if(!data.fotoUrl) throw new Error('upload OK mas sem fotoUrl na resposta — veja o console');
+      const salvo = await window.DB.anoAtivoAlunos.save({ _id: alunoId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
+      console.log('[foto-aluno] salvo no Firestore:', salvo);
+      _fotoFileIdAtual = data.fotoFileId;
       _setStatus('✅ Foto salva.', '#166534');
     }catch(e){
+      console.error('[foto-aluno] falha ao enviar/salvar foto:', e);
       _setStatus('❌ Falha ao enviar foto: ' + e.message, '#b91c1c');
     }
   }
@@ -3334,16 +3342,26 @@ function normSerie(s){
   });
 
   btnRemover.addEventListener('click', async () => {
+    const fileIdAntigo = _fotoFileIdAtual;
     previewImg.style.display = 'none';
     previewImg.src = '';
     placeholder.style.display = '';
     btnRemover.style.display = 'none';
     inpFoto.value = '';
     _fotoPendente = null;
+    _fotoFileIdAtual = null;
     _setStatus('');
     if(_fotoAlunoId){
       try{ await window.DB.anoAtivoAlunos.save({ _id: _fotoAlunoId, fotoUrl: null, fotoFileId: null }); }
-      catch(e){ console.warn('Erro ao remover foto:', e); }
+      catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
+    }
+    if(fileIdAntigo){
+      try{
+        await fetch('/api/drive-delete', {
+          method: 'DELETE', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+        });
+      }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
     }
   });
 
@@ -3353,6 +3371,7 @@ function normSerie(s){
   window.limparFoto = function(){
     _fotoPendente = null;
     _fotoAlunoId  = null;
+    _fotoFileIdAtual = null;
     inpFoto.value = '';
     previewImg.style.display = 'none';
     previewImg.src = '';
@@ -3566,7 +3585,7 @@ function normSerie(s){
       if(!resp.ok) throw new Error(data.error);
       // A foto de perfil vive na mesma pasta do Cloudinary, mas tem seu
       // próprio widget — não deve aparecer aqui como documento anexado.
-      const files = (data.files || []).filter(f => f.fileName !== 'foto_perfil.jpg');
+      const files = data.files || [];
       if(!files.length) return;
       wrap && (wrap.style.display = '');
       const sep = document.createElement('div');

@@ -1288,6 +1288,7 @@ async function abrirFichaAluno(alunoId){
   // turno/status/situação calculados a partir da matrícula).
   let fresco = null;
   try{ fresco = await window.DB.anoAtivoAlunos.get(alunoId); }catch(e){ /* segue só com o raw */ }
+  console.log('[ficha-aluno] doc fresco do Firestore:', fresco);
   const base = fresco ? { ...raw, ...fresco } : raw;
   // alunosOrdenados só passa por _enriquecerComMeta (turno/status/modelo);
   // aqui garantimos também o cálculo de _neeResumo/etc via enriquecerAlunos.
@@ -1372,7 +1373,7 @@ async function carregarDocsFicha(alunoId, targetId){
     if(!resp.ok) throw new Error(data.error || 'Erro ao buscar documentos');
     // A foto de perfil vive na mesma pasta do Cloudinary, mas tem exibição
     // própria no cabeçalho da ficha — não deve aparecer aqui como documento.
-    const files = (data.files || []).filter(f => f.fileName !== 'foto_perfil.jpg');
+    const files = data.files || [];
     if(!files.length){
       el.innerHTML = `<div style="font-size:13px;color:var(--muted);">Nenhum documento anexado</div>`;
       return;
