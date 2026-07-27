@@ -5,11 +5,8 @@
      2. Tabela completa (DOCX) — todos os campos, em Word (softwares de RH
         específicos só abrem Word)
      3. CSV completo — todos os campos, exceto imagem/documento
-
-   PENDENTE (não implementado ainda, propositalmente): Ficha individual
-   (PDF, 1 por funcionário) — será adicionada depois, seguindo o padrão que
-   está sendo construído na página de aluno. O botão já existe no HTML,
-   desabilitado.
+     4. Ficha individual (PDF) — uma página por funcionário, com foto (3x
+        maior que a usada na ficha individual do aluno, a pedido)
 
    Fonte dos dados: window.PesquisaFuncionarios (exposto em
    pesquisa-funcionario.js):
@@ -17,7 +14,7 @@
      - getParaExportar() -> regra de seleção já aplicada:
          nenhum card marcado  = getFiltrados()
          1+ cards marcados    = só os marcados, mantendo a ordem
-   Os 3 exports abaixo usam sempre getParaExportar().
+   Os 4 exports abaixo usam sempre getParaExportar().
    ══════════════════════════════════════════════════════════ */
 (function(){
 
@@ -388,6 +385,128 @@
   }
 
   /* ══════════════════════════════════════════
+     4) Ficha individual (PDF) — uma página por funcionário, todos os dados
+     em formato de ficha (rótulo: valor). Foto 3x maior que a do aluno
+     (aluno usa 40pt; aqui 120pt), a pedido.
+  ══════════════════════════════════════════ */
+  function _fetchImagemComoDataUrl(url){
+    return fetch(url)
+      .then(r => r.blob())
+      .then(blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }))
+      .catch(() => null); // sem foto ou falha de rede — ficha segue sem ela
+  }
+
+  async function exportFichaIndividualPdf(titulo, lista){
+    if(!lista.length){ alert('Nenhum funcionário para exportar.'); return; }
+    const { jsPDF } = window.jspdf || {};
+    if(!jsPDF){ alert('Falha ao carregar jsPDF. Verifique sua conexão.'); return; }
+
+    const escola = await _carregarDadosEscola();
+    const enriquecidos = lista.map(enriquecerFuncionario);
+
+    // Busca todas as fotos em paralelo antes de montar as páginas
+    const comFoto = enriquecidos.filter(f => f.fotoUrl);
+    const pares = await Promise.all(comFoto.map(f => _fetchImagemComoDataUrl(f.fotoUrl)));
+    const fotoDataUrls = {};
+    comFoto.forEach((f, i) => { if(pares[i]) fotoDataUrls[f.funcId] = pares[i]; });
+
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+
+    const secoes = [
+      { titulo: 'Identificação', campos: [
+        ['Nome', 'nome'], ['Função', 'funcao'], ['CPF', 'cpf'],
+        ['RG/CNH', 'rgCnh'], ['Nascimento', '_nasc'], ['Idade', '_idade'],
+        ['Sexo', '_sexoTexto'], ['Cor/Raça', 'corRaca'], ['Naturalidade', '_naturalidadeTexto'],
+        ['País', 'naturalidadePais'],
+      ]},
+      { titulo: 'Filiação', campos: [ ['Mãe', 'filiacaoMae'], ['Pai', 'filiacaoPai'] ] },
+      { titulo: 'Vínculo funcional', campos: [
+        ['Vínculo', '_statusTexto'], ['Carga horária', 'cargaHoraria'],
+        ['Turnos', '_turnosTexto'], ['Ano letivo', 'anoLetivo'],
+      ]},
+      { titulo: 'Endereço', campos: [
+        ['CEP', 'cep'], ['Cidade', 'endCidade'], ['UF', 'endUF'], ['Zona', 'zonaResidencia'],
+      ]},
+      { titulo: 'Escolaridade e formação', campos: [
+        ['Escolaridade', '_escolaridadeTexto'], ['Tipo de ensino', 'tipoEnsino'],
+        ['Graduações', '_graduacoesTexto'], ['Pós-graduações', '_posGraduacoesTexto'],
+        ['Complementações pedagógicas', '_complementacoesTexto'], ['Outros cursos', '_outrosCursosTexto'],
+      ]},
+    ];
+
+    enriquecidos.forEach((f, i) => {
+      if(i > 0) doc.addPage();
+      let y = _desenharCabecalhoEscola(doc, escola, titulo, pw);
+
+      const bX = 20, bW = pw - 40, colW = bW / 2;
+      const fotoDataUrl = fotoDataUrls[f.funcId];
+      const fotoSize = 120; // 3x o tamanho usado na ficha do aluno (40pt)
+      const bannerH = 26;
+      const bannerW = fotoDataUrl ? bW - fotoSize - 10 : bW;
+
+      // Faixa com o nome do funcionário em destaque (encolhe se houver foto)
+      doc.setFillColor(11, 63, 191);
+      doc.roundedRect(bX, y, bannerW, bannerH, 3, 3, 'F');
+      doc.setFontSize(12); doc.setFont(undefined,'bold'); doc.setTextColor(255);
+      doc.text((f.nome||'—').toUpperCase(), bX + 10, y + 17, { maxWidth: bannerW - 20 });
+
+      if(fotoDataUrl){
+        try{
+          doc.addImage(fotoDataUrl, 'JPEG', bX + bannerW + 10, y, fotoSize, fotoSize, undefined, 'FAST');
+        }catch(e){ /* imagem corrompida/formato inesperado — segue sem travar a ficha */ }
+      }
+      // Avança o Y pelo que for mais alto: a faixa do nome ou a foto (bem
+      // maior aqui, então normalmente é ela quem manda no espaço reservado)
+      y += Math.max(bannerH, fotoDataUrl ? fotoSize : 0) + 14;
+
+      secoes.forEach(sec => {
+        doc.setFontSize(9.5); doc.setFont(undefined,'bold'); doc.setTextColor(11,63,191);
+        doc.text(sec.titulo.toUpperCase(), bX, y);
+        y += 4;
+        doc.setDrawColor(210,220,240); doc.setLineWidth(0.6);
+        doc.line(bX, y, bX + bW, y);
+        y += 14;
+
+        doc.setFontSize(9); doc.setTextColor(30,30,50);
+        for(let idx=0; idx<sec.campos.length; idx+=2){
+          for(let c=0; c<2; c++){
+            const campo = sec.campos[idx+c];
+            if(!campo) continue;
+            const [label, key] = campo;
+            const valor = String(f[key] ?? '').trim() || '—';
+            const colX = bX + c * colW;
+            doc.setFont(undefined,'bold');
+            doc.text(`${label}:`, colX, y);
+            const labelW = doc.getTextWidth(`${label}: `);
+            doc.setFont(undefined,'normal');
+            doc.text(valor, colX + labelW + 2, y, { maxWidth: colW - labelW - 14 });
+          }
+          y += 16;
+        }
+        y += 12;
+      });
+
+      // NEE / Deficiência
+      doc.setFontSize(9.5); doc.setFont(undefined,'bold'); doc.setTextColor(11,63,191);
+      doc.text('NEE / DEFICIÊNCIA', bX, y);
+      y += 4;
+      doc.setDrawColor(210,220,240); doc.setLineWidth(0.6);
+      doc.line(bX, y, bX + bW, y);
+      y += 14;
+      doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(30,30,50);
+      doc.text(f._neeTexto || 'Nenhuma', bX, y, { maxWidth: bW });
+    });
+
+    doc.save(_buildFilename('Fichas_Individuais', escola, 'pdf'));
+  }
+
+  /* ══════════════════════════════════════════
      Wiring — dropdown "Exportar" + botões
   ══════════════════════════════════════════ */
   function _tituloContexto(){
@@ -426,7 +545,11 @@
       exportCsvCompleto(lista);
     });
 
-    // btnExportFichaIndividual fica desabilitado de propósito — pendente.
+    document.getElementById('btnExportFichaIndividual').addEventListener('click', function(){
+      drop.style.display = 'none';
+      const lista = window.PesquisaFuncionarios.getParaExportar();
+      exportFichaIndividualPdf(`${_tituloContexto()} • Ficha Individual`, lista);
+    });
   });
 
 })();

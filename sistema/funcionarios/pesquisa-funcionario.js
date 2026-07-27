@@ -580,10 +580,17 @@
     const nasc = formatDate(f.dataNascimento) || '—';
     const idade = calcAge(f.dataNascimento) || '—';
 
+    const fotoHtml = f.fotoUrl
+      ? `<img src="${escapeHtml(f.fotoUrl)}" alt="Foto do funcionário" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--card-border,var(--border));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:'🧑',style:'width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--card-border,var(--border));'}))">`
+      : `<div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--card-border,var(--border));">🧑</div>`;
+
     const cabecalho = `
-      <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--card-border,var(--border));border-radius:10px;background:var(--chip-bg);">
-        <b>${escapeHtml(f.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(f.funcId||'—')}
-        &nbsp;•&nbsp; Vínculo: ${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}
+      <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--card-border,var(--border));border-radius:10px;background:var(--chip-bg);display:flex;align-items:center;gap:12px;">
+        ${fotoHtml}
+        <div>
+          <b>${escapeHtml(f.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(f.funcId||'—')}
+          &nbsp;•&nbsp; Vínculo: ${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}
+        </div>
       </div>`;
 
     const camposBasicos = [
