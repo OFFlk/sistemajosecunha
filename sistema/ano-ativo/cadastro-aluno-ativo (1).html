@@ -1,0 +1,3649 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (manter — evita flash de tema errado) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../loading-overlay.js"></script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../matricula-utils.js"></script>
+<script src="../identidade-aluno.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Bibliotecas específicas desta página (conversão de PDF em imagens) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  if(typeof pdfjsLib !== 'undefined'){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<!-- CSS específico desta página (só o que não está nos globais) -->
+<style>
+/* ── Variáveis do sistema ──
+   --bg, --ink, --muted, --line, --chip-bg/border/color/name, --mark-bg,
+   --sub-color, --school-bg/color NÃO ficam aqui: já existem em header.css.
+   Redeclará-las aqui (depois do header.css) sobrescreveria os valores
+   globais — foi exatamente esse bug que quebrou a cor do chip em outra
+   página. --chip, --chipText, --primary, --danger2 também foram removidas
+   por não serem usadas em lugar nenhum desta página (código morto). */
+:root {
+  --card:         #ffffff;
+  --text:         #1e1b4b;
+  --border:       var(--brand-border, #ddd6fe);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  --danger:       #b91c1c;
+  --radius:       14px;
+  --radius2:      10px;
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border, #ddd6fe);
+  --accent:       var(--brand, #7c3aed);
+}
+html[data-theme="dark"] {
+  --card:         #131c2e;
+  --text:         #e2e8f0;
+  --border:       #2a3a5c;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
+  --accent:       var(--brand-d, #7c3aed);
+}
+
+/* ── Layout ── */
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
+
+/* ── Cards e painéis ── */
+.card, .panel {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 18px; margin-bottom: 16px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
+.sub, .muted { color: var(--muted); font-size: 13px; }
+.subnote { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 14px; }
+
+/* ── Botões ── */
+.btn {
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  padding: 9px 14px; border-radius: 10px; font-weight: 700; font-size: 14px;
+  text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, transform 0.06s;
+}
+.btn:active { transform: translateY(1px); }
+.btn.primary, .btn-primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
+.btn.primary:hover, .btn-primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
+html[data-theme="dark"] .btn.primary, html[data-theme="dark"] .btn-primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
+html[data-theme="dark"] .btn.primary:hover, html[data-theme="dark"] .btn-primary:hover { background: var(--brand-hover-d, #6d28d9); }
+.btn.danger, .btn-danger { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: var(--danger); }
+.btn.danger:hover { background: rgba(185,28,28,0.18); }
+.btn.ghost, .btn.secondary { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn.ghost:hover, .btn.secondary:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+.btn.small { padding: 7px 11px; font-size: 13px; }
+.btn.cancel { background: var(--card); border-color: var(--border); color: var(--muted); }
+
+/* ── Campos ── */
+.field label { display: block; font-size: 13px; font-weight: 700; margin: 0 0 6px; color: var(--text); }
+.field input, .field select,
+.card select, .card input[type="text"], .card input[type="number"], .card input[type="date"] {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--field-border);
+  border-radius: 10px; background: var(--field-bg); color: var(--text);
+  font-size: 14px; font-family: 'Nunito', sans-serif; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus, .field select:focus,
+.card select:focus, .card input:focus {
+  border-color: var(--brand, #7c3aed);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+html[data-theme="dark"] .field input, html[data-theme="dark"] .field select,
+html[data-theme="dark"] .card input, html[data-theme="dark"] .card select {
+  background: var(--field-bg); color: var(--text); border-color: var(--field-border);
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: rgba(226,232,240,0.45); }
+label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+
+/* ── Tabelas ── */
+.table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 980px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+th { background: var(--chip-bg); position: sticky; top: 0; z-index: 1; font-size: 12px; font-weight: 700; color: var(--muted); }
+tr:hover td { background: var(--chip-bg); opacity: 0.7; }
+html[data-theme="dark"] tr:hover td { opacity: 1; }
+
+/* ── Grids ── */
+.grid   { display: grid; grid-template-columns: 260px 1fr auto; gap: 14px; align-items: start; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; align-items: start; }
+.grid2  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid3  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.card .inline { display: grid; grid-template-columns: 1.2fr .7fr 1fr; gap: 18px; align-items: start; }
+.inline { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.inline > * { flex: 1; min-width: 180px; }
+.inline-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; align-items: start; }
+.split { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.inline-check { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--muted); font-size: 13px; user-select: none; cursor: pointer; white-space: nowrap; }
+.inline-check input { margin: 0; width: 16px; height: 16px; accent-color: var(--accent); }
+@media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr; } .card .inline { grid-template-columns: 1fr; } }
+@media (max-width: 920px) { .grid2, .grid3, .form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+
+/* ── Pills, chips, badges ── */
+.pill  { display: inline-flex; align-items: center; border: 1px solid var(--border); background: var(--chip-bg); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--chip-color); }
+.badge { display: inline-flex; align-items: center; border: 1px solid var(--border); background: var(--chip-bg); border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 800; color: var(--text); }
+.chip  { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--chip-color); padding: 8px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.count { background: var(--chip-bg); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+
+/* ── Misc ── */
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.top-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.stack { display: flex; flex-direction: column; }
+.right-col { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.row-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.panel-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.actions-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item { border: 1px solid var(--border); border-radius: var(--radius2); padding: 10px; background: var(--card); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; transition: background 0.3s; }
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.2; min-height: 14px; }
+.help.err { color: var(--danger); font-weight: 700; }
+.help.ok  { color: #1f8f4a; font-weight: 700; }
+.req { color: #ef4444; font-weight: 700; margin-left: 6px; }
+.loading { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.warn { padding: 10px 12px; border-radius: 10px; background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); font-size: 14px; }
+.ok-msg { padding: 10px 12px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #15803d; font-size: 14px; }
+html[data-theme="dark"] .ok-msg { color: #4ade80; }
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+.modebox { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--chip-bg); }
+
+/* ── Turno toggle (radio-style) ── */
+.turno-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.turno-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  border: 1.5px solid var(--border); background: var(--card); color: var(--muted);
+  cursor: pointer; font-family: 'Nunito', sans-serif;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.turno-btn:hover { border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+.turno-btn.selected {
+  background: var(--chip-bg); border-color: var(--brand, #7c3aed);
+  color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .turno-btn { background: var(--card); color: var(--muted); border-color: var(--border); }
+html[data-theme="dark"] .turno-btn.selected { background: var(--chip-bg); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+
+/* ── Integral toggle ── */
+#integralBox {
+  display: none;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--brand-border, #ddd6fe);
+  border-radius: 12px;
+  background: var(--chip-bg);
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  animation: fadeSlide 0.18s ease;
+}
+#integralBox.visible { display: flex; }
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.integral-toggle { display: flex; gap: 6px; }
+.integral-btn {
+  padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  border: 1.5px solid var(--border); background: var(--card); color: var(--muted);
+  cursor: pointer; font-family: 'Nunito', sans-serif;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.integral-btn.selected-sim {
+  background: #d1fae5; border-color: #34d399; color: #065f46;
+}
+.integral-btn.selected-nao {
+  background: var(--chip-bg); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .integral-btn { background: var(--card); color: var(--muted); border-color: var(--border); }
+html[data-theme="dark"] .integral-btn.selected-sim { background: rgba(52,211,153,0.18); border-color: #34d399; color: #6ee7b7; }
+html[data-theme="dark"] .integral-btn.selected-nao { background: var(--chip-bg); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+#integralBadge {
+  display: none; font-size: 12px; font-weight: 800;
+  padding: 3px 10px; border-radius: 999px;
+  background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+}
+#integralBadge.visible { display: inline-flex; align-items: center; gap: 4px; }
+html[data-theme="dark"] #integralBadge { background: rgba(52,211,153,0.18); border-color: #34d399; color: #6ee7b7; }
+.statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+
+/* ── Banner aluno encontrado ── */
+#bannerAlunoEncontrado { display: none; }
+#bannerAlunoEncontrado.visible { display: flex !important; }
+.field-locked input, .field-locked select, .field-locked .nat-input-real { background: var(--chip-bg) !important; color: var(--muted) !important; cursor: default !important; pointer-events: none; }
+.field-locked label::after { content: " 🔒"; font-size: 11px; opacity: .6; }
+
+/* ── Naturalidade autocomplete ── */
+.nat-wrap { position: relative; }
+.nat-ghost-layer { position: absolute; inset: 0; padding: 12px; border: 1px solid transparent; border-radius: 10px; font-size: 14px; font-family: inherit; pointer-events: none; white-space: nowrap; overflow: hidden; color: transparent; }
+.nat-ghost-layer span.ghost-tail { color: #adb5bd; }
+.nat-input-real { position: relative; width: 100%; padding: 11px 12px; border: 1px solid var(--field-border); border-radius: 10px; background: transparent; outline: none; font-size: 14px; }
+.nat-input-real:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+.nat-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.10); max-height: 200px; overflow-y: auto; display: none; }
+.nat-dropdown.open { display: block; }
+.nat-opt { padding: 10px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nat-opt:hover, .nat-opt.active { background: var(--chip-bg); }
+.nat-opt .nat-uf { font-size: 11px; font-weight: 800; color: var(--chip-color); background: var(--chip-bg); border-radius: 999px; padding: 2px 7px; flex-shrink: 0; }
+html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--text); }
+
+/* ── Modal ── */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
+.modal { width: min(1100px, 96vw); max-height: 86vh; overflow: auto; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
+.modal-head { position: sticky; top: 0; background: var(--card); display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.modal-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.modal-body { padding: 14px; }
+
+/* ══════════════════════════════════════════════
+   WIZARD — STEPPER
+══════════════════════════════════════════════ */
+.wz-stepper {
+  display: flex; align-items: center;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 18px; margin-bottom: 16px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.wz-step { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
+.wz-step-num {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800;
+  border: 2px solid var(--border); background: var(--card); color: var(--muted);
+  transition: all 0.25s;
+}
+.wz-step.active .wz-step-num { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
+.wz-step.done   .wz-step-num { background: rgba(22,163,74,0.12); border-color: rgba(22,163,74,0.35); color: #166534; }
+html[data-theme="dark"] .wz-step.done .wz-step-num { color: #4ade80; }
+.wz-step-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.wz-step-title { font-size: 13px; font-weight: 800; }
+.wz-step.active .wz-step-title { color: var(--brand-text, #6d28d9); }
+.wz-step.done   .wz-step-title { color: #166534; }
+html[data-theme="dark"] .wz-step.done .wz-step-title { color: #4ade80; }
+.wz-sep { width: 36px; height: 2px; background: var(--border); flex-shrink: 0; margin: 0 6px; border-radius: 2px; transition: background 0.3s; }
+.wz-sep.done { background: rgba(22,163,74,0.35); }
+
+/* Etapas */
+.wz-etapa { display: none; }
+.wz-etapa.ativa { display: block; }
+
+/* ══════════════════════════════════════════════
+   NEE — bloco Sim/Não + painel
+══════════════════════════════════════════════ */
+.nee-block { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 0; transition: border-color 0.2s; }
+.nee-block.ativo { border-color: var(--brand, #7c3aed); }
+html[data-theme="dark"] .nee-block.ativo { border-color: var(--brand-d, #7c3aed); }
+.nee-block.ativo .nee-header { background: var(--chip-bg); }
+
+.nee-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 14px;
+  background: var(--card); flex-wrap: wrap;
+  transition: background 0.2s;
+  border-bottom: 1px solid transparent;
+}
+.nee-block.ativo .nee-header { border-bottom-color: var(--brand, #7c3aed); }
+html[data-theme="dark"] .nee-block.ativo .nee-header { border-bottom-color: var(--brand-d, #7c3aed); }
+.nee-header-label { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.nee-toggle { display: flex; gap: 6px; }
+/* ── Botões Sim/Não ──────────────────────────────────────────────
+   Padrão de 3 estados:
+   • Neutro (nenhum): borda cinza discreta, sem fundo, texto muted
+   • Sim selecionado: fundo brand preenchido, texto branco
+   • Não selecionado: borda cinza, sem fundo, texto muted (igual ao neutro)
+─────────────────────────────────────────────────────────────── */
+.nee-sim-nao {
+  padding: 5px 16px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  border: 1.5px solid var(--border); background: transparent; color: var(--muted);
+  cursor: pointer; font-family: 'Nunito', sans-serif;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.nee-sim-nao:hover {
+  border-color: var(--brand, #7c3aed);
+  color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .nee-sim-nao:hover {
+  border-color: var(--brand-border-d, #7c3aed);
+  color: var(--brand-text-d, #c4b5fd);
+}
+/* SIM selecionado → fundo sólido brand */
+.nee-sim-nao.sim {
+  background: var(--brand, #7c3aed);
+  border-color: var(--brand, #7c3aed);
+  color: #fff;
+}
+html[data-theme="dark"] .nee-sim-nao.sim {
+  background: var(--brand-d, #7c3aed);
+  border-color: var(--brand-d, #7c3aed);
+  color: #fff;
+}
+/* NÃO selecionado → discreto, igual ao estado neutro */
+.nee-sim-nao.nao {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+/* Card com feedback visual quando "Sim" está ativo */
+.nee-block { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 0; transition: border-color 0.2s; }
+.nee-block.ativo { border-color: var(--brand, #7c3aed); }
+html[data-theme="dark"] .nee-block.ativo { border-color: var(--brand-d, #7c3aed); }
+.nee-block.ativo .nee-header { background: var(--chip-bg); }
+
+.nee-panel { display: none; padding: 14px; border-top: 1px solid var(--border); animation: fadeSlide 0.18s ease; }
+.nee-panel.open { display: block; }
+.nee-section-title { font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; }
+.nee-simple-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+@media(max-width:540px){ .nee-simple-grid { grid-template-columns: 1fr; } }
+
+/* Itens das deficiências — hover e checked usam brand */
+.nee-simple-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--card);
+  font-size: 13px; font-weight: 700; color: var(--text);
+  transition: background 0.15s, border-color 0.15s, color 0.15s; user-select: none;
+}
+.nee-simple-item:hover {
+  border-color: var(--brand, #7c3aed);
+  background: var(--chip-bg);
+  color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .nee-simple-item:hover {
+  border-color: var(--brand-border-d, #7c3aed);
+  background: var(--chip-bg);
+  color: var(--brand-text-d, #c4b5fd);
+}
+.nee-simple-item.checked {
+  background: var(--chip-bg);
+  border-color: var(--brand, #7c3aed);
+  color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .nee-simple-item.checked {
+  background: var(--chip-bg);
+  border-color: var(--brand-border-d, #7c3aed);
+  color: var(--brand-text-d, #c4b5fd);
+}
+.nee-simple-item input[type="checkbox"] { width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--brand, #7c3aed); cursor: pointer; margin: 0; }
+
+/* Transtornos — mesma lógica mas com --yellow-* via chip amarelo */
+.nee-simple-item.transtorno:hover {
+  border-color: var(--chip-border, #ddd6fe);
+  background: var(--chip-bg);
+  color: var(--chip-color, #6d28d9);
+}
+html[data-theme="dark"] .nee-simple-item.transtorno:hover {
+  border-color: var(--brand-border-d, #7c3aed);
+  background: var(--chip-bg);
+  color: var(--brand-text-d, #c4b5fd);
+}
+/* checked do transtorno mantém distinção amarela */
+.nee-simple-item.transtorno.checked {
+  background: rgba(234,179,8,0.10);
+  border-color: rgba(234,179,8,0.50);
+  color: #854d0e;
+}
+html[data-theme="dark"] .nee-simple-item.transtorno.checked {
+  background: rgba(234,179,8,0.14);
+  border-color: rgba(234,179,8,0.55);
+  color: #fde047;
+}
+
+/* Categorias com sub-opções */
+.nee-category { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.nee-category:last-child { margin-bottom: 0; }
+.nee-cat-header {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  cursor: pointer; background: var(--card); transition: background 0.15s; user-select: none;
+}
+.nee-cat-header:hover { background: var(--chip-bg); }
+html[data-theme="dark"] .nee-cat-header:hover { background: var(--chip-bg); }
+.nee-check { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--brand, #7c3aed); cursor: pointer; }
+.nee-cat-name { font-size: 13px; font-weight: 800; flex: 1; }
+.nee-cat-badge {
+  display: none; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px;
+  background: var(--chip-bg); border: 1px solid var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
+}
+.nee-cat-badge.visible { display: inline-flex; align-items: center; }
+html[data-theme="dark"] .nee-cat-badge {
+  border-color: var(--brand-border-d, #7c3aed);
+  color: var(--brand-text-d, #c4b5fd);
+}
+
+.nee-sub {
+  display: none; padding: 8px 12px 10px 38px;
+  border-top: 1px solid var(--border); background: var(--field-bg);
+  gap: 4px; flex-direction: column; animation: fadeSlide 0.15s ease;
+}
+.nee-sub.open { display: flex; }
+.nee-radio-item {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: background 0.12s; user-select: none;
+}
+.nee-radio-item:hover { background: var(--chip-bg); color: var(--brand-text, #6d28d9); }
+html[data-theme="dark"] .nee-radio-item:hover { background: var(--chip-bg); color: var(--brand-text-d, #c4b5fd); }
+.nee-radio-item.selected { background: var(--chip-bg); color: var(--brand-text, #6d28d9); }
+html[data-theme="dark"] .nee-radio-item.selected { color: var(--brand-text-d, #c4b5fd); }
+.nee-radio-item input[type="radio"] { width: 14px; height: 14px; flex-shrink: 0; accent-color: var(--brand, #7c3aed); cursor: pointer; margin: 0; }
+
+/* ══════════════════════════════════════════════
+   CEP — status badge
+══════════════════════════════════════════════ */
+.cep-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 700; margin-top: 5px;
+  padding: 3px 10px; border-radius: 999px;
+}
+.cep-status.loading { background: var(--chip-bg); color: var(--brand-text, #6d28d9); border: 1px solid var(--brand, #7c3aed); }
+.cep-status.ok  { background: rgba(22,163,74,0.10); color: #166534; border: 1px solid rgba(22,163,74,0.30); }
+.cep-status.err { background: rgba(239,68,68,0.08); color: #b91c1c; border: 1px solid rgba(239,68,68,0.30); }
+html[data-theme="dark"] .cep-status.ok  { color: #4ade80; }
+html[data-theme="dark"] .cep-status.err { color: #fca5a5; }
+.field input.cep-locked { background: var(--chip-bg) !important; color: var(--muted) !important; cursor: default; }
+
+/* ══════════════════════════════════════════════
+   BADGE DE COMPLETUDE (listagem futura)
+══════════════════════════════════════════════ */
+.badge-completude {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800;
+}
+.badge-completude.verde   { background: rgba(22,163,74,0.10);  border: 1px solid rgba(22,163,74,0.30);  color: #166534; }
+.badge-completude.amarelo { background: rgba(234,179,8,0.10);  border: 1px solid rgba(234,179,8,0.35);  color: #854d0e; }
+.badge-completude.vermelho{ background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.30);  color: #b91c1c; }
+html[data-theme="dark"] .badge-completude.verde   { color: #4ade80; }
+html[data-theme="dark"] .badge-completude.amarelo { color: #fde047; }
+html[data-theme="dark"] .badge-completude.vermelho{ color: #fca5a5; }
+
+/* ── Stepper — badge de aviso etapa incompleta ── */
+.wz-step-num.aviso { background: rgba(234,179,8,0.15) !important; border-color: rgba(234,179,8,0.60) !important; color: #854d0e !important; }
+html[data-theme="dark"] .wz-step-num.aviso { color: #fde047 !important; }
+.wz-etapa2-aviso {
+  display: none; align-items: center; gap: 8px;
+  padding: 8px 14px; margin-bottom: 12px;
+  background: rgba(234,179,8,0.10); border: 1px solid rgba(234,179,8,0.40); border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: #854d0e;
+}
+html[data-theme="dark"] .wz-etapa2-aviso { color: #fde047; }
+.wz-etapa2-aviso.show { display: flex; }
+
+/* ── Modo somente leitura (aluno inativo) ── */
+.modo-readonly { pointer-events: none; opacity: .5; user-select: none; }
+.modo-readonly-overlay {
+  position: absolute; inset: 0; z-index: 10; cursor: not-allowed;
+}
+/* ── Fila de docs — separador fixo ── */
+.docs-fila-sep-fixo {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  padding: 6px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
+}
+
+/* Ações com botão esquerdo */
+.actions-wizard { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+.actions-wizard .left { margin-right: auto; display: flex; gap: 8px; }
+
+/* ── Modo edição ── */
+.modo-edicao-banner {
+  display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; margin-bottom: 14px;
+  background: rgba(234,179,8,0.10); border: 1px solid rgba(234,179,8,0.40);
+  border-radius: 12px;
+}
+.modo-edicao-banner.show { display: flex; }
+.modo-edicao-banner-icon { font-size: 20px; }
+.modo-edicao-banner-text { flex: 1; font-size: 13px; font-weight: 700; color: #854d0e; }
+html[data-theme="dark"] .modo-edicao-banner-text { color: #fde047; }
+.modo-edicao-banner-btn {
+  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;
+  border: 1px solid rgba(234,179,8,0.50); background: transparent;
+  color: #854d0e; cursor: pointer; font-family: 'Nunito', sans-serif; transition: background .15s;
+}
+.modo-edicao-banner-btn:hover { background: rgba(234,179,8,0.15); }
+html[data-theme="dark"] .modo-edicao-banner-btn { color: #fde047; }
+/* ── Semilock — campos com desbloqueio manual ── */
+.campo-semilock-wrap { position: relative; }
+.campo-semilock-overlay {
+  position: absolute; inset: 0; border-radius: 10px;
+  background: var(--field-bg); opacity: .55;
+  cursor: pointer; z-index: 2;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 10px; transition: opacity .15s;
+}
+.campo-semilock-overlay:hover { opacity: .35; }
+.campo-semilock-overlay .lock-icon {
+  font-size: 15px; pointer-events: none;
+}
+.campo-semilock-aviso {
+  display: none; margin-top: 5px; padding: 7px 10px;
+  background: rgba(234,179,8,0.10); border: 1px solid rgba(234,179,8,0.40);
+  border-radius: 8px; font-size: 12px; font-weight: 700; color: #854d0e;
+  align-items: center; gap: 8px;
+}
+html[data-theme="dark"] .campo-semilock-aviso { color: #fde047; }
+.campo-semilock-aviso.show { display: flex; }
+.campo-semilock-aviso-btn {
+  padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
+  border: 1px solid rgba(234,179,8,0.50); background: transparent;
+  color: #854d0e; cursor: pointer; font-family: 'Nunito', sans-serif;
+  white-space: nowrap;
+}
+html[data-theme="dark"] .campo-semilock-aviso-btn { color: #fde047; border-color: rgba(234,179,8,.5); }
+.campo-semilock-aviso-btn:hover { background: rgba(234,179,8,0.15); }
+
+</style>
+<style id="drive-docs-css">
+/* ── Drop area ── */
+.docs-drop-area {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 20px 16px;
+  text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s; background: var(--field-bg);
+}
+.docs-drop-area:hover, .docs-drop-area.over {
+  border-color: var(--brand, #7c3aed); background: var(--chip-bg);
+}
+.docs-drop-area input[type="file"] { display: none; }
+.docs-drop-icon { font-size: 26px; margin-bottom: 4px; }
+.docs-drop-text { font-size: 13px; font-weight: 700; color: var(--muted); }
+.docs-drop-text span { color: var(--brand-text, #6d28d9); cursor: pointer; text-decoration: underline; }
+
+/* ── Fila de arquivos pendentes ── */
+.docs-fila-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card);
+}
+.docs-fila-icon { font-size: 18px; flex-shrink: 0; }
+.docs-fila-info { flex: 1; min-width: 0; }
+.docs-fila-nome { font-size: 13px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs-fila-label {
+  width: 100%; margin-top: 4px; padding: 5px 8px;
+  border: 1px solid var(--field-border); border-radius: 8px;
+  background: var(--field-bg); color: var(--text);
+  font-size: 12px; font-family: 'Nunito', sans-serif; outline: none;
+}
+.docs-fila-label:focus { border-color: var(--brand, #7c3aed); }
+.docs-fila-size { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.docs-fila-rm {
+  background: none; border: none; cursor: pointer;
+  font-size: 15px; color: var(--muted); padding: 0 2px; line-height: 1;
+  transition: color .15s;
+}
+.docs-fila-rm:hover { color: #b91c1c; }
+
+/* ── Status ── */
+.docs-status {
+  display: none; font-size: 12px; font-weight: 700;
+  padding: 6px 12px; border-radius: 8px; margin-top: 8px;
+}
+.docs-status.show   { display: block; }
+.docs-status.ok     { background: rgba(22,163,74,.10); color: #166534; border: 1px solid rgba(22,163,74,.30); }
+.docs-status.err    { background: rgba(239,68,68,.08); color: #b91c1c; border: 1px solid rgba(239,68,68,.30); }
+.docs-status.loading{ background: var(--chip-bg); color: var(--brand-text,#6d28d9); border: 1px solid var(--border); }
+html[data-theme="dark"] .docs-status.ok  { color: #4ade80; }
+html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
+
+/* ── Barra de progresso por arquivo ── */
+.docs-prog-wrap { height: 3px; border-radius: 999px; background: var(--border); margin-top: 4px; overflow: hidden; display: none; }
+.docs-prog-wrap.show { display: block; }
+.docs-prog-bar  { height: 100%; border-radius: 999px; background: var(--brand,#7c3aed); width: 0%; transition: width .3s; }
+</style>
+
+<title>Cadastro de alunos • Ano Ativo</title>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<main class="wrap">
+<section class="card">
+<div class="card-head">
+<div>
+<h2>Selecionar turma</h2>
+<p class="muted">Escolha a turma para visualizar os matriculados e inserir um novo aluno.</p>
+</div>
+<div class="pill" id="pillStatus">Banco: —</div>
+</div>
+<div class="inline">
+<div>
+<label for="turmaSelect">Turma<span class="req">*</span></label>
+<select id="turmaSelect">
+<option value="">— Selecione —</option>
+</select>
+<div class="subnote" id="turmaInfo">Selecione uma turma para carregar os alunos.</div>
+</div>
+<div>
+<label for="anoLetivo">Ano letivo</label>
+<input id="anoLetivo" max="2100" min="2000" type="number"/>
+<div class="subnote">Preenchido automaticamente a partir da turma/ano ativo.</div>
+</div>
+<div id="wrapStatusPadrao">
+<label for="statusPadrao" id="labelStatusPadrao">Status padrão da matrícula</label>
+<select id="statusPadrao"></select>
+<div class="subnote" id="subnoteStatusPadrao">Você pode ajustar por aluno depois (futuro).</div>
+</div>
+</div>
+</section>
+<!-- ═══════════════════════════════════════════════
+     STEPPER
+════════════════════════════════════════════ -->
+<div class="wz-stepper" id="wzStepper">
+  <div class="wz-step active" id="wzStep1">
+    <div class="wz-step-num" id="wzStepNum1">1</div>
+    <div>
+      <div class="wz-step-label">Etapa 1 de 2</div>
+      <div class="wz-step-title">Identificação e matrícula</div>
+    </div>
+  </div>
+  <div class="wz-sep" id="wzStepSep"></div>
+  <div class="wz-step" id="wzStep2">
+    <div class="wz-step-num" id="wzStepNum2">2</div>
+    <div>
+      <div class="wz-step-label">Etapa 2 de 2</div>
+      <div class="wz-step-title">Dados complementares</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ETAPA 1 — campos obrigatórios + NEE
+════════════════════════════════════════════ -->
+<div class="wz-etapa ativa" id="wzEtapa1">
+
+<section class="card">
+<h2 id="paginaTitulo">Dados do aluno</h2>
+<p id="paginaSubtitulo">Preencha os campos obrigatórios. Use <b>Próximo</b> para adicionar dados complementares ou <b>Salvar</b> para cadastrar direto.</p>
+<div class="chips">
+<span class="chip" id="pillAnoAtivo">ano ativo: —</span>
+</div>
+<div class="warn" id="msgForm" style="display:none"></div>
+
+<!-- Foto do aluno -->
+<div id="fotoAlunoBox" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:14px;
+  border:1.5px dashed var(--border,#ddd6fe);border-radius:14px;background:var(--card);">
+  <div id="fotoAlunoPreviewWrap" style="width:88px;height:88px;border-radius:50%;overflow:hidden;
+    background:var(--chip-bg,#f3f0ff);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    border:2px solid var(--border,#ddd6fe);">
+    <img id="fotoAlunoPreview" src="" alt="Foto do aluno" style="display:none;width:100%;height:100%;object-fit:cover;">
+    <span id="fotoAlunoPlaceholder" style="font-size:30px;">🧑</span>
+  </div>
+  <div style="flex:1;min-width:0;">
+    <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Foto do aluno (opcional)</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+      Aparece na ficha individual (PDF) e na visualização na pesquisa. Comprimida automaticamente antes de enviar.
+    </div>
+    <input type="file" id="inpFotoAluno" accept="image/*" style="display:none;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn small" id="btnEscolherFoto" onclick="document.getElementById('inpFotoAluno').click()">📷 Escolher foto</button>
+      <button type="button" class="btn small" id="btnRemoverFoto" style="display:none;">🗑️ Remover</button>
+    </div>
+    <div id="fotoAlunoStatus" style="font-size:12px;margin-top:6px;"></div>
+  </div>
+</div>
+
+<!-- Banner modo edição -->
+<div class="modo-edicao-banner" id="bannerModoEdicao">
+  <span class="modo-edicao-banner-icon">✏️</span>
+  <div class="modo-edicao-banner-text" id="bannerModoEdicaoText">
+    Modo edição — campos em cinza são imutáveis
+  </div>
+  <button class="modo-edicao-banner-btn" type="button" onclick="window.location.href=window.location.pathname">
+    + Novo cadastro
+  </button>
+</div>
+
+<!-- Banner de aluno encontrado (CPF ou Nome) -->
+<div id="bannerAlunoEncontrado" style="display:none;
+  background:#f0fdf4; border:1px solid #86efac; border-radius:14px;
+  padding:12px 16px; margin-bottom:12px; display:none;
+  align-items:center; gap:14px; flex-wrap:wrap;">
+  <span style="font-size:22px;">✅</span>
+  <div style="flex:1; min-width:0;">
+    <div style="font-weight:800; font-size:14px;" id="bannerNome">—</div>
+    <div style="font-size:12px; color:#166534;" id="bannerSub">—</div>
+  </div>
+  <button type="button" id="btnLimparAutoFill"
+    style="border:1px solid #86efac; background:#dcfce7; color:#166534;
+           border-radius:999px; padding:6px 12px; font-size:12px;
+           font-weight:700; cursor:pointer;">
+    ✏️ Cadastrar como novo
+  </button>
+</div>
+
+<div class="grid-3">
+  <!-- Toggle modo de identificação -->
+  <div class="field" style="grid-column:1/-1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:2px;">
+    <span style="font-size:13px; font-weight:700; color:var(--muted)">Identificar por:</span>
+    <div style="display:flex; gap:6px;">
+      <button type="button" id="btnModoCPF"
+        onclick="_setModoId('cpf')"
+        style="border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;
+               background:#2563eb;color:#fff;border:1.5px solid #2563eb;">
+        🔑 CPF
+      </button>
+      <button type="button" id="btnModoNome"
+        onclick="_setModoId('nome')"
+        style="border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;
+               background:#fff;color:#374151;border:1.5px solid #d1d5db;">
+        👤 Nome
+      </button>
+    </div>
+    <span id="modoIdHint" style="font-size:12px;color:var(--muted)">CPF é a chave principal. Sem CPF, use o nome para vincular a um aluno já cadastrado.</span>
+  </div>
+
+  <div class="field" id="fieldCpf">
+    <label for="cpf">CPF <span class="req">*</span></label>
+    <input id="cpf" placeholder="Digite o CPF para buscar o aluno" inputmode="numeric" />
+    <small class="help" id="cpfMsg" aria-live="polite"></small>
+  </div>
+
+  <div class="field" id="fieldNome">
+    <label for="nome">Nome do aluno <span class="req">*</span></label>
+    <div style="position:relative;">
+      <input id="nome" placeholder="Nome completo" required autocomplete="off" oninput="this.value=this.value.toUpperCase()" />
+      <span id="nomeGhost" style="position:absolute;left:0;top:0;padding:inherit;color:#9ca3af;
+        pointer-events:none;white-space:nowrap;overflow:hidden;width:100%;"></span>
+      <div id="nomeDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;
+        background:#fff;border:1px solid #d1d5db;border-radius:10px;z-index:200;
+        box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;margin-top:2px;">
+      </div>
+    </div>
+    <small class="help" id="nomeLookupMsg" aria-live="polite"></small>
+  </div>
+
+  <div class="field" id="fieldStatusAluno">
+    <label for="statusAluno" id="labelStatusAluno">Situação</label>
+    <select id="statusAluno"></select>
+  </div>
+
+  <div class="field">
+    <label for="nasc">Data de nascimento <span class="req">*</span></label>
+    <input id="nasc" type="date" required />
+  </div>
+
+  <div class="field">
+    <label for="mae">Nome da mãe <span class="req">*</span></label>
+    <input id="mae" placeholder="Nome da mãe" required oninput="this.value=this.value.toUpperCase()" />
+  </div>
+
+  <div class="field">
+    <label for="sexo">Sexo <span class="req">*</span></label>
+    <select id="sexo" required>
+      <option value="">— selecione —</option>
+      <option value="F">Feminino</option>
+      <option value="M">Masculino</option>
+      <option value="O">Outro</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Naturalidade <span class="req">*</span></label>
+    <div class="inline-2">
+      <div class="nat-wrap">
+        <div class="nat-ghost-layer" id="natGhost" aria-hidden="true"></div>
+        <input id="naturalidadeCidade" class="nat-input-real" placeholder="Cidade de nascimento"
+               autocomplete="off" autocorrect="off" spellcheck="false" required />
+        <div class="nat-dropdown" id="natDropdown" role="listbox"></div>
+      </div>
+      <select id="naturalidadeUF" required>
+        <option value="">--</option>
+        <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
+        <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
+        <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
+        <option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option>
+        <option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option>
+        <option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option>
+        <option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="pai">Nome do pai <span class="req">*</span></label>
+    <input id="pai" placeholder="Nome do pai" required oninput="this.value=this.value.toUpperCase()" />
+    <label class="inline-check" style="margin-top:8px;">
+      <input type="checkbox" id="paiNaoInformado" style="transform:scale(1.05)"/>
+      <span>Pai não informado</span>
+    </label>
+  </div>
+
+  <div class="field">
+    <label for="corRaca">Cor/Raça <span class="req">*</span></label>
+    <select id="corRaca" required>
+      <option value="NÃO DECLARADA" selected>Não declarada</option>
+      <option value="BRANCA">Branca</option>
+      <option value="PRETA">Preta</option>
+      <option value="PARDA">Parda</option>
+      <option value="AMARELA">Amarela</option>
+      <option value="INDÍGENA">Indígena</option>
+      <option value="OUTRA">Outra</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="serieAluno">Série do aluno na turma <span class="req">*</span></label>
+    <select id="serieAluno" required>
+      <option value="">— Selecione a turma primeiro —</option>
+    </select>
+  </div>
+
+  <div class="field" style="grid-column:1/-1;">
+    <label>📚 Frequenta o Integral? <span class="req">*</span></label>
+    <div id="integralBox" class="visible">
+      <div class="integral-toggle">
+        <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">✅ Sim</button>
+        <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">❌ Não</button>
+      </div>
+      <span id="integralBadge">📚 Modelo Integral</span>
+      <span style="font-size:12px; color:var(--muted); flex:1;">
+        Aluno que frequenta o Integral estuda o ensino regular no turno da turma e recebe atividades de contraturno.
+      </span>
+    </div>
+    <!-- Turno não é mais definido aqui — vem da turma selecionada (cadastro de turma). -->
+    <input type="hidden" id="turnoSelecionado" value="" />
+    <input type="hidden" id="modeloEnsino" value="" />
+    <small class="help" id="turnoMsg" aria-live="polite"></small>
+  </div>
+</div>
+
+<!-- NEE — Deficiências -->
+<div class="divider"></div>
+<div class="nee-block" style="margin-bottom:10px;">
+  <div class="nee-header">
+    <div class="nee-header-label">♿ Aluno(a) com deficiência, TEA ou altas habilidades / superdotação?</div>
+    <div class="nee-toggle">
+      <button type="button" class="nee-sim-nao" id="btnDefSim" onclick="_neeSet('def',true)">Sim</button>
+      <button type="button" class="nee-sim-nao" id="btnDefNao" onclick="_neeSet('def',false)">Não</button>
+    </div>
+  </div>
+  <div class="nee-panel" id="panelDef">
+    <p class="nee-section-title">Marcação direta</p>
+    <div class="nee-simple-grid">
+      <label class="nee-simple-item" id="neeItemTea"><input type="checkbox" id="neeChkTea" onchange="_neeSyncSimple('tea','neeItemTea')"/>🧩 TEA</label>
+      <label class="nee-simple-item" id="neeItemAltas"><input type="checkbox" id="neeChkAltas" onchange="_neeSyncSimple('altas','neeItemAltas')"/>⭐ Altas habilidades / superdotação</label>
+      <label class="nee-simple-item" id="neeItemFisica"><input type="checkbox" id="neeChkFisica" onchange="_neeSyncSimple('fisica','neeItemFisica')"/>🦽 Deficiência física</label>
+      <label class="nee-simple-item" id="neeItemIntelectual"><input type="checkbox" id="neeChkIntelectual" onchange="_neeSyncSimple('intelectual','neeItemIntelectual')"/>🧠 Deficiência intelectual</label>
+    </div>
+    <div class="divider"></div>
+    <p class="nee-section-title">Com especificação</p>
+    <div class="nee-category">
+      <div class="nee-cat-header" onclick="_neeToggleCat('visual')">
+        <input type="checkbox" class="nee-check" id="neeChkVisual"
+          onclick="event.stopPropagation();_neeToggleCat('visual',this.checked)"
+          onchange="_neeSyncCat('visual')"/>
+        <span class="nee-cat-name">👁️ Deficiência visual</span>
+        <span class="nee-cat-badge" id="neeBadgeVisual"></span>
+      </div>
+      <div class="nee-sub" id="neeSubVisual">
+        <label class="nee-radio-item" id="neeRVisual0"><input type="radio" name="neeRVisual" value="BAIXA_VISAO" onchange="_neeSelectSub('visual','BAIXA_VISAO','Baixa visão')"/>Baixa visão</label>
+        <label class="nee-radio-item" id="neeRVisual1"><input type="radio" name="neeRVisual" value="CEGUEIRA" onchange="_neeSelectSub('visual','CEGUEIRA','Cegueira')"/>Cegueira</label>
+        <label class="nee-radio-item" id="neeRVisual2"><input type="radio" name="neeRVisual" value="VISAO_MONOCULAR" onchange="_neeSelectSub('visual','VISAO_MONOCULAR','Visão monocular')"/>Visão monocular</label>
+      </div>
+    </div>
+    <div class="nee-category">
+      <div class="nee-cat-header" onclick="_neeToggleCat('auditiva')">
+        <input type="checkbox" class="nee-check" id="neeChkAuditiva"
+          onclick="event.stopPropagation();_neeToggleCat('auditiva',this.checked)"
+          onchange="_neeSyncCat('auditiva')"/>
+        <span class="nee-cat-name">👂 Deficiência auditiva / surdez</span>
+        <span class="nee-cat-badge" id="neeBadgeAuditiva"></span>
+      </div>
+      <div class="nee-sub" id="neeSubAuditiva">
+        <label class="nee-radio-item" id="neeRAuditiva0"><input type="radio" name="neeRAuditiva" value="DEF_AUDITIVA" onchange="_neeSelectSub('auditiva','DEF_AUDITIVA','Def. auditiva')"/>Deficiência auditiva</label>
+        <label class="nee-radio-item" id="neeRAuditiva1"><input type="radio" name="neeRAuditiva" value="SURDEZ" onchange="_neeSelectSub('auditiva','SURDEZ','Surdez')"/>Surdez</label>
+        <label class="nee-radio-item" id="neeRAuditiva2"><input type="radio" name="neeRAuditiva" value="SURDOCEGUEIRA" onchange="_neeSelectSub('auditiva','SURDOCEGUEIRA','Surdocegueira')"/>Surdocegueira</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEE — Transtornos -->
+<div class="nee-block">
+  <div class="nee-header">
+    <div class="nee-header-label">📋 Aluno(a) com transtorno que impacta o desenvolvimento da aprendizagem?</div>
+    <div class="nee-toggle">
+      <button type="button" class="nee-sim-nao" id="btnTransSim" onclick="_neeSet('trans',true)">Sim</button>
+      <button type="button" class="nee-sim-nao" id="btnTransNao" onclick="_neeSet('trans',false)">Não</button>
+    </div>
+  </div>
+  <div class="nee-panel" id="panelTrans">
+    <div class="nee-simple-grid">
+      <label class="nee-simple-item transtorno" id="neeItemDiscalculia"><input type="checkbox" id="neeChkDiscalculia" onchange="_neeSyncSimple('discalculia','neeItemDiscalculia')"/>🔢 Discalculia / raciocínio lógico-matemático</label>
+      <label class="nee-simple-item transtorno" id="neeItemDisgrafia"><input type="checkbox" id="neeChkDisgrafia" onchange="_neeSyncSimple('disgrafia','neeItemDisgrafia')"/>✏️ Disgrafia / disortografia / escrita</label>
+      <label class="nee-simple-item transtorno" id="neeItemDislalia"><input type="checkbox" id="neeChkDislalia" onchange="_neeSyncSimple('dislalia','neeItemDislalia')"/>🗣️ Dislalia / linguagem e comunicação</label>
+      <label class="nee-simple-item transtorno" id="neeItemDislexia"><input type="checkbox" id="neeChkDislexia" onchange="_neeSyncSimple('dislexia','neeItemDislexia')"/>📖 Dislexia</label>
+      <label class="nee-simple-item transtorno" id="neeItemTdah"><input type="checkbox" id="neeChkTdah" onchange="_neeSyncSimple('tdah','neeItemTdah')"/>⚡ TDAH</label>
+      <label class="nee-simple-item transtorno" id="neeItemTpac"><input type="checkbox" id="neeChkTpac" onchange="_neeSyncSimple('tpac','neeItemTpac')"/>🔊 TPAC</label>
+    </div>
+  </div>
+</div>
+
+<div class="actions-wizard">
+  <div class="left">
+    <button class="btn secondary" id="btnLimparCampos" type="button">Limpar campos</button>
+  </div>
+  <button class="btn ghost" id="btnSalvarEtapa1" type="button">💾 Salvar</button>
+  <button class="btn primary" id="btnProximo" type="button">Próximo →</button>
+</div>
+</section>
+
+</div><!-- /wzEtapa1 -->
+
+<!-- ═══════════════════════════════════════════════
+     ETAPA 2 — dados complementares
+════════════════════════════════════════════ -->
+<div class="wz-etapa" id="wzEtapa2">
+
+<section class="card">
+<h2>Dados complementares</h2>
+<p>Campos opcionais — enriquecem o cadastro para o censo escolar e consultas futuras.</p>
+
+<!-- Aviso etapa 1 incompleta -->
+<div class="wz-etapa2-aviso" id="wzAviso1Incompleta">
+  ⚠️ Etapa 1 incompleta — preencha os dados obrigatórios antes de salvar
+  <button type="button" onclick="voltarEtapa1()" style="margin-left:auto;padding:4px 12px;border-radius:8px;font-size:12px;font-weight:800;border:1px solid rgba(234,179,8,0.50);background:transparent;color:#854d0e;cursor:pointer;font-family:'Nunito',sans-serif;">← Voltar e completar</button>
+</div>
+
+<!-- Documentos -->
+<h3 style="margin:0 0 10px;">📄 Documentos</h3>
+<div class="grid-3">
+  <div class="field">
+    <label for="compRG">RG</label>
+    <input id="compRG" placeholder="00.000.000-00"/>
+  </div>
+  <div class="field">
+    <label for="compRGOrgao">Órgão emissor</label>
+    <input id="compRGOrgao" placeholder="Ex: SSP-BA" oninput="this.value=this.value.toUpperCase()"/>
+  </div>
+  <div class="field">
+    <label for="compCertidao">Certidão de nascimento</label>
+    <input id="compCertidao" placeholder="Número da certidão"/>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- Endereço -->
+<h3 style="margin:0 0 10px;">📍 Endereço</h3>
+<div class="grid-3">
+  <div class="field">
+    <label for="compPais">País</label>
+    <select id="compPais">
+      <option value="BR">Brasil</option>
+      <option value="OUTRO">Outro</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="compZona">Zona</label>
+    <select id="compZona">
+      <option value="">— selecione —</option>
+      <option value="URBANA">Urbana</option>
+      <option value="RURAL">Rural</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="compCEP">CEP</label>
+    <input id="compCEP" placeholder="00000-000" inputmode="numeric" maxlength="9"/>
+    <div id="compCepStatus"></div>
+  </div>
+  <div class="field">
+    <label for="compLogradouro">Logradouro</label>
+    <input id="compLogradouro" placeholder="Rua, Av, Travessa…"/>
+  </div>
+  <div class="field">
+    <label for="compUF">UF</label>
+    <select id="compUF">
+      <option value="">--</option>
+      <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
+      <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+      <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
+      <option>MT</option><option>PA</option><option>PB</option><option>PE</option>
+      <option>PI</option><option>PR</option><option>RJ</option><option>RN</option>
+      <option>RO</option><option>RR</option><option>RS</option><option>SC</option>
+      <option>SE</option><option>SP</option><option>TO</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="compCidade">Cidade</label>
+    <div class="nat-wrap">
+      <div class="nat-ghost-layer" id="compCidadeGhost" aria-hidden="true"></div>
+      <input id="compCidade" class="nat-input-real" placeholder="Município"
+             autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <div class="nat-dropdown" id="compCidadeDropdown" role="listbox"></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- Observações -->
+<h3 style="margin:0 0 10px;">📝 Observações</h3>
+<div class="field">
+  <textarea id="compObs" placeholder="Informações adicionais, observações pedagógicas, anotações…" style="width:100%;min-height:80px;padding:10px 12px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--text);font-size:14px;font-family:'Nunito',sans-serif;outline:none;resize:vertical;"></textarea>
+</div>
+
+<div class="divider"></div>
+
+<!-- Documentos — fila de arquivos, upload junto ao salvar -->
+<h3 style="margin:0 0 10px;">📎 Documentos <span style="font-size:12px;font-weight:600;color:var(--muted);">(opcional)</span></h3>
+
+<div class="docs-drop-area" id="docsDropArea">
+  <input type="file" id="docsFileInput" multiple
+    accept=".pdf,.jpg,.jpeg,.png,.webp"/>
+  <div class="docs-drop-icon">📂</div>
+  <div class="docs-drop-text">
+    Arraste arquivos aqui ou <span onclick="document.getElementById('docsFileInput').click()">clique para selecionar</span>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-top:4px;">Imagens (JPG, PNG, WEBP) ou PDF — PDFs são convertidos em imagens — máx. 10 MB · PDFs máx. 12 páginas</div>
+</div>
+
+<!-- Fila de arquivos selecionados (ainda não enviados) -->
+<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:10px;margin-bottom:6px;" id="docsFilaSepFixo" style="display:none;">
+  Arquivos selecionados serão enviados ao salvar
+</div>
+<div id="docsFilaWrap" style="display:none;margin-top:0;">
+  <div id="docsFilaLista" style="display:flex;flex-direction:column;gap:6px;"></div>
+</div>
+
+<div class="docs-status" id="docsStatus"></div>
+
+<div class="actions-wizard">
+  <div class="left">
+    <button class="btn ghost" id="btnVoltar" type="button">← Voltar</button>
+  </div>
+  <button class="btn primary" id="btnInserir" type="button">💾 Salvar aluno</button>
+</div>
+</section>
+
+</div><!-- /wzEtapa2 -->
+<section class="card">
+<div class="card-head">
+<div class="head-row">
+<h2>Matriculados na turma</h2>
+
+</div>
+<p class="muted">Preview da turma selecionada. (Campos exportáveis: série, nome, CPF, nascimento, idade, mãe, pai, naturalidade, sexo, cor/raça, turno, modelo)</p>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Série</th>
+<th>Nome</th>
+<th>CPF</th>
+<th>Nasc.</th>
+<th>Idade</th>
+<th>Mãe</th>
+<th>Pai</th>
+<th>Naturalidade</th>
+<th>Sexo</th>
+<th>Cor/Raça</th>
+<th>Turno</th>
+<th>Modelo</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="tbodyMatriculados">
+<tr><td class="muted" colspan="13">Selecione uma turma para carregar.</td></tr>
+</tbody>
+</table>
+
+</div>
+</section>
+</main>
+
+<!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
+<script src="../header-logic.js"></script>
+
+<!-- 2. Scripts específicos da página (wizard de cadastro + upload de documentos) -->
+<script>
+(function(){
+  // ---------- helpers ----------
+  const KEYS = {
+    turmas: "anoAtivoTurmasDB_v1",
+    alunos: "anoAtivoAlunosDB_v1",
+    mats: "anoAtivoMatriculasDB_v1",
+    anoAtual: "configAnoAtivoAtual_v1",
+    aluSeq: "anoAtivoAluSeq_v1"
+  };
+  // ---------- school scoping (namespacing) ----------
+  function _safeJSONParse(s, fb){ try{ return JSON.parse(s); }catch(_){ return fb; } }
+
+  function _getSession(){
+    try{
+      if(window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
+    }catch(_){}
+    return _safeJSONParse(localStorage.getItem('auth_session_v2') || 'null', null);
+  }
+
+  function _effectiveSchoolId(){
+    const s = _getSession();
+    let sid = (s && s.schoolId ? String(s.schoolId) : '').trim();
+    if(!sid) sid = 'ESCOLA_A';
+    if(sid.toUpperCase() === 'ADMIN'){
+      const active = (localStorage.getItem('admin_active_school_v1') || '').trim();
+      return active || 'ADMIN';
+    }
+    return sid;
+  }
+
+  const __SCHOOL_ID__ = _effectiveSchoolId();
+  const __PFX__ = 'schools:' + __SCHOOL_ID__ + ':';
+  const _k = (key) => __PFX__ + key;
+
+  function _lsGet(key){
+    const sk = _k(key);
+    let raw = localStorage.getItem(sk);
+    if(raw == null){
+      // migração suave: copia do legado (global) para o escopo da escola
+      const legacy = localStorage.getItem(key);
+      if(legacy != null){
+        localStorage.setItem(sk, legacy);
+        raw = legacy;
+      }
+    }
+    return raw;
+  }
+  function _lsSet(key, value){
+    localStorage.setItem(_k(key), value);
+    // Firestore em paralelo
+    try{
+      if(!window.DB||!window.Auth||!window.Auth.getSession()) return;
+      const _M={"anoAtivoTurmasDB_v1":"anoAtivoTurmas","anoAtivoAlunosDB_v1":"anoAtivoAlunos","anoAtivoMatriculasDB_v1":"anoAtivoMatriculas","configAnoAtivoAtual_v1":null};
+      const col=_M[key]; if(col===undefined) return;
+      if(col===null){ if(window.DB.escola) window.DB.escola.save({configAnoAtivo:value}).catch(()=>{}); return; }
+      const parsed=JSON.parse(value); const fc=window.DB[col]; if(!fc) return;
+      Array.isArray(parsed)?fc.saveAll(parsed).catch(()=>{}):fc.save(parsed).catch(()=>{});
+    }catch(_){}
+  }
+  function _lsRemove(key){ localStorage.removeItem(_k(key)); }
+
+
+  function safeParse(key, fallback){
+    try {
+      const raw = _lsGet(key);
+      if(!raw) return fallback;
+      const v = JSON.parse(raw);
+      // aceitar array ou objeto
+      if(Array.isArray(fallback) && v && !Array.isArray(v)) return Object.values(v);
+      return v;
+    } catch(e) {
+      return fallback;
+    }
+  }
+
+  function save(key, value){
+    _lsSet(key, JSON.stringify(value));
+  }
+
+  function stripNum(s){ return (s||"").toString().replace(/\D+/g,""); }
+
+  function normUpper(s){ return (s||"").toString().trim().replace(/\s+/g," ").toUpperCase(); }
+
+  
+
+  function normalizeName(s){
+    // Normaliza para comparação/armazenamento: remove acentos, ajusta espaços e deixa em CAIXA ALTA
+    return (s||"")
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toUpperCase();
+  }
+
+  function normalizeCity(s){
+    return (s||"").toString().trim().replace(/\s+/g," ");
+  }
+
+function normSerie(s){
+    const t = normUpper(s);
+    if(!t) return "";
+    // normaliza EIXO2 -> EIXO 2, etc.
+    const eixo = t.match(/^EIXO\s*([12345])$/);
+    if(eixo) return `EIXO ${eixo[1]}`;
+    return t;
+  }
+
+  function formatCPF(cpf){
+    const d = stripNum(cpf);
+    if(d.length !== 11) return cpf || "";
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  }
+
+  function maskCPFPartial(value){
+    const d = stripNum(value).slice(0,11);
+    if(!d) return "";
+    if(d.length <= 3) return d;
+    if(d.length <= 6) return d.replace(/(\d{3})(\d+)/, "$1.$2");
+    if(d.length <= 9) return d.replace(/(\d{3})(\d{3})(\d+)/, "$1.$2.$3");
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, "$1.$2.$3-$4").replace(/-$/, "");
+  }
+
+
+
+  function isValidCPF(cpf){
+    const d = stripNum(cpf);
+    if(d.length !== 11) return false;
+    if(/^(\d)\1{10}$/.test(d)) return false;
+    let sum = 0;
+    for(let i=0;i<9;i++) sum += parseInt(d.charAt(i),10) * (10-i);
+    let dv1 = 11 - (sum % 11);
+    if(dv1 >= 10) dv1 = 0;
+    if(dv1 !== parseInt(d.charAt(9),10)) return false;
+
+    sum = 0;
+    for(let i=0;i<10;i++) sum += parseInt(d.charAt(i),10) * (11-i);
+    let dv2 = 11 - (sum % 11);
+    if(dv2 >= 10) dv2 = 0;
+    return dv2 === parseInt(d.charAt(10),10);
+  }
+
+  function setCpfMsg(kind, text){
+    const el = document.getElementById("cpfMsg");
+    if(!el) return;
+    el.textContent = text || "";
+    el.classList.remove("err","ok","info");
+    if(kind) el.classList.add(kind);
+  }
+
+  function checkCpfField(){
+    const cpfEl = document.getElementById("cpf");
+    if(!cpfEl) return true;
+    const cpfDigits = stripNum(cpfEl.value);
+    setCpfMsg(null, "");
+    if(!cpfDigits) return true;
+    if(cpfDigits.length < 11) return true; // ainda digitando
+    if(!isValidCPF(cpfDigits)){
+      setCpfMsg("err","CPF inválido");
+      return false;
+    }
+    // CPF existente = aluno já cadastrado = rematrícula (não é erro)
+    const fonte = window.Identidade ? window.Identidade.lerTodos() : getAlunos();
+    const existente = fonte.find(a => stripNum(a.cpf || "") === cpfDigits);
+    if(existente){
+      const nomEx = existente.nomeOficial || existente.nome || existente.alunoId;
+      setCpfMsg("ok", `✔ Aluno já cadastrado: ${nomEx} (${existente.alunoId}) — nova matrícula será criada.`);
+    } else {
+      setCpfMsg("ok","CPF válido");
+    }
+    return true; // CPF duplicado = rematrícula, não bloqueia
+  }
+
+  function calcAge(dateStr){
+    if(!dateStr) return "";
+    // date input => yyyy-mm-dd
+    const d = new Date(dateStr);
+    if(isNaN(d.getTime())) return "";
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if(m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return age < 0 ? "" : age;
+  }
+
+  // nextAlunoId removido — use window.Identidade.findOrCreate() ou window.Identidade.proximoId()
+
+  function getTurmas(){
+    const turmas = safeParse(KEYS.turmas, []);
+    return Array.isArray(turmas) ? turmas : [];
+  }
+
+  function getAlunos(){
+    const alunos = safeParse(KEYS.alunos, []);
+    return Array.isArray(alunos) ? alunos : [];
+  }
+
+  function getMats(){
+    const mats = safeParse(KEYS.mats, []);
+    return Array.isArray(mats) ? mats : [];
+  }
+
+  function _validarEnderecoTudoOuNada(){
+    const campos = {
+      zona:       (document.getElementById('compZona')?.value||'').trim(),
+      cep:        (document.getElementById('compCEP')?.value||'').trim(),
+      logradouro: (document.getElementById('compLogradouro')?.value||'').trim(),
+      uf:         (document.getElementById('compUF')?.value||'').trim(),
+      cidade:     (document.getElementById('compCidade')?.value||'').trim(),
+    };
+    const valores = Object.values(campos);
+    const algumPreenchido  = valores.some(v => v);
+    const todosPreenchidos = valores.every(v => v);
+    if(algumPreenchido && !todosPreenchidos){
+      return 'Endereço incompleto: se preencher um campo do endereço (zona, CEP, logradouro, UF ou cidade), os demais também precisam ser preenchidos.';
+    }
+    return null;
+  }
+
+  function setMsg(text, kind){
+    // O span "msgForm" antigo ficava fora de vista quando a página estava
+    // rolada — some sempre e vira toast fixo (independe de scroll).
+    const el = document.getElementById("msgForm");
+    if(el) el.style.display = "none";
+    const t = (text||"").toString();
+    if(!t) return;
+    if(kind === "err") _toastErro('⚠️ ' + t);
+    else if(kind === "ok") _toastSucesso('✅ ' + t);
+    else _toastErro(t);
+  }
+
+  // ---------- UI refs ----------
+  const turmaSelect = document.getElementById("turmaSelect");
+  const turmaInfo = document.getElementById("turmaInfo");
+  const pillStatus = document.getElementById("pillStatus");
+  const pillAnoAtivo = document.getElementById("pillAnoAtivo");
+  const anoLetivo = document.getElementById("anoLetivo");
+  const statusPadrao = document.getElementById("statusPadrao");
+
+  const serieAluno = document.getElementById("serieAluno");
+  const statusAluno = document.getElementById("statusAluno");
+  const nome = document.getElementById("nome");
+  const cpf = document.getElementById("cpf");
+  const nasc = document.getElementById("nasc");
+  const mae = document.getElementById("mae");
+  const pai = document.getElementById("pai");
+  const paiNaoInformado = document.getElementById("paiNaoInformado");
+  const naturalidadeCidade = document.getElementById("naturalidadeCidade");
+  const naturalidadeUF = document.getElementById("naturalidadeUF");
+  const sexo = document.getElementById("sexo");
+  const corRaca = document.getElementById("corRaca");
+  const tbody = document.getElementById("tbodyMatriculados");
+
+  // ---------- init ----------
+  function updatePill(){
+    const turmas = getTurmas().length;
+    const alunos = getAlunos().length;
+    const mats = getMats().length;
+    pillStatus.textContent = `Banco: turmas ${turmas} • alunos ${alunos} • matrículas ${mats}`;
+  }
+
+  function getAnoAtivoDefault(){
+    const v = safeParse(KEYS.anoAtual, null);
+    if(typeof v === "number") return v;
+    if(typeof v === "string" && v.trim()) return parseInt(v,10) || new Date().getFullYear();
+    return new Date().getFullYear();
+  }
+
+  function isAnoAtivo(anoValor){
+    const a = String(anoValor||"").trim();
+    if(!a) return true; // sem ano escolhido ainda: assume ativo (comportamento padrão/mais comum)
+    return a === String(getAnoAtivoDefault());
+  }
+
+  // Opções válidas de "situação" (só se aplicam a matrícula INATIVO, anos não-ativos)
+  const SITUACOES_OPCOES = [
+    { v: 'TRANSFERIDO', t: 'TRANSFERIDO' },
+    { v: 'DESISTENTE',  t: 'DESISTENTE'  },
+    { v: 'FALECIDO',    t: 'FALECIDO'    },
+    { v: 'APROVADO',    t: 'APROVADO'    },
+    { v: 'REPROVADO',   t: 'REPROVADO'   },
+  ];
+
+  // Status/Situação só fazem sentido para registros de anos NÃO ativos —
+  // no ano ativo a matrícula é sempre ATIVO/situação=null, então os campos
+  // somem. Em anos anteriores, viram "Situação"/"Situação padrão" com as
+  // 5 opções válidas (nunca ATIVO/INATIVO/VAZIO soltos).
+  function _atualizarCamposStatusSituacao(){
+    const wrapPadrao  = document.getElementById('wrapStatusPadrao');
+    const labelPadrao  = document.getElementById('labelStatusPadrao');
+    const fieldAluno  = document.getElementById('fieldStatusAluno');
+    const labelAluno  = document.getElementById('labelStatusAluno');
+    if(!wrapPadrao || !fieldAluno || !statusPadrao || !statusAluno) return;
+
+    const ativo = isAnoAtivo(anoLetivo.value);
+
+    if(ativo){
+      wrapPadrao.style.display = 'none';
+      fieldAluno.style.display = 'none';
+      statusPadrao.innerHTML = '';
+      statusAluno.innerHTML = '';
+      return;
+    }
+
+    wrapPadrao.style.display = '';
+    fieldAluno.style.display = '';
+    if(labelPadrao) labelPadrao.textContent = 'Situação padrão da matrícula';
+    if(labelAluno)  labelAluno.textContent  = 'Situação';
+
+    const optsHtml = '<option value="">— selecione —</option>' +
+      SITUACOES_OPCOES.map(o => `<option value="${o.v}">${o.t}</option>`).join('');
+
+    const padraoAnterior = statusPadrao.value;
+    const alunoAnterior  = statusAluno.value;
+    statusPadrao.innerHTML = optsHtml;
+    statusAluno.innerHTML  = optsHtml;
+    if(SITUACOES_OPCOES.some(o => o.v === padraoAnterior)) statusPadrao.value = padraoAnterior;
+    if(SITUACOES_OPCOES.some(o => o.v === alunoAnterior))  statusAluno.value  = alunoAnterior;
+  }
+
+  function loadTurmaOptions(){
+    const anoFiltro = String(anoLetivo?.value || getAnoAtivoDefault());
+    const allTurmas = getTurmas();
+    // Filtra por ano letivo (respeita o select de ano)
+    const turmas = anoFiltro
+      ? allTurmas.filter(t => String(t.anoLetivo||"") === anoFiltro)
+      : allTurmas;
+
+    turmaSelect.innerHTML = '<option value="">— Selecione —</option>';
+    // ordenar por ano desc, depois nome
+    turmas.sort((a,b)=> {
+      const ay = parseInt(a.anoLetivo||0,10);
+      const by = parseInt(b.anoLetivo||0,10);
+      if(ay !== by) return by - ay;
+      return String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR");
+    });
+    for(const t of turmas){
+      const tid = t.turmaId || t.id || "";
+      if(!tid) continue;
+      const series = Array.isArray(t.series) ? t.series.map(normSerie).join(", ") : (t.serie ? normSerie(t.serie) : "");
+      const turno = t.turno ? String(t.turno) : "";
+      const label = `${t.nome || tid}${turno ? " • " + turno : ""}${series ? " • " + series : ""}`;
+      const opt = document.createElement("option");
+      opt.value = tid;
+      opt.textContent = label;
+      turmaSelect.appendChild(opt);
+    }
+  }
+
+  function getSelectedTurma(){
+    const tid = turmaSelect.value;
+    if(!tid) return null;
+    const turmas = getTurmas();
+    return turmas.find(t => (t.turmaId||t.id) === tid) || null;
+  }
+
+  function loadSerieOptionsForTurma(t, preserveValue){
+    const previousValue = preserveValue ? serieAluno.value : null;
+    serieAluno.innerHTML = "";
+    if(!t){
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "— Selecione a turma primeiro —";
+      serieAluno.appendChild(opt);
+      return;
+    }
+    const series = Array.isArray(t.series) ? t.series : (t.serie ? [t.serie] : []);
+    const cleaned = [...new Set(series.map(normSerie).filter(Boolean))];
+    if(cleaned.length === 0) cleaned.push("—");
+    const first = cleaned[0] || "";
+    for(const s of cleaned){
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      serieAluno.appendChild(opt);
+    }
+    // Se havia uma seleção prévia e ela ainda existe nas opções, mantém.
+    // Caso contrário cai no primeiro item (comportamento original ao trocar turma).
+    if(previousValue && cleaned.includes(previousValue)){
+      serieAluno.value = previousValue;
+    } else {
+      serieAluno.value = first;
+    }
+  }
+
+  function refreshTurmaInfo(preserveSerieValue){
+    const t = getSelectedTurma();
+    const turnoHidden = document.getElementById('turnoSelecionado');
+    if(!t){
+      turmaInfo.textContent = "Selecione uma turma para carregar os alunos.";
+      // Não sobrescreve anoLetivo — o usuário controla esse campo
+      loadSerieOptionsForTurma(null, false);
+      if(turnoHidden) turnoHidden.value = '';
+      _atualizarCamposStatusSituacao();
+      return;
+    }
+    const tid = t.turmaId || t.id;
+    const series = Array.isArray(t.series) ? t.series.map(normSerie).join(", ") : (t.serie ? normSerie(t.serie) : "—");
+    const turno = t.turno ? String(t.turno) : "—";
+    const prof = t.professor ? String(t.professor) : "";
+    turmaInfo.textContent = `ID: ${tid} • Ano: ${t.anoLetivo || getAnoAtivoDefault()} • Turno: ${turno} • Séries: ${series}${prof ? " • Prof.: " + prof : ""}`;
+    // Preenche o anoLetivo a partir da turma SOMENTE se o campo estiver vazio
+    if(!anoLetivo.value) anoLetivo.value = t.anoLetivo || getAnoAtivoDefault();
+    // Turno não é mais escolhido no cadastro de aluno — é herdado da turma selecionada.
+    if(turnoHidden) turnoHidden.value = t.turno ? String(t.turno).toUpperCase() : '';
+    loadSerieOptionsForTurma(t, !!preserveSerieValue);
+    _atualizarCamposStatusSituacao();
+  }
+
+  function renderMatriculados(){
+    const t = getSelectedTurma();
+    if(!t){
+      tbody.innerHTML = '<tr><td colspan="13" class="muted">Selecione uma turma para carregar.</td></tr>';
+      return;
+    }
+    const tid = t.turmaId || t.id;
+    const mats = getMats().filter(m => m && m.turmaId === tid);
+    const alunos = getAlunos();
+    const byId = new Map(alunos.map(a => [a.alunoId, a]));
+
+    if(mats.length === 0){
+      tbody.innerHTML = '<tr><td colspan="13" class="muted">Nenhum aluno matriculado nessa turma ainda.</td></tr>';
+      return;
+    }
+
+    // ordenar por série depois nome
+    mats.sort((a,b)=> {
+      const sa = normSerie(a.serie||"");
+      const sb = normSerie(b.serie||"");
+      if(sa !== sb) return sa.localeCompare(sb,"pt-BR");
+      const na = (byId.get(a.alunoId)?.nome)||"";
+      const nb = (byId.get(b.alunoId)?.nome)||"";
+      return na.localeCompare(nb,"pt-BR");
+    });
+
+    const rows = mats.filter(m => byId.has(m.alunoId)).map(m => {
+      const a = byId.get(m.alunoId) || {};
+      const nasc = a.dataNascimento || "";
+      const idade = (a.idade !== undefined && a.idade !== null && a.idade !== "") ? a.idade : calcAge(nasc);
+      const cpfFmt = formatCPF(a.cpf || "");
+      const cor = a.corRaca || a.corOuRaca || "";
+      return `<tr>
+        <td>${normSerie(m.serie || a.serie || "")}</td>
+        <td>${(a.nome||"").toString()}</td>
+        <td>${cpfFmt}</td>
+        <td>${nasc}</td>
+        <td>${idade!=="" ? idade : ""}</td>
+        <td>${(a.mae||"")}</td>
+        <td>${(a.pai||"")}</td>
+        <td>${(a.naturalidade||"")}</td>
+        <td>${(a.sexo||"")}</td>
+        <td>${(cor||"")}</td>
+        <td>${(m.turno||"")}</td>
+        <td>${(m.modelo||"REGULAR")}</td>
+        <td>${(m.status||"")}</td>
+      </tr>`;
+    }).join("");
+
+    tbody.innerHTML = rows;
+  }
+
+  function clearFields(){
+    // limpa banner de auto-fill se estiver ativo
+    if(window._limparAutoFill) window._limparAutoFill();
+    if(window.limparFoto) window.limparFoto();
+    serieAluno.value = serieAluno.value || "";
+    _atualizarCamposStatusSituacao();
+    nome.value = "";
+    cpf.value = "";
+    nasc.value = "";
+    mae.value = "";
+    pai.value = "";
+    if(paiNaoInformado){ paiNaoInformado.checked = false; pai.disabled = false; }
+    naturalidadeCidade.value = "";
+    naturalidadeUF.value = "";
+    sexo.value = "";
+    corRaca.value = "";
+    // reset integral (turno é resetado junto com a turma, em refreshTurmaInfo)
+    const modeloHidden = document.getElementById('modeloEnsino');
+    if(modeloHidden) modeloHidden.value = '';
+    document.getElementById('btnIntegralSim')?.classList.remove('selected-sim');
+    document.getElementById('btnIntegralNao')?.classList.remove('selected-nao');
+    const badge = document.getElementById('integralBadge');
+    if(badge) badge.classList.remove('visible');
+    const turnoMsg = document.getElementById('turnoMsg');
+    if(turnoMsg) { turnoMsg.textContent = ''; turnoMsg.className = 'help'; }
+
+    // Limpa campos complementares (etapa 2)
+    ['compRG','compRGOrgao','compCertidao','compCEP','compLogradouro','compCidade','compObs']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    const compPais = document.getElementById('compPais');
+    if(compPais) compPais.value = 'BR';
+    const compZona = document.getElementById('compZona');
+    if(compZona) compZona.value = '';
+    const compUF = document.getElementById('compUF');
+    if(compUF) compUF.value = '';
+    document.getElementById('compCepStatus') && (document.getElementById('compCepStatus').innerHTML='');
+    ['compLogradouro','compUF','compCidade'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.classList.remove('cep-locked');el.removeAttribute('disabled');}
+    });
+
+    // Limpa NEE
+    if(window._neeLimparTudo) window._neeLimparTudo();
+
+    // Volta para etapa 1 se estiver na etapa 2
+    const e1=document.getElementById('wzEtapa1');
+    const e2=document.getElementById('wzEtapa2');
+    if(e2 && e2.classList.contains('ativa')){
+      e2.classList.remove('ativa');
+      e1?.classList.add('ativa');
+      document.getElementById('wzStep1')?.classList.remove('done');
+      document.getElementById('wzStep1')?.classList.add('active');
+      document.getElementById('wzStepNum1') && (document.getElementById('wzStepNum1').textContent='1');
+      document.getElementById('wzStep2')?.classList.remove('active');
+      document.getElementById('wzStepSep')?.classList.remove('done');
+    }
+
+    setMsg("", "muted");
+  }
+
+  async function inserirAluno(){
+  setMsg("", "");
+
+  // ── MODO EDIÇÃO ──────────────────────────────────────────────────
+  if(window._modoEdicaoId){
+    return await _atualizarAluno();
+  }
+  const turmaSel = getSelectedTurma();
+  if(!turmaSel) return setMsg("Selecione uma turma.", "err");
+
+  const tid   = turmaSel.turmaId || turmaSel.id;
+  const tnome = turmaSel.nome || tid;
+
+  const serie    = (serieAluno.value || "").trim();
+  const nomeVal  = normalizeName(nome.value);
+  const maeNome  = normalizeName(mae.value);
+
+  let paiNome = normalizeName(pai.value);
+  if(paiNaoInformado && paiNaoInformado.checked) paiNome = "--";
+
+  const cpfDigits = stripNum(cpf.value);
+  const nascVal   = (nasc.value || "").trim();
+  const natCidade = normalizeCity(naturalidadeCidade.value);
+  const natUF     = (naturalidadeUF.value || "").trim();
+  const sexoVal   = (sexo.value || "").trim();
+  const corVal    = (corRaca.value || "NÃO DECLARADA").trim() || "NÃO DECLARADA";
+  const ano       = (anoLetivo.value || "").trim();
+  const anoEhAtivo = isAnoAtivo(ano);
+  const situacaoEscolhida = ((statusAluno ? statusAluno.value : (statusPadrao ? statusPadrao.value : "")) || "").toString().trim();
+  const turno     = (document.getElementById('turnoSelecionado')?.value || "").trim();
+  const modelo    = (document.getElementById('modeloEnsino')?.value || "").trim();
+
+  // ── Validações ────────────────────────────────────────────────
+  if(!serie)    return setMsg("Selecione a série do aluno.", "err");
+  if(!nomeVal)  return setMsg("Informe o nome do aluno.", "err");
+  if(!maeNome)  return setMsg("Informe o nome da mãe.", "err");
+  if(!nascVal)  return setMsg("Informe a data de nascimento.", "err");
+  if(!cpfDigits) return setMsg("Informe o CPF.", "err");
+  if(!checkCpfField()){
+    const t = document.getElementById("cpfMsg")?.textContent || "CPF inválido.";
+    return setMsg(t, "err");
+  }
+  if(!paiNome)  return setMsg("Informe o nome do pai ou marque “Pai não informado”.", "err");
+  if(!natCidade || !natUF) return setMsg("Informe a naturalidade (cidade e UF).", "err");
+  if(!sexoVal)  return setMsg("Selecione o sexo.", "err");
+  if(!ano)      return setMsg("Informe o ano letivo.", "err");
+  if(!anoEhAtivo && !situacaoEscolhida) return setMsg("Selecione a situação da matrícula (ano não é o ativo).", "err");
+  if(!modelo){
+    const turnoMsg = document.getElementById('turnoMsg');
+    if(turnoMsg){ turnoMsg.textContent = 'Informe se o aluno frequenta o Integral.'; turnoMsg.className = 'help err'; }
+    return setMsg("Informe se o aluno frequenta o Integral.", "err");
+  }
+  if(window._neeValidar){
+    const erroNee = window._neeValidar();
+    if(erroNee) return setMsg(erroNee, "err");
+  }
+  const erroEndereco = _validarEnderecoTudoOuNada();
+  if(erroEndereco) return setMsg(erroEndereco, "err");
+
+  const naturalidade = natCidade + "/" + natUF.toUpperCase();
+  const idade = calcAge(nascVal);
+
+  // ── Barreira: nome igual em atas + modo CPF ─────────────────────
+  // Detecta se existe aluno de mesmo nome nas atas SEM vínculo de ID
+  // (significa que o usuário deveria ter usado o modo Nome para vincular)
+  if(window._modoId !== 'nome' && !window._alunoEncontrado){
+    const nomeNorm = (s => (s||'').trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g,''))(nomeVal);
+    const fonte = window.Identidade ? window.Identidade.lerTodos() : [];
+    const atasAluno = fonte.find(a => {
+      const n = (s => (s||'').trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g,''))(a.nomeOficial||a.nome||'');
+      return n === nomeNorm;
+    });
+    if(atasAluno){
+      const msg =
+        `⚠️ Atenção: já existe um aluno com o nome "${nomeVal}" cadastrado no sistema (ID: ${atasAluno.alunoId||atasAluno.id}).
+
+` +
+        `Se for a mesma pessoa, use o modo 👤 Nome para vinculá-la ao mesmo ID — assim o histórico ficará completo.
+
+` +
+        `Deseja continuar mesmo assim e criar um ID separado?`;
+      if(!confirm(msg)) return;
+    }
+  }
+
+  // ── Identidade: find-or-create ────────────────────────────────
+  // Se o aluno já existe no sistema (mesmo que em outro módulo/ano),
+  // reutiliza o alunoId e apenas cria nova matrícula.
+  if(!window.Identidade) return setMsg("Módulo de identidade não carregado. Recarregue a página.", "err");
+
+  const cpfFormatado = formatCPF(cpfDigits);
+
+  // Dados complementares (etapa 2)
+  const dadosComp = {
+    rg:          (document.getElementById('compRG')?.value||'').trim(),
+    rgOrgao:     (document.getElementById('compRGOrgao')?.value||'').trim().toUpperCase(),
+    certidao:    (document.getElementById('compCertidao')?.value||'').trim(),
+    pais:        (document.getElementById('compPais')?.value||'BR'),
+    zona:        (document.getElementById('compZona')?.value||'').trim(),
+    cep:         (document.getElementById('compCEP')?.value||'').trim(),
+    logradouro:  (document.getElementById('compLogradouro')?.value||'').trim(),
+    endUF:       (document.getElementById('compUF')?.value||'').trim(),
+    cidade:      (document.getElementById('compCidade')?.value||'').trim(),
+    obs:         (document.getElementById('compObs')?.value||'').trim(),
+  };
+
+  // Dados NEE
+  const dadosNEE = window._neeGetDados ? window._neeGetDados() : {};
+
+  const dadosAluno = {
+    nomeOficial:        nomeVal,
+    nome:               nomeVal,
+    cpf:                cpfFormatado,
+    dataNascimento:     nascVal,
+    mae:                maeNome,
+    pai:                paiNome,
+    naturalidade,
+    naturalidadeCidade: natCidade,
+    naturalidadeUF:     natUF.toUpperCase(),
+    sexo:               sexoVal,
+    corRaca:            corVal,
+    ...dadosNEE,
+    ...dadosComp,
+  };
+
+  // ── CPF dedup: se já existe aluno com esse CPF, atualiza e reutiliza ──
+  // Evita ter 2 registros com o mesmo CPF. Se o usuário clicou em
+  // "Cadastrar como novo", os dados novos substituem os antigos em TODAS as turmas.
+  const todosAlunos = window.Identidade.lerTodos ? window.Identidade.lerTodos() : [];
+  const alunoMesmoCPF = cpfDigits
+    ? todosAlunos.find(a => stripNum(a.cpf || '') === cpfDigits)
+    : null;
+
+  let alunoId, isNew;
+
+  if(alunoMesmoCPF){
+    // Reutiliza o ID e atualiza os dados no Firestore + cache
+    alunoId = alunoMesmoCPF.alunoId || alunoMesmoCPF.id;
+    isNew = false;
+    const dadosAtualizados = { _id: alunoId, alunoId, ...dadosAluno };
+    try{
+      if(window.DB && window.Auth && window.Auth.getSession()){
+        await window.DB.alunos.save(dadosAtualizados);
+      }
+    }catch(e){ console.warn('Firestore aluno update (CPF dedup):', e); }
+    // Atualiza cache local de alunos
+    try{
+      const alunosCache = safeParse(KEYS.alunos, []);
+      const idx = alunosCache.findIndex(a => (a.alunoId || a.id) === alunoId);
+      if(idx >= 0) alunosCache[idx] = { ...alunosCache[idx], ...dadosAtualizados };
+      else alunosCache.push(dadosAtualizados);
+      save(KEYS.alunos, alunosCache);
+    }catch(e){ console.warn('Cache aluno update:', e); }
+  } else if(window._alunoIdVinculado){
+    // Usuário já escolheu explicitamente um aluno das atas (dropdown de nome
+    // ou CPF encontrado) — vincula direto, sem deixar a heurística de
+    // findOrCreate redescobrir (e possivelmente discordar) o match.
+    const result = await window.Identidade.vincularExplicito(window._alunoIdVinculado, dadosAluno);
+    alunoId = result.alunoId;
+    isNew = result.isNew;
+  } else {
+    const result = await window.Identidade.findOrCreate(dadosAluno);
+    alunoId = result.alunoId;
+    isNew = result.isNew;
+  }
+
+  // ── Matrícula: evita duplicata na mesma turma + ano ───────────
+  const mats = getMats();
+
+  // ID único por turma + aluno + ano (inclui o ano para evitar colisão entre anos letivos)
+  const matriculaId = `MAT|${tid}|${alunoId}|${ano}`;
+
+  const matExistente = mats.find(m =>
+    m.turmaId === tid && m.alunoId === alunoId &&
+    String(m.anoLetivo) === String(ano)
+  );
+  if(matExistente) return setMsg(`Aluno já matriculado nessa turma em ${ano}.`, "err");
+
+  const modeloFinal = modelo || 'REGULAR';
+  let novaMatricula = {
+    matriculaId,
+    turmaId: tid,
+    alunoId,
+    anoLetivo: ano,
+    serie,
+    turno,
+    modelo: modeloFinal,
+    status: anoEhAtivo ? 'ATIVO' : 'INATIVO',
+    situacao: anoEhAtivo ? null : situacaoEscolhida,
+    criadoEm: new Date().toISOString()
+  };
+
+  if(window.MatriculaUtils){
+    try{
+      novaMatricula = window.MatriculaUtils.validarMatricula(novaMatricula);
+    }catch(e){
+      return setMsg(e.message, "err");
+    }
+  }
+
+  // Salva no Firestore diretamente com ID determinístico (upsert seguro)
+  try{
+    if(window.DB && window.Auth && window.Auth.getSession()){
+      await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, ...novaMatricula });
+    }
+  }catch(e){ console.warn('Firestore matricula save:', e); }
+
+  // Atualiza apenas o cache local em memória (sem chamar saveAll no Firestore de novo)
+  mats.push(novaMatricula);
+  localStorage.setItem(_k(KEYS.mats), JSON.stringify(mats));
+
+  // Garante que o aluno recém-cadastrado está no cache local de alunos,
+  // para que renderMatriculados() o encontre imediatamente sem recarregar a página.
+  if(!alunoMesmoCPF){
+    try{
+      const alunosCache = safeParse(KEYS.alunos, []);
+      const jaExiste = alunosCache.some(a => (a.alunoId || a.id) === alunoId);
+      if(!jaExiste){
+        alunosCache.push({ _id: alunoId, alunoId, ...dadosAluno });
+        save(KEYS.alunos, alunosCache);
+      }
+    }catch(e){ console.warn('Cache aluno insert:', e); }
+  }
+
+  updatePill();
+  refreshTurmaInfo(true);
+  renderMatriculados();
+  if(pillAnoAtivo) pillAnoAtivo.textContent = `ano ativo: ${ano}`;
+
+  const msg = isNew
+    ? "Aluno cadastrado e matriculado com sucesso."
+    : alunoMesmoCPF
+      ? `Dados do aluno (${alunoId}) atualizados e nova matrícula criada para ${ano}.`
+      : `Aluno já existente (${alunoId}) — nova matrícula criada para ${ano}.`;
+  setMsg(msg, "ok");
+  if(window.initDocs) window.initDocs(alunoId);
+  if(window.uploadDocsQueue) await window.uploadDocsQueue();
+  if(window.enviarFotoPendente) await window.enviarFotoPendente(alunoId);
+  clearFields();
+  if(window._natRebuild) window._natRebuild();
+}
+
+// events
+  document.getElementById("btnInserir").addEventListener("click", inserirAluno);
+
+  async function _atualizarAluno(){
+    const alunoId       = window._modoEdicaoId;
+    const alunoOriginal = window._modoEdicaoAluno || {};
+
+    const dadosComp = {
+      mae:          normalizeName(document.getElementById('mae')?.value || ''),
+      pai:          (document.getElementById('paiNaoInformado')?.checked) ? '--' : normalizeName(document.getElementById('pai')?.value || ''),
+      dataNascimento:(document.getElementById('nasc')?.value || '').trim(),
+      sexo:         (document.getElementById('sexo')?.value || '').trim(),
+      corRaca:      (document.getElementById('corRaca')?.value || 'NÃO DECLARADA').trim(),
+      naturalidadeCidade: normalizeCity(document.getElementById('naturalidadeCidade')?.value || ''),
+      naturalidadeUF:     (document.getElementById('naturalidadeUF')?.value || '').trim().toUpperCase(),
+      turno:        (document.getElementById('turnoSelecionado')?.value || '').trim(),
+      modeloEnsino: (document.getElementById('modeloEnsino')?.value || '').trim(),
+      ...(window._neeGetDados ? window._neeGetDados() : {}),
+      rg:           (document.getElementById('compRG')?.value || '').trim(),
+      rgOrgao:      (document.getElementById('compRGOrgao')?.value || '').trim().toUpperCase(),
+      certidao:     (document.getElementById('compCertidao')?.value || '').trim(),
+      pais:         (document.getElementById('compPais')?.value || 'BR'),
+      zona:         (document.getElementById('compZona')?.value || '').trim(),
+      cep:          (document.getElementById('compCEP')?.value || '').trim(),
+      logradouro:   (document.getElementById('compLogradouro')?.value || '').trim(),
+      endUF:        (document.getElementById('compUF')?.value || '').trim(),
+      cidade:       (document.getElementById('compCidade')?.value || '').trim(),
+      obs:          (document.getElementById('compObs')?.value || '').trim(),
+    };
+    dadosComp.naturalidade = dadosComp.naturalidadeCidade + '/' + dadosComp.naturalidadeUF;
+
+    if(!dadosComp.mae)           return _toastErro('⚠️ Informe o nome da mãe.');
+    if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
+    if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
+    if(window._neeValidar){
+      const erroNee = window._neeValidar();
+      if(erroNee) return _toastErro('⚠️ ' + erroNee);
+    }
+    const erroEndereco = _validarEnderecoTudoOuNada();
+    if(erroEndereco) return _toastErro('⚠️ ' + erroEndereco);
+
+    try{
+      setMsg('Salvando…','');
+      // fotoUrl/fotoFileId ficam de fora de propósito: quem controla esses dois
+      // campos é o módulo de foto (foto-aluno-js), que já salva no Firestore na
+      // hora em que a foto é trocada/removida. Se reenviássemos alunoOriginal
+      // inteiro aqui, o snapshot antigo (capturado quando a página abriu) sempre
+      // sobrescreveria a foto nova por cima — foi exatamente o bug relatado.
+      const { fotoUrl, fotoFileId, ...alunoOriginalSemFoto } = alunoOriginal;
+      await window.DB.anoAtivoAlunos.save({ _id: alunoId, alunoId, ...alunoOriginalSemFoto, ...dadosComp });
+
+      if(window.initDocs)        window.initDocs(alunoId);
+      if(window.uploadDocsQueue) await window.uploadDocsQueue();
+
+      // Toast fixo visível em qualquer etapa
+      _toastSucesso('✅ Dados atualizados com sucesso! Redirecionando…');
+
+      // Redireciona para pesquisa após 2s
+      setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
+
+    } catch(e){
+      console.error('Erro ao atualizar aluno:', e);
+      _toastErro('❌ Erro ao salvar: ' + e.message);
+    }
+  }
+
+  // Toast fixo — aparece no centro/base da tela, independente do scroll
+  function _toastSucesso(msg){
+    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+  }
+  function _toastErro(msg){
+    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+  }
+  function _showToast(msg, bg, shadow, duration){
+    const existing = document.getElementById('_toastGlobal');
+    if(existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_toastGlobal';
+    toast.style.cssText =
+      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
+      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
+    document.body.appendChild(toast);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+
+  // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──────────────────────────────
+  (function(){
+    const params  = new URLSearchParams(window.location.search);
+    const editId  = params.get('editar');
+    if(!editId) return; // modo cadastro normal
+
+    // Campos imutáveis no modo edição
+    const CAMPOS_TRAVADOS = ['cpf','nome'];
+
+    async function ativarModoEdicao(){
+      await new Promise(res => {
+        if(window.DB) return res();
+        document.addEventListener('auth:ready', res, { once: true });
+      });
+
+      let aluno = null;
+      try { aluno = await window.DB.anoAtivoAlunos.get(editId); } catch(e){}
+
+      if(!aluno){
+        document.getElementById('msgForm').textContent = '⚠️ Aluno não encontrado ou sem permissão de acesso.';
+        document.getElementById('msgForm').style.display = '';
+        document.getElementById('msgForm').className = 'warn';
+        return;
+      }
+
+      // ── Banner de modo edição ──
+      const banner = document.getElementById('bannerModoEdicao');
+      const bannerText = document.getElementById('bannerModoEdicaoText');
+      banner?.classList.add('show');
+      if(bannerText) bannerText.textContent = `Editando: ${aluno.nome || editId}`;
+
+      // ── Título e subtítulo ──
+      const titulo = document.getElementById('paginaTitulo');
+      const sub    = document.getElementById('paginaSubtitulo');
+      if(titulo) titulo.textContent = 'Editar aluno';
+      if(sub)    sub.innerHTML = 'Atualize os dados e clique em <b>Atualizar aluno</b>.';
+
+      // ── Botões ──
+      const btnInserir = document.getElementById('btnInserir');
+      if(btnInserir) btnInserir.textContent = '💾 Atualizar aluno';
+      const btnSalvar1 = document.getElementById('btnSalvarEtapa1');
+      if(btnSalvar1) btnSalvar1.textContent = '💾 Atualizar';
+
+      // ── Oculta "Limpar campos" no modo edição ──
+      const btnLimpar = document.getElementById('btnLimparCampos');
+      if(btnLimpar) btnLimpar.style.display = 'none';
+
+      // ── Botão Cancelar (volta para pesquisa sem salvar) ──
+      const _cancelE1 = document.querySelector('#wzEtapa1 .actions-wizard .left');
+      const _cancelE2 = document.querySelector('#wzEtapa2 .actions-wizard .left');
+      const mkCancel  = () => {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'btn ghost';
+        btn.textContent = '✕ Cancelar';
+        btn.onclick = () => { location.href = 'pesquisa-ano-ativo.html'; };
+        return btn;
+      };
+      _cancelE1?.appendChild(mkCancel());
+      _cancelE2?.appendChild(mkCancel());
+
+      // ── Semilock nos campos sensíveis ──
+      CAMPOS_TRAVADOS.forEach(id => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        const field = el.closest('.field');
+        if(!field) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'campo-semilock-wrap';
+        el.parentNode.insertBefore(wrap, el);
+        wrap.appendChild(el);
+        const overlay = document.createElement('div');
+        overlay.className = 'campo-semilock-overlay';
+        overlay.innerHTML = '<span class="lock-icon">🔒</span>';
+        wrap.appendChild(overlay);
+        const aviso = document.createElement('div');
+        aviso.className = 'campo-semilock-aviso';
+        aviso.innerHTML =
+          '<span>⚠️ Alterar este campo pode afetar vínculos com outros registros.</span>' +
+          '<button class="campo-semilock-aviso-btn" type="button">Entendi, desbloquear</button>';
+        field.appendChild(aviso);
+        overlay.addEventListener('click', () => aviso.classList.add('show'));
+        aviso.querySelector('button').addEventListener('click', () => {
+          overlay.remove(); aviso.remove(); el.focus();
+        });
+      });
+
+      // Nota: alunos inativos (status INATIVO na matrícula) não são mais
+      // detectados/tratados aqui. Readmissão acontece em readmitir-aluno.html;
+      // este cadastro trata apenas edição de aluno ativo.
+
+      // Busca a matrícula EXATA que estava sendo visualizada na pesquisa.
+      // pesquisa-ano-ativo.html já manda turmaId/anoLetivo na URL — antes,
+      // eles eram ignorados e pegávamos qualquer matrícula do aluno (find()
+      // sem critério de ano), o que fazia o formulário abrir sem turma e
+      // com o ano ativo default quando o aluno tinha matrícula em mais de
+      // um ano letivo.
+      try{
+        const qsTurmaId   = params.get('turmaId');
+        const qsAnoLetivo = params.get('anoLetivo');
+        const mats = await window.DB.anoAtivoMatriculas.list();
+        const matsDoAluno = mats.filter(m => m.alunoId === editId);
+
+        let matAluno = null;
+        if(qsTurmaId){
+          matAluno = matsDoAluno.find(m =>
+            m.turmaId === qsTurmaId &&
+            (!qsAnoLetivo || String(m.anoLetivo) === String(qsAnoLetivo))
+          );
+        }
+        if(!matAluno) matAluno = matsDoAluno[0]; // fallback: link direto sem esses params
+
+        if(matAluno && matAluno.turmaId){
+          // Preenche o ano letivo ANTES de mexer na turma: loadTurmaOptions()
+          // filtra as turmas disponíveis pelo anoLetivo atual do formulário,
+          // então se isso não rodar primeiro a turma do ano certo nem aparece
+          // nas opções.
+          if(matAluno.anoLetivo != null){
+            anoLetivo.value = matAluno.anoLetivo;
+            anoLetivo.dispatchEvent(new Event('change'));
+          }
+          // Aguarda o select ser populado (pode não estar ainda)
+          const _tentarSetar = (tentativas = 0) => {
+            const opt = turmaSelect.querySelector(`option[value="${matAluno.turmaId}"]`);
+            if(opt){
+              turmaSelect.value = matAluno.turmaId;
+              turmaSelect.dispatchEvent(new Event('change'));
+              // Aguarda série ser carregada e seleciona
+              setTimeout(() => {
+                const serieEl = document.getElementById('serieAluno');
+                if(serieEl && matAluno.serie) serieEl.value = matAluno.serie;
+              }, 200);
+            } else if(tentativas < 10){
+              setTimeout(() => _tentarSetar(tentativas + 1), 300);
+            }
+          };
+          _tentarSetar();
+        }
+      }catch(e){ console.warn('[edição] Erro ao buscar matrícula:', e); }
+
+      // ── Botão encerrar matrícula (com semilock) ──
+      const _acE1 = document.querySelector('#wzEtapa1 .actions-wizard');
+      if(_acE1){
+        const wrapEncerrar = document.createElement('div');
+        wrapEncerrar.style.cssText = 'width:100%;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;';
+        wrapEncerrar.innerHTML =
+          '<details style="font-size:12px;color:var(--muted);">'+
+            '<summary style="cursor:pointer;font-weight:800;color:var(--danger,#b91c1c);">⚠️ Zona de perigo — Encerrar matrícula</summary>'+
+            '<div style="margin-top:8px;padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:10px;">'+
+              '<p style="margin:0 0 8px;font-size:12px;">Encerra a matrícula do aluno na turma atual. O cadastro do aluno é preservado e ele pode ser readmitido depois.</p>'+
+              '<button id="btnEncerrarMatricula" type="button" '+
+                'style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:800;'+
+                'background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.35);'+
+                'color:#b91c1c;cursor:pointer;font-family:\'Nunito\',sans-serif;">'+
+                '🚪 Encerrar matrícula'+
+              '</button>'+
+            '</div>'+
+          '</details>';
+        _acE1.after(wrapEncerrar);
+
+        // ── Modal de encerramento (3 opções: Transferido / Desistente / Faleceu) ──
+        const modalEncerrar = document.createElement('div');
+        modalEncerrar.className = 'modal-backdrop';
+        modalEncerrar.id = 'modalEncerrarMatricula';
+        modalEncerrar.innerHTML =
+          '<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">'+
+            '<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Encerrar matrícula</h3>'+
+            '<p style="margin:0 0 16px;font-size:13px;color:var(--muted);">Selecione o motivo do encerramento:</p>'+
+            '<div style="display:flex;flex-direction:column;gap:8px;">'+
+              '<button type="button" class="btn ghost" data-situacao="TRANSFERIDO" style="justify-content:flex-start;">🔁 Transferido</button>'+
+              '<button type="button" class="btn ghost" data-situacao="DESISTENTE" style="justify-content:flex-start;">🚫 Desistente</button>'+
+              '<button type="button" class="btn ghost" data-situacao="FALECIDO" style="justify-content:flex-start;">🕊️ Faleceu</button>'+
+            '</div>'+
+            '<div style="display:flex;justify-content:flex-end;margin-top:16px;">'+
+              '<button type="button" class="btn ghost" id="btnCancelarEncerramento">Cancelar</button>'+
+            '</div>'+
+          '</div>';
+        document.body.appendChild(modalEncerrar);
+
+        function abrirModalEncerrar(){ modalEncerrar.style.display = 'flex'; }
+        function fecharModalEncerrar(){ modalEncerrar.style.display = 'none'; }
+
+        document.getElementById('btnEncerrarMatricula')?.addEventListener('click', abrirModalEncerrar);
+        document.getElementById('btnCancelarEncerramento')?.addEventListener('click', fecharModalEncerrar);
+        modalEncerrar.addEventListener('click', (ev) => { if(ev.target === modalEncerrar) fecharModalEncerrar(); });
+
+        modalEncerrar.querySelectorAll('button[data-situacao]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const situacaoEscolhida = btn.dataset.situacao;
+            const nomeAluno = aluno.nome || editId;
+            const rotulo = { TRANSFERIDO: 'Transferido', DESISTENTE: 'Desistente', FALECIDO: 'Faleceu' }[situacaoEscolhida];
+            if(!confirm(`Encerrar matrícula de "${nomeAluno}" como "${rotulo}"?\n\nO cadastro do aluno será preservado.\nEsta ação não pode ser desfeita.`)) return;
+
+            fecharModalEncerrar();
+
+            try{
+              const matAluno = (await window.DB.anoAtivoMatriculas.list()).find(m => m.alunoId === editId);
+
+              if(!matAluno){
+                _toastErro('❌ Nenhuma matrícula ativa encontrada para este aluno.');
+                return;
+              }
+
+              const matriculaAtualizada = window.MatriculaUtils.validarMatricula({
+                ...matAluno,
+                status: 'INATIVO',
+                situacao: situacaoEscolhida,
+                encerradoEm: new Date().toISOString(),
+              });
+
+              await window.DB.anoAtivoMatriculas.save(matriculaAtualizada);
+
+              _toastSucesso('✅ Matrícula encerrada. Redirecionando…');
+              setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
+
+            }catch(e){
+              console.error('Erro ao encerrar matrícula:', e);
+              _toastErro('❌ Erro ao encerrar matrícula: ' + e.message);
+            }
+          });
+        });
+      }
+
+      // ── Preenche etapa 1 ──
+      _pre('nome',               aluno.nome || aluno.nomeOficial || '');
+      _pre('cpf',                aluno.cpf  || '');
+      _pre('nasc',               aluno.dataNascimento || '');
+      _pre('mae',                aluno.mae  || '');
+      _pre('pai',                aluno.pai === '--' ? '' : (aluno.pai || ''));
+      _pre('sexo',               aluno.sexo || '');
+      _pre('corRaca',            aluno.corRaca || 'NÃO DECLARADA');
+      _pre('naturalidadeCidade', aluno.naturalidadeCidade || '');
+      _pre('naturalidadeUF',     aluno.naturalidadeUF || '');
+
+      // Pai não informado
+      if(aluno.pai === '--'){
+        const paiNaoInf = document.getElementById('paiNaoInformado');
+        if(paiNaoInf){ paiNaoInf.checked = true; }
+        const paiEl = document.getElementById('pai');
+        if(paiEl){ paiEl.value = ''; paiEl.disabled = true; }
+      }
+
+      // Turno — não é mais editável aqui (vem da turma); só preenche o hidden de referência
+      if(aluno.turno){
+        const turnoHidden = document.getElementById('turnoSelecionado');
+        if(turnoHidden) turnoHidden.value = aluno.turno.toUpperCase();
+      }
+
+      // Modelo integral
+      if(aluno.modeloEnsino || aluno.modelo){
+        const modelo = (aluno.modeloEnsino || aluno.modelo || '').toUpperCase();
+        const modeloHidden = document.getElementById('modeloEnsino');
+        if(modeloHidden) modeloHidden.value = modelo;
+        const isIntegral = modelo === 'INTEGRAL';
+        const btnSim = document.getElementById('btnIntegralSim');
+        const btnNao = document.getElementById('btnIntegralNao');
+        const badge  = document.getElementById('integralBadge');
+        if(isIntegral){
+          btnSim?.classList.add('selected-sim');
+          btnNao?.classList.remove('selected-nao');
+          badge?.classList.add('visible');
+        } else {
+          btnNao?.classList.add('selected-nao');
+          btnSim?.classList.remove('selected-sim');
+          badge?.classList.remove('visible');
+        }
+      }
+
+      // NEE
+      if(aluno.deficiencia === true && window._neeSet){
+        window._neeSet('def', true);
+        const neeSimples = [
+          ['tea','Tea'],['altas','Altas'],['fisica','Fisica'],['intelectual','Intelectual']
+        ];
+        neeSimples.forEach(([key, cap]) => {
+          if(aluno[key === 'altas' ? 'altasHabilidades' : key]){
+            const c = document.getElementById('neeChk'+cap);
+            if(c){ c.checked=true; window._neeSyncSimple(key,'neeItem'+cap); }
+          }
+        });
+        if(aluno.defVisual){
+          window._neeToggleCat('visual', true);
+          if(aluno.defVisualTipo) window._neeSelectSub('visual', aluno.defVisualTipo, aluno.defVisualTipo);
+        }
+        if(aluno.defAuditiva){
+          window._neeToggleCat('auditiva', true);
+          if(aluno.defAuditivaTipo) window._neeSelectSub('auditiva', aluno.defAuditivaTipo, aluno.defAuditivaTipo);
+        }
+      }
+      if(aluno.transtorno === true && window._neeSet){
+        window._neeSet('trans', true);
+        ['discalculia','disgrafia','dislalia','dislexia','tdah','tpac'].forEach(k => {
+          if(aluno[k]){
+            const cap = k.charAt(0).toUpperCase()+k.slice(1);
+            const c = document.getElementById('neeChk'+cap);
+            if(c){ c.checked=true; window._neeSyncSimple(k,'neeItem'+cap); }
+          }
+        });
+      }
+
+      // ── Preenche etapa 2 ──
+      _pre('compRG',         aluno.rg         || '');
+      _pre('compRGOrgao',    aluno.rgOrgao    || '');
+      _pre('compCertidao',   aluno.certidao   || '');
+      _pre('compPais',       aluno.pais       || 'BR');
+      _pre('compZona',       aluno.zona       || '');
+      _pre('compCEP',        aluno.cep        || '');
+      _pre('compLogradouro', aluno.logradouro || '');
+      _pre('compUF',         aluno.endUF      || '');
+      _pre('compCidade',     aluno.cidade     || '');
+      _pre('compObs',        aluno.obs        || '');
+
+      // ── Documentos ──
+      if(window.initDocs) window.initDocs(editId);
+
+      // ── Foto ──
+      if(window.initFoto) window.initFoto(editId, aluno.fotoUrl || '', aluno.fotoFileId || '');
+
+      window._modoEdicaoId    = editId;
+      window._modoEdicaoAluno = aluno;
+    }
+
+    function _pre(id, valor){
+      const el = document.getElementById(id);
+      if(!el || valor === undefined || valor === null) return;
+      el.value = valor;
+    }
+
+    // Inicia após auth:ready
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', ativarModoEdicao);
+    } else {
+      ativarModoEdicao();
+    }
+  })();
+
+  // ── WIZARD — navegação entre etapas ─────────────────────────────────────
+  (function(){
+    function _etapa1Completa(){
+      const turmaSel = (typeof getSelectedTurma === 'function') ? getSelectedTurma() : null;
+      if(!turmaSel) return false;
+      if(!(document.getElementById('serieAluno')?.value||'').trim()) return false;
+      if(!(document.getElementById('nome')?.value||'').trim()) return false;
+      if(!(document.getElementById('mae')?.value||'').trim()) return false;
+      if(!(document.getElementById('nasc')?.value||'').trim()) return false;
+      if(!(document.getElementById('cpf')?.value||'').replace(/\D/g,'')) return false;
+      const paiNaoInf = document.getElementById('paiNaoInformado');
+      if(!(document.getElementById('pai')?.value||'').trim() && !paiNaoInf?.checked) return false;
+      if(!(document.getElementById('naturalidadeCidade')?.value||'').trim()) return false;
+      if(!(document.getElementById('naturalidadeUF')?.value||'').trim()) return false;
+      if(!(document.getElementById('sexo')?.value||'').trim()) return false;
+      if(!(document.getElementById('modeloEnsino')?.value||'').trim()) return false;
+      return true;
+    }
+
+    function _validarEtapa1(){
+      const turmaSel = (typeof getSelectedTurma === 'function') ? getSelectedTurma() : null;
+      if(!turmaSel){ _toastErro('⚠️ Selecione uma turma.'); return false; }
+      if(!(document.getElementById('serieAluno')?.value||'').trim()){ _toastErro('⚠️ Selecione a série do aluno.'); return false; }
+      if(!(document.getElementById('nome')?.value||'').trim()){ _toastErro('⚠️ Informe o nome do aluno.'); return false; }
+      if(!(document.getElementById('mae')?.value||'').trim()){ _toastErro('⚠️ Informe o nome da mãe.'); return false; }
+      if(!(document.getElementById('nasc')?.value||'').trim()){ _toastErro('⚠️ Informe a data de nascimento.'); return false; }
+      if(!(document.getElementById('cpf')?.value||'').replace(/\D/g,'')){ _toastErro('⚠️ Informe o CPF.'); return false; }
+      if(typeof checkCpfField === 'function' && !checkCpfField()){
+        _toastErro('⚠️ ' + (document.getElementById('cpfMsg')?.textContent || 'CPF inválido.')); return false;
+      }
+      const paiNaoInf = document.getElementById('paiNaoInformado');
+      if(!(document.getElementById('pai')?.value||'').trim() && !paiNaoInf?.checked){ _toastErro('⚠️ Informe o nome do pai ou marque "Pai não informado".'); return false; }
+      if(!(document.getElementById('naturalidadeCidade')?.value||'').trim() || !(document.getElementById('naturalidadeUF')?.value||'').trim()){ _toastErro('⚠️ Informe a naturalidade (cidade e UF).'); return false; }
+      if(!(document.getElementById('sexo')?.value||'').trim()){ _toastErro('⚠️ Selecione o sexo.'); return false; }
+      const modeloV = (document.getElementById('modeloEnsino')?.value||'').trim();
+      if(!modeloV){ _toastErro('⚠️ Informe se o aluno frequenta o Integral.'); return false; }
+      return true;
+    }
+
+    function irEtapa2(){
+      // Sempre avança — sem validação obrigatória
+      const completa = _etapa1Completa();
+      document.getElementById('wzEtapa1').classList.remove('ativa');
+      document.getElementById('wzEtapa2').classList.add('ativa');
+      document.getElementById('wzStep1').classList.remove('active');
+      // Badge: ✓ verde se completa, ⚠️ amarelo se incompleta
+      const stepNum1 = document.getElementById('wzStepNum1');
+      if(completa){
+        document.getElementById('wzStep1').classList.add('done');
+        document.getElementById('wzStep1').classList.remove('aviso');
+        if(stepNum1){ stepNum1.textContent='✓'; stepNum1.classList.remove('aviso'); }
+        document.getElementById('wzStepSep').classList.add('done');
+      } else {
+        document.getElementById('wzStep1').classList.remove('done');
+        document.getElementById('wzStep1').classList.add('aviso');
+        if(stepNum1){ stepNum1.textContent='⚠️'; stepNum1.classList.add('aviso'); }
+        document.getElementById('wzStepSep').classList.remove('done');
+      }
+      document.getElementById('wzStep2').classList.add('active');
+      // Mostra/oculta aviso no topo da etapa 2
+      const avisoEl = document.getElementById('wzAviso1Incompleta');
+      if(avisoEl) avisoEl.classList.toggle('show', !completa);
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+
+    window.voltarEtapa1 = function voltarEtapa1(){
+      document.getElementById('wzEtapa2').classList.remove('ativa');
+      document.getElementById('wzEtapa1').classList.add('ativa');
+      document.getElementById('wzStep1').classList.remove('done','aviso');
+      document.getElementById('wzStep1').classList.add('active');
+      const stepNum1 = document.getElementById('wzStepNum1');
+      if(stepNum1){ stepNum1.textContent='1'; stepNum1.classList.remove('aviso'); }
+      document.getElementById('wzStep2').classList.remove('active');
+      document.getElementById('wzStepSep').classList.remove('done');
+      window.scrollTo({top:0,behavior:'smooth'});
+    };
+    document.getElementById('btnProximo')?.addEventListener('click', irEtapa2);
+    document.getElementById('btnVoltar')?.addEventListener('click', voltarEtapa1);
+
+    // Navegação livre clicando no número/nome da etapa no stepper (como no Educacenso)
+    document.getElementById('wzStep1')?.addEventListener('click', () => {
+      if(document.getElementById('wzEtapa1')?.classList.contains('ativa')) return;
+      voltarEtapa1();
+    });
+    document.getElementById('wzStep2')?.addEventListener('click', () => {
+      if(document.getElementById('wzEtapa2')?.classList.contains('ativa')) return;
+      irEtapa2();
+    });
+
+    // "Salvar" na etapa 1 dispara inserirAluno direto (sem ir para etapa 2)
+    document.getElementById('btnSalvarEtapa1')?.addEventListener('click', inserirAluno);
+  })();
+
+  // ── NEE — deficiências e transtornos ─────────────────────────────────────
+  (function(){
+    const _neeE = {
+      def:null, trans:null,
+      tea:false, altas:false, fisica:false, intelectual:false,
+      visual:false, visualSub:null,
+      auditiva:false, auditivaSub:null,
+      discalculia:false, disgrafia:false, dislalia:false,
+      dislexia:false, tdah:false, tpac:false,
+    };
+
+    function _cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+    window._neeSet = function(bloco, sim){
+      _neeE[bloco] = sim;
+      const bSim  = document.getElementById('btn'+_cap(bloco)+'Sim');
+      const bNao  = document.getElementById('btn'+_cap(bloco)+'Nao');
+      const panel = document.getElementById('panel'+_cap(bloco));
+      const block = bSim?.closest('.nee-block');
+      if(sim){
+        bSim?.classList.add('sim');    bNao?.classList.remove('nao');
+        panel?.classList.add('open'); block?.classList.add('ativo');
+      } else {
+        bNao?.classList.add('nao');    bSim?.classList.remove('sim');
+        panel?.classList.remove('open'); block?.classList.remove('ativo');
+        bloco==='def' ? _neeLimparDef() : _neeLimparTrans();
+      }
+    };
+
+    window._neeSyncSimple = function(key, itemId){
+      const chk = document.getElementById('neeChk'+_cap(key));
+      _neeE[key] = chk.checked;
+      document.getElementById(itemId)?.classList.toggle('checked', chk.checked);
+    };
+
+    window._neeToggleCat = function(cat, forceVal){
+      const chk = document.getElementById('neeChk'+_cap(cat));
+      const sub = document.getElementById('neeSub'+_cap(cat));
+      if(forceVal===undefined) chk.checked=!chk.checked; else chk.checked=forceVal;
+      _neeE[cat] = chk.checked;
+      sub?.classList.toggle('open', chk.checked);
+      if(!chk.checked){
+        _neeE[cat+'Sub']=null;
+        document.querySelectorAll('input[name="neeR'+_cap(cat)+'"]').forEach(r=>r.checked=false);
+        document.querySelectorAll('[id^="neeR'+_cap(cat)+'"]').forEach(el=>el.classList.remove('selected'));
+        _neeUpdateBadge(cat,null);
+      }
+    };
+
+    window._neeSyncCat = function(cat){
+      const chk = document.getElementById('neeChk'+_cap(cat));
+      _neeE[cat] = chk.checked;
+      document.getElementById('neeSub'+_cap(cat))?.classList.toggle('open', chk.checked);
+      if(!chk.checked){ _neeE[cat+'Sub']=null; _neeUpdateBadge(cat,null); }
+    };
+
+    window._neeSelectSub = function(cat, value, label){
+      _neeE[cat+'Sub'] = value;
+      document.querySelectorAll('[id^="neeR'+_cap(cat)+'"]').forEach(el=>el.classList.remove('selected'));
+      document.querySelectorAll('input[name="neeR'+_cap(cat)+'"]').forEach(r=>{
+        if(r.value===value) r.closest('.nee-radio-item')?.classList.add('selected');
+      });
+      _neeUpdateBadge(cat,label);
+    };
+
+    function _neeUpdateBadge(cat, label){
+      const b = document.getElementById('neeBadge'+_cap(cat));
+      if(!b) return;
+      if(label){b.textContent=label;b.classList.add('visible');}
+      else{b.textContent='';b.classList.remove('visible');}
+    }
+
+    function _neeLimparDef(){
+      ['tea','altas','fisica','intelectual'].forEach(k=>{
+        _neeE[k]=false;
+        const c=document.getElementById('neeChk'+_cap(k));if(c)c.checked=false;
+        document.getElementById('neeItem'+_cap(k))?.classList.remove('checked');
+      });
+      ['visual','auditiva'].forEach(cat=>{
+        _neeE[cat]=false;_neeE[cat+'Sub']=null;
+        const c=document.getElementById('neeChk'+_cap(cat));if(c)c.checked=false;
+        document.getElementById('neeSub'+_cap(cat))?.classList.remove('open');
+        document.querySelectorAll('input[name="neeR'+_cap(cat)+'"]').forEach(r=>r.checked=false);
+        document.querySelectorAll('[id^="neeR'+_cap(cat)+'"]').forEach(el=>el.classList.remove('selected'));
+        _neeUpdateBadge(cat,null);
+      });
+    }
+
+    function _neeLimparTrans(){
+      ['discalculia','disgrafia','dislalia','dislexia','tdah','tpac'].forEach(k=>{
+        _neeE[k]=false;
+        const c=document.getElementById('neeChk'+_cap(k));if(c)c.checked=false;
+        document.getElementById('neeItem'+_cap(k))?.classList.remove('checked');
+      });
+    }
+
+    // Expõe estado para inserirAluno e clearFields
+    window._neeGetDados = function(){
+      return {
+        deficiencia:        _neeE.def,
+        tea:                _neeE.tea,
+        altasHabilidades:   _neeE.altas,
+        defFisica:          _neeE.fisica,
+        defIntelectual:     _neeE.intelectual,
+        defVisual:          _neeE.visual,
+        defVisualTipo:      _neeE.visualSub,
+        defAuditiva:        _neeE.auditiva,
+        defAuditivaTipo:    _neeE.auditivaSub,
+        transtorno:         _neeE.trans,
+        discalculia:        _neeE.discalculia,
+        disgrafia:          _neeE.disgrafia,
+        dislalia:           _neeE.dislalia,
+        dislexia:           _neeE.dislexia,
+        tdah:               _neeE.tdah,
+        tpac:               _neeE.tpac,
+      };
+    };
+
+    // Valida a regra: Não = passa; Sim + pelo menos 1 marcação = passa
+    // (visual/auditiva exigem também a sub-marcação — baixa visão/surdez/etc.);
+    // Sim sozinho, sem nenhuma marcação = NÃO passa.
+    window._neeValidar = function(){
+      if(_neeE.def === true){
+        if(_neeE.visual && !_neeE.visualSub){
+          return 'Selecione o tipo de deficiência visual (baixa visão, cegueira ou visão monocular).';
+        }
+        if(_neeE.auditiva && !_neeE.auditivaSub){
+          return 'Selecione o tipo de deficiência auditiva/surdez (deficiência auditiva, surdez ou surdocegueira).';
+        }
+        const algumaMarcacao =
+          _neeE.tea || _neeE.altas || _neeE.fisica || _neeE.intelectual ||
+          (_neeE.visual && _neeE.visualSub) || (_neeE.auditiva && _neeE.auditivaSub);
+        if(!algumaMarcacao){
+          return 'Marque ao menos uma deficiência/TEA/altas habilidades, já que "Sim" foi selecionado.';
+        }
+      }
+      if(_neeE.trans === true){
+        const algumTranstorno =
+          _neeE.discalculia || _neeE.disgrafia || _neeE.dislalia ||
+          _neeE.dislexia || _neeE.tdah || _neeE.tpac;
+        if(!algumTranstorno){
+          return 'Marque ao menos um transtorno, já que "Sim" foi selecionado.';
+        }
+      }
+      return null;
+    };
+
+    window._neeLimparTudo = function(){
+      _neeE.def=null; _neeE.trans=null;
+      ['btnDefSim','btnDefNao','btnTransSim','btnTransNao'].forEach(id=>{
+        document.getElementById(id)?.classList.remove('sim','nao');
+      });
+      ['panelDef','panelTrans'].forEach(id=>{
+        document.getElementById(id)?.classList.remove('open');
+      });
+      _neeLimparDef(); _neeLimparTrans();
+    };
+  })();
+
+  // ── CEP — etapa 2 ───────────────────────────────────────────────────────
+  (function(){
+    let _ct = null;
+    const cepEl = document.getElementById('compCEP');
+    if(!cepEl) return;
+
+    function maskCEP(v){ const d=v.replace(/\D/g,'').slice(0,8); return d.length>5?d.slice(0,5)+'-'+d.slice(5):d; }
+
+    function setCepStatus(kind, text){
+      const el = document.getElementById('compCepStatus'); if(!el) return;
+      el.innerHTML='';
+      if(!text) return;
+      const s=document.createElement('span');s.className='cep-status '+kind;s.textContent=text;el.appendChild(s);
+    }
+
+    function lockEndFields(locked){
+      // Logradouro NÃO é travado — CEP preenche como sugestão mas usuário pode editar
+      ['compUF','compCidade'].forEach(id=>{
+        const el=document.getElementById(id);if(!el)return;
+        if(locked){el.classList.add('cep-locked');if(el.tagName==='SELECT')el.setAttribute('disabled','');}
+        else{el.classList.remove('cep-locked');el.removeAttribute('disabled');}
+      });
+    }
+
+    async function buscarCEP(cep){
+      setCepStatus('loading','⏳ Buscando…');
+      try{
+        const r=await fetch('https://viacep.com.br/ws/'+cep+'/json/');
+        if(!r.ok) throw new Error('http');
+        const d=await r.json();
+        if(d.erro) throw new Error('nf');
+        const el=id=>document.getElementById(id);
+        if(el('compLogradouro')) el('compLogradouro').value=d.logradouro||'';
+        if(el('compUF'))        el('compUF').value=d.uf||'';
+        if(el('compCidade'))    el('compCidade').value=d.localidade||'';
+        lockEndFields(true);
+        setCepStatus('ok','✅ CEP encontrado');
+      }catch(e){
+        lockEndFields(false);
+        setCepStatus('err', e.message==='nf'?'❌ CEP não encontrado — preencha manualmente':'⚠️ Falha na busca — preencha manualmente');
+      }
+    }
+
+    cepEl.addEventListener('input',function(){
+      const m=maskCEP(cepEl.value);if(cepEl.value!==m)cepEl.value=m;
+      const d=m.replace(/\D/g,'');
+      if(d.length<8){setCepStatus('','');lockEndFields(false);return;}
+      clearTimeout(_ct);_ct=setTimeout(()=>buscarCEP(d),500);
+    });
+  })();
+
+  // ── RG — máscara 00.000.000-00 (até 10 caracteres, último bloco aceita X) ──
+  (function(){
+    const rgEl = document.getElementById('compRG');
+    if(!rgEl) return;
+
+    function maskRG(raw){
+      const v = raw.replace(/[^\dXx]/g,'').toUpperCase().slice(0,10);
+      let out = v.slice(0,2);
+      if(v.length > 2) out += '.' + v.slice(2,5);
+      if(v.length > 5) out += '.' + v.slice(5,8);
+      if(v.length > 8) out += '-' + v.slice(8,10);
+      return out;
+    }
+
+    rgEl.addEventListener('input', function(){
+      this.value = maskRG(this.value);
+    });
+    // Sem maxlength no HTML: o navegador trunca o texto colado ANTES do
+    // evento "input" rodar, cortando o RG na primeira parte. A máscara acima
+    // já limita a 10 dígitos — deixa ela controlar o tamanho.
+    rgEl.removeAttribute('maxlength');
+    rgEl.setAttribute('placeholder', '00.000.000-00');
+  })();
+
+  // ── Certidão de nascimento — máscara padrão CNM (32 dígitos) ─────────────
+  // Formato: NNNNNN NN NN NNNN N NNNNN NNN NNNNNNN-NN
+  // Ex.: 230341 01 55 2017 1 64903 434 3980960-16
+  (function(){
+    const cnEl  = document.getElementById('compCertidao');
+    const cnMsg = document.createElement('small');
+    cnMsg.className = 'help'; cnMsg.style.display='block';
+    cnEl?.parentNode?.appendChild(cnMsg);
+    if(!cnEl) return;
+
+    const SEGMENTOS = [6,2,2,4,1,5,3,7,2];
+    const SEPARADORES = [' ',' ',' ',' ',' ',' ',' ','-']; // entre os segmentos (o último não tem separador depois)
+
+    function maskCertidao(raw){
+      const digits = raw.replace(/\D/g,'').slice(0,32);
+      let out = '';
+      let pos = 0;
+      for(let i = 0; i < SEGMENTOS.length && pos < digits.length; i++){
+        const tamanho = SEGMENTOS[i];
+        const bloco = digits.slice(pos, pos + tamanho);
+        out += bloco;
+        pos += tamanho;
+        if(pos < digits.length && i < SEPARADORES.length) out += SEPARADORES[i];
+      }
+      return out;
+    }
+
+    cnEl.setAttribute('placeholder', '230341 01 55 2017 1 64903 434 3980960-16');
+    cnEl.removeAttribute('maxlength'); // evita truncar paste antes da máscara rodar
+
+    cnEl.addEventListener('input', function(){
+      this.value = maskCertidao(this.value);
+      const v = this.value.replace(/\D/g,'');
+      if(!v){ cnMsg.textContent=''; cnMsg.className = 'help'; return; }
+      if(v.length === 32){
+        cnMsg.textContent = '✅ Formato CNM completo (32 dígitos)';
+        cnMsg.className = 'help ok';
+      } else {
+        cnMsg.textContent = `${v.length}/32 dígitos`;
+        cnMsg.className = 'help';
+      }
+    });
+  })();
+
+  // ── Fábrica de autocomplete de cidade (reutilizada em endereço + naturalidade) ──
+  function criarAutocompleteCidade({ inputId, selUFId, dropdownId, ghostId, incluirCidadeEndereco }){
+    const inpCidade = document.getElementById(inputId);
+    const selUF     = document.getElementById(selUFId);
+    const dropdown  = document.getElementById(dropdownId);
+    const ghost     = document.getElementById(ghostId);
+    if(!inpCidade || !selUF || !dropdown || !ghost) return null;
+
+    let cidadeDB = [];
+    let activeIdx = -1;
+
+    function buildCidadeDB(){
+      const alunos = (typeof getAlunos === 'function') ? getAlunos() : [];
+      const map = new Map();
+      alunos.forEach(a => {
+        const c = (a.naturalidadeCidade || '').trim();
+        const u = (a.naturalidadeUF     || '').trim().toUpperCase();
+        if(c && u) map.set(c.toUpperCase(), { cidade: c, uf: u });
+        if(incluirCidadeEndereco){
+          const ce = (a.cidade || '').trim();
+          const ue = (a.endUF  || '').trim().toUpperCase();
+          if(ce && ue) map.set(ce.toUpperCase(), { cidade: ce, uf: ue });
+        }
+      });
+      cidadeDB = Array.from(map.values()).sort((a,b) => a.cidade.localeCompare(b.cidade, 'pt-BR'));
+    }
+
+    function norm(s){ return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+    function bestMatch(val){ if(!val) return null; const n = norm(val); return cidadeDB.find(o => norm(o.cidade).startsWith(n)) || null; }
+    function filtrarSugestoes(val){ if(!val) return []; const n = norm(val); return cidadeDB.filter(o => norm(o.cidade).startsWith(n)).slice(0, 8); }
+    function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function updateGhost(val){
+      const match = bestMatch(val);
+      if(!match || !val){ ghost.innerHTML = ''; return; }
+      const tail = match.cidade.slice(val.length);
+      ghost.innerHTML = `<span class="ghost-match">${escHtml(val)}</span><span class="ghost-tail">${escHtml(tail)}</span>`;
+    }
+
+    function applyCity(cidade, uf){ inpCidade.value = cidade; if(uf) selUF.value = uf; ghost.innerHTML = ''; closeDropdown(); }
+
+    function openDropdown(val){
+      const opts = filtrarSugestoes(val);
+      if(!opts.length){ closeDropdown(); return; }
+      activeIdx = -1;
+      dropdown.innerHTML = opts.map((o,i) =>
+        `<div class="nat-opt" role="option" data-idx="${i}" data-cidade="${escHtml(o.cidade)}" data-uf="${escHtml(o.uf)}">
+          <span>${escHtml(o.cidade)}</span><span class="nat-uf">${escHtml(o.uf)}</span>
+        </div>`
+      ).join('');
+      dropdown.classList.add('open');
+    }
+
+    function closeDropdown(){ dropdown.classList.remove('open'); activeIdx = -1; }
+    function highlightItem(idx){ dropdown.querySelectorAll('.nat-opt').forEach((el,i) => el.classList.toggle('active', i === idx)); }
+
+    inpCidade.addEventListener('input', () => {
+      buildCidadeDB();
+      const val = inpCidade.value;
+      updateGhost(val);
+      openDropdown(val);
+    });
+
+    inpCidade.addEventListener('keydown', (e) => {
+      const items = dropdown.querySelectorAll('.nat-opt');
+      const isOpen = dropdown.classList.contains('open');
+      if(e.key === 'Tab' || e.key === 'Enter'){
+        if(isOpen && activeIdx >= 0 && items[activeIdx]){
+          e.preventDefault();
+          applyCity(items[activeIdx].dataset.cidade, items[activeIdx].dataset.uf);
+          return;
+        }
+        const match = bestMatch(inpCidade.value);
+        if(match && inpCidade.value){ e.preventDefault(); applyCity(match.cidade, match.uf); return; }
+        closeDropdown(); return;
+      }
+      if(e.key === 'ArrowDown'){
+        e.preventDefault();
+        if(!isOpen) openDropdown(inpCidade.value);
+        activeIdx = Math.min(activeIdx + 1, items.length - 1);
+        highlightItem(activeIdx); return;
+      }
+      if(e.key === 'ArrowUp'){ e.preventDefault(); activeIdx = Math.max(activeIdx - 1, -1); highlightItem(activeIdx); return; }
+      if(e.key === 'Escape'){ closeDropdown(); ghost.innerHTML = ''; return; }
+    });
+
+    dropdown.addEventListener('mousedown', (e) => {
+      const opt = e.target.closest('.nat-opt');
+      if(!opt) return;
+      e.preventDefault();
+      applyCity(opt.dataset.cidade, opt.dataset.uf);
+    });
+
+    document.addEventListener('click', (e) => {
+      if(!inpCidade.contains(e.target) && !dropdown.contains(e.target)){ closeDropdown(); ghost.innerHTML = ''; }
+    });
+
+    selUF.addEventListener('change', () => closeDropdown());
+
+    buildCidadeDB();
+    return { rebuild: buildCidadeDB };
+  }
+
+  // Endereço (etapa 2)
+  criarAutocompleteCidade({
+    inputId: 'compCidade', selUFId: 'compUF',
+    dropdownId: 'compCidadeDropdown', ghostId: 'compCidadeGhost',
+    incluirCidadeEndereco: true
+  });
+
+  // ── Integral toggle (turno agora vem da turma selecionada) ──────────────
+  window._setIntegral = function(sim){
+    const modeloHidden = document.getElementById('modeloEnsino');
+    const badge = document.getElementById('integralBadge');
+    const btnSim = document.getElementById('btnIntegralSim');
+    const btnNao = document.getElementById('btnIntegralNao');
+
+    if(sim){
+      btnSim?.classList.add('selected-sim');
+      btnSim?.classList.remove('selected-nao');
+      btnNao?.classList.remove('selected-sim');
+      btnNao?.classList.remove('selected-nao');
+      if(modeloHidden) modeloHidden.value = 'INTEGRAL';
+      if(badge) badge.classList.add('visible');
+    } else {
+      btnNao?.classList.add('selected-nao');
+      btnNao?.classList.remove('selected-sim');
+      btnSim?.classList.remove('selected-sim');
+      btnSim?.classList.remove('selected-nao');
+      if(modeloHidden) modeloHidden.value = 'REGULAR';
+      if(badge) badge.classList.remove('visible');
+    }
+
+    const turnoMsg = document.getElementById('turnoMsg');
+    if(turnoMsg){ turnoMsg.textContent = ''; turnoMsg.className = 'help'; }
+  };
+
+  // CPF: máscara + feedback
+  const cpfEl = document.getElementById("cpf");
+  if(cpfEl){
+    const applyCpfMask = () => {
+      const masked = maskCPFPartial(cpfEl.value);
+      if(cpfEl.value !== masked) cpfEl.value = masked;
+      checkCpfField();
+    };
+    cpfEl.addEventListener("input", applyCpfMask);
+    cpfEl.addEventListener("blur", applyCpfMask);
+    // aplica ao carregar (ex.: quando voltar de navegação)
+    applyCpfMask();
+  }
+
+  // Situação da matrícula (por inserção): esconde/mostra + segue a "Situação
+  // padrão" quando o ano letivo não é o ativo (ver _atualizarCamposStatusSituacao)
+  if(statusPadrao && statusAluno){
+    statusPadrao.addEventListener("change", () => {
+      if(!statusAluno.value) statusAluno.value = statusPadrao.value;
+    });
+    _atualizarCamposStatusSituacao();
+  }
+
+
+  // Pai não informado: desabilita campo e remove required
+  if(paiNaoInformado && pai){
+    const syncPai = () => {
+      const on = !!paiNaoInformado.checked;
+      if(on){
+        pai.value = "";
+        pai.disabled = true;
+        pai.required = false;
+      }else{
+        pai.disabled = false;
+        pai.required = true;
+      }
+    };
+    paiNaoInformado.addEventListener("change", syncPai);
+    syncPai();
+  }
+  document.getElementById("btnLimparCampos").addEventListener("click", clearFields);
+  turmaSelect.addEventListener("change", () => {
+    setMsg("", "muted");
+    refreshTurmaInfo();
+    renderMatriculados();
+  });
+
+  // ── Auto-fill por CPF ───────────────────────────────────────────────────
+  (function(){
+    /* ── Modo de identificação: CPF ↔ Nome ─────────────────────── */
+    function _setModoId(modo){
+      const fieldCpf   = document.getElementById('fieldCpf');
+      const fieldNome  = document.getElementById('fieldNome');
+      const btnCPF     = document.getElementById('btnModoCPF');
+      const btnNome    = document.getElementById('btnModoNome');
+      const cpfEl      = document.getElementById('cpf');
+      const nomeEl     = document.getElementById('nome');
+      const hint       = document.getElementById('modoIdHint');
+
+      if(modo === 'cpf'){
+        if(fieldCpf)  fieldCpf.style.display  = '';
+        if(fieldNome){ fieldNome.style.order = ''; } // mantém posição natural no grid
+        if(btnCPF)  { btnCPF.style.background  = '#2563eb'; btnCPF.style.color  = '#fff'; btnCPF.style.borderColor = '#2563eb'; }
+        if(btnNome) { btnNome.style.background = '#fff';    btnNome.style.color = '#374151'; btnNome.style.borderColor = '#d1d5db'; }
+        if(cpfEl)    cpfEl.required = true;
+        if(hint)     hint.textContent = 'CPF é a chave principal. Use para vincular ou criar um aluno.';
+        window._modoId = 'cpf';
+      } else {
+        // No modo nome o CPF fica visível (opcional) para poder cadastrá-lo
+        if(fieldCpf)  fieldCpf.style.display  = '';
+        if(btnCPF)  { btnCPF.style.background  = '#fff';    btnCPF.style.color  = '#374151'; btnCPF.style.borderColor = '#d1d5db'; }
+        if(btnNome) { btnNome.style.background = '#2563eb'; btnNome.style.color = '#fff'; btnNome.style.borderColor = '#2563eb'; }
+        if(cpfEl)  { cpfEl.required = false; }  // opcional — pode ser preenchido manualmente
+        if(hint)     hint.textContent = 'Busca pelo nome no banco global. CPF fica disponível para ser adicionado ao aluno encontrado.';
+        window._modoId = 'nome';
+        document.getElementById('nome')?.focus();
+      }
+    }
+    window._setModoId = _setModoId;
+    window._modoId = 'cpf'; // default
+    _setModoId('cpf'); // aplica estado inicial
+
+    const CAMPOS_AUTOPREENCH = ['nome','nasc','mae','pai','sexo','corRaca','naturalidadeCidade','naturalidadeUF'];
+    const banner   = document.getElementById('bannerAlunoEncontrado');
+    const bannerNm = document.getElementById('bannerNome');
+    const bannerSb = document.getElementById('bannerSub');
+    const btnLimpar= document.getElementById('btnLimparAutoFill');
+    const cpfEl    = document.getElementById('cpf');
+    if(!banner || !cpfEl) return;
+
+    let _alunoEncontrado = null; // aluno atualmente auto-preenchido
+    window._alunoEncontrado = null; // espelho público para inserirAluno
+
+    function setLocked(locked){
+      CAMPOS_AUTOPREENCH.forEach(id => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        const field = el.closest('.field') || el.parentElement;
+        if(locked){ field.classList.add('field-locked'); el.readOnly = (el.tagName==='INPUT'); }
+        else      { field.classList.remove('field-locked'); el.readOnly = false; }
+      });
+      // paiNaoInformado checkbox
+      const chk = document.getElementById('paiNaoInformado');
+      if(chk) chk.disabled = locked;
+    }
+
+    function preencherCampos(a){
+      const get = id => document.getElementById(id);
+      if(get('nome'))    get('nome').value    = a.nomeOficial || a.nome || '';
+      if(get('nasc'))    get('nasc').value    = a.dataNascimento || '';
+      if(get('mae'))     get('mae').value     = a.mae  || '';
+      if(get('pai'))     get('pai').value     = (a.pai && a.pai !== '--') ? a.pai : '';
+      if(get('sexo'))    get('sexo').value    = a.sexo || '';
+      if(get('corRaca')) get('corRaca').value = a.corRaca || 'NÃO DECLARADA';
+
+      // Naturalidade
+      if(get('naturalidadeCidade')){
+        get('naturalidadeCidade').value = a.naturalidadeCidade ||
+          (a.naturalidade ? a.naturalidade.split('/')[0] : '');
+      }
+      if(get('naturalidadeUF')){
+        get('naturalidadeUF').value = a.naturalidadeUF ||
+          (a.naturalidade ? (a.naturalidade.split('/')[1]||'').trim() : '');
+      }
+
+      // pai não informado
+      const chk = document.getElementById('paiNaoInformado');
+      if(chk){ chk.checked = (a.pai === '--'); }
+
+      // Dispara eventos para que outros listeners (ex: autocomplete nat) percebam
+      ['nome','nasc','mae','pai','naturalidadeCidade','naturalidadeUF'].forEach(id => {
+        get(id)?.dispatchEvent(new Event('input', {bubbles:true}));
+      });
+    }
+
+    function mostrarBanner(a, semLock){
+      const turmasComAluno = getMats()
+        .filter(m => m.alunoId === a.alunoId)
+        .map(m => `${m.anoLetivo||'?'} • ${m.serie||'?'}`)
+        .join(' | ');
+
+      bannerNm.textContent = a.nomeOficial || a.nome || a.alunoId;
+      bannerSb.textContent = `${a.alunoId}${turmasComAluno ? ' — Matrículas: ' + turmasComAluno : ' — Nenhuma matrícula anterior'}`;
+      banner.classList.add('visible');
+      if(semLock){
+        // Modo nome: campos editáveis para adicionar dados pessoais que as atas não têm
+        setLocked(false);
+        const btnLimparEl = document.getElementById('btnLimparAutoFill');
+        if(btnLimparEl) btnLimparEl.textContent = '✏️ Desvincular';
+      } else {
+        setLocked(true);
+        const btnLimparEl = document.getElementById('btnLimparAutoFill');
+        if(btnLimparEl) btnLimparEl.textContent = '✏️ Cadastrar como novo';
+      }
+      _alunoEncontrado = a;
+      window._alunoEncontrado = a;
+      // Trava o alunoId explicitamente — inserirAluno() usa isso para vincular
+      // direto (Identidade.vincularExplicito), sem redescobrir o match por
+      // heurística. Evita o caso de dois alunos com mesmo nome nas atas onde
+      // a heurística por nome único falharia e criaria um ID novo, mesmo com
+      // o usuário já tendo escolhido um específico aqui.
+      window._alunoIdVinculado = a.alunoId;
+    }
+
+    function limparBanner(){
+      banner.classList.remove('visible');
+      setLocked(false);
+      _alunoEncontrado = null;
+      window._alunoEncontrado = null;
+      window._alunoIdVinculado = null;
+    }
+
+    function buscarPorCpf(digits){
+      if(!window.Identidade) return null;
+      return window.Identidade.lerTodos()
+        .find(a => (a.cpf||'').replace(/\D/g,'') === digits) || null;
+    }
+
+    // Exposição para clearFields e modo nome usar
+    window._limparAutoFill = limparBanner;
+    window._preencherCampos = preencherCampos;
+    window._mostrarBanner   = mostrarBanner;
+
+    // Escuta digitação no CPF
+    cpfEl.addEventListener('input', function(){
+      const digits = cpfEl.value.replace(/\D/g,'');
+      if(digits.length !== 11){ limparBanner(); return; }
+      if(!isValidCPF(digits)){  limparBanner(); return; }
+      const encontrado = buscarPorCpf(digits);
+      if(encontrado){
+        preencherCampos(encontrado);
+        mostrarBanner(encontrado);
+      } else {
+        limparBanner();
+      }
+    });
+
+    // Botão "Cadastrar como novo"
+    if(btnLimpar){
+      btnLimpar.addEventListener('click', function(){
+        limparBanner();
+        // Limpa apenas os campos auto-preenchidos, mantém CPF
+        CAMPOS_AUTOPREENCH.forEach(id => {
+          const el = document.getElementById(id);
+          if(el && el.tagName === 'INPUT') el.value = '';
+        });
+        document.getElementById('sexo')?.dispatchEvent(new Event('change'));
+        document.getElementById('corRaca')?.value && (document.getElementById('corRaca').value = 'NÃO DECLARADA');
+        const chk = document.getElementById('paiNaoInformado');
+        if(chk){ chk.checked = false; chk.disabled = false; }
+        setCpfMsg('ok','CPF válido — novo cadastro');
+        document.getElementById('nome')?.focus();
+      });
+    }
+  })();
+
+  // ── Autocomplete de Nome (modo identificação por nome) ──────────────────
+  (function(){
+    const nomeEl   = document.getElementById('nome');
+    const dropdown = document.getElementById('nomeDropdown');
+    const ghost    = document.getElementById('nomeGhost');
+    const msgEl    = document.getElementById('nomeLookupMsg');
+    if(!nomeEl || !dropdown) return;
+
+    let _activeIdx = -1;
+
+    function norm(s){
+      return (s||'').trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
+
+    function getAlunosGlobal(){
+      return window.Identidade ? window.Identidade.lerTodos() : [];
+    }
+
+    function filtrar(val){
+      if(!val || val.length < 3) return [];
+      const n = norm(val);
+      return getAlunosGlobal()
+        .filter(a => norm(a.nomeOficial||a.nome||'').includes(n))
+        .slice(0, 10);
+    }
+
+    function renderDropdown(lista, typed){
+      if(!lista.length){ dropdown.style.display='none'; if(ghost) ghost.textContent=''; return; }
+      dropdown.innerHTML = '';
+      _activeIdx = -1;
+      lista.forEach((a, i) => {
+        const nome    = a.nomeOficial || a.nome || '(sem nome)';
+        const sub     = [a.alunoId, a.cpf].filter(Boolean).join(' • ');
+        const div = document.createElement('div');
+        div.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:13px;';
+        div.innerHTML = `<b>${nome}</b>${sub ? ' <span style="color:#9ca3af;font-size:11px;">'+sub+'</span>' : ''}`;
+        div.addEventListener('mouseenter', ()=>{ setActive(i); });
+        div.addEventListener('click', ()=>{ selecionarAluno(a); });
+        dropdown.appendChild(div);
+      });
+      dropdown.style.display = 'block';
+      // ghost text: primeira sugestão
+      if(ghost){
+        const first = norm(lista[0].nomeOficial||lista[0].nome||'');
+        const typedN = norm(typed);
+        if(first.startsWith(typedN)){
+          ghost.textContent = typed + (lista[0].nomeOficial||lista[0].nome||'').slice(typed.length);
+        } else {
+          ghost.textContent = '';
+        }
+      }
+    }
+
+    function setActive(idx){
+      const items = dropdown.querySelectorAll('div');
+      items.forEach((el,i)=> el.style.background = i===idx ? '#eff6ff' : '');
+      _activeIdx = idx;
+    }
+
+    function closeDropdown(){
+      dropdown.style.display = 'none';
+      if(ghost) ghost.textContent = '';
+      _activeIdx = -1;
+    }
+
+    function selecionarAluno(a){
+      nomeEl.value = a.nomeOficial || a.nome || '';
+      closeDropdown();
+      // Preenche campos mas NÃO trava — no modo nome o usuário precisa adicionar dados pessoais
+      if(typeof window._preencherCampos === 'function') window._preencherCampos(a);
+      if(typeof window._mostrarBanner   === 'function') window._mostrarBanner(a, true); // semLock=true
+      // Preenche CPF se o aluno já tiver (caso venha das atas sem CPF, campo fica vazio p/ preenchimento)
+      const cpfEl = document.getElementById('cpf');
+      if(cpfEl && !cpfEl.value && a.cpf) cpfEl.value = a.cpf;
+      if(msgEl){ msgEl.textContent = '✅ Aluno vinculado — preencha os dados pessoais e insira'; msgEl.style.color='#166534'; }
+    }
+
+    nomeEl.addEventListener('input', function(){
+      if(window._modoId !== 'nome') return;
+      const val = nomeEl.value;
+      const lista = filtrar(val);
+      renderDropdown(lista, val);
+      if(msgEl && val.length >= 3 && !lista.length){
+        msgEl.textContent = 'Nenhum aluno encontrado — será criado como novo.';
+        msgEl.style.color = '#6b7280';
+      } else if(msgEl && val.length < 3){
+        msgEl.textContent = '';
+      }
+    });
+
+    nomeEl.addEventListener('keydown', function(e){
+      if(window._modoId !== 'nome') return;
+      const items = dropdown.querySelectorAll('div');
+      if(e.key === 'ArrowDown'){ e.preventDefault(); setActive(Math.min(_activeIdx+1, items.length-1)); }
+      else if(e.key === 'ArrowUp'){ e.preventDefault(); setActive(Math.max(_activeIdx-1, 0)); }
+      else if(e.key === 'Enter' && _activeIdx >= 0){
+        e.preventDefault();
+        // Find the aluno by index
+        const lista = filtrar(nomeEl.value);
+        if(lista[_activeIdx]) selecionarAluno(lista[_activeIdx]);
+      } else if(e.key === 'Escape'){ closeDropdown(); }
+      else if(e.key === 'Tab' && ghost?.textContent){
+        // Tab aceita ghost text
+        e.preventDefault();
+        const lista = filtrar(nomeEl.value);
+        if(lista[0]) selecionarAluno(lista[0]);
+      }
+    });
+
+    // Fecha ao clicar fora
+    document.addEventListener('click', function(e){
+      if(!nomeEl.contains(e.target) && !dropdown.contains(e.target)) closeDropdown();
+    });
+
+    // Expõe preencherCampos e mostrarBanner para uso do bloco acima
+    // (eles são definidos no IIFE anterior — precisamos de uma ponte)
+    // A ponte é feita via window no bloco CPF:
+    // window._nomeLookupSelecionar = selecionarAluno — mas como estamos num IIFE
+    // sem acesso direto, usamos eventos customizados
+    nomeEl.addEventListener('_nomeSelecionado', function(e){
+      if(e.detail) selecionarAluno(e.detail);
+    });
+  })();
+
+  // Naturalidade (etapa 1) — mesma base de cidades do endereço acima
+  window._natRebuild = criarAutocompleteCidade({
+    inputId: 'naturalidadeCidade', selUFId: 'naturalidadeUF',
+    dropdownId: 'natDropdown', ghostId: 'natGhost',
+    incluirCidadeEndereco: true
+  })?.rebuild;
+
+  // Recarrega turmas ao mudar o ano letivo
+  anoLetivo.addEventListener("change", ()=>{
+    loadTurmaOptions();
+    // Reseta seleção sem disparar o listener de change do turmaSelect
+    // (para não sobrescrever o anoLetivo que o usuário acabou de editar)
+    turmaSelect.value = "";
+    loadSerieOptionsForTurma(null);
+    turmaInfo.textContent = "Selecione uma turma para carregar os alunos.";
+    tbody.innerHTML = '<tr><td colspan="13" class="muted">Selecione uma turma para carregar.</td></tr>';
+    _atualizarCamposStatusSituacao();
+  });
+
+  // init run — aguarda Firestore antes de popular a UI
+  (async function initRun(){
+    try{
+      await new Promise(res => {
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        document.addEventListener('auth:ready', res, { once: true });
+      });
+      const dados = await window.DB.loadAllAnoAtivo();
+      const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
+      if(sid){
+        const pre = k => `schools:${sid}:${k}`;
+        if(dados.turmasDB)     localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dados.turmasDB));
+        if(dados.alunosDB)     localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dados.alunosDB));
+        if(dados.matriculasDB) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dados.matriculasDB));
+        if(dados.dadosEscola?.configAnoAtivo)
+          localStorage.setItem(pre('configAnoAtivoAtual_v1'), JSON.stringify(dados.dadosEscola.configAnoAtivo));
+      }
+    }catch(e){ console.warn('Cadastro Ano Ativo — pré-carga Firestore:', e); }
+
+    anoLetivo.value = getAnoAtivoDefault();
+    if(pillAnoAtivo){ pillAnoAtivo.textContent = `ano ativo: ${anoLetivo.value || getAnoAtivoDefault()}`; }
+    updatePill();
+    loadTurmaOptions();
+    refreshTurmaInfo();
+    renderMatriculados();
+    Loading.esconder();
+  })();
+
+})();
+</script>
+
+<script id="foto-aluno-js">
+(function(){
+  const inpFoto      = document.getElementById('inpFotoAluno');
+  const previewImg    = document.getElementById('fotoAlunoPreview');
+  const placeholder   = document.getElementById('fotoAlunoPlaceholder');
+  const btnRemover    = document.getElementById('btnRemoverFoto');
+  const statusEl      = document.getElementById('fotoAlunoStatus');
+  if(!inpFoto) return;
+
+  let _fotoPendente = null; // { base64, mimeType } — cadastro novo, aguardando alunoId
+  let _fotoAlunoId  = null; // conhecido de cara em modo edição
+  let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
+
+  function _setStatus(txt, cor){
+    statusEl.textContent = txt || '';
+    statusEl.style.color = cor || 'var(--muted)';
+  }
+
+  // Chamado no modo edição, com a foto já existente (se houver)
+  window.initFoto = function(alunoId, fotoUrlExistente, fotoFileIdExistente){
+    console.log('[foto-aluno] initFoto chamado com:', alunoId, fotoUrlExistente);
+    _fotoAlunoId = alunoId ? String(alunoId) : null;
+    _fotoFileIdAtual = fotoFileIdExistente || null;
+    if(fotoUrlExistente){
+      previewImg.src = fotoUrlExistente;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+    }
+  };
+
+  // Redimensiona no canvas (máx. 480px no maior lado) e reexporta em JPEG
+  // qualidade 0.75 — mantém a foto pequena no Cloudinary sem perder muito
+  // de identificação visual.
+  function _comprimir(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = e => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const MAX = 480;
+          let { width, height } = img;
+          if(width > height && width > MAX){ height = Math.round(height * MAX / width); width = MAX; }
+          else if(height >= width && height > MAX){ width = Math.round(width * MAX / height); height = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', preview: dataUrl });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function _enviarFoto(alunoId, base64, mimeType){
+    _setStatus('Enviando foto...');
+    try{
+      const resp = await fetch('/api/avatar-upload', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, fileBase64: base64, mimeType }),
+      });
+      const data = await resp.json();
+      console.log('[foto-aluno] resposta do upload:', resp.status, data);
+      if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
+      if(!data.fotoUrl) throw new Error('upload OK mas sem fotoUrl na resposta — veja o console');
+      const salvo = await window.DB.anoAtivoAlunos.save({ _id: alunoId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
+      console.log('[foto-aluno] salvo no Firestore:', salvo);
+      _fotoFileIdAtual = data.fotoFileId;
+      _setStatus('✅ Foto salva.', '#166534');
+    }catch(e){
+      console.error('[foto-aluno] falha ao enviar/salvar foto:', e);
+      _setStatus('❌ Falha ao enviar foto: ' + e.message, '#b91c1c');
+    }
+  }
+
+  inpFoto.addEventListener('change', async () => {
+    const file = inpFoto.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){
+      _setStatus('⚠️ Selecione um arquivo de imagem.', '#b91c1c');
+      return;
+    }
+    _setStatus('Comprimindo...');
+    try{
+      const { base64, mimeType, preview } = await _comprimir(file);
+      previewImg.src = preview;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+
+      if(_fotoAlunoId){
+        await _enviarFoto(_fotoAlunoId, base64, mimeType);
+      } else {
+        _fotoPendente = { base64, mimeType };
+        _setStatus('Foto pronta — será enviada ao salvar o aluno.', '#166534');
+      }
+    }catch(e){
+      _setStatus('❌ Falha ao processar a foto: ' + e.message, '#b91c1c');
+    }
+  });
+
+  btnRemover.addEventListener('click', async () => {
+    const fileIdAntigo = _fotoFileIdAtual;
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    inpFoto.value = '';
+    _fotoPendente = null;
+    _fotoFileIdAtual = null;
+    _setStatus('');
+    if(_fotoAlunoId){
+      try{ await window.DB.anoAtivoAlunos.save({ _id: _fotoAlunoId, fotoUrl: null, fotoFileId: null }); }
+      catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
+    }
+    if(fileIdAntigo){
+      try{
+        await fetch('/api/drive-delete', {
+          method: 'DELETE', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+        });
+      }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+    }
+  });
+
+  // Reseta o widget de foto pro estado vazio — chamado por clearFields()
+  // depois de salvar um cadastro novo, senão a foto continua no slot e
+  // seria reenviada junto do próximo aluno cadastrado.
+  window.limparFoto = function(){
+    _fotoPendente = null;
+    _fotoAlunoId  = null;
+    _fotoFileIdAtual = null;
+    inpFoto.value = '';
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    _setStatus('');
+  };
+
+  // Chamado por inserirAluno() logo depois que o alunoId de um cadastro
+  // NOVO é confirmado — envia a foto que ficou esperando.
+  window.enviarFotoPendente = async function(alunoId){
+    if(!_fotoPendente) return;
+    _fotoAlunoId = String(alunoId);
+    const { base64, mimeType } = _fotoPendente;
+    _fotoPendente = null;
+    await _enviarFoto(alunoId, base64, mimeType);
+  };
+})();
+</script>
+
+<script id="drive-docs-js">
+(function(){
+  const API_UPLOAD = '/api/drive-upload';
+  const MAX_MB     = 10;
+  const MAX_PAGES  = 12;
+
+  let _fila    = [];
+  let _alunoId = null;
+
+  function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
+  function fmtSize(b){
+    if(b<1024) return b+' B';
+    if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+  }
+  function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function setStatus(kind, text){
+    const el = document.getElementById('docsStatus');
+    if(!el) return;
+    el.className = 'docs-status'+(text?' show '+kind:'');
+    el.textContent = text;
+    if(kind==='ok'&&text) setTimeout(()=>{ el.className='docs-status'; el.textContent=''; }, 4000);
+  }
+
+  function renderFila(){
+    const wrap  = document.getElementById('docsFilaWrap');
+    const lista = document.getElementById('docsFilaLista');
+    const sep   = document.getElementById('docsFilaSepFixo');
+    if(!wrap||!lista) return;
+    lista.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
+    const temExistente = lista.querySelector('.docs-existente');
+    if(!_fila.length){
+      wrap.style.display  = temExistente ? '' : 'none';
+      if(sep) sep.style.display = 'none';
+      return;
+    }
+    wrap.style.display = '';
+    if(sep) sep.style.display = '';
+
+    _fila.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'docs-fila-item docs-fila-pendente';
+      const previewSrc  = item.base64 ? `data:${item.mimeType};base64,${item.base64}` : '';
+      const previewHtml = previewSrc
+        ? `<img src="${previewSrc}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;" />`
+        : `<span class="docs-fila-icon">${iconForMime(item.mimeType)}</span>`;
+      div.innerHTML =
+        previewHtml+
+        '<div class="docs-fila-info">'+
+          `<div class="docs-fila-nome">${escHtml(item._fileName||item.file.name)}</div>`+
+          `<input class="docs-fila-label" type="text" placeholder="Rótulo opcional…" value="${escHtml(item.label)}" data-idx="${idx}"/>`+
+          `<div class="docs-prog-wrap" id="docsProgItem${idx}"><div class="docs-prog-bar"></div></div>`+
+        '</div>'+
+        `<span class="docs-fila-size">${fmtSize(item._size||item.file.size)}</span>`+
+        `<button class="docs-fila-rm docs-fila-pendente" data-idx="${idx}" title="Remover">✕</button>`;
+      lista.insertBefore(div, lista.querySelector('.docs-existente')||null);
+    });
+
+    lista.querySelectorAll('.docs-fila-label').forEach(inp => {
+      inp.addEventListener('input', e => { _fila[parseInt(e.target.dataset.idx)].label = e.target.value; });
+    });
+    lista.querySelectorAll('button.docs-fila-rm.docs-fila-pendente').forEach(btn => {
+      btn.addEventListener('click', e => {
+        _fila.splice(parseInt(e.currentTarget.dataset.idx), 1);
+        lista.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
+        renderFila();
+      });
+    });
+  }
+
+  async function pdfParaImagens(file){
+    if(typeof pdfjsLib === 'undefined'){
+      setStatus('err','❌ PDF.js não carregado. Recarregue a página.');
+      return [];
+    }
+    setStatus('loading', `⏳ Convertendo "${file.name}"…`);
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    if(pdf.numPages > MAX_PAGES){
+      setStatus('err', `❌ "${file.name}" tem ${pdf.numPages} páginas. Limite: ${MAX_PAGES}. Arquivo rejeitado.`);
+      return [];
+    }
+    const baseName = file.name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const imagens  = [];
+    for(let i = 1; i <= pdf.numPages; i++){
+      const page     = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas   = document.createElement('canvas');
+      canvas.width   = viewport.width;
+      canvas.height  = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const base64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const fileName = `${baseName}_p${i}.jpg`;
+      imagens.push({
+        file:        new File([new Uint8Array(0)], fileName, { type: 'image/jpeg' }),
+        label:       '',
+        base64,
+        mimeType:    'image/jpeg',
+        isConverted: true,
+        _fileName:   fileName,
+        _size:       Math.round(base64.length * 0.75),
+      });
+    }
+    setStatus('ok', `✅ "${file.name}" convertido: ${pdf.numPages} página(s)`);
+    return imagens;
+  }
+
+  async function adicionarArquivos(files){
+    const lista = document.getElementById('docsFilaLista');
+    lista?.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
+    for(const f of Array.from(files)){
+      if(f.size > MAX_MB * 1024 * 1024){
+        setStatus('err', `❌ "${f.name}" excede ${MAX_MB} MB e foi ignorado.`);
+        continue;
+      }
+      const isPDF = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+      if(isPDF){
+        const imagens = await pdfParaImagens(f);
+        imagens.forEach(img => _fila.push(img));
+      } else {
+        const base64 = await new Promise((res,rej) => {
+          const r = new FileReader();
+          r.onload  = e => res(e.target.result.split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(f);
+        });
+        _fila.push({ file: f, label: '', base64, mimeType: f.type||'image/jpeg', isConverted: false });
+      }
+    }
+    renderFila();
+  }
+
+  async function uploadItem(item, idx){
+    const progWrap = document.getElementById(`docsProgItem${idx}`);
+    const progBar  = progWrap?.querySelector('.docs-prog-bar');
+    progWrap?.classList.add('show');
+    let pct = 0;
+    const iv = setInterval(()=>{ pct=Math.min(pct+Math.random()*20,85); if(progBar) progBar.style.width=pct+'%'; }, 300);
+    try{
+      const base64   = item.base64 || await new Promise((res,rej)=>{
+        const r = new FileReader(); r.onload=e=>res(e.target.result.split(',')[1]); r.onerror=rej; r.readAsDataURL(item.file);
+      });
+      const fileName = item._fileName || item.file.name;
+      const mimeType = item.mimeType  || item.file.type || 'image/jpeg';
+      const resp = await fetch(API_UPLOAD, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alunoId: _alunoId, fileName, mimeType, fileBase64: base64, label: item.label||fileName }),
+      });
+      clearInterval(iv);
+      if(progBar) progBar.style.width='100%';
+      if(!resp.ok){ const d=await resp.json(); throw new Error(d.error||'Erro no servidor'); }
+      setTimeout(()=>progWrap?.classList.remove('show'), 500);
+      return { ok: true };
+    } catch(err){
+      clearInterval(iv);
+      progWrap?.classList.remove('show');
+      return { ok: false, name: item._fileName||item.file.name, error: err.message };
+    }
+  }
+
+  window.uploadDocsQueue = async function(){
+    if(!_fila.length || !_alunoId) return;
+    setStatus('loading', `⏳ Enviando ${_fila.length} imagem(ns)…`);
+    const erros = [];
+    for(let i=0; i<_fila.length; i++){
+      const res = await uploadItem(_fila[i], i);
+      if(!res.ok) erros.push(res.name+': '+res.error);
+    }
+    _fila = [];
+    document.getElementById('docsFilaLista')?.querySelectorAll('.docs-fila-pendente').forEach(el=>el.remove());
+    if(erros.length){ setStatus('err', `⚠️ ${erros.length} arquivo(s) falharam: ${erros.join(' | ')}`); }
+    else { setStatus('ok', '✅ Todos os documentos enviados!'); }
+  };
+
+  window.initDocs = function(alunoId){
+    if(!alunoId) return;
+    _alunoId = String(alunoId);
+    _carregarDocs();
+  };
+
+  async function _carregarDocs(){
+    if(!_alunoId) return;
+    const wrap  = document.getElementById('docsFilaWrap');
+    const lista = document.getElementById('docsFilaLista');
+    if(!lista) return;
+    lista.querySelectorAll('.docs-existente').forEach(el => el.remove());
+    try{
+      const resp = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(_alunoId)}`);
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error);
+      // A foto de perfil vive na mesma pasta do Cloudinary, mas tem seu
+      // próprio widget — não deve aparecer aqui como documento anexado.
+      const files = data.files || [];
+      if(!files.length) return;
+      wrap && (wrap.style.display = '');
+      const sep = document.createElement('div');
+      sep.className = 'docs-existente';
+      sep.style.cssText = 'font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:6px;';
+      sep.textContent = 'Documentos já anexados';
+      lista.appendChild(sep);
+      files.forEach(f => {
+        const icon     = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
+        const data_fmt = f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR') : '';
+        const item     = document.createElement('div');
+        item.className = 'docs-fila-item docs-existente';
+        item.style.cssText = 'opacity:.85;';
+        item.innerHTML =
+          `<span class="docs-fila-icon">${icon}</span>`+
+          '<div class="docs-fila-info">'+
+            `<div class="docs-fila-nome">${escHtml(f.label||f.fileName)}</div>`+
+            `<div style="font-size:11px;color:var(--muted)">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
+          '</div>'+
+          `<a href="${f.webViewLink}" target="_blank" rel="noopener"`+
+            ` style="padding:4px 10px;border-radius:8px;font-size:12px;font-weight:800;border:1px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;white-space:nowrap;">👁️ Ver</a>`+
+          `<button class="docs-fila-rm" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Remover">🗑️</button>`;
+        lista.appendChild(item);
+      });
+      lista.querySelectorAll('.docs-existente .docs-fila-rm').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if(!confirm(`Remover "${btn.dataset.name}"?\n\nEssa ação não pode ser desfeita.`)) return;
+          setStatus('loading','⏳ Removendo…');
+          try{
+            const r = await fetch('/api/drive-delete',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:btn.dataset.fileid,resourceType:btn.dataset.restype||'image'})});
+            const d = await r.json();
+            if(!r.ok) throw new Error(d.error);
+            btn.closest('.docs-existente').remove();
+            setStatus('ok','✅ Documento removido.');
+          }catch(e){ setStatus('err','❌ Erro ao remover: '+e.message); }
+        });
+      });
+    }catch(err){ console.warn('[docs] Erro ao carregar:', err.message); }
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const fileInput = document.getElementById('docsFileInput');
+    const dropArea  = document.getElementById('docsDropArea');
+    fileInput?.addEventListener('change', e => { adicionarArquivos(e.target.files); fileInput.value=''; });
+    dropArea?.addEventListener('dragover',  e => { e.preventDefault(); dropArea.classList.add('over'); });
+    dropArea?.addEventListener('dragleave', ()  => dropArea.classList.remove('over'));
+    dropArea?.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('over'); adicionarArquivos(e.dataTransfer.files); });
+    dropArea?.addEventListener('click', e => { if(e.target.tagName !== 'SPAN') fileInput?.click(); });
+  });
+
+})();
+</script>
+
+</body>
+</html>
