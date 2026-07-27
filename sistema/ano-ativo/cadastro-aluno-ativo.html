@@ -1948,7 +1948,13 @@ function normSerie(s){
 
     try{
       setMsg('Salvando…','');
-      await window.DB.anoAtivoAlunos.save({ _id: alunoId, alunoId, ...alunoOriginal, ...dadosComp });
+      // fotoUrl/fotoFileId ficam de fora de propósito: quem controla esses dois
+      // campos é o módulo de foto (foto-aluno-js), que já salva no Firestore na
+      // hora em que a foto é trocada/removida. Se reenviássemos alunoOriginal
+      // inteiro aqui, o snapshot antigo (capturado quando a página abriu) sempre
+      // sobrescreveria a foto nova por cima — foi exatamente o bug relatado.
+      const { fotoUrl, fotoFileId, ...alunoOriginalSemFoto } = alunoOriginal;
+      await window.DB.anoAtivoAlunos.save({ _id: alunoId, alunoId, ...alunoOriginalSemFoto, ...dadosComp });
 
       if(window.initDocs)        window.initDocs(alunoId);
       if(window.uploadDocsQueue) await window.uploadDocsQueue();
@@ -3342,7 +3348,6 @@ function normSerie(s){
   });
 
   btnRemover.addEventListener('click', async () => {
-    console.log('[foto-aluno] botão Remover clicado. _fotoAlunoId:', _fotoAlunoId, '_fotoFileIdAtual:', _fotoFileIdAtual);
     const fileIdAntigo = _fotoFileIdAtual;
     previewImg.style.display = 'none';
     previewImg.src = '';
@@ -3351,32 +3356,19 @@ function normSerie(s){
     inpFoto.value = '';
     _fotoPendente = null;
     _fotoFileIdAtual = null;
-    _setStatus('Removendo...');
+    _setStatus('');
     if(_fotoAlunoId){
-      try{
-        const salvo = await window.DB.anoAtivoAlunos.save({ _id: _fotoAlunoId, fotoUrl: null, fotoFileId: null });
-        console.log('[foto-aluno] Firestore limpo:', salvo);
-      }catch(e){
-        console.error('[foto-aluno] Erro ao limpar foto no Firestore:', e);
-      }
-    } else {
-      console.warn('[foto-aluno] _fotoAlunoId estava vazio — Firestore NÃO foi atualizado.');
+      try{ await window.DB.anoAtivoAlunos.save({ _id: _fotoAlunoId, fotoUrl: null, fotoFileId: null }); }
+      catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
     }
     if(fileIdAntigo){
       try{
-        const r = await fetch('/api/drive-delete', {
+        await fetch('/api/drive-delete', {
           method: 'DELETE', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
         });
-        const d = await r.json();
-        console.log('[foto-aluno] resposta do drive-delete:', r.status, d);
-      }catch(e){
-        console.error('[foto-aluno] Erro ao apagar foto no Cloudinary:', e);
-      }
-    } else {
-      console.warn('[foto-aluno] fileIdAntigo estava vazio — nada foi apagado no Cloudinary.');
+      }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
     }
-    _setStatus('🗑️ Foto removida.', '#166534');
   });
 
   // Reseta o widget de foto pro estado vazio — chamado por clearFields()
