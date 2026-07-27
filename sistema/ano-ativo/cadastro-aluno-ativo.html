@@ -2025,6 +2025,8 @@ function normSerie(s){
 
       let aluno = null;
       try { aluno = await window.DB.anoAtivoAlunos.get(editId); } catch(e){}
+      console.log('[DEBUG-FOTO] aluno retornado do Firestore (anoAtivoAlunos.get):', aluno);
+      console.log('[DEBUG-FOTO] fotoUrl deste aluno, direto do Firestore:', aluno && aluno.fotoUrl);
 
       if(!aluno){
         document.getElementById('msgForm').textContent = '⚠️ Aluno não encontrado ou sem permissão de acesso.';
