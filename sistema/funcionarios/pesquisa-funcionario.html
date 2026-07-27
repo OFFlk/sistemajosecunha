@@ -137,6 +137,11 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
 .modal-body     { padding: 14px; }
 </style>
 
+<!-- ══ Bibliotecas de Exportação (PDF / DOCX) ══ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5/build/index.umd.min.js"></script>
+
 <title>Pesquisa de Funcionários • Ano Ativo</title>
 </head>
 
@@ -250,8 +255,19 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
       <div class="panel-actions">
         <label class="check-all"><input type="checkbox" id="chkAllFuncionarios"> Todos</label>
         <span class="count count-selecionados" id="countSelecionados" style="display:none;">0 selecionado(s)</span>
-        <button class="btn primary" id="btnExportXLSX" type="button" title="Exportar para Excel">📊 XLSX</button>
-        <button class="btn ghost" id="btnExportDOCX" type="button" title="Exportar para Word">📄 DOCX</button>
+        <div style="position:relative;display:inline-block;" id="wrapExportFuncionarios">
+          <button class="btn primary" id="btnExportarFuncionarios" type="button">Exportar ▾</button>
+          <div id="dropExportFuncionarios" style="display:none;position:absolute;right:0;top:calc(100% + 6px);
+            background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
+            box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:230px;padding:6px 0;
+            flex-direction:column;">
+            <button class="btn" id="btnExportFichaGeral" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📋 Ficha geral (PDF)</button>
+            <button class="btn" id="btnExportDocx" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Tabela completa (Word)</button>
+            <button class="btn" id="btnExportCsv" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 CSV completo (todos os dados)</button>
+            <div style="height:1px;background:var(--card-border);margin:6px 0;"></div>
+            <button class="btn" id="btnExportFichaIndividual" type="button" disabled title="Em desenvolvimento" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;opacity:.5;cursor:not-allowed;">🧾 Ficha individual (em breve)</button>
+          </div>
+        </div>
       </div>
     </div>
 
