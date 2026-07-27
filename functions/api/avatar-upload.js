@@ -65,7 +65,10 @@ export async function onRequestPost({ request, env }) {
     // que reenviar uma foto substitui a anterior em vez de criar outra.
     const publicId = `${pasta}/${entidadeId}`;
     const timestamp = Math.floor(Date.now() / 1000);
-    const allParams = { overwrite: true, public_id: publicId, timestamp };
+    // invalidate:true é essencial aqui: sem isso o CDN do Cloudinary continua
+    // servindo a versão antiga da imagem em cache mesmo depois do overwrite,
+    // já que o public_id (e portanto a URL de entrega) não muda entre uploads.
+    const allParams = { invalidate: true, overwrite: true, public_id: publicId, timestamp };
     const sigStr = Object.keys(allParams)
       .sort()
       .map(k => `${k}=${allParams[k]}`)
@@ -77,6 +80,7 @@ export async function onRequestPost({ request, env }) {
       file: dataUri,
       public_id: publicId,
       overwrite: true,
+      invalidate: true,
       timestamp,
       api_key: env.CLOUDINARY_API_KEY,
       signature,
