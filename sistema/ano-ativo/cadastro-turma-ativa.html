@@ -1403,10 +1403,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
         document.addEventListener('auth:ready', res, { once: true });
       });
 
-      const dados = await window.DB.loadAll();
-      const funcionarios = Array.isArray(dados.funcionariosDB)
-        ? dados.funcionariosDB
-        : (Array.isArray(dados.dadosEscola?.funcionariosDB) ? dados.dadosEscola.funcionariosDB : []);
+      const funcionarios = await window.DB.funcionarios.list();
 
       // Filtra quem tem função de professor/professora (case-insensitive)
       const FUNCOES_PROF = ['PROFESSOR', 'PROFESSORA', 'PROFESSOR(A)'];
