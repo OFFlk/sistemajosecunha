@@ -35,16 +35,24 @@
 <style>
 /* ── Stepper ── */
 .stepper{display:flex;align-items:center;margin-bottom:20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius, 14px);padding:16px 20px;box-shadow:var(--shadow);}
-.step{display:flex;align-items:center;gap:10px;flex:1;}
+.step{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;}
 .step-num{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--border);background:var(--card);color:var(--muted);transition:all .25s;}
 .step.active .step-num{background:var(--primary, #7c3aed);border-color:var(--primary, #7c3aed);color:#fff;}
 .step.done .step-num{background:var(--ok-bg, rgba(22,163,74,0.10));border-color:var(--ok-border, rgba(22,163,74,0.30));color:var(--ok-text, #166534);}
+.step-num.aviso{background:rgba(234,179,8,0.15) !important;border-color:rgba(234,179,8,0.60) !important;color:#854d0e !important;}
+html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
 .step-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
 .step-title{font-size:14px;font-weight:800;}
 .step.active .step-title{color:var(--primary, #7c3aed);}
 .step.done .step-title{color:var(--ok-text, #166534);}
 .step-sep{width:40px;height:2px;background:var(--border);flex-shrink:0;margin:0 6px;border-radius:2px;transition:background .3s;}
 .step-sep.done{background:var(--ok-border, rgba(22,163,74,0.30));}
+
+/* ── Toast fixo — visível em qualquer etapa/scroll (substitui os spans msgForm/msgOk/erroSalvar) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 
 /* ── Etapas ── */
 .etapa{display:none;}
@@ -540,6 +548,15 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
           </select>
         </div>
         <div class="field">
+          <label for="endCidade">Cidade</label>
+          <div class="nat-wrap">
+            <div class="nat-ghost-layer" id="endCidadeGhost" aria-hidden="true"></div>
+            <input id="endCidade" class="nat-input-real" placeholder="Município"
+                   autocomplete="off" autocorrect="off" spellcheck="false"/>
+            <div class="nat-dropdown" id="endCidadeDropdown" role="listbox"></div>
+          </div>
+        </div>
+        <div class="field">
           <label for="endUF">UF</label>
           <select id="endUF">
             <option value="">--</option>
@@ -551,15 +568,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
             <option>RO</option><option>RR</option><option>RS</option><option>SC</option>
             <option>SE</option><option>SP</option><option>TO</option>
           </select>
-        </div>
-        <div class="field">
-          <label for="endCidade">Cidade</label>
-          <div class="nat-wrap">
-            <div class="nat-ghost-layer" id="endCidadeGhost" aria-hidden="true"></div>
-            <input id="endCidade" class="nat-input-real" placeholder="Município"
-                   autocomplete="off" autocorrect="off" spellcheck="false"/>
-            <div class="nat-dropdown" id="endCidadeDropdown" role="listbox"></div>
-          </div>
         </div>
       </div>
     </section>
@@ -1052,11 +1060,39 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   /* ════════════════════════════════════════
      Stepper
   ════════════════════════════════════════ */
+  // Verifica se os campos obrigatórios (*) da etapa 1 estão preenchidos —
+  // usada só pra decidir o selo visual (✓ ou ⚠️) no stepper, nunca pra
+  // bloquear a troca de etapa. Quem realmente bloqueia é o Salvar.
+  function _etapa1Completa(){
+    if(!isValidCPF(stripNum(document.getElementById('cpf').value))) return false;
+    if(!document.getElementById('nome').value.trim()) return false;
+    if(!document.getElementById('nasc').value) return false;
+    if(!document.getElementById('mae').value.trim()) return false;
+    if(!document.getElementById('sexo').value) return false;
+    if(!document.getElementById('corRaca').value) return false;
+    if(document.getElementById('natPais').value === 'BR'){
+      if(!document.getElementById('natUF').value || !document.getElementById('natCidade').value.trim()) return false;
+    }
+    if(!document.getElementById('funcao').value) return false;
+    if(document.getElementById('funcao').value === 'OUTRO' && !document.getElementById('funcaoOutro').value.trim()) return false;
+    if(!document.getElementById('status').value) return false;
+    return true;
+  }
+
   function irEtapa2(){
     document.getElementById('etapa1').classList.remove('ativa');
     document.getElementById('etapa2').classList.add('ativa');
-    document.getElementById('step1').classList.replace('active','done');
-    document.getElementById('stepNum1').textContent='✓';
+    document.getElementById('step1').classList.remove('active');
+    const stepNum1 = document.getElementById('stepNum1');
+    if(_etapa1Completa()){
+      document.getElementById('step1').classList.add('done');
+      document.getElementById('step1').classList.remove('aviso');
+      if(stepNum1){ stepNum1.textContent='✓'; stepNum1.classList.remove('aviso'); }
+    } else {
+      document.getElementById('step1').classList.remove('done');
+      document.getElementById('step1').classList.add('aviso');
+      if(stepNum1){ stepNum1.textContent='⚠️'; stepNum1.classList.add('aviso'); }
+    }
     document.getElementById('step2').classList.add('active');
     document.getElementById('stepSep').classList.add('done');
     window.scrollTo({top:0,behavior:'smooth'});
@@ -1074,6 +1110,17 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   }
 
   document.getElementById('btnVoltar').addEventListener('click', voltarEtapa1);
+
+  // Navegação livre clicando no número/nome da etapa no stepper — trocar de
+  // etapa é sempre permitido, só o Salvar é que bloqueia com dados ausentes.
+  document.getElementById('step1').addEventListener('click', () => {
+    if(document.getElementById('etapa1').classList.contains('ativa')) return;
+    voltarEtapa1();
+  });
+  document.getElementById('step2').addEventListener('click', () => {
+    if(document.getElementById('etapa2').classList.contains('ativa')) return;
+    irEtapa2();
+  });
 
   /* ════════════════════════════════════════
      Função select
@@ -1271,48 +1318,12 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   }
 
   /* ════════════════════════════════════════
-     Próximo (etapa 1 → etapa 2) com validação
+     Próximo (etapa 1 → etapa 2) — sempre avança
   ════════════════════════════════════════ */
-  document.getElementById('btnProximo').addEventListener('click', function(){
-    const msgForm = document.getElementById('msgForm');
-    msgForm.style.display = 'none';
-
-    if(!isValidCPF(stripNum(document.getElementById('cpf').value))){
-      msgForm.textContent = 'CPF inválido.'; msgForm.style.display = 'block'; return;
-    }
-    if(!document.getElementById('nome').value.trim()){
-      msgForm.textContent = 'Nome obrigatório.'; msgForm.style.display = 'block'; return;
-    }
-    if(!document.getElementById('nasc').value){
-      msgForm.textContent = 'Data de nascimento obrigatória.'; msgForm.style.display = 'block'; return;
-    }
-    if(!document.getElementById('mae').value.trim()){
-      msgForm.textContent = 'Filiação mãe / filiação 1 obrigatória.'; msgForm.style.display = 'block'; return;
-    }
-    if(!document.getElementById('sexo').value){
-      msgForm.textContent = 'Sexo obrigatório.'; msgForm.style.display = 'block'; return;
-    }
-    if(!document.getElementById('corRaca').value){
-      msgForm.textContent = 'Cor / Raça obrigatória.'; msgForm.style.display = 'block'; return;
-    }
-    const pais = document.getElementById('natPais').value;
-    if(pais === 'BR'){
-      if(!document.getElementById('natUF').value || !document.getElementById('natCidade').value.trim()){
-        msgForm.textContent = 'Preencha a naturalidade completa (UF e cidade).'; msgForm.style.display = 'block'; return;
-      }
-    }
-    if(!document.getElementById('funcao').value){
-      msgForm.textContent = 'Função obrigatória.'; msgForm.style.display = 'block'; return;
-    }
-    if(document.getElementById('funcao').value === 'OUTRO' && !document.getElementById('funcaoOutro').value.trim()){
-      msgForm.textContent = 'Digite a função.'; msgForm.style.display = 'block'; return;
-    }
-    if(!document.getElementById('status').value){
-      msgForm.textContent = 'Status / Vínculo obrigatório.'; msgForm.style.display = 'block'; return;
-    }
-
-    irEtapa2();
-  });
+  // Trocar de etapa é sempre permitido (o stepper só sinaliza com ⚠️ se
+  // algo obrigatório ainda estiver em branco). Quem realmente impede
+  // prosseguir é o botão Salvar, no final da etapa 2.
+  document.getElementById('btnProximo').addEventListener('click', irEtapa2);
 
   /* ════════════════════════════════════════
      Escolaridade → mostrar card superior
@@ -1704,6 +1715,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     document.getElementById('editBanner').style.display='none';
     document.getElementById('btnCancelarEdicao').style.display='none';
     document.getElementById('zonaPerigo').style.display='none';
+    const btnLimparReset = document.getElementById('btnLimpar');
+    if(btnLimparReset) btnLimparReset.style.display='';
 
     // NEE
     WIZ.def = null;
@@ -1810,19 +1823,92 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   /* ════════════════════════════════════════
      Salvar funcionário (etapa 2)
   ════════════════════════════════════════ */
+  // Toast fixo — aparece no centro/base da tela, independente do scroll
+  // (substitui os spans antigos msgForm/msgOk/erroSalvar, que só ficavam
+  // visíveis no topo da página e sumiam quando o usuário estava rolado
+  // para baixo)
+  function _toastSucesso(msg){
+    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+  }
+  function _toastErro(msg){
+    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+  }
+  function _showToast(msg, bg, shadow, duration){
+    const existing = document.getElementById('_toastGlobal');
+    if(existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_toastGlobal';
+    toast.style.cssText =
+      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
+      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
+    document.body.appendChild(toast);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+  // Mantido por compatibilidade com o restante do arquivo (usado antes só
+  // pro span de erro da etapa 2) — agora só encaminha pro toast.
   function mostrarErroSalvar(msg){
-    const el = document.getElementById('erroSalvar');
-    el.textContent = msg;
-    el.style.display = msg ? '' : 'none';
-    if(msg) el.scrollIntoView({behavior:'smooth', block:'center'});
+    if(msg) _toastErro(msg.startsWith('⚠️') || msg.startsWith('❌') ? msg : '⚠️ ' + msg);
   }
 
   document.getElementById('btnSalvar').addEventListener('click', async function(){
-    mostrarErroSalvar('');
+    // ── Validação da etapa 1 — como agora dá pra trocar de etapa
+    // livremente sem preencher nada, é aqui (no Salvar) que os campos
+    // obrigatórios (*) realmente são cobrados. Se faltar algo, volta
+    // pra etapa 1 e mostra o toast. ──
+    if(!isValidCPF(stripNum(document.getElementById('cpf').value))){
+      _toastErro('⚠️ CPF inválido.'); voltarEtapa1(); return;
+    }
+    if(!document.getElementById('nome').value.trim()){
+      _toastErro('⚠️ Nome obrigatório.'); voltarEtapa1(); return;
+    }
+    if(!document.getElementById('nasc').value){
+      _toastErro('⚠️ Data de nascimento obrigatória.'); voltarEtapa1(); return;
+    }
+    if(!document.getElementById('mae').value.trim()){
+      _toastErro('⚠️ Filiação mãe / filiação 1 obrigatória.'); voltarEtapa1(); return;
+    }
+    if(!document.getElementById('sexo').value){
+      _toastErro('⚠️ Sexo obrigatório.'); voltarEtapa1(); return;
+    }
+    if(!document.getElementById('corRaca').value){
+      _toastErro('⚠️ Cor / Raça obrigatória.'); voltarEtapa1(); return;
+    }
+    if(document.getElementById('natPais').value === 'BR'){
+      if(!document.getElementById('natUF').value || !document.getElementById('natCidade').value.trim()){
+        _toastErro('⚠️ Preencha a naturalidade completa (UF e cidade).'); voltarEtapa1(); return;
+      }
+    }
+    if(!document.getElementById('funcao').value){
+      _toastErro('⚠️ Função obrigatória.'); voltarEtapa1(); return;
+    }
+    if(document.getElementById('funcao').value === 'OUTRO' && !document.getElementById('funcaoOutro').value.trim()){
+      _toastErro('⚠️ Digite a função.'); voltarEtapa1(); return;
+    }
+    if(!document.getElementById('status').value){
+      _toastErro('⚠️ Status / Vínculo obrigatório.'); voltarEtapa1(); return;
+    }
 
-    // Escolaridade obrigatória
+    // Escolaridade obrigatória (etapa 2)
     if(!document.getElementById('escolaridade').value){
-      mostrarErroSalvar('⚠️ Nível de escolaridade obrigatório.');
+      _toastErro('⚠️ Nível de escolaridade obrigatório.');
       document.getElementById('escolaridade').focus();
       return;
     }
@@ -1946,7 +2032,18 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       if(window.initDocsFuncionario)        window.initDocsFuncionario(funcId);
       if(window.uploadDocsQueueFuncionario) await window.uploadDocsQueueFuncionario();
 
-      // Exibe resumo
+      // Edição via URL (?editar=ID): já vai redirecionar de qualquer jeito,
+      // então só o toast de confirmação basta — sem exibir o card de
+      // resumo, igual ao padrão do cadastro-aluno.
+      if(_editandoViaURL){
+        _toastSucesso('✅ Funcionário atualizado com sucesso! Redirecionando…');
+        setTimeout(() => { location.href = PAGINA_PESQUISA; }, 1800);
+        return;
+      }
+
+      // Cadastro novo (ou edição direto nesta página, sem vir da pesquisa):
+      // mostra o resumo pra continuar cadastrando mais funcionários em
+      // seguida, como já funcionava.
       const escOpts = document.getElementById('escolaridade').options;
       const escLabel = escOpts[escOpts.selectedIndex]?.text || '—';
       document.getElementById('resumoGrid').innerHTML =
@@ -1955,14 +2052,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         `<div class="resumo-item"><strong>Nascimento</strong>${obj.dataNascimento}</div>` +
         `<div class="resumo-item"><strong>Escolaridade</strong>${escLabel}</div>`;
       document.getElementById('resumoFinal').classList.add('show');
+      _toastSucesso('✅ Funcionário salvo com sucesso!');
       window.scrollTo({top:0,behavior:'smooth'});
-
-      // Edição via URL (?editar=ID): volta pra pesquisa após concluir
-      if(_editandoViaURL){
-        document.getElementById('resumoGrid').insertAdjacentHTML('afterend',
-          '<div class="lista-vazia" style="grid-column:1/-1;">Redirecionando para a pesquisa…</div>');
-        setTimeout(() => { location.href = PAGINA_PESQUISA; }, 1800);
-      }
     } catch(e){
       console.error(e);
       mostrarErroSalvar('❌ Erro ao salvar: ' + (e.message||e));
@@ -2067,6 +2158,13 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     document.getElementById('btnSalvar').textContent = '💾 Atualizar funcionário';
     document.getElementById('formCard')?.scrollIntoView({ behavior:'smooth', block:'start' });
     document.getElementById('zonaPerigo').style.display = 'block';
+
+    // ── Oculta "Limpar campos" no modo edição: no modo cadastro ele só
+    // limpa o formulário em branco, mas em edição apagaria dados que não
+    // podem ser perdidos (o registro só é recarregado se a página for
+    // recarregada, então evitamos esse risco escondendo o botão) ──
+    const btnLimpar = document.getElementById('btnLimpar');
+    if(btnLimpar) btnLimpar.style.display = 'none';
 
     // ── Documentos já anexados a este funcionário ──
     if(window.initDocsFuncionario) window.initDocsFuncionario(f.funcId);
@@ -2185,11 +2283,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         if(alvo){
           iniciarEdicao(alvo, true);
         } else {
-          const msg = document.getElementById('msgForm');
-          if(msg){
-            msg.textContent = '⚠️ Funcionário não encontrado ou sem permissão de acesso.';
-            msg.style.display = '';
-          }
+          _toastErro('⚠️ Funcionário não encontrado ou sem permissão de acesso.');
         }
       }
     } finally {
