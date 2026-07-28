@@ -225,7 +225,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
       <p class="muted">
         Remove um único aluno: os dados pessoais (<b>anoAtivoAlunos</b>) e <b>todas</b> as
         matrículas dele (<b>anoAtivoMatriculas</b>, de qualquer ano — não só o ano ativo),
-        além dos documentos anexados. Útil pra limpar dados de teste sem afetar o resto.
+        além dos documentos anexados e do avatar (foto), se houver. Útil pra limpar dados de teste sem afetar o resto.
         <b>Ação irreversível — não há como desfazer.</b>
       </p>
       <div class="row-btns">
@@ -239,6 +239,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
         <div id="previewAlunoInfo"></div>
         <div id="previewAlunoMats" style="margin-top:8px;"></div>
         <div id="previewAlunoDocs" style="margin-top:8px;"></div>
+        <div id="previewAlunoFoto" style="margin-top:8px;"></div>
         <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:700;cursor:pointer;">
           <input type="checkbox" id="chkApagarCatalogo" style="width:auto;margin:0;">
           <span id="chkApagarCatalogoTxt">Também remover do catálogo/atas (coleção <code>alunos</code>)</span>
@@ -911,6 +912,13 @@ async function buscarAlunoExcluir() {
       docsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum documento anexado encontrado.</div>`;
     }
 
+    const fotoEl = document.getElementById('previewAlunoFoto');
+    if (aluno.fotoFileId) {
+      fotoEl.innerHTML = `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Avatar (foto) do aluno — ${esc(aluno.fotoFileId)}</div>`;
+    } else {
+      fotoEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum avatar cadastrado pra esse aluno.</div>`;
+    }
+
     const chk = document.getElementById('chkApagarCatalogo');
     const chkTxt = document.getElementById('chkApagarCatalogoTxt');
     chk.checked = false;
@@ -981,6 +989,20 @@ async function executarExclusaoAluno() {
         logEl(`  ✅ Documento "${f.label || f.fileName}" apagado.`, 'logExcluirAluno');
       } catch (e) {
         logEl(`  ⚠️ Falha ao apagar documento "${f.label || f.fileName}": ${e.message}`, 'logExcluirAluno');
+      }
+    }
+
+    if (aluno.fotoFileId) {
+      try {
+        const r = await fetch('/api/drive-delete', {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileId: aluno.fotoFileId, resourceType: 'image' }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'erro desconhecido');
+        logEl(`  ✅ Avatar apagado (${aluno.fotoFileId}).`, 'logExcluirAluno');
+      } catch (e) {
+        logEl(`  ⚠️ Falha ao apagar avatar: ${e.message}`, 'logExcluirAluno');
       }
     }
 
