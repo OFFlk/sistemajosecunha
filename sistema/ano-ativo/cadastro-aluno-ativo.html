@@ -1954,7 +1954,10 @@ function normSerie(s){
       // inteiro aqui, o snapshot antigo (capturado quando a página abriu) sempre
       // sobrescreveria a foto nova por cima — foi exatamente o bug relatado.
       const { fotoUrl, fotoFileId, ...alunoOriginalSemFoto } = alunoOriginal;
-      await window.DB.anoAtivoAlunos.save({ _id: alunoId, alunoId, ...alunoOriginalSemFoto, ...dadosComp });
+      const objParaSalvar = { _id: alunoId, alunoId, ...alunoOriginalSemFoto, ...dadosComp };
+      console.log('[DEBUG-FOTO] objeto que _atualizarAluno vai salvar (tem fotoUrl/fotoFileId?):', objParaSalvar);
+      console.log('[DEBUG-FOTO] alunoOriginal (snapshot capturado ao abrir a página) tinha fotoUrl:', alunoOriginal.fotoUrl);
+      await window.DB.anoAtivoAlunos.save(objParaSalvar);
 
       if(window.initDocs)        window.initDocs(alunoId);
       if(window.uploadDocsQueue) await window.uploadDocsQueue();
