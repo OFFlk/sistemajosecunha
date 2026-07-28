@@ -651,7 +651,7 @@ function enrichAluno(item){
   const m = mats.find(x=>String(x?.alunoId||'')===alvoId) || mats.find(x=>nrm(x?.nomeRaw||x?.nome||'')===alvoNome) || {};
   const pick=(...vals)=>{ for(const v of vals){ if(v!=null && String(v).trim()!=='') return String(v).trim(); } return ''; };
   const sexoRaw=pick(a.sexo,m.sexo).toUpperCase();
-  return { id:pick(a.id,alvoId), nome:pick(a.nomeOficial,a.nome,m.nomeRaw,item.nome), cpf:pick(a.cpf,a.CPF,m.cpf), rgCn:pick(a.rgCn,a.rg,m.rgCn,m.rg), nis:pick(a.nis,m.nis), dataNascimento:pick(a.dataNascimento,a.nascimento,a.dtNascimento,m.dataNascimento), naturalidade:pick(a.naturalidade,m.naturalidade), ufNascimento:pick(a.ufNascimento,a.uf,m.ufNascimento), mae:pick(a.nomeMae,a.mae,m.mae), pai:pick(a.nomePai,a.pai,m.pai), sexo:sexoRaw.startsWith('F')?'F':(sexoRaw.startsWith('M')?'M':'') };
+  return { id:pick(a.id,alvoId), nome:pick(a.nomeOficial,a.nome,m.nomeRaw,item.nome), cpf:pick(a.cpf,a.CPF,m.cpf), rgCn:pick(a.rgCn,a.rg,m.rgCn,m.rg), nis:pick(a.nis,m.nis), dataNascimento:pick(a.dataNascimento,a.nascimento,a.dtNascimento,m.dataNascimento), naturalidade:pick(a.naturalidadeCidade,a.naturalidade,m.naturalidade), ufNascimento:pick(a.naturalidadeUF,a.ufNascimento,a.uf,m.ufNascimento), mae:pick(a.nomeMae,a.mae,m.mae), pai:pick(a.nomePai,a.pai,m.pai), sexo:sexoRaw.startsWith('F')?'F':(sexoRaw.startsWith('M')?'M':'') };
 }
 /* =========================
    Salvar dados pessoais no Identidade (localStorage + Firestore)
