@@ -271,6 +271,29 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       <div id="msgForm" class="warn" style="display:none;"></div>
       <div id="msgOk" class="ok-msg" style="display:none;"></div>
 
+      <!-- Foto do funcionário -->
+      <div id="fotoFuncionarioBox" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:14px;
+        border:1.5px dashed var(--border,#ddd6fe);border-radius:14px;background:var(--card);">
+        <div id="fotoFuncionarioPreviewWrap" style="width:88px;height:88px;border-radius:50%;overflow:hidden;
+          background:var(--chip-bg,#f3f0ff);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          border:2px solid var(--border,#ddd6fe);">
+          <img id="fotoFuncionarioPreview" src="" alt="Foto do funcionário" style="display:none;width:100%;height:100%;object-fit:cover;">
+          <span id="fotoFuncionarioPlaceholder" style="font-size:30px;">🧑</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Foto do funcionário (opcional)</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+            Aparece na ficha individual (PDF) e na visualização na pesquisa. Comprimida automaticamente antes de enviar.
+          </div>
+          <input type="file" id="inpFotoFuncionario" accept="image/*" style="display:none;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn small" id="btnEscolherFotoFuncionario" onclick="document.getElementById('inpFotoFuncionario').click()">📷 Escolher foto</button>
+            <button type="button" class="btn small" id="btnRemoverFotoFuncionario" style="display:none;">🗑️ Remover</button>
+          </div>
+          <div id="fotoFuncionarioStatus" style="font-size:12px;margin-top:6px;"></div>
+        </div>
+      </div>
+
       <div class="form-grid">
         <div class="field">
           <label for="cpf">CPF <span class="req">*</span></label>
@@ -1004,6 +1027,24 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     }
   }
 
+  /* ════════════════════════════════════════
+     Ponte pro widget de foto (foto-funcionario-js, script/IIFE separada)
+     Como os funcionários vivem todos num único array (funcionariosDB, no
+     doc da escola — não um doc por funcionário como no aluno), não dá pra
+     fazer um "save parcial" só do fotoUrl. A foto muda o registro em
+     memória aqui e persiste o array inteiro, na hora — pra qualquer save
+     seguinte do formulário principal já pegar o valor certo (ver comentário
+     no handler do btnSalvar, onde isso é lido de volta).
+  ════════════════════════════════════════ */
+  window._getFuncionarioAtual = function(funcId){
+    return funcionarios.find(f => f.funcId === funcId) || null;
+  };
+  window._setFotoFuncionario = async function(funcId, fotoUrl, fotoFileId){
+    const idx = funcionarios.findIndex(f => f.funcId === funcId);
+    if(idx >= 0) funcionarios[idx] = { ...funcionarios[idx], fotoUrl, fotoFileId };
+    await salvarDB();
+  };
+
   async function salvarFuncoesExtras(){
     try{
       if(window.DB && window.DB.escola && window.DB.escola.save){
@@ -1702,6 +1743,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
     _editandoId = null;
     _editandoViaURL = false;
+
+    if(window.limparFotoFuncionario) window.limparFotoFuncionario();
   }
 
   document.getElementById('btnLimpar').addEventListener('click', limparFormulario);
@@ -1809,6 +1852,16 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
     const funcId = _editandoId || gerarFuncId();
 
+    // fotoUrl/fotoFileId ficam de fora dos campos do formulário — quem
+    // controla esses dois é o widget de foto (foto-funcionario-js), que já
+    // atualiza o array em memória e salva na hora em que a foto é
+    // trocada/removida. Como "obj" abaixo SUBSTITUI o registro inteiro
+    // (funcionarios[idx] = obj, não é merge), buscamos o valor mais recente
+    // aqui pra não sobrescrever de volta com "undefined" — esse foi
+    // exatamente o bug relatado no módulo de aluno, adaptado aqui pro fato
+    // de que aqui a troca de campo é um replace completo do objeto.
+    const _atual = _editandoId ? funcionarios.find(f => f.funcId === funcId) : null;
+
     // Verifica duplicata de CPF no mesmo ano
     if(!_editandoId){
       const jaExiste = funcionarios.some(f => stripNum(f.cpf||'')===cpf && String(f.anoLetivo||f.ano)===String(anoAtivo));
@@ -1866,6 +1919,9 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       posGraduacoes: WIZ.posGraduacoes,
       complementacoes: WIZ.complementacoes,
       outrosCursos: WIZ.outrosCursos,
+      // Preservados do registro atual — ver comentário acima de _atual.
+      fotoUrl:    _atual?.fotoUrl    ?? null,
+      fotoFileId: _atual?.fotoFileId ?? null,
     };
 
     const btnSalvar = document.getElementById('btnSalvar');
@@ -1877,10 +1933,20 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         if(idx>=0) funcionarios[idx] = obj;
       } else {
         funcionarios.push(obj);
+        // Trava o ID assim que o cadastro novo é confirmado: sem isso, um
+        // segundo clique em "Salvar" (ex.: o usuário ajusta algo e salva de
+        // novo, sem passar por "Novo funcionário") geraria outro funcId e
+        // duplicaria o registro — e qualquer troca de foto nesse meio tempo
+        // ficaria "pendente" de novo em vez de ir direto pro registro certo.
+        _editandoId = funcId;
       }
       await salvarDB();
       if(typeof window._natCacheInvalidate === 'function') window._natCacheInvalidate();
       atualizarPill();
+
+      // Envia a foto que ficou esperando o funcId ser confirmado (cadastro
+      // novo) — não faz nada se não houver foto pendente.
+      if(window.enviarFotoPendenteFuncionario) await window.enviarFotoPendenteFuncionario(funcId);
 
       // Envia a fila de documentos pendentes (upload junto ao salvar)
       if(window.initDocsFuncionario)        window.initDocsFuncionario(funcId);
@@ -1930,6 +1996,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     limparFormulario();
     _editandoId = f.funcId;
     _editandoViaURL = !!viaURL;
+
+    if(window.initFotoFuncionario) window.initFotoFuncionario(f.funcId, f.fotoUrl || '', f.fotoFileId || '');
 
     // Ano letivo do registro — preserva o ano original, não sobrescreve com o ano ativo
     const anoDoRegistro = parseInt(f.anoLetivo, 10);
@@ -2136,6 +2204,165 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     }
   })();
 
+})();
+</script>
+
+<!-- ══ Foto do funcionário — upload/preview/remoção via /api/avatar-upload ══
+     Script isolado (própria IIFE), igual ao padrão do aluno. Como os dados
+     de funcionário vivem todos num único array (funcionariosDB, dentro do
+     doc da escola — não um doc por funcionário como no aluno), a mutação do
+     array em memória + a persistência ficam concentradas nas funções
+     window._setFotoFuncionario / window._getFuncionarioAtual, expostas pelo
+     script principal (mesmo arquivo, IIFE separada) logo abaixo. -->
+<script id="foto-funcionario-js">
+(function(){
+  const inpFoto      = document.getElementById('inpFotoFuncionario');
+  const previewImg    = document.getElementById('fotoFuncionarioPreview');
+  const placeholder   = document.getElementById('fotoFuncionarioPlaceholder');
+  const btnRemover    = document.getElementById('btnRemoverFotoFuncionario');
+  const statusEl      = document.getElementById('fotoFuncionarioStatus');
+  if(!inpFoto) return;
+
+  let _fotoPendente = null;    // { base64, mimeType } — cadastro novo, aguardando funcId confirmado
+  let _fotoFuncId   = null;    // conhecido de cara em modo edição
+  let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
+
+  function _setStatus(txt, cor){
+    statusEl.textContent = txt || '';
+    statusEl.style.color = cor || 'var(--muted)';
+  }
+
+  // Chamado no modo edição, com a foto já existente (se houver)
+  window.initFotoFuncionario = function(funcId, fotoUrlExistente, fotoFileIdExistente){
+    _fotoFuncId = funcId ? String(funcId) : null;
+    _fotoFileIdAtual = fotoFileIdExistente || null;
+    if(fotoUrlExistente){
+      previewImg.src = fotoUrlExistente;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+    }
+  };
+
+  // Redimensiona no canvas (máx. 480px no maior lado) e reexporta em JPEG
+  // qualidade 0.75 — mesmo padrão do aluno.
+  function _comprimir(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = e => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const MAX = 480;
+          let { width, height } = img;
+          if(width > height && width > MAX){ height = Math.round(height * MAX / width); width = MAX; }
+          else if(height >= width && height > MAX){ width = Math.round(width * MAX / height); height = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', preview: dataUrl });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function _enviarFoto(funcId, base64, mimeType){
+    _setStatus('Enviando foto...');
+    try{
+      const resp = await fetch('/api/avatar-upload', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tipo: 'funcionario', entidadeId: funcId, fileBase64: base64, mimeType }),
+      });
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
+      if(!data.fotoUrl) throw new Error('upload OK mas sem fotoUrl na resposta — veja o console');
+      // Atualiza o registro em memória + persiste o array inteiro (é assim
+      // que este módulo salva — ver comentário no topo do bloco).
+      if(window._setFotoFuncionario) await window._setFotoFuncionario(funcId, data.fotoUrl, data.fotoFileId);
+      _fotoFileIdAtual = data.fotoFileId;
+      _setStatus('✅ Foto salva.', '#166534');
+    }catch(e){
+      console.error('[foto-funcionario] falha ao enviar/salvar foto:', e);
+      _setStatus('❌ Falha ao enviar foto: ' + e.message, '#b91c1c');
+    }
+  }
+
+  inpFoto.addEventListener('change', async () => {
+    const file = inpFoto.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){
+      _setStatus('⚠️ Selecione um arquivo de imagem.', '#b91c1c');
+      return;
+    }
+    _setStatus('Comprimindo...');
+    try{
+      const { base64, mimeType, preview } = await _comprimir(file);
+      previewImg.src = preview;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+
+      if(_fotoFuncId){
+        await _enviarFoto(_fotoFuncId, base64, mimeType);
+      } else {
+        _fotoPendente = { base64, mimeType };
+        _setStatus('Foto pronta — será enviada ao salvar o funcionário.', '#166534');
+      }
+    }catch(e){
+      _setStatus('❌ Falha ao processar a foto: ' + e.message, '#b91c1c');
+    }
+  });
+
+  btnRemover.addEventListener('click', async () => {
+    const fileIdAntigo = _fotoFileIdAtual;
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    inpFoto.value = '';
+    _fotoPendente = null;
+    _fotoFileIdAtual = null;
+    _setStatus('');
+    if(_fotoFuncId && window._setFotoFuncionario){
+      try{ await window._setFotoFuncionario(_fotoFuncId, null, null); }
+      catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
+    }
+    if(fileIdAntigo){
+      try{
+        await fetch('/api/drive-delete-funcionario', {
+          method: 'DELETE', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+        });
+      }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+    }
+  });
+
+  // Reseta o widget de foto pro estado vazio — chamado por limparFormulario()
+  window.limparFotoFuncionario = function(){
+    _fotoPendente = null;
+    _fotoFuncId   = null;
+    _fotoFileIdAtual = null;
+    inpFoto.value = '';
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    _setStatus('');
+  };
+
+  // Chamado logo depois que o funcId de um cadastro NOVO é confirmado —
+  // envia a foto que ficou esperando.
+  window.enviarFotoPendenteFuncionario = async function(funcId){
+    if(!_fotoPendente) return;
+    _fotoFuncId = String(funcId);
+    const { base64, mimeType } = _fotoPendente;
+    _fotoPendente = null;
+    await _enviarFoto(funcId, base64, mimeType);
+  };
 })();
 </script>
 
