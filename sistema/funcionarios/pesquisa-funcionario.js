@@ -154,15 +154,7 @@
         if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
         document.addEventListener('auth:ready', res, {once:true});
       });
-      const dados = await window.DB.loadAll();
-      // Tenta coleção dedicada primeiro; fallback para campo dentro do documento da escola
-      if(Array.isArray(dados.funcionariosDB) && dados.funcionariosDB.length){
-        funcionarios = dados.funcionariosDB;
-      } else if(Array.isArray(dados.dadosEscola?.funcionariosDB)){
-        funcionarios = dados.dadosEscola.funcionariosDB;
-      } else {
-        funcionarios = [];
-      }
+      funcionarios = await window.DB.funcionarios.list();
     }catch(e){
       console.warn('carregarDB pesquisa funcionarios:', e);
       funcionarios = [];

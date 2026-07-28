@@ -994,14 +994,9 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   async function carregarDB(){
     console.log('[DEBUG] carregarDB iniciou');
     try{
-      console.log('[DEBUG] auth ok, chamando DB.escola.get()');
+      funcionarios = await window.DB.funcionarios.list();
+      console.log('[DEBUG] funcionarios carregados da coleção dedicada:', funcionarios.length);
       const dadosEscola = await window.DB.escola.get();
-      console.log('[DEBUG] dadosEscola recebido, funcionariosDB length:', dadosEscola?.funcionariosDB?.length);
-      if(Array.isArray(dadosEscola?.funcionariosDB) && dadosEscola.funcionariosDB.length){
-        funcionarios = dadosEscola.funcionariosDB;
-      } else {
-        funcionarios = [];
-      }
       if(Array.isArray(dadosEscola?.funcoesCadastradas)){
         _funcoesExtras = dadosEscola.funcoesCadastradas;
       }
@@ -1014,27 +1009,20 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     atualizarPill();
   }
 
-  async function salvarDB(){
-    try{
-      if(window.DB && window.DB.escola && window.DB.escola.save){
-        await window.DB.escola.save({ funcionariosDB: funcionarios });
-      } else if(window.DB && window.DB.funcionarios && window.DB.funcionarios.saveAll){
-        await window.DB.funcionarios.saveAll(funcionarios);
-      }
-    } catch(e){
-      console.error('salvarDB funcionarios:', e);
-      throw e;
-    }
+  // Salva UM funcionário — merge parcial no doc dele (coleção `funcionarios`),
+  // não mexe em mais nada. Substitui o antigo salvarDB(), que reescrevia o
+  // array funcionariosDB inteiro a cada mudança (era a raiz do bug de foto:
+  // qualquer save de qualquer funcionário podia clobar o que outra aba/save
+  // tivesse acabado de gravar).
+  async function salvarFuncionarioDoc(obj){
+    await window.DB.funcionarios.save({ _id: obj.funcId, ...obj });
   }
 
   /* ════════════════════════════════════════
      Ponte pro widget de foto (foto-funcionario-js, script/IIFE separada)
-     Como os funcionários vivem todos num único array (funcionariosDB, no
-     doc da escola — não um doc por funcionário como no aluno), não dá pra
-     fazer um "save parcial" só do fotoUrl. A foto muda o registro em
-     memória aqui e persiste o array inteiro, na hora — pra qualquer save
-     seguinte do formulário principal já pegar o valor certo (ver comentário
-     no handler do btnSalvar, onde isso é lido de volta).
+     Agora é um merge parcial de verdade — só fotoUrl/fotoFileId, sem tocar
+     em mais nada nem no doc de mais ninguém (era o problema do modelo
+     antigo com o array único).
   ════════════════════════════════════════ */
   window._getFuncionarioAtual = function(funcId){
     return funcionarios.find(f => f.funcId === funcId) || null;
@@ -1042,7 +1030,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   window._setFotoFuncionario = async function(funcId, fotoUrl, fotoFileId){
     const idx = funcionarios.findIndex(f => f.funcId === funcId);
     if(idx >= 0) funcionarios[idx] = { ...funcionarios[idx], fotoUrl, fotoFileId };
-    await salvarDB();
+    await window.DB.funcionarios.save({ _id: funcId, fotoUrl, fotoFileId });
   };
 
   async function salvarFuncoesExtras(){
@@ -1785,13 +1773,26 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         alert('Aviso: não foi possível confirmar a exclusão dos documentos no Cloudinary (' + errCloud.message + '). O cadastro será removido mesmo assim — verifique a pasta manualmente se necessário.');
       }
 
-      // 2) Remove do array local e salva no DB
+      // 2) Apaga a foto de perfil no Cloudinary, se houver (pasta separada
+      //    dos documentos — avatares/funcionarios/{funcId} — por isso
+      //    precisa de uma chamada à parte da exclusão de pasta acima)
+      const _alvoAtual = funcionarios.find(f => f.funcId === funcId);
+      if(_alvoAtual?.fotoFileId){
+        try{
+          await fetch('/api/drive-delete-funcionario', {
+            method: 'DELETE', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ fileId: _alvoAtual.fotoFileId, resourceType: 'image' }),
+          });
+        }catch(errFoto){ console.warn('Falha ao apagar foto de perfil no Cloudinary:', errFoto.message); }
+      }
+
+      // 3) Remove o doc do funcionário (coleção dedicada, um por funcionário)
       const idx = funcionarios.findIndex(f => f.funcId === funcId);
       if(idx === -1) throw new Error('Funcionário não encontrado na lista local.');
       funcionarios.splice(idx, 1);
-      await salvarDB();
+      await window.DB.funcionarios.remove(funcId);
 
-      // 3) Feedback e redireciona pra pesquisa
+      // 4) Feedback e redireciona pra pesquisa
       statusEl.className = '';
       statusEl.style.cssText = 'display:block;font-size:12px;font-weight:700;margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(22,163,74,.10);color:#166534;border:1px solid rgba(22,163,74,.30);';
       statusEl.textContent = '✅ Funcionário excluído. Redirecionando...';
@@ -1852,16 +1853,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
     const funcId = _editandoId || gerarFuncId();
 
-    // fotoUrl/fotoFileId ficam de fora dos campos do formulário — quem
-    // controla esses dois é o widget de foto (foto-funcionario-js), que já
-    // atualiza o array em memória e salva na hora em que a foto é
-    // trocada/removida. Como "obj" abaixo SUBSTITUI o registro inteiro
-    // (funcionarios[idx] = obj, não é merge), buscamos o valor mais recente
-    // aqui pra não sobrescrever de volta com "undefined" — esse foi
-    // exatamente o bug relatado no módulo de aluno, adaptado aqui pro fato
-    // de que aqui a troca de campo é um replace completo do objeto.
-    const _atual = _editandoId ? funcionarios.find(f => f.funcId === funcId) : null;
-
     // Verifica duplicata de CPF no mesmo ano
     if(!_editandoId){
       const jaExiste = funcionarios.some(f => stripNum(f.cpf||'')===cpf && String(f.anoLetivo||f.ano)===String(anoAtivo));
@@ -1919,28 +1910,31 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       posGraduacoes: WIZ.posGraduacoes,
       complementacoes: WIZ.complementacoes,
       outrosCursos: WIZ.outrosCursos,
-      // Preservados do registro atual — ver comentário acima de _atual.
-      fotoUrl:    _atual?.fotoUrl    ?? null,
-      fotoFileId: _atual?.fotoFileId ?? null,
     };
 
     const btnSalvar = document.getElementById('btnSalvar');
     btnSalvar.disabled = true; btnSalvar.textContent = '⏳ Salvando…';
 
     try{
-      if(_editandoId){
+      const isNovo = !_editandoId;
+      if(!isNovo){
         const idx = funcionarios.findIndex(f=>f.funcId===funcId);
-        if(idx>=0) funcionarios[idx] = obj;
+        // Merge local (não replace): preserva fotoUrl/fotoFileId e qualquer
+        // outro campo que o widget de foto (ou algo futuro) já tenha
+        // atualizado neste registro, mesmo que "obj" não os inclua.
+        if(idx>=0) funcionarios[idx] = { ...funcionarios[idx], ...obj };
+        else funcionarios.push(obj);
       } else {
         funcionarios.push(obj);
-        // Trava o ID assim que o cadastro novo é confirmado: sem isso, um
-        // segundo clique em "Salvar" (ex.: o usuário ajusta algo e salva de
-        // novo, sem passar por "Novo funcionário") geraria outro funcId e
-        // duplicaria o registro — e qualquer troca de foto nesse meio tempo
-        // ficaria "pendente" de novo em vez de ir direto pro registro certo.
+      }
+      await salvarFuncionarioDoc(obj);
+      if(isNovo){
+        // Trava o ID só depois do save confirmar: sem isso, um segundo
+        // clique em "Salvar" (ex.: o usuário ajusta algo e salva de novo,
+        // sem passar por "Novo funcionário") geraria outro funcId e
+        // duplicaria o registro.
         _editandoId = funcId;
       }
-      await salvarDB();
       if(typeof window._natCacheInvalidate === 'function') window._natCacheInvalidate();
       atualizarPill();
 
@@ -2090,9 +2084,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     if(_cidadeCache) return _cidadeCache;
     try{
       let docs = [];
-      if(window.DB && typeof window.DB.escola?.get === 'function'){
-        const d = await window.DB.escola.get();
-        docs = Array.isArray(d?.funcionariosDB) ? d.funcionariosDB : [];
+      if(window.DB && typeof window.DB.funcionarios?.list === 'function'){
+        docs = await window.DB.funcionarios.list();
       }
       const map = new Map();
       docs.forEach(d => {
@@ -2208,12 +2201,10 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 </script>
 
 <!-- ══ Foto do funcionário — upload/preview/remoção via /api/avatar-upload ══
-     Script isolado (própria IIFE), igual ao padrão do aluno. Como os dados
-     de funcionário vivem todos num único array (funcionariosDB, dentro do
-     doc da escola — não um doc por funcionário como no aluno), a mutação do
-     array em memória + a persistência ficam concentradas nas funções
-     window._setFotoFuncionario / window._getFuncionarioAtual, expostas pelo
-     script principal (mesmo arquivo, IIFE separada) logo abaixo. -->
+     Script isolado (própria IIFE), igual ao padrão do aluno. Cada
+     funcionário tem seu próprio doc na coleção `funcionarios` (mesmo
+     padrão do aluno) — window._setFotoFuncionario faz um merge parcial
+     (só fotoUrl/fotoFileId) direto no doc, sem tocar em mais nada. -->
 <script id="foto-funcionario-js">
 (function(){
   const inpFoto      = document.getElementById('inpFotoFuncionario');
