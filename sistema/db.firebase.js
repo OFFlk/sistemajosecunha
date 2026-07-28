@@ -80,6 +80,9 @@
         cacheClear(colName);
         const { _id, ...data } = obj;
         data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+        if (colName === 'anoAtivoAlunos') {
+          console.log('[DEBUG-FOTO] DB.anoAtivoAlunos.save() vai gravar (merge:true) _id=', _id, 'data=', data);
+        }
         if (_id) {
           await col(colName).doc(_id).set(data, { merge: true });
           return { _id, ...data };
