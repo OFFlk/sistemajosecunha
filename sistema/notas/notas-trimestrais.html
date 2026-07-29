@@ -400,6 +400,18 @@ function parseNota(v) {
   const n = parseFloat(v);
   return isNaN(n) ? null : n;
 }
+// Normaliza uma nota objetiva: aceita "," ou ".", limita entre 0,0 e 10,0
+// e sempre devolve já formatada com vírgula (ex: "7" → "7,0").
+// Retorna "" se vazio, ou null se o texto digitado não é um número válido.
+function normalizarNotaObjetiva(raw) {
+  const v = normStr(raw);
+  if (v === "") return "";
+  let n = parseFloat(v.replace(",", "."));
+  if (isNaN(n)) return null;
+  if (n < 0) n = 0;
+  if (n > 10) n = 10;
+  return n.toFixed(1).replace(".", ",");
+}
 function formatarNotaExibicao(n) {
   if (n === null || n === undefined || n === "") return "";
   return String(n).replace(".", ",");
@@ -424,14 +436,29 @@ function renderFormularioDinamico() {
       <div class="campo" style="min-width:150px;">
         <label>${m.label}</label>
         <div style="display:flex;gap:4px;">
-          <input id="n1_${m.key}" placeholder="1º" style="text-align:center;">
-          <input id="n2_${m.key}" placeholder="2º" style="text-align:center;">
-          <input id="n3_${m.key}" placeholder="3º" style="text-align:center;">
+          <input id="n1_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+          <input id="n2_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+          <input id="n3_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
         </div>
       </div>
     `;
   }
   grid.innerHTML = html;
+}
+
+// Roda quando o professor sai do campo de nota: valida (0,0 a 10,0) e já
+// deixa formatado com vírgula. Se digitou algo inválido, avisa e limpa.
+function aplicarMascaraNota(el) {
+  const bruto = el.value;
+  if (normStr(bruto) === "") return;
+  const normalizado = normalizarNotaObjetiva(bruto);
+  if (normalizado === null) {
+    alert(`Nota inválida: "${bruto}". Digite um número de 0,0 a 10,0.`);
+    el.value = "";
+    el.focus();
+    return;
+  }
+  el.value = normalizado;
 }
 
 function limparCamposAluno() {
@@ -452,10 +479,19 @@ function adicionarAluno() {
   const materias = getMateriasAtivas();
   const notas = {};
   for (const m of materias) {
-    const n1 = $(`n1_${m.key}`)?.value || "";
-    const n2 = $(`n2_${m.key}`)?.value || "";
-    const n3 = $(`n3_${m.key}`)?.value || "";
-    notas[m.key] = { n1, n2, n3 };
+    const camposDaMateria = { n1: "1º", n2: "2º", n3: "3º" };
+    for (const [chave, rotuloTri] of Object.entries(camposDaMateria)) {
+      const el = $(`${chave}_${m.key}`);
+      const bruto = el ? el.value : "";
+      const normalizado = normalizarNotaObjetiva(bruto);
+      if (normalizado === null) {
+        alert(`Nota inválida em "${m.label}" (${rotuloTri} trimestre): "${bruto}". Digite um número de 0,0 a 10,0.`);
+        el.focus();
+        return;
+      }
+      if (el) el.value = normalizado; // já deixa o campo com a vírgula certa na tela
+      (notas[m.key] ||= {})[chave] = normalizado;
+    }
   }
 
   const aluno = { nome: nomeEl.value.trim(), notas };

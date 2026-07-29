@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Firebase / Auth / DB -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+<!-- Sem loading-overlay.js de propósito: nesta página ele travava carregando pra sempre. -->
+
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pesquisa.css">
+
+<style>
+:root {
+  --card-bg:             #ffffff;
+  --card-border:         var(--brand-border, #ddd6fe);
+  --field-bg:            #ffffff;
+  --field-border:        var(--brand-border, #ddd6fe);
+  --shadow:              0 4px 20px rgba(0,0,0,0.06);
+  --danger:              #b91c1c;
+  --chip-neutral-bg:     #f3f4f6;
+  --chip-neutral-border: #d1d5db;
+  --chip-neutral-color:  #4b5563;
+}
+html[data-theme="dark"] {
+  --card-bg:             #131c2e;
+  --card-border:         #2a3a5c;
+  --field-bg:            #0a1426;
+  --field-border:        #1e2540;
+  --shadow:              0 4px 24px rgba(0,0,0,0.4);
+  --chip-neutral-bg:     rgba(148,163,184,0.15);
+  --chip-neutral-border: rgba(148,163,184,0.3);
+  --chip-neutral-color:  #cbd5e1;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 10px; padding: 8px 14px;
+  font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 13px;
+  border: 1.5px solid transparent; cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s, opacity 0.18s;
+  white-space: nowrap;
+}
+.btn:active { opacity: 0.85; }
+.btn:not(.primary):not(.ghost):not(.secondary):not(.danger) {
+  background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color);
+}
+.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):hover {
+  background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text);
+}
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger) {
+  background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #cbd5e1;
+}
+html[data-theme="dark"] .btn.primary { background: var(--brand-d); border-color: var(--brand-d); color: #fff; }
+.btn.ghost       { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
+.btn.ghost:hover { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
+.btn.secondary       { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
+.btn.secondary:hover { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
+.btn.danger          { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
+.btn.danger:hover    { background: rgba(185,28,28,0.18); border-color: rgba(185,28,28,0.55); }
+.btn.small { padding: 6px 11px; font-size: 12px; }
+
+#sidebarTitulo { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+#sidebarTitulo:hover { opacity: 0.75; }
+#sortIndicator { font-size: 11px; opacity: 0.6; }
+
+.layout-expandido #card-esquerda .list-item .item-meta { display: none !important; }
+
+#container.split.layout-normal { align-items: stretch; }
+#container.split.layout-normal #card-esquerda,
+#container.split.layout-normal #card-direita { align-self: stretch; }
+
+#card-esquerda .list-item:not(.selected):hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  cursor: pointer;
+}
+
+.aluno-search-checkbox {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--muted); cursor: pointer; user-select: none;
+}
+.aluno-search-checkbox input { cursor: pointer; accent-color: var(--brand); }
+
+/* Tabela de notas trimestrais: cabeçalho de matéria com 4 sub-colunas */
+.table-scroll table.notas-table{ width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
+.notas-table th, .notas-table td{ padding:6px 5px; border-bottom:1px solid var(--line); text-align:center; white-space:nowrap; }
+.notas-table th.th-nome, .notas-table td.col-nome{ text-align:left; padding-left:8px; min-width:140px; position:sticky; left:0; background:var(--card-bg); z-index:1; }
+.notas-table th.th-materia{ background:var(--brand-faded,#f5f3ff); font-weight:800; color:var(--brand-text,#6d28d9); }
+html[data-theme="dark"] .notas-table th.th-materia{ background:rgba(124,58,237,0.15); }
+.notas-table th.th-sub{ font-size:10px; font-weight:700; color:var(--muted); width:42px; }
+.notas-table td.col-media{ font-weight:800; color:var(--brand,#7c3aed); width:46px; }
+.notas-table td.col-nota input{ width:42px; padding:4px; font-size:12px; text-align:center; border:1px solid var(--field-border); border-radius:6px; background:var(--field-bg); color:var(--ink); }
+
+.ordem-lista{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+.ordem-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--field-bg); font-size:13px; }
+.ordem-item.desativado{ opacity:0.45; }
+.ordem-item .ordem-num{ font-weight:800; color:var(--brand,#7c3aed); width:22px; text-align:center; flex-shrink:0; }
+.ordem-item .ordem-label{ flex:1; }
+.ordem-item .ordem-btns{ display:flex; gap:4px; }
+.status-msg{ font-size:13px; margin-top:8px; min-height:18px; }
+.status-msg.ok{ color:#16a34a; }
+.status-msg.err{ color:#dc2626; }
+.hidden{ display:none !important; }
+</style>
+
+<title>Pesquisa de Notas Trimestrais</title>
+</head>
+
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="wrap">
+
+  <!-- Filtros -->
+  <div class="card">
+    <p class="section-title">Filtros</p>
+    <div class="filters">
+      <div class="field">
+        <label>Ano letivo</label>
+        <select id="fAno"><option value="">Todos</option></select>
+      </div>
+      <div class="field">
+        <label>Série</label>
+        <input id="fSerie" type="text" placeholder="Ex: 5º ano">
+      </div>
+      <div class="field">
+        <label>Busca geral</label>
+        <input id="fBusca" type="text" placeholder="Procura por turma ou aluno...">
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
+      <span class="muted">Ou pesquise vazio para ver todos os registros.</span>
+    </div>
+    <div class="muted" style="margin-top:10px;">
+      Banco: <b id="dbInfo">carregando...</b>
+    </div>
+  </div>
+
+  <!-- Pesquisa por aluno -->
+  <div class="card">
+    <p class="section-title">Pesquisa por aluno</p>
+    <div class="aluno-search-row">
+      <div class="field">
+        <label>Nome do aluno</label>
+        <input id="alunoQuery" type="text" placeholder="Ex: José da Silva">
+      </div>
+      <div class="aluno-search-actions">
+        <label class="aluno-search-checkbox">
+          <input type="checkbox" id="alunoParcial" checked>
+          Buscar por parte do nome
+        </label>
+        <button class="btn primary" type="button" onclick="pesquisarAluno()">Pesquisar</button>
+        <button class="btn secondary" type="button" onclick="limparPesquisaAluno()">Limpar</button>
+      </div>
+    </div>
+    <div id="alunoResultados"></div>
+  </div>
+
+  <!-- Split: registros + detalhes -->
+  <div id="container" class="split layout-normal">
+
+    <div id="card-esquerda" class="card">
+      <p class="section-title" id="sidebarTitulo" title="Clique para ordenar">TURMAS <span id="sortIndicator">↑</span></p>
+      <div id="listaRegistros" class="list">
+        <div class="list-item"><span class="muted">Nenhum registro carregado.</span></div>
+      </div>
+    </div>
+
+    <div id="card-direita" class="card">
+      <p class="section-title">Detalhes</p>
+
+      <div id="detalhesVazio" class="muted">Selecione uma turma na lista para ver os alunos.</div>
+
+      <div id="detalhesBox" style="display:none;">
+        <div class="muted" id="detalhesMeta"></div>
+
+        <div class="detalhe-actions">
+          <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
+          <button class="btn" id="btnEditarNotas" type="button" onclick="alternarPainelEdicao()">✏️ Editar notas</button>
+          <button class="btn secondary" type="button" onclick="copiarTodasLinhasPesquisa()">📋 Copiar tudo p/ Access</button>
+          <button class="btn secondary small" type="button" onclick="fecharRegistro()" style="margin-left:auto;">✕ Fechar</button>
+        </div>
+
+        <div class="table-scroll">
+          <table class="notas-table">
+            <thead>
+              <tr id="theadMateriasView"></tr>
+              <tr id="theadSubView"></tr>
+            </thead>
+            <tbody id="tAlunosView"></tbody>
+          </table>
+        </div>
+
+        <div class="summary" id="resumoTurma"></div>
+
+        <!-- Painel de edição -->
+        <div id="painelEdicao" class="hidden" style="margin-top:16px;border-top:1px dashed var(--line);padding-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <b>✏️ Editar notas</b>
+            <div style="display:flex;gap:8px;">
+              <button class="btn primary small" type="button" onclick="salvarEdicaoNotas()">💾 Salvar</button>
+              <button class="btn secondary small" type="button" onclick="alternarPainelEdicao()">✕ Fechar edição</button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="notas-table">
+              <thead>
+                <tr id="theadMateriasEdit"></tr>
+                <tr id="theadSubEdit"></tr>
+              </thead>
+              <tbody id="tAlunosEdit"></tbody>
+            </table>
+          </div>
+          <div class="status-msg" id="statusEdicao"></div>
+        </div>
+
+        <!-- Ordem de cópia p/ Access -->
+        <div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:14px;">
+          <b>🗂️ Ordem de cópia para o Access</b>
+          <div class="ordem-lista" id="ordemLista"></div>
+          <div class="status-msg" id="statusCopia"></div>
+        </div>
+
+      </div><!-- /detalhesBox -->
+    </div><!-- /card-direita -->
+
+  </div><!-- /split -->
+
+</div><!-- /wrap -->
+
+<script src="../header-logic.js"></script>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function normStr(v){ return String(v ?? "").trim(); }
+function norm(v) {
+  return String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/* =========================
+   Acesso à coleção notasTrimestrais (Firestore, definida em db.firebase.js)
+========================= */
+function getNotasCollection() {
+  if (!window.DB || !window.DB.notasTrimestrais) {
+    throw new Error("window.DB.notasTrimestrais não existe. Confirme se a linha foi adicionada em db.firebase.js.");
+  }
+  return window.DB.notasTrimestrais;
+}
+
+/* =========================
+   Schemas (matérias) — mesmo formato usado no cadastro
+========================= */
+const SCHEMAS_KEY = "turmasSchemas_v1";
+function getDefaultConfig() {
+  return {
+    id: "default", nome: "Padrão",
+    colunas: [
+      { key:"port",  label:"Português",  type:"nota", enabled:true },
+      { key:"mat",   label:"Matemática", type:"nota", enabled:true },
+      { key:"hist",  label:"História",   type:"nota", enabled:true },
+      { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
+      { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
+      { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
+      { key:"arte",  label:"Arte",       type:"nota", enabled:true },
+      { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
+    ]
+  };
+}
+let SCHEMAS_CACHE = [];
+function loadSchemas() {
+  try {
+    const raw = localStorage.getItem(SCHEMAS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) && arr.length ? arr : [getDefaultConfig()];
+  } catch { return [getDefaultConfig()]; }
+}
+function getSchemaById(id) {
+  return SCHEMAS_CACHE.find(s => s.id === id) || getDefaultConfig();
+}
+function getMateriasDoRegistro(reg) {
+  const schema = getSchemaById(reg?.schemaId);
+  return (schema.colunas || []).filter(c => c.enabled && c.type === "nota");
+}
+
+/* =========================
+   Notas / Média (mesma regra do cadastro: objetiva 0,0–10,0)
+========================= */
+function parseNota(v) {
+  v = normStr(v).replace(",", ".");
+  if (v === "") return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+function normalizarNotaObjetiva(raw) {
+  const v = normStr(raw);
+  if (v === "") return "";
+  let n = parseFloat(v.replace(",", "."));
+  if (isNaN(n)) return null;
+  if (n < 0) n = 0;
+  if (n > 10) n = 10;
+  return n.toFixed(1).replace(".", ",");
+}
+function calcularMedia(n1, n2, n3) {
+  const vals = [n1, n2, n3].map(parseNota).filter(v => v !== null);
+  if (!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0) / vals.length;
+}
+
+/* =========================
+   Estado
+========================= */
+let registros = [];       // todos os docs de notasTrimestrais
+let registroSelecionado = null;
+let alunosView = [];
+let _jaFoiPesquisado = false;
+let _ordemAsc = false;
+
+/* =========================
+   Filtros / listagem
+========================= */
+function preencherFiltroAno(lista) {
+  const sel = $("fAno");
+  const anos = Array.from(new Set(lista.map(r => String(r.ano || "").trim()).filter(Boolean)))
+    .sort((a,b)=>b.localeCompare(a,'pt-BR'));
+  const atual = sel.value;
+  sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
+  sel.value = anos.includes(atual) ? atual : "";
+}
+
+function ordenarRegistros(lista) {
+  return lista.slice().sort((a, b) => {
+    const anoA = String(a.ano || ''), anoB = String(b.ano || '');
+    const cmp = _ordemAsc ? anoA.localeCompare(anoB,'pt-BR') : anoB.localeCompare(anoA,'pt-BR');
+    if (cmp !== 0) return cmp;
+    return String(a.turmaNome||'').localeCompare(String(b.turmaNome||''), 'pt-BR');
+  });
+}
+
+function renderListaRegistros(lista) {
+  const box = $("listaRegistros");
+  box.innerHTML = "";
+  if (!lista.length) {
+    box.innerHTML = `<div class="list-item"><span class="muted">Nenhum registro encontrado com os filtros.</span></div>`;
+    return;
+  }
+  lista.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.dataset.id = r._id;
+    div.addEventListener("click", () => selecionarRegistro(r._id));
+
+    const anoTxt = r.ano ? String(r.ano) : "?";
+    const qtdAlunos = (r.alunos?.length ?? 0) + " aluno(s)";
+
+    div.innerHTML = `
+      <div class="left">
+        <div><b>${r.turmaNome || "Turma sem nome"}</b></div>
+        <div class="badges-row">
+          <span class="badge">${anoTxt}</span>
+          <span class="badge badge-serie">${r.serie || "?"}</span>
+        </div>
+        <div class="muted item-meta">${qtdAlunos}</div>
+      </div>
+      <div class="right" onclick="event.stopPropagation()">
+        <button class="btn primary small" type="button" onclick="selecionarRegistro('${r._id}')">Abrir</button>
+      </div>
+    `;
+    box.appendChild(div);
+  });
+}
+
+function aplicarFiltros() {
+  const fAno = normStr($("fAno").value);
+  const fSerie = norm($("fSerie").value);
+  const fBusca = norm($("fBusca").value);
+
+  let lista = registros.slice();
+  if (fAno) lista = lista.filter(r => String(r.ano || "").trim() === fAno);
+  if (fSerie) lista = lista.filter(r => norm(r.serie || "").includes(fSerie));
+  if (fBusca) {
+    lista = lista.filter(r => {
+      const base = norm(r.turmaNome||"") + " " + norm(r.serie||"") + " " + norm(r.ano||"");
+      if (base.includes(fBusca)) return true;
+      return (r.alunos||[]).some(a => norm(a.nome).includes(fBusca));
+    });
+  }
+  renderListaRegistros(ordenarRegistros(lista));
+}
+
+/* =========================
+   Selecionar / fechar registro
+========================= */
+function selecionarRegistro(id) {
+  registroSelecionado = registros.find(r => r._id === id) || null;
+
+  $("detalhesVazio").style.display = registroSelecionado ? "none" : "block";
+  $("detalhesBox").style.display = registroSelecionado ? "block" : "none";
+  if (!registroSelecionado) return;
+
+  $("detalhesMeta").innerHTML =
+    `<b>${registroSelecionado.turmaNome || "Turma"}</b><br>` +
+    `ID: ${registroSelecionado._id}<br>` +
+    `Ano: <b>${registroSelecionado.ano || "?"}</b> · Série: <b>${registroSelecionado.serie || "?"}</b>`;
+
+  $("painelEdicao").classList.add("hidden");
+  alunosView = (registroSelecionado.alunos || []).slice();
+
+  renderCabecalhoView();
+  renderAlunosView(alunosView);
+  renderOrdemAccess(registroSelecionado);
+
+  $("fAluno").value = "";
+  $("fAluno").oninput = () => {
+    const q = norm($("fAluno").value);
+    renderAlunosView(alunosView.filter(a => norm(a.nome).includes(q)));
+  };
+
+  renderResumoTurma(registroSelecionado);
+
+  const container = $("container");
+  container.classList.remove("layout-normal");
+  container.classList.add("layout-expandido");
+
+  document.querySelectorAll("#listaRegistros .list-item").forEach(el => {
+    el.classList.toggle("selected", el.dataset.id === id);
+  });
+}
+
+function fecharRegistro() {
+  registroSelecionado = null;
+  $("detalhesVazio").style.display = "block";
+  $("detalhesBox").style.display = "none";
+  $("painelEdicao").classList.add("hidden");
+
+  const container = $("container");
+  container.classList.remove("layout-expandido");
+  container.classList.add("layout-normal");
+
+  document.querySelectorAll("#listaRegistros .list-item").forEach(el => el.classList.remove("selected"));
+}
+
+/* =========================
+   Render tabela (visualização)
+========================= */
+function renderCabecalhoView() {
+  const materias = getMateriasDoRegistro(registroSelecionado);
+  let htmlM = `<th class="th-nome" rowspan="2">Nome</th>`;
+  let htmlS = ``;
+  for (const m of materias) {
+    htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
+    htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
+  }
+  $("theadMateriasView").innerHTML = htmlM;
+  $("theadSubView").innerHTML = htmlS;
+}
+
+function renderAlunosView(lista) {
+  const tbody = $("tAlunosView");
+  const materias = getMateriasDoRegistro(registroSelecionado);
+
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="${materias.length*4+1}" style="text-align:center;color:var(--muted);padding:12px;">Nenhum aluno.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = lista.map(a => {
+    let cells = `<td class="col-nome">${a.nome || ""}</td>`;
+    for (const m of materias) {
+      const n = a.notas?.[m.key] || {};
+      const media = calcularMedia(n.n1, n.n2, n.n3);
+      cells += `<td>${n.n1 || "—"}</td><td>${n.n2 || "—"}</td><td>${n.n3 || "—"}</td>`;
+      cells += `<td class="col-media">${media !== null ? media.toFixed(1).replace(".",",") : "—"}</td>`;
+    }
+    return `<tr>${cells}</tr>`;
+  }).join("");
+}
+
+function renderResumoTurma(r) {
+  const alunos = r.alunos || [];
+  const linhas = [
+    `Turma: ${r.turmaNome || "?"}`,
+    `Ano: ${r.ano || "?"} | Série: ${r.serie || "?"}`,
+    `Alunos: ${alunos.length}`,
+  ];
+  $("resumoTurma").textContent = linhas.join("\n");
+}
+
+/* =========================
+   Painel de edição de notas
+========================= */
+function alternarPainelEdicao() {
+  const painel = $("painelEdicao");
+  const abrindo = painel.classList.contains("hidden");
+  painel.classList.toggle("hidden");
+  if (abrindo) renderPainelEdicao();
+}
+
+function renderPainelEdicao() {
+  const materias = getMateriasDoRegistro(registroSelecionado);
+  let htmlM = `<th class="th-nome" rowspan="2">Nome</th>`;
+  let htmlS = ``;
+  for (const m of materias) {
+    htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
+    htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
+  }
+  $("theadMateriasEdit").innerHTML = htmlM;
+  $("theadSubEdit").innerHTML = htmlS;
+
+  const alunos = registroSelecionado.alunos || [];
+  $("tAlunosEdit").innerHTML = alunos.map((a, idx) => {
+    let cells = `<td class="col-nome">${a.nome || ""}</td>`;
+    for (const m of materias) {
+      const n = a.notas?.[m.key] || {};
+      cells += `<td class="col-nota"><input type="text" inputmode="decimal" value="${n.n1||""}" data-idx="${idx}" data-mat="${m.key}" data-tri="n1" onblur="aplicarMascaraNotaEdit(this)"></td>`;
+      cells += `<td class="col-nota"><input type="text" inputmode="decimal" value="${n.n2||""}" data-idx="${idx}" data-mat="${m.key}" data-tri="n2" onblur="aplicarMascaraNotaEdit(this)"></td>`;
+      cells += `<td class="col-nota"><input type="text" inputmode="decimal" value="${n.n3||""}" data-idx="${idx}" data-mat="${m.key}" data-tri="n3" onblur="aplicarMascaraNotaEdit(this)"></td>`;
+      cells += `<td class="col-media" data-media-idx="${idx}" data-media-mat="${m.key}">—</td>`;
+    }
+    return `<tr>${cells}</tr>`;
+  }).join("");
+
+  // calcula médias já na abertura
+  alunos.forEach((a, idx) => materias.forEach(m => atualizarMediaEdit(idx, m.key)));
+}
+
+function aplicarMascaraNotaEdit(el) {
+  const bruto = el.value;
+  if (normStr(bruto) !== "") {
+    const normalizado = normalizarNotaObjetiva(bruto);
+    if (normalizado === null) {
+      alert(`Nota inválida: "${bruto}". Digite um número de 0,0 a 10,0.`);
+      el.value = "";
+    } else {
+      el.value = normalizado;
+    }
+  }
+  atualizarMediaEdit(el.dataset.idx, el.dataset.mat);
+}
+
+function atualizarMediaEdit(idx, matKey) {
+  const linha = document.querySelector(`#tAlunosEdit tr:nth-child(${Number(idx)+1})`);
+  if (!linha) return;
+  const n1 = linha.querySelector(`input[data-mat="${matKey}"][data-tri="n1"]`)?.value || "";
+  const n2 = linha.querySelector(`input[data-mat="${matKey}"][data-tri="n2"]`)?.value || "";
+  const n3 = linha.querySelector(`input[data-mat="${matKey}"][data-tri="n3"]`)?.value || "";
+  const media = calcularMedia(n1, n2, n3);
+  const cel = document.querySelector(`#tAlunosEdit td[data-media-idx="${idx}"][data-media-mat="${matKey}"]`);
+  if (cel) cel.textContent = media !== null ? media.toFixed(1).replace(".",",") : "—";
+}
+
+async function salvarEdicaoNotas() {
+  const materias = getMateriasDoRegistro(registroSelecionado);
+  const alunos = (registroSelecionado.alunos || []).map(a => ({ ...a, notas: { ...(a.notas||{}) } }));
+
+  // valida tudo antes de gravar
+  const inputs = document.querySelectorAll("#tAlunosEdit input");
+  for (const el of inputs) {
+    const bruto = el.value;
+    if (normStr(bruto) === "") continue;
+    const normalizado = normalizarNotaObjetiva(bruto);
+    if (normalizado === null) {
+      alert(`Nota inválida (${el.dataset.mat}, ${el.dataset.tri}): "${bruto}". Corrija antes de salvar.`);
+      el.focus();
+      return;
+    }
+  }
+
+  inputs.forEach(el => {
+    const idx = Number(el.dataset.idx), mat = el.dataset.mat, tri = el.dataset.tri;
+    if (!alunos[idx]) return;
+    alunos[idx].notas[mat] = { ...(alunos[idx].notas[mat]||{}), [tri]: el.value };
+  });
+
+  registroSelecionado.alunos = alunos;
+  registroSelecionado.atualizadoEm = new Date().toISOString();
+
+  const msg = $("statusEdicao");
+  msg.className = "status-msg"; msg.textContent = "Salvando...";
+  try {
+    await getNotasCollection().save(registroSelecionado);
+    msg.className = "status-msg ok"; msg.textContent = `✅ Notas salvas — ${alunos.length} aluno(s) atualizados.`;
+
+    alunosView = alunos.slice();
+    renderAlunosView(alunosView);
+    renderResumoTurma(registroSelecionado);
+
+    const idxLista = registros.findIndex(r => r._id === registroSelecionado._id);
+    if (idxLista >= 0) registros[idxLista] = registroSelecionado;
+  } catch (e) {
+    console.error(e);
+    msg.className = "status-msg err"; msg.textContent = "❌ Erro ao salvar: " + (e.message || e);
+  }
+}
+
+/* =========================
+   Ordem de cópia p/ Access (mesma lógica do cadastro, por schemaId)
+========================= */
+let ORDEM_ACCESS = [];
+function ordemAccessKey(schemaId) { return `ordemAccessNotas_v1_${schemaId}`; }
+
+function gerarOrdemPadrao(reg) {
+  const materias = getMateriasDoRegistro(reg);
+  const campos = [];
+  for (const m of materias) for (const tri of [1,2,3])
+    campos.push({ materiaKey: m.key, materiaLabel: m.label, trimestre: tri, enabled: true });
+  return campos;
+}
+
+function carregarOrdemAccess(reg) {
+  try {
+    const raw = localStorage.getItem(ordemAccessKey(reg.schemaId));
+    if (!raw) return gerarOrdemPadrao(reg);
+    const salvo = JSON.parse(raw);
+    const padrao = gerarOrdemPadrao(reg);
+    const chaveOf = (c) => `${c.materiaKey}__${c.trimestre}`;
+    const salvoChaves = new Set(salvo.map(chaveOf));
+    const novos = padrao.filter(c => !salvoChaves.has(chaveOf(c)));
+    const padraoChaves = new Set(padrao.map(chaveOf));
+    const filtrado = salvo.filter(c => padraoChaves.has(chaveOf(c)));
+    return [...filtrado, ...novos];
+  } catch { return gerarOrdemPadrao(reg); }
+}
+
+function salvarOrdemAccess(reg) {
+  localStorage.setItem(ordemAccessKey(reg.schemaId), JSON.stringify(ORDEM_ACCESS));
+}
+
+function renderOrdemAccess(reg) {
+  ORDEM_ACCESS = carregarOrdemAccess(reg);
+  const wrap = $("ordemLista");
+  wrap.innerHTML = "";
+  ORDEM_ACCESS.forEach((campo, idx) => {
+    const div = document.createElement("div");
+    div.className = "ordem-item" + (campo.enabled ? "" : " desativado");
+    div.innerHTML = `
+      <span class="ordem-num">${idx + 1}</span>
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
+        <input type="checkbox" ${campo.enabled ? "checked" : ""} data-idx="${idx}" class="ordem-check">
+        <span class="ordem-label">${campo.materiaLabel} — ${campo.trimestre}º trimestre</span>
+      </label>
+      <div class="ordem-btns">
+        <button type="button" class="btn small secondary" data-idx="${idx}" data-dir="-1">↑</button>
+        <button type="button" class="btn small secondary" data-idx="${idx}" data-dir="1">↓</button>
+      </div>`;
+    wrap.appendChild(div);
+  });
+  wrap.querySelectorAll(".ordem-check").forEach(chk => {
+    chk.addEventListener("change", () => {
+      ORDEM_ACCESS[+chk.dataset.idx].enabled = chk.checked;
+      salvarOrdemAccess(reg);
+      renderOrdemAccess(reg);
+    });
+  });
+  wrap.querySelectorAll("button[data-dir]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = +btn.dataset.idx, j = i + (+btn.dataset.dir);
+      if (j < 0 || j >= ORDEM_ACCESS.length) return;
+      [ORDEM_ACCESS[i], ORDEM_ACCESS[j]] = [ORDEM_ACCESS[j], ORDEM_ACCESS[i]];
+      salvarOrdemAccess(reg);
+      renderOrdemAccess(reg);
+    });
+  });
+}
+
+function valorCampoAccess(aluno, campo) {
+  const n = aluno.notas?.[campo.materiaKey] || {};
+  return normStr(n["n"+campo.trimestre] || "");
+}
+function montarLinhaTSV(aluno) {
+  return ORDEM_ACCESS.filter(c=>c.enabled).map(c => valorCampoAccess(aluno, c)).join("\t");
+}
+async function copiarParaClipboard(texto, msgOk) {
+  const el = $("statusCopia");
+  try {
+    await navigator.clipboard.writeText(texto);
+    el.className = "status-msg ok"; el.textContent = msgOk;
+  } catch (e) {
+    el.className = "status-msg err"; el.textContent = "❌ Não consegui copiar automaticamente — copie manualmente:";
+    prompt("Copie manualmente (Ctrl+C):", texto);
+  }
+}
+function copiarTodasLinhasPesquisa() {
+  if (!registroSelecionado) return;
+  const camposAtivos = ORDEM_ACCESS.filter(c=>c.enabled);
+  if (!camposAtivos.length) { $("statusCopia").className="status-msg err"; $("statusCopia").textContent="⚠️ Nenhum campo habilitado na ordem de cópia."; return; }
+  const alunos = registroSelecionado.alunos || [];
+  if (!alunos.length) { $("statusCopia").className="status-msg err"; $("statusCopia").textContent="⚠️ Nenhum aluno."; return; }
+  const bloco = alunos.map(montarLinhaTSV).join("\n");
+  copiarParaClipboard(bloco, `✅ Bloco com ${alunos.length} aluno(s) copiado! Cole no Access a partir da 1ª célula do 1º aluno.`);
+}
+
+/* =========================
+   Pesquisa por aluno
+========================= */
+function limparPesquisaAluno(){
+  $("alunoQuery").value = "";
+  $("alunoResultados").innerHTML = "";
+}
+function escapeHtml(s){
+  return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+function pesquisarAluno(){
+  const termo = norm($("alunoQuery").value);
+  const parcial = $("alunoParcial").checked;
+  const out = $("alunoResultados");
+  if (!termo) { alert("Digite o nome do aluno."); return; }
+
+  const achados = [];
+  for (const r of registros) {
+    for (const a of (r.alunos||[])) {
+      const nomeA = norm(a?.nome);
+      if (!nomeA) continue;
+      const ok = parcial ? nomeA.includes(termo) : nomeA === termo;
+      if (!ok) continue;
+      achados.push({ aluno: a.nome, ano: r.ano||"", serie: r.serie||a.serie||"", id: r._id, turma: r.turmaNome||"" });
+    }
+  }
+  if (!achados.length) {
+    out.innerHTML = `<div class="aluno-not-found">Nenhuma ocorrência encontrada para <b>${escapeHtml($("alunoQuery").value)}</b>.</div>`;
+    return;
+  }
+  achados.sort((x,y)=>{
+    const ax = parseInt(x.ano,10)||0, ay = parseInt(y.ano,10)||0;
+    if (ax!==ay) return ax-ay;
+    return String(x.serie).localeCompare(String(y.serie),"pt-BR");
+  });
+  out.innerHTML = achados.map(h => `
+    <div class="aluno-result-row">
+      <div class="aluno-result-info">
+        <div><b>${escapeHtml(h.ano||"?")}</b> — ${escapeHtml(h.serie||"?")} — ${escapeHtml(h.turma)} — <span style="font-weight:700;">${escapeHtml(h.aluno)}</span></div>
+      </div>
+      <div class="aluno-result-actions">
+        <button class="btn ghost small" type="button" onclick="selecionarRegistro('${h.id}')">Abrir</button>
+      </div>
+    </div>
+  `).join("");
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("alunoQuery").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") { ev.preventDefault(); pesquisarAluno(); }
+  });
+});
+
+/* =========================
+   Boot
+========================= */
+async function carregar() {
+  SCHEMAS_CACHE = loadSchemas();
+
+  await new Promise(res=>{
+    if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+    document.addEventListener('auth:ready', res, { once:true });
+  });
+
+  try {
+    registros = await getNotasCollection().list();
+  } catch (e) {
+    console.error(e);
+    $("dbInfo").textContent = "erro ao carregar (" + (e.message || e) + ")";
+    return;
+  }
+
+  $("dbInfo").textContent = `${registros.length} turma(s) — clique em Pesquisar para exibir`;
+  preencherFiltroAno(registros);
+
+  $("listaRegistros").innerHTML = `<div class="list-item"><span class="muted">Clique em <b>🔍 Pesquisar</b> para carregar as turmas.</span></div>`;
+  $("detalhesVazio").style.display = "block";
+  $("detalhesBox").style.display = "none";
+
+  $("btnPesquisar").onclick = () => { _jaFoiPesquisado = true; aplicarFiltros(); };
+  $("fAno").onchange   = () => { if (_jaFoiPesquisado) aplicarFiltros(); };
+  $("fSerie").oninput  = () => { if (_jaFoiPesquisado) aplicarFiltros(); };
+  $("fBusca").oninput  = () => { if (_jaFoiPesquisado) aplicarFiltros(); };
+
+  $("sidebarTitulo").addEventListener("click", () => {
+    _ordemAsc = !_ordemAsc;
+    $("sortIndicator").textContent = _ordemAsc ? "↓" : "↑";
+    if (_jaFoiPesquisado) aplicarFiltros();
+  });
+}
+document.addEventListener("DOMContentLoaded", carregar);
+</script>
+
+</body>
+</html>
