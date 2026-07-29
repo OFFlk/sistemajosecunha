@@ -1368,7 +1368,15 @@ function normSerie(s){
     if(!t) return;
     if(kind === "err") _toastErro('⚠️ ' + t);
     else if(kind === "ok") _toastSucesso('✅ ' + t);
-    else _toastErro(t);
+    else if(kind === "warn") _toastAviso('⚠️ ' + t);
+    else if(kind === "loading") _toastCarregando('⏳ ' + t);
+    else {
+      // Tipo não catalogado — não presume vermelho (isso soaria como erro
+      // sem ser). Cai em aviso (amarelo) e avisa no console pra revisarmos
+      // a cor certa junto.
+      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+      _toastAviso(t);
+    }
   }
 
   // ---------- UI refs ----------
@@ -1871,12 +1879,15 @@ function normSerie(s){
 
     if(!anoEhAtivo){
       const situacaoOutra = outraMatriculaNoAno.situacao || '—';
-      const msg =
-        `⚠️ Este aluno já tem outra matrícula em ${ano}, na turma "${nomeTurmaOutra}" (situação: ${situacaoOutra}).\n\n` +
-        `Isso só faz sentido se ele realmente estudou nas duas turmas naquele ano (ex.: transferência no meio do ano). ` +
-        `Se não for o caso, cancele e confira se não é um cadastro duplicado.\n\n` +
-        `Deseja continuar e criar esta matrícula mesmo assim?`;
-      if(!confirm(msg)) return setMsg('Matrícula cancelada.', 'err');
+      if(!(await _confirmModal({
+        titulo: '⚠️ Matrícula duplicada em outro ano?',
+        corpo: `Este aluno já tem outra matrícula em ${ano}, na turma "${_escHtml(nomeTurmaOutra)}" (situação: ${_escHtml(situacaoOutra)}).\n\n` +
+               `Isso só faz sentido se ele realmente estudou nas duas turmas naquele ano (ex.: transferência no meio do ano). ` +
+               `Se não for o caso, cancele e confira se não é um cadastro duplicado.\n\n` +
+               `Deseja continuar e criar esta matrícula mesmo assim?`,
+        corDestaque: '#b45309',
+        textoConfirmar: 'Continuar mesmo assim',
+      }))) return setMsg('Matrícula cancelada.', 'warn');
     }
   }
 
@@ -1986,7 +1997,7 @@ function normSerie(s){
     if(erroEndereco) return _toastErro('⚠️ ' + erroEndereco);
 
     try{
-      setMsg('Salvando…','');
+      setMsg('Salvando…','loading');
       // fotoUrl/fotoFileId ficam de fora de propósito: quem controla esses dois
       // campos é o módulo de foto (foto-aluno-js), que já salva no Firestore na
       // hora em que a foto é trocada/removida. Se reenviássemos alunoOriginal
@@ -2014,11 +2025,27 @@ function normSerie(s){
   }
 
   // Toast fixo — aparece no centro/base da tela, independente do scroll
+  //
+  // Padrão de cores (definido com o usuário):
+  //   sucesso/salvo     → verde   (_toastSucesso)
+  //   aviso/cancelar    → amarelo (_toastAviso)
+  //   carregando        → azul    (_toastCarregando)
+  //   erro              → vermelho (_toastErro)
+  // Qualquer tipo novo que não se encaixe nesses 4 deve ser perguntado
+  // antes de decidir a cor — por segurança, cai em "aviso" (amarelo) em
+  // vez de vermelho, já que vermelho passa a mensagem errada (erro) pra
+  // algo que pode não ser um erro de verdade.
   function _toastSucesso(msg){
     _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
   }
   function _toastErro(msg){
     _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+  }
+  function _toastAviso(msg){
+    _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
+  }
+  function _toastCarregando(msg){
+    _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
   }
   function _showToast(msg, bg, shadow, duration){
     const existing = document.getElementById('_toastGlobal');
@@ -2048,6 +2075,47 @@ function normSerie(s){
     toast.appendChild(btnClose);
     document.body.appendChild(toast);
     setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+
+  function _escHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Modal de confirmação customizado — substitui o confirm() nativo do
+  // navegador (que não pode ser estilizado) pelo mesmo visual usado no
+  // modal de "Encerrar matrícula" (.modal-backdrop). Retorna uma
+  // Promise<boolean>: true = confirmou, false = cancelou/fechou fora.
+  // Por padrão usa a cor de aviso (amarelo) — é o único tipo de confirmação
+  // que existe no sistema hoje; se surgir um caso de outra cor, ajustamos
+  // corDestaque então.
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+    return new Promise((resolve) => {
+      const cor = corDestaque || '#b45309'; // amber-700
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.style.display = 'flex';
+      backdrop.innerHTML =
+        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+              `${_escHtml(textoConfirmar || 'Continuar')}`+
+            `</button>`+
+          `</div>`+
+        `</div>`;
+      document.body.appendChild(backdrop);
+
+      function fechar(resultado){
+        backdrop.remove();
+        resolve(resultado);
+      }
+      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+      backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+      backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    });
   }
 
   // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──────────────────────────────
