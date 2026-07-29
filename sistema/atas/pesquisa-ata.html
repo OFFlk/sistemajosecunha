@@ -892,7 +892,7 @@ async function carregar() {
     }
   }catch(e){ console.warn('Firestore pré-carga:', e); }
 
-  turmas = lerTurmasDB();
+  turmas = lerTurmasDB().filter(t => String(t.status || "ATIVA").toUpperCase() !== "INATIVA");
 
   document.getElementById("dbInfo").textContent =
     `${turmas.length} turma(s) — clique em Pesquisar para exibir`;

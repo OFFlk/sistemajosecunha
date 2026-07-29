@@ -314,15 +314,16 @@ html[data-theme="dark"] .confirm-badge {
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
       <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
-      <button class="btn btn-danger-outline" id="btnExcluirTurma" onclick="mostrarConfirmExclusao()" style="display:none; margin-left:auto;">🗑️ Excluir turma</button>
+      <button class="btn btn-danger-outline" id="btnInativarTurma" onclick="mostrarConfirmInativacao()" style="display:none; margin-left:auto;">🚫 Inativar turma</button>
+      <button class="btn btn-secondary" id="btnReativarTurma" onclick="reativarTurma()" style="display:none; margin-left:auto;">✅ Reativar turma</button>
     </div>
 
-    <!-- Badge de confirmação de exclusão -->
-    <div class="confirm-badge" id="confirmBadgeExclusao">
-      <strong>⚠️ Excluir esta turma e todos os seus scans? Essa ação é irreversível.</strong>
+    <!-- Badge de confirmação de inativação -->
+    <div class="confirm-badge" id="confirmBadgeInativacao">
+      <strong>⚠️ Inativar esta turma? Ela deixa de aparecer na pesquisa de atas, mas os dados continuam salvos e podem ser reativados depois.</strong>
       <div class="confirm-badge-btns">
-        <button class="btn btn-danger-outline btn-mini" onclick="confirmarExclusaoTurma()">Sim, excluir</button>
-        <button class="btn btn-secondary btn-mini" onclick="fecharConfirmExclusao()">Cancelar</button>
+        <button class="btn btn-danger-outline btn-mini" onclick="confirmarInativacaoTurma()">Sim, inativar</button>
+        <button class="btn btn-secondary btn-mini" onclick="fecharConfirmInativacao()">Cancelar</button>
       </div>
     </div>
 
@@ -1482,6 +1483,7 @@ async function garantirIdsESistemaParaTurma(turmaObj){
 ========================= */
 let modoEdicao = false;
 let idTurmaEditando = "";
+let turmaEditandoObj = null; // objeto completo da turma carregada em edição — usado por inativar/reativar
 
 function getQueryParam(nome) {
   const url = new URL(window.location.href);
@@ -1572,11 +1574,11 @@ async function carregarTurmaParaEdicao(id) {
   atualizarTabela();
 
   modoEdicao = true;
-  idTurmaEditando = turma.id;
+  idTurmaEditando = turma.id || turma._id || turma.turmaId;
+  turmaEditandoObj = turma;
 
-  // Modo edição: mostra botão excluir turma
-  const btnExcluir = document.getElementById('btnExcluirTurma');
-  if (btnExcluir) btnExcluir.style.display = 'inline-flex';
+  // Modo edição: mostra botão de inativar/reativar conforme status atual
+  atualizarBotaoStatusTurma();
 }
 
 /* =========================
@@ -1644,6 +1646,7 @@ async function _salvarNoBancoInterno() {
     // ✅ referência do schema escolhido (turma nova) + snapshot congelado
     schemaId: modoEdicao ? (existente?.schemaId || "") : (schemaSelecionadoId || ""),
     schemaSnapshot: schema,
+    status: existente?.status || "ATIVA",
 
     atualizadoEm: new Date().toISOString(),
     criadoEm: existente?.criadoEm || new Date().toISOString()
@@ -1703,57 +1706,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <script>
 /* =========================
-   Exclusão de turma
+   Status da turma (Ativa/Inativa)
 ========================= */
-function mostrarConfirmExclusao() {
-  const badge = document.getElementById('confirmBadgeExclusao');
+function atualizarBotaoStatusTurma() {
+  const btnInativar = document.getElementById('btnInativarTurma');
+  const btnReativar = document.getElementById('btnReativarTurma');
+  if (!modoEdicao) {
+    if (btnInativar) btnInativar.style.display = 'none';
+    if (btnReativar) btnReativar.style.display = 'none';
+    return;
+  }
+  const status = String(turmaEditandoObj?.status || 'ATIVA').toUpperCase();
+  if (btnInativar) btnInativar.style.display = status === 'INATIVA' ? 'none' : 'inline-flex';
+  if (btnReativar) btnReativar.style.display = status === 'INATIVA' ? 'inline-flex' : 'none';
+}
+
+function mostrarConfirmInativacao() {
+  const badge = document.getElementById('confirmBadgeInativacao');
   if (badge) badge.classList.add('show');
 }
 
-function fecharConfirmExclusao() {
-  const badge = document.getElementById('confirmBadgeExclusao');
+function fecharConfirmInativacao() {
+  const badge = document.getElementById('confirmBadgeInativacao');
   if (badge) badge.classList.remove('show');
 }
 
-async function confirmarExclusaoTurma() {
+async function confirmarInativacaoTurma() {
   if (!modoEdicao || !idTurmaEditando) return;
-  fecharConfirmExclusao();
+  fecharConfirmInativacao();
 
-  const btnExcluir = document.getElementById('btnExcluirTurma');
-  if (btnExcluir) { btnExcluir.disabled = true; btnExcluir.textContent = 'Excluindo…'; }
+  const btn = document.getElementById('btnInativarTurma');
+  if (btn) { btn.disabled = true; btn.textContent = 'Inativando…'; }
 
   try {
-    // 1. Apaga todos os scans do Cloudinary
-    const scansResp = await fetch(`/api/atas-list?turmaId=${encodeURIComponent(idTurmaEditando)}`);
-    if (scansResp.ok) {
-      const scansData = await scansResp.json();
-      const files = scansData.files || [];
-      for (const f of files) {
-        await fetch('/api/atas-delete', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileId: f.fileId, resourceType: f.resourceType || 'image' }),
-        });
-      }
-      console.log(`🗑️ ${files.length} scan(s) removido(s) do Cloudinary`);
-    }
-
-    // 2. Remove a turma do Firebase
-    const db = await lerTurmasDB();
-    const turma = db.find(t => t.id === idTurmaEditando || t._id === idTurmaEditando);
-    if (turma?._id) {
-      await window.DB.turmas.remove(turma._id);
-      _invalidarCacheTurmas();
-      console.log('🗑️ Turma removida do Firebase:', idTurmaEditando);
-    }
-
-    alert('Turma excluída com sucesso.');
-    window.history.back();
-
+    const _id = turmaEditandoObj?._id || turmaEditandoObj?.id || turmaEditandoObj?.turmaId || idTurmaEditando;
+    await window.DB.turmas.save({ _id, status: 'INATIVA' });
+    if (turmaEditandoObj) turmaEditandoObj.status = 'INATIVA';
+    _invalidarCacheTurmas();
+    atualizarBotaoStatusTurma();
+    alert('Turma inativada. Ela não aparecerá mais na pesquisa de atas — os dados continuam salvos e podem ser reativados aqui mesmo.');
   } catch(err) {
-    console.error('[excluirTurma]', err);
-    alert('Erro ao excluir a turma: ' + err.message);
-    if (btnExcluir) { btnExcluir.disabled = false; btnExcluir.textContent = '🗑️ Excluir turma'; }
+    console.error('[inativarTurma]', err);
+    alert('Erro ao inativar a turma: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🚫 Inativar turma'; }
+  }
+}
+
+async function reativarTurma() {
+  if (!modoEdicao || !idTurmaEditando) return;
+  if (!confirm('Reativar esta turma? Ela volta a aparecer na pesquisa de atas.')) return;
+
+  const btn = document.getElementById('btnReativarTurma');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reativando…'; }
+
+  try {
+    const _id = turmaEditandoObj?._id || turmaEditandoObj?.id || turmaEditandoObj?.turmaId || idTurmaEditando;
+    await window.DB.turmas.save({ _id, status: 'ATIVA' });
+    if (turmaEditandoObj) turmaEditandoObj.status = 'ATIVA';
+    _invalidarCacheTurmas();
+    atualizarBotaoStatusTurma();
+    alert('Turma reativada.');
+  } catch(err) {
+    console.error('[reativarTurma]', err);
+    alert('Erro ao reativar a turma: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Reativar turma'; }
   }
 }
 </script>
