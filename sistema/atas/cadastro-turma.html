@@ -1601,6 +1601,7 @@ function _showToast(msg, bg, shadow, duration){
 
 // Modal de confirmação para decisões importantes (padrão do sistema).
 // Retorna uma Promise<boolean>: true = confirmou, false = cancelou/fechou fora.
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
   return new Promise((resolve) => {
     const cor = corDestaque || '#b45309'; // amber-700 (padrão do sistema)
