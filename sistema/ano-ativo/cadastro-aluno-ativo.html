@@ -1900,7 +1900,7 @@ function normSerie(s){
   setMsg(msg, "ok");
   if(window.initDocs) window.initDocs(alunoId);
   if(window.uploadDocsQueue) await window.uploadDocsQueue();
-  if(window.enviarFotoPendente) await window.enviarFotoPendente(alunoId);
+  if(window.enviarFotoPendente) await window.enviarFotoPendente(alunoId, ano, matriculaId);
   clearFields();
   if(window._natRebuild) window._natRebuild();
 }
@@ -2028,8 +2028,12 @@ function normSerie(s){
 
       let aluno = null;
       try { aluno = await window.DB.anoAtivoAlunos.get(editId); } catch(e){}
-      console.log('[DEBUG-FOTO] aluno retornado do Firestore (anoAtivoAlunos.get):', aluno);
-      console.log('[DEBUG-FOTO] fotoUrl deste aluno, direto do Firestore:', aluno && aluno.fotoUrl);
+
+      // Içado pro escopo da função (era `let` dentro do try{} logo abaixo)
+      // porque o módulo de foto (initFoto, mais abaixo) agora precisa do
+      // ano/matriculaId dessa matrícula específica — a foto passou a viver
+      // em anoAtivoMatriculas, não mais em anoAtivoAlunos.
+      let matAluno = null;
 
       if(!aluno){
         document.getElementById('msgForm').textContent = '⚠️ Aluno não encontrado ou sem permissão de acesso.';
@@ -2115,7 +2119,6 @@ function normSerie(s){
         const mats = await window.DB.anoAtivoMatriculas.list();
         const matsDoAluno = mats.filter(m => m.alunoId === editId);
 
-        let matAluno = null;
         if(qsTurmaId){
           matAluno = matsDoAluno.find(m =>
             m.turmaId === qsTurmaId &&
@@ -2328,7 +2331,18 @@ function normSerie(s){
       if(window.initDocs) window.initDocs(editId);
 
       // ── Foto ──
-      if(window.initFoto) window.initFoto(editId, aluno.fotoUrl || '', aluno.fotoFileId || '');
+      // A foto agora é por matrícula/ano, não mais global pro aluno — por
+      // isso initFoto recebe matAluno (achado acima) em vez de `aluno`.
+      // Se por algum motivo matAluno não foi encontrado (aluno sem
+      // matrícula, ou ainda não migrado — ver TAREFA de migração), cai pro
+      // ano ativo default só pra não travar o widget; fotoUrl fica vazia.
+      if(window.initFoto) window.initFoto({
+        alunoId:     editId,
+        ano:         matAluno?.anoLetivo || getAnoAtivoDefault(),
+        matriculaId: matAluno?._id || null,
+        fotoUrl:     matAluno?.fotoUrl || '',
+        fotoFileId:  matAluno?.fotoFileId || '',
+      });
 
       window._modoEdicaoId    = editId;
       window._modoEdicaoAluno = aluno;
@@ -3048,8 +3062,10 @@ function normSerie(s){
       if(encontrado){
         preencherCampos(encontrado);
         mostrarBanner(encontrado);
+        if(window.sugerirFotoExistente) window.sugerirFotoExistente(encontrado.alunoId);
       } else {
         limparBanner();
+        if(window.limparFotoSugerida) window.limparFotoSugerida();
       }
     });
 
@@ -3057,6 +3073,7 @@ function normSerie(s){
     if(btnLimpar){
       btnLimpar.addEventListener('click', function(){
         limparBanner();
+        if(window.limparFotoSugerida) window.limparFotoSugerida();
         // Limpa apenas os campos auto-preenchidos, mantém CPF
         CAMPOS_AUTOPREENCH.forEach(id => {
           const el = document.getElementById(id);
@@ -3144,6 +3161,7 @@ function normSerie(s){
       // Preenche campos mas NÃO trava — no modo nome o usuário precisa adicionar dados pessoais
       if(typeof window._preencherCampos === 'function') window._preencherCampos(a);
       if(typeof window._mostrarBanner   === 'function') window._mostrarBanner(a, true); // semLock=true
+      if(window.sugerirFotoExistente) window.sugerirFotoExistente(a.alunoId);
       // Preenche CPF se o aluno já tiver (caso venha das atas sem CPF, campo fica vazio p/ preenchimento)
       const cpfEl = document.getElementById('cpf');
       if(cpfEl && !cpfEl.value && a.cpf) cpfEl.value = a.cpf;
@@ -3258,6 +3276,8 @@ function normSerie(s){
 
   let _fotoPendente = null; // { base64, mimeType } — cadastro novo, aguardando alunoId
   let _fotoAlunoId  = null; // conhecido de cara em modo edição
+  let _fotoAno      = null; // ano letivo da matrícula em edição (public_id no Cloudinary é alunoId/ano)
+  let _fotoMatriculaId = null; // _id do doc em anoAtivoMatriculas onde a foto é salva (modo edição)
   let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
 
   function _setStatus(txt, cor){
@@ -3265,13 +3285,18 @@ function normSerie(s){
     statusEl.style.color = cor || 'var(--muted)';
   }
 
-  // Chamado no modo edição, com a foto já existente (se houver)
-  window.initFoto = function(alunoId, fotoUrlExistente, fotoFileIdExistente){
-    console.log('[foto-aluno] initFoto chamado com:', alunoId, fotoUrlExistente);
-    _fotoAlunoId = alunoId ? String(alunoId) : null;
-    _fotoFileIdAtual = fotoFileIdExistente || null;
-    if(fotoUrlExistente){
-      previewImg.src = fotoUrlExistente;
+  // Chamado no modo edição, com a foto já existente (se houver). A foto
+  // vive por matrícula/ano agora — por isso recebe alunoId (usado como
+  // entidadeId no Cloudinary) E matriculaId (onde salvar no Firestore),
+  // além do ano (parte do public_id).
+  window.initFoto = function({ alunoId, ano, matriculaId, fotoUrl, fotoFileId }){
+    console.log('[foto-aluno] initFoto chamado com:', { alunoId, ano, matriculaId, fotoUrl });
+    _fotoAlunoId     = alunoId ? String(alunoId) : null;
+    _fotoAno         = ano || null;
+    _fotoMatriculaId = matriculaId || null;
+    _fotoFileIdAtual = fotoFileId || null;
+    if(fotoUrl){
+      previewImg.src = fotoUrl;
       previewImg.style.display = 'block';
       placeholder.style.display = 'none';
       btnRemover.style.display = '';
@@ -3305,19 +3330,27 @@ function normSerie(s){
     });
   }
 
-  async function _enviarFoto(alunoId, base64, mimeType){
+  async function _enviarFoto(alunoId, ano, matriculaId, base64, mimeType){
+    if(!ano || !matriculaId){
+      _setStatus('❌ Falha ao enviar foto: ano/matrícula não identificados.', '#b91c1c');
+      console.error('[foto-aluno] _enviarFoto chamado sem ano/matriculaId:', { alunoId, ano, matriculaId });
+      return;
+    }
     _setStatus('Enviando foto...');
     try{
       const resp = await fetch('/api/avatar-upload', {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, fileBase64: base64, mimeType }),
+        body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, ano, fileBase64: base64, mimeType }),
       });
       const data = await resp.json();
       console.log('[foto-aluno] resposta do upload:', resp.status, data);
       if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
       if(!data.fotoUrl) throw new Error('upload OK mas sem fotoUrl na resposta — veja o console');
-      const salvo = await window.DB.anoAtivoAlunos.save({ _id: alunoId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
-      console.log('[foto-aluno] salvo no Firestore:', salvo);
+      // A foto agora é salva no documento da MATRÍCULA (anoAtivoMatriculas),
+      // não mais no documento do aluno (anoAtivoAlunos) — é o que torna a
+      // foto específica desta matrícula/ano.
+      const salvo = await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
+      console.log('[foto-aluno] salvo no Firestore (anoAtivoMatriculas):', salvo);
       _fotoFileIdAtual = data.fotoFileId;
       _setStatus('✅ Foto salva.', '#166534');
     }catch(e){
@@ -3342,7 +3375,7 @@ function normSerie(s){
       btnRemover.style.display = '';
 
       if(_fotoAlunoId){
-        await _enviarFoto(_fotoAlunoId, base64, mimeType);
+        await _enviarFoto(_fotoAlunoId, _fotoAno, _fotoMatriculaId, base64, mimeType);
       } else {
         _fotoPendente = { base64, mimeType };
         _setStatus('Foto pronta — será enviada ao salvar o aluno.', '#166534');
@@ -3359,20 +3392,34 @@ function normSerie(s){
     placeholder.style.display = '';
     btnRemover.style.display = 'none';
     inpFoto.value = '';
-    _fotoPendente = null;
     _fotoFileIdAtual = null;
     _setStatus('');
     if(_fotoAlunoId){
-      try{ await window.DB.anoAtivoAlunos.save({ _id: _fotoAlunoId, fotoUrl: null, fotoFileId: null }); }
+      // Modo edição: a matrícula já é definitiva, remove no Cloudinary/Firestore na hora.
+      _fotoPendente = null;
+      try{ await window.DB.anoAtivoMatriculas.save({ _id: _fotoMatriculaId, fotoUrl: null, fotoFileId: null }); }
       catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
-    }
-    if(fileIdAntigo){
-      try{
-        await fetch('/api/drive-delete', {
-          method: 'DELETE', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
-        });
-      }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+      if(fileIdAntigo){
+        try{
+          await fetch('/api/drive-delete', {
+            method: 'DELETE', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+          });
+        }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+      }
+    } else if(_fotoPendente && _fotoPendente.reaproveitar){
+      // Cadastro novo com foto sugerida de uma matrícula anterior do mesmo
+      // aluno (CPF/nome já identificado): usuário recusou a sugestão.
+      // Diferente do modelo antigo (foto global por aluno), aqui a foto
+      // sugerida pertence a OUTRA matrícula (outro ano) que não é tocada
+      // por essa recusa — nada foi copiado/salvo ainda pra matrícula nova,
+      // então só resetar local já basta, sem chamar drive-delete (isso
+      // apagaria a foto viva da matrícula antiga, o que seria um bug).
+      _fotoPendente = null;
+    } else {
+      // Cadastro novo, sem alunoId ainda e sem sugestão — só reseta local,
+      // nada tinha sido enviado ao servidor ainda.
+      _fotoPendente = null;
     }
   });
 
@@ -3382,6 +3429,8 @@ function normSerie(s){
   window.limparFoto = function(){
     _fotoPendente = null;
     _fotoAlunoId  = null;
+    _fotoAno      = null;
+    _fotoMatriculaId = null;
     _fotoFileIdAtual = null;
     inpFoto.value = '';
     previewImg.style.display = 'none';
@@ -3391,14 +3440,93 @@ function normSerie(s){
     _setStatus('');
   };
 
-  // Chamado por inserirAluno() logo depois que o alunoId de um cadastro
-  // NOVO é confirmado — envia a foto que ficou esperando.
-  window.enviarFotoPendente = async function(alunoId){
+  // Chamado por inserirAluno() logo depois que a matrícula NOVA é
+  // confirmada — resolve o que quer que esteja pendente no widget de foto:
+  // uma foto nova escolhida manualmente, ou uma sugestão de matrícula
+  // anterior aceita (precisa ser COPIADA pro public_id desta matrícula/ano,
+  // já que agora cada ano tem seu próprio arquivo no Cloudinary).
+  window.enviarFotoPendente = async function(alunoId, ano, matriculaId){
     if(!_fotoPendente) return;
-    _fotoAlunoId = String(alunoId);
+
+    if(_fotoPendente.reaproveitar){
+      // Usuário manteve a foto sugerida (de uma matrícula anterior do
+      // mesmo aluno, possivelmente outro ano). Diferente do modelo antigo
+      // (public_id fixo por aluno, sem ano — bastava apontar pro mesmo
+      // arquivo), agora cada ano tem seu próprio public_id, então
+      // precisamos COPIAR o arquivo pro public_id desta matrícula nova.
+      // A matrícula de origem não é tocada — fica com a foto dela intacta.
+      const { fotoUrl } = _fotoPendente;
+      _fotoPendente = null;
+      if(!ano || !matriculaId){
+        console.error('[foto-aluno] reaproveitar sem ano/matriculaId:', { alunoId, ano, matriculaId });
+        return;
+      }
+      try{
+        const resp = await fetch('/api/avatar-upload', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, ano, sourceUrl: fotoUrl }),
+        });
+        const data = await resp.json();
+        console.log('[foto-aluno] resposta da cópia (reaproveitar):', resp.status, data);
+        if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
+        await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
+        _fotoFileIdAtual = data.fotoFileId;
+      }catch(e){ console.warn('[foto-aluno] erro ao copiar foto reaproveitada:', e); }
+      return;
+    }
+
+    // Fluxo original: uma foto de fato nova, escolhida manualmente pelo
+    // usuário (base64 comprimido esperando alunoId/ano/matriculaId ficarem
+    // disponíveis, o que só acontece depois da matrícula confirmada).
+    _fotoAlunoId     = String(alunoId);
+    _fotoAno         = ano || null;
+    _fotoMatriculaId = matriculaId || null;
     const { base64, mimeType } = _fotoPendente;
     _fotoPendente = null;
-    await _enviarFoto(alunoId, base64, mimeType);
+    await _enviarFoto(alunoId, ano, matriculaId, base64, mimeType);
+  };
+
+  // Busca se o aluno identificado (por CPF ou nome, numa rematrícula) já
+  // teve uma foto salva em alguma matrícula anterior — a mais recente,
+  // mesmo que de outro ano (inclusive em cadastros retroativos) — e
+  // sugere ela no widget, sem alterar nada no Cloudinary/Firestore ainda.
+  // A cópia de fato só acontece em enviarFotoPendente, quando a matrícula
+  // nova for confirmada.
+  window.sugerirFotoExistente = async function(alunoId){
+    if(!alunoId) return;
+    // Não atropela: se já tem alunoId de edição real, ou se o usuário já
+    // escolheu manualmente uma foto nova pra este cadastro, não mexe.
+    if(_fotoAlunoId) return;
+    if(_fotoPendente && !_fotoPendente.reaproveitar) return;
+    try{
+      const mats = await window.DB.anoAtivoMatriculas.list();
+      const maisRecente = mats
+        .filter(m => m.alunoId === String(alunoId) && m.fotoUrl)
+        .sort((a, b) => Number(b.anoLetivo) - Number(a.anoLetivo))[0];
+      if(maisRecente){
+        _fotoPendente = { reaproveitar: true, fotoUrl: maisRecente.fotoUrl, anoOrigem: maisRecente.anoLetivo };
+        previewImg.src = maisRecente.fotoUrl;
+        previewImg.style.display = 'block';
+        placeholder.style.display = 'none';
+        btnRemover.style.display = '';
+        _setStatus(`Foto de uma matrícula anterior deste aluno (${maisRecente.anoLetivo}) — mantenha ou clique em "Remover" pra trocar.`, 'var(--muted)');
+      }
+    }catch(e){ console.warn('[foto-aluno] falha ao buscar foto de matrícula anterior:', e); }
+  };
+
+  // Limpa só a sugestão automática (não mexe se o usuário já tiver
+  // escolhido manualmente outra foto por cima). Chamado quando o
+  // CPF/nome deixa de bater com um aluno já cadastrado.
+  window.limparFotoSugerida = function(){
+    if(_fotoPendente && _fotoPendente.reaproveitar){
+      _fotoPendente = null;
+      _fotoFileIdAtual = null;
+      previewImg.style.display = 'none';
+      previewImg.src = '';
+      placeholder.style.display = '';
+      btnRemover.style.display = 'none';
+      _setStatus('');
+    }
   };
 })();
 </script>
