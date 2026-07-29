@@ -214,6 +214,34 @@ html[data-theme="dark"] .confirm-badge {
 .confirm-badge strong { flex: 1; }
 .confirm-badge-btns { display: flex; gap: 8px; }
 
+/* ── Toast de feedback (salvar turma) ── */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.toast {
+  min-width: 240px;
+  max-width: 360px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Nunito', sans-serif;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.ok    { background: #16a34a; color: #fff; }
+.toast.erro  { background: #b91c1c; color: #fff; }
+
 </style>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -221,6 +249,7 @@ html[data-theme="dark"] .confirm-badge {
 
 <body>
 <div id="header-placeholder"></div>
+<div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
 
@@ -1584,6 +1613,20 @@ async function carregarTurmaParaEdicao(id) {
 /* =========================
    Salvar turma no banco
 ========================= */
+function showToast(msg, tipo) {
+  const container = document.getElementById('toastContainer');
+  if (!container) { alert(msg); return; }
+  const el = document.createElement('div');
+  el.className = 'toast ' + (tipo === 'erro' ? 'erro' : 'ok');
+  el.textContent = msg;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, tipo === 'erro' ? 6000 : 3500);
+}
+
 async function salvarNoBanco() {
   // Anti-duplo-clique: desabilita o botão durante o save
   const btnSalvar = document.querySelector('button[onclick="salvarNoBanco()"]');
@@ -1653,17 +1696,29 @@ async function _salvarNoBancoInterno() {
   };
 
   // Salva direto no Firebase (upsert via _id)
-  await salvarTurmasDB({ ...turmaObj, _id: existente?._id || idFinal });
+  try {
+    await salvarTurmasDB({ ...turmaObj, _id: existente?._id || idFinal });
+  } catch(e) {
+    console.error('[salvarNoBanco]', e);
+    showToast('❌ Erro ao salvar — ' + (e.message || e), 'erro');
+    return;
+  }
 
   // IDs e bancos do sistema (atas/matrículas) em background
   garantirIdsESistemaParaTurma(turmaObj).catch(e => console.warn("[garantirIds]", e));
 
-  // ── Scans: libera o card e dispara upload da fila (antes do alert para não travar) ──
+  // ── Scans: libera o card e dispara upload da fila (antes do toast para não travar) ──
   if (!modoEdicao && window.initScans) window.initScans(idFinal, false);
   if (window.uploadScansQueue) await window.uploadScansQueue();
 
   console.log('✅ Turma salva:', idFinal);
-  alert(modoEdicao ? "Turma atualizada no banco." : "Turma salva no banco.");
+
+  if (modoEdicao) {
+    showToast('✅ Turma atualizada no banco.', 'ok');
+    setTimeout(() => { window.location.href = 'pesquisa-ata.html'; }, 1200);
+  } else {
+    showToast('✅ Turma salva no banco.', 'ok');
+  }
 }
 
 /* =========================
