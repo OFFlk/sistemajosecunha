@@ -268,6 +268,10 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
     <div class="filter-actions">
       <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
       <span class="muted">Ou pesquise vazio para ver todas as turmas.</span>
+      <label class="aluno-search-checkbox" style="margin-left:auto;">
+        <input type="checkbox" id="fInativas">
+        Exibir atas inativas
+      </label>
     </div>
     <div class="muted" style="margin-top:10px;">
       DB local: <b id="dbInfo">carregando...</b>
@@ -483,12 +487,21 @@ function salvarTurmasDB(turmas) {
    Estado
 ========================= */
 let turmas = [];
+let turmasTodas = []; // todas as turmas carregadas, antes do filtro ativa/inativa
 let turmaSelecionada = null;
 let alunosView = [];
 
 /* =========================
    Utilitários
 ========================= */
+function recomputarTurmasBase() {
+  const exibirInativas = document.getElementById("fInativas")?.checked;
+  turmas = turmasTodas.filter(t => {
+    const inativa = String(t.status || "ATIVA").toUpperCase() === "INATIVA";
+    return exibirInativas ? inativa : !inativa;
+  });
+}
+
 function norm(v) {
   return String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -892,7 +905,8 @@ async function carregar() {
     }
   }catch(e){ console.warn('Firestore pré-carga:', e); }
 
-  turmas = lerTurmasDB().filter(t => String(t.status || "ATIVA").toUpperCase() !== "INATIVA");
+  turmasTodas = lerTurmasDB();
+  recomputarTurmasBase();
 
   document.getElementById("dbInfo").textContent =
     `${turmas.length} turma(s) — clique em Pesquisar para exibir`;
@@ -913,6 +927,11 @@ async function carregar() {
   document.getElementById("fTurno").onchange  = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fSerie").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
+  document.getElementById("fInativas").onchange = function(){
+    recomputarTurmasBase();
+    preencherFiltroAno(turmas);
+    if(_jaFoiPesquisado) aplicarFiltros();
+  };
 
   Loading.esconder();
 }
