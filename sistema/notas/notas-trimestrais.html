@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<link rel="icon" href="../icon.png" type="image/png"/>
+<script src="../loading-overlay.js"></script>
+<script src="../auth.firebase.js"></script>
+<!--
+  ⚠️ Este arquivo AINDA NÃO chama Auth.requireRole().
+  Como o plano é criar um "hub" depois (com pesquisa/cadastro e entrada por URL),
+  deixei sem trava de admin por enquanto para não bloquear o professor que só
+  precisa digitar notas. Quando o hub existir, decida se essa página continua
+  aberta pra qualquer papel logado, ou se também exige login.
+-->
+<script src="../theme-colors.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<title>Notas Trimestrais (bridge Access)</title>
+
+<style>
+:root {
+  --card-bg:      #ffffff;
+  --card-border:  var(--brand-border, #ddd6fe);
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border, #ddd6fe);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  --radius:       14px;
+}
+html[data-theme="dark"] {
+  --card-bg:      #131c2e;
+  --card-border:  #2a3a5c;
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
+  --shadow:       0 4px 24px rgba(0,0,0,0.4);
+}
+
+.container { max-width: 1300px; margin: 22px auto 48px; padding: 0 18px; }
+.card { padding: 20px; margin-bottom: 16px; }
+
+.row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
+@media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
+@media(max-width:540px){ .row{grid-template-columns:1fr;} }
+.campo{ display:flex; flex-direction:column; min-width:0; }
+.campo label { font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block; }
+.campo input, .campo select,
+#formGridDinamico input, #formGridDinamico select {
+  padding: 10px 12px; font-size: 14px; width: 100%;
+  border: 1px solid var(--field-border, #ddd6fe); border-radius: 10px;
+  background: var(--field-bg, #fff); color: var(--ink);
+  outline: none; font-family: 'Nunito', sans-serif;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.campo input:focus, .campo select:focus,
+#formGridDinamico input:focus, #formGridDinamico select:focus {
+  border-color: var(--brand, #7c3aed);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+}
+html[data-theme="dark"] .campo input, html[data-theme="dark"] .campo select,
+html[data-theme="dark"] #formGridDinamico input, html[data-theme="dark"] #formGridDinamico select {
+  background: var(--field-bg, #0a1426); color: var(--ink); border-color: var(--field-border, #1e2540);
+}
+.form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:15px; }
+.actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
+
+.btn.btn-secondary, button.btn-secondary {
+  background: transparent; border: 1.5px solid var(--brand, #7c3aed); color: var(--brand, #7c3aed);
+}
+.btn.btn-secondary:hover { background: var(--brand-faded, #f5f3ff); }
+html[data-theme="dark"] .btn.btn-secondary { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
+
+.btn.btn-danger-outline {
+  background: transparent; border: 1.5px solid #b91c1c; color: #b91c1c;
+}
+.btn.btn-danger-outline:hover { background: rgba(185,28,28,0.08); }
+html[data-theme="dark"] .btn.btn-danger-outline { color: #fca5a5; border-color: #fca5a5; }
+
+.btn-mini { padding:6px 10px; font-size:12px; border-radius:8px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:'Nunito',sans-serif; }
+
+.table-wrap{ overflow-x:auto; padding-bottom:6px; border:1px solid var(--line); border-radius:14px; margin-top:14px; }
+table{ width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
+html[data-theme="dark"] tbody tr:hover td{ background:var(--chip-bg); }
+th, td{ padding:6px 5px; border-bottom:1px solid var(--line); text-align:center; white-space:nowrap; }
+th.th-nome, td.col-nome{ text-align:left; padding-left:8px; min-width:160px; position:sticky; left:0; background:var(--card-bg); z-index:1; }
+th.th-materia{ background:var(--brand-faded,#f5f3ff); font-weight:800; color:var(--brand-text,#6d28d9); }
+html[data-theme="dark"] th.th-materia{ background:rgba(124,58,237,0.15); }
+th.th-sub{ font-size:10px; font-weight:700; color:var(--muted); width:44px; }
+td.col-nota input{ width:42px; padding:4px; font-size:12px; text-align:center; border:1px solid var(--field-border); border-radius:6px; background:var(--field-bg); color:var(--ink); }
+td.col-media{ font-weight:800; color:var(--brand,#7c3aed); width:48px; }
+td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(0,0,0,0.03) 4px, transparent 4px, transparent 8px); }
+
+.aviso-warn{ background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
+.aviso-info{ background:rgba(59,130,246,.10); border:1px solid rgba(59,130,246,.30); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); line-height:1.5; }
+
+.ordem-lista{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+.ordem-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--field-bg); font-size:13px; }
+.ordem-item.desativado{ opacity:0.45; }
+.ordem-item .ordem-num{ font-weight:800; color:var(--brand,#7c3aed); width:22px; text-align:center; flex-shrink:0; }
+.ordem-item .ordem-label{ flex:1; }
+.ordem-item .ordem-btns{ display:flex; gap:4px; }
+
+.status-msg{ font-size:13px; margin-top:8px; min-height:18px; }
+.status-msg.ok{ color:#16a34a; }
+.status-msg.err{ color:#dc2626; }
+
+.hidden{ display:none !important; }
+</style>
+<script src="../db.firebase.js"></script>
+</head>
+
+<body>
+<div id="header-placeholder"></div>
+
+<div class="container">
+
+  <div class="card">
+    <h2 style="margin-top:0;">📥 Lançamento de Notas Trimestrais</h2>
+    <div class="aviso-info">
+      <strong>Pra que serve esta página:</strong> ela NÃO substitui o sistema da prefeitura.
+      Serve só pra você digitar as notas de forma rápida aqui, conferir a média de cada aluno,
+      e depois copiar os valores prontos (na ordem certa) pra colar no Access.
+    </div>
+
+    <div class="row">
+      <div class="campo">
+        <label>Ano</label>
+        <select id="ano"></select>
+      </div>
+      <div class="campo">
+        <label>Schema (matérias)</label>
+        <select id="schemaTurma" title="Escolha o schema salvo no Admin — define quais matérias aparecem"></select>
+      </div>
+      <div class="campo">
+        <label>Turma (identificação livre)</label>
+        <input id="turmaNome" placeholder="ex: 5º ano A - Matutino">
+      </div>
+      <div class="campo">
+        <label>Série</label>
+        <select id="serieTurma"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       CONFIGURAÇÃO DE ORDEM PARA O ACCESS
+  ═══════════════════════════════════ -->
+  <div class="card">
+    <h3 style="margin-top:0;">🗂️ Ordem de cópia para o Access</h3>
+    <div class="aviso-warn">
+      Isso é o que resolve o problema do Ctrl+V: o Access no modo grade (datasheet) até aceita colar
+      várias células de uma vez, mas só se a <b>quantidade e a ordem das colunas coladas forem
+      idênticas</b> à ordem dos campos na tela do Access — inclusive pulando os que a matéria não usa lá.
+      Se não bater, ele realmente joga tudo dentro da célula onde você colou.<br><br>
+      Monte abaixo a lista <b>exatamente na ordem que aparece no Access</b> (use as setas ↑ ↓),
+      e desmarque os campos que não existem lá pra essa turma. Isso fica salvo no seu navegador.
+    </div>
+    <div class="ordem-lista" id="ordemLista"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Alunos</h3>
+    <div class="form-grid" id="formGridDinamico"></div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
+      <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
+      <button class="btn btn-secondary" onclick="copiarTodasLinhas()">📋 Copiar todas as notas (bloco)</button>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+
+    <div class="table-wrap"><table>
+      <thead>
+        <tr id="theadMaterias"></tr>
+        <tr id="theadSub"></tr>
+      </thead>
+      <tbody id="tabela"></tbody>
+    </table></div>
+  </div>
+
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function normStr(v){ return String(v ?? "").trim(); }
+function setStatus(kind, msg){
+  const el = $("statusMsg");
+  if(!el) return;
+  el.className = "status-msg" + (kind ? " " + kind : "");
+  el.textContent = msg || "";
+}
+
+/* =========================
+   DB — usa window.DB.notasTrimestrais (Firestore real)
+   ⚠️ Isso só existe se você adicionar esta linha em db.firebase.js,
+   dentro do objeto window.DB (perto de "funcionarios: makeCollection(...)"):
+
+       notasTrimestrais: makeCollection('notasTrimestrais'),
+
+   Isso cria a coleção /schools/{schoolId}/notasTrimestrais/{docId},
+   isolada dos módulos de atas/ano-ativo, exatamente como você pediu.
+========================= */
+function getNotasCollection() {
+  if (!window.DB || !window.DB.notasTrimestrais) {
+    throw new Error(
+      "window.DB.notasTrimestrais não existe. Adicione 'notasTrimestrais: makeCollection(\\'notasTrimestrais\\'),' " +
+      "dentro do window.DB em db.firebase.js."
+    );
+  }
+  return window.DB.notasTrimestrais;
+}
+
+/* =========================
+   Schema (reaproveita o que o Admin já configurou)
+========================= */
+const SCHEMAS_KEY = "turmasSchemas_v1";
+const ACTIVE_SCHEMA_ID_KEY = "turmasSchemaActiveId_v1";
+
+function getDefaultConfig() {
+  return {
+    id: "default", version: 1, nome: "Padrão (arquivo original)",
+    serieAtiva: true,
+    colunas: [
+      { key:"port",  label:"Português",  type:"nota", enabled:true },
+      { key:"mat",   label:"Matemática", type:"nota", enabled:true },
+      { key:"hist",  label:"História",   type:"nota", enabled:true },
+      { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
+      { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
+      { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
+      { key:"arte",  label:"Arte",       type:"nota", enabled:true },
+      { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
+    ]
+  };
+}
+
+function loadSchemas() {
+  try {
+    const raw = localStorage.getItem(SCHEMAS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+let SCHEMAS_CACHE = [];
+let schemaSelecionadoId = "";
+
+function renderSelectSchemas() {
+  const sel = $("schemaTurma");
+  SCHEMAS_CACHE = loadSchemas();
+  if (!SCHEMAS_CACHE.length) SCHEMAS_CACHE = [getDefaultConfig()];
+
+  if (!schemaSelecionadoId) {
+    const activeId = localStorage.getItem(ACTIVE_SCHEMA_ID_KEY) || "";
+    schemaSelecionadoId = SCHEMAS_CACHE.some(s => s.id === activeId) ? activeId : SCHEMAS_CACHE[0].id;
+  }
+
+  sel.innerHTML = SCHEMAS_CACHE.map(s =>
+    `<option value="${s.id}" ${s.id === schemaSelecionadoId ? "selected" : ""}>${String(s.nome || s.id)}</option>`
+  ).join("");
+
+  sel.onchange = () => {
+    schemaSelecionadoId = sel.value;
+    onSchemaChange();
+  };
+}
+
+function getSchemaAtiva() {
+  return SCHEMAS_CACHE.find(s => s.id === schemaSelecionadoId) || getDefaultConfig();
+}
+function getMateriasAtivas() {
+  return (getSchemaAtiva().colunas || []).filter(c => c.enabled && c.type === "nota");
+}
+
+function onSchemaChange() {
+  alunos = [];
+  renderOrdemAccess();
+  renderFormularioDinamico();
+  renderCabecalhoTabela();
+  atualizarTabela();
+}
+
+/* =========================
+   Ordem de cópia p/ Access (por schema, salvo no navegador)
+========================= */
+function ordemAccessKey() { return `ordemAccessNotas_v1_${schemaSelecionadoId}`; }
+
+// gera a lista padrão: cada matéria ativa gera 3 campos (T1,T2,T3), todos habilitados
+function gerarOrdemPadrao() {
+  const materias = getMateriasAtivas();
+  const campos = [];
+  for (const m of materias) {
+    for (const tri of [1,2,3]) {
+      campos.push({ materiaKey: m.key, materiaLabel: m.label, trimestre: tri, enabled: true });
+    }
+  }
+  return campos;
+}
+
+function carregarOrdemAccess() {
+  try {
+    const raw = localStorage.getItem(ordemAccessKey());
+    if (!raw) return gerarOrdemPadrao();
+    const salvo = JSON.parse(raw);
+    const padrao = gerarOrdemPadrao();
+    // funde: mantém ordem/estado salvo, mas adiciona campos novos (matéria nova no schema) no fim
+    const chaveOf = (c) => `${c.materiaKey}__${c.trimestre}`;
+    const salvoChaves = new Set(salvo.map(chaveOf));
+    const novos = padrao.filter(c => !salvoChaves.has(chaveOf(c)));
+    // remove do salvo campos de matérias que não existem mais no schema atual
+    const padraoChaves = new Set(padrao.map(chaveOf));
+    const filtrado = salvo.filter(c => padraoChaves.has(chaveOf(c)));
+    return [...filtrado, ...novos];
+  } catch { return gerarOrdemPadrao(); }
+}
+
+let ORDEM_ACCESS = [];
+
+function salvarOrdemAccess() {
+  localStorage.setItem(ordemAccessKey(), JSON.stringify(ORDEM_ACCESS));
+}
+
+function renderOrdemAccess() {
+  ORDEM_ACCESS = carregarOrdemAccess();
+  const wrap = $("ordemLista");
+  wrap.innerHTML = "";
+  ORDEM_ACCESS.forEach((campo, idx) => {
+    const div = document.createElement("div");
+    div.className = "ordem-item" + (campo.enabled ? "" : " desativado");
+    div.innerHTML = `
+      <span class="ordem-num">${idx + 1}</span>
+      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
+        <input type="checkbox" ${campo.enabled ? "checked" : ""} data-idx="${idx}" class="ordem-check">
+        <span class="ordem-label">${campo.materiaLabel} — ${campo.trimestre}º trimestre</span>
+      </label>
+      <div class="ordem-btns">
+        <button type="button" class="btn-mini btn-secondary" data-idx="${idx}" data-dir="-1">↑</button>
+        <button type="button" class="btn-mini btn-secondary" data-idx="${idx}" data-dir="1">↓</button>
+      </div>
+    `;
+    wrap.appendChild(div);
+  });
+
+  wrap.querySelectorAll(".ordem-check").forEach(chk => {
+    chk.addEventListener("change", () => {
+      ORDEM_ACCESS[+chk.dataset.idx].enabled = chk.checked;
+      salvarOrdemAccess();
+      renderOrdemAccess();
+    });
+  });
+  wrap.querySelectorAll("button[data-dir]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = +btn.dataset.idx;
+      const dir = +btn.dataset.dir;
+      const j = i + dir;
+      if (j < 0 || j >= ORDEM_ACCESS.length) return;
+      [ORDEM_ACCESS[i], ORDEM_ACCESS[j]] = [ORDEM_ACCESS[j], ORDEM_ACCESS[i]];
+      salvarOrdemAccess();
+      renderOrdemAccess();
+    });
+  });
+}
+
+/* =========================
+   Ano / Série
+========================= */
+function preencherAnos() {
+  const el = $("ano");
+  const anoAtual = new Date().getFullYear();
+  el.innerHTML = "";
+  for (let a = anoAtual - 3; a <= anoAtual + 1; a++) {
+    el.innerHTML += `<option${a === anoAtual ? " selected" : ""}>${a}</option>`;
+  }
+}
+const SERIES_PADRAO = [
+  "Alfabetização","Eixo 1","Eixo 2","Eixo 3",
+  "1ª série","2ª série","3ª série","4ª série",
+  "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano"
+];
+function preencherSeries() {
+  const el = $("serieTurma");
+  el.innerHTML = `<option value="">Selecione...</option>` + SERIES_PADRAO.map(s => `<option>${s}</option>`).join("");
+}
+
+/* =========================
+   Notas / Média
+========================= */
+function parseNota(v) {
+  v = normStr(v).replace(",", ".");
+  if (v === "") return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+function formatarNotaExibicao(n) {
+  if (n === null || n === undefined || n === "") return "";
+  return String(n).replace(".", ",");
+}
+function calcularMedia(n1, n2, n3) {
+  const vals = [n1, n2, n3].map(parseNota).filter(v => v !== null);
+  if (!vals.length) return null;
+  const soma = vals.reduce((a,b) => a+b, 0);
+  return soma / vals.length;
+}
+
+/* =========================
+   Formulário dinâmico de aluno
+========================= */
+function renderFormularioDinamico() {
+  const grid = $("formGridDinamico");
+  const materias = getMateriasAtivas();
+
+  let html = `<div class="campo"><label>Nome do aluno *</label><input id="nome"></div>`;
+  for (const m of materias) {
+    html += `
+      <div class="campo" style="min-width:150px;">
+        <label>${m.label}</label>
+        <div style="display:flex;gap:4px;">
+          <input id="n1_${m.key}" placeholder="1º" style="text-align:center;">
+          <input id="n2_${m.key}" placeholder="2º" style="text-align:center;">
+          <input id="n3_${m.key}" placeholder="3º" style="text-align:center;">
+        </div>
+      </div>
+    `;
+  }
+  grid.innerHTML = html;
+}
+
+function limparCamposAluno() {
+  $("nome").value = "";
+  for (const m of getMateriasAtivas()) {
+    ["n1","n2","n3"].forEach(p => { const el = $(`${p}_${m.key}`); if (el) el.value = ""; });
+  }
+  $("nome").focus();
+}
+
+let alunos = [];
+let editandoIdx = -1;
+
+function adicionarAluno() {
+  const nomeEl = $("nome");
+  if (!nomeEl.value.trim()) { alert("Informe o nome do aluno."); return; }
+
+  const materias = getMateriasAtivas();
+  const notas = {};
+  for (const m of materias) {
+    const n1 = $(`n1_${m.key}`)?.value || "";
+    const n2 = $(`n2_${m.key}`)?.value || "";
+    const n3 = $(`n3_${m.key}`)?.value || "";
+    notas[m.key] = { n1, n2, n3 };
+  }
+
+  const aluno = { nome: nomeEl.value.trim(), notas };
+
+  if (editandoIdx >= 0) { alunos[editandoIdx] = aluno; editandoIdx = -1; }
+  else alunos.push(aluno);
+
+  alunos.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  atualizarTabela();
+  limparCamposAluno();
+}
+
+function editarAluno(idx) {
+  const a = alunos[idx];
+  $("nome").value = a.nome;
+  for (const key in a.notas) {
+    const n = a.notas[key];
+    if ($(`n1_${key}`)) $(`n1_${key}`).value = n.n1 || "";
+    if ($(`n2_${key}`)) $(`n2_${key}`).value = n.n2 || "";
+    if ($(`n3_${key}`)) $(`n3_${key}`).value = n.n3 || "";
+  }
+  editandoIdx = idx;
+  window.scrollTo({ top: $("formGridDinamico").offsetTop - 100, behavior: "smooth" });
+}
+
+function excluirAluno(idx) {
+  if (!confirm(`Remover "${alunos[idx].nome}"?`)) return;
+  alunos.splice(idx, 1);
+  atualizarTabela();
+}
+
+/* =========================
+   Tabela
+========================= */
+function renderCabecalhoTabela() {
+  const materias = getMateriasAtivas();
+  const trM = $("theadMaterias");
+  const trS = $("theadSub");
+
+  let htmlM = `<th class="th-nome" rowspan="2">Nome</th>`;
+  let htmlS = ``;
+  for (const m of materias) {
+    htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
+    htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
+  }
+  htmlM += `<th rowspan="2">Ações</th>`;
+  trM.innerHTML = htmlM;
+  trS.innerHTML = htmlS;
+}
+
+function atualizarTabela() {
+  const tb = $("tabela");
+  const materias = getMateriasAtivas();
+
+  if (!alunos.length) {
+    tb.innerHTML = `<tr><td colspan="${materias.length*4+2}" style="text-align:center;color:var(--muted);padding:16px;">Nenhum aluno adicionado ainda.</td></tr>`;
+    return;
+  }
+
+  tb.innerHTML = alunos.map((a, idx) => {
+    let cells = `<td class="col-nome">${a.nome}</td>`;
+    for (const m of materias) {
+      const n = a.notas[m.key] || {};
+      const media = calcularMedia(n.n1, n.n2, n.n3);
+      cells += `<td class="col-nota">${n.n1 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      cells += `<td class="col-nota">${n.n2 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      cells += `<td class="col-nota">${n.n3 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      cells += `<td class="col-media">${media !== null ? formatarNotaExibicao(media.toFixed(1)) : "—"}</td>`;
+    }
+    cells += `<td style="white-space:nowrap;">
+      <button class="btn-mini btn-secondary" onclick="editarAluno(${idx})" title="Editar">✏️</button>
+      <button class="btn-mini btn-secondary" onclick="copiarLinha(${idx})" title="Copiar notas deste aluno p/ Access">📋</button>
+      <button class="btn-mini btn-danger-outline" onclick="excluirAluno(${idx})" title="Excluir">🗑️</button>
+    </td>`;
+    return `<tr>${cells}</tr>`;
+  }).join("");
+}
+
+/* =========================
+   Exportação p/ Access (TSV = separado por TAB)
+========================= */
+function valorCampo(aluno, campo) {
+  const n = aluno.notas[campo.materiaKey] || {};
+  const chave = "n" + campo.trimestre;
+  return normStr(n[chave] || "").replace(".", ",");
+}
+
+function montarLinhaTSV(aluno) {
+  const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
+  return camposAtivos.map(c => valorCampo(aluno, c)).join("\t");
+}
+
+async function copiarParaClipboard(texto, msgOk) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    setStatus("ok", msgOk);
+  } catch (e) {
+    setStatus("err", "❌ Não consegui copiar automaticamente. Selecione e copie manualmente o texto abaixo:");
+    console.warn(e);
+    prompt("Copie manualmente (Ctrl+C):", texto);
+  }
+}
+
+function copiarLinha(idx) {
+  const aluno = alunos[idx];
+  const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
+  if (!camposAtivos.length) { setStatus("err", "⚠️ Nenhum campo habilitado na ordem de cópia acima."); return; }
+  const linha = montarLinhaTSV(aluno);
+  copiarParaClipboard(linha, `✅ Notas de "${aluno.nome}" copiadas! Clique na 1ª célula do aluno no Access e dê Ctrl+V.`);
+}
+
+function copiarTodasLinhas() {
+  const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
+  if (!camposAtivos.length) { setStatus("err", "⚠️ Nenhum campo habilitado na ordem de cópia acima."); return; }
+  if (!alunos.length) { setStatus("err", "⚠️ Nenhum aluno cadastrado."); return; }
+  const bloco = alunos.map(montarLinhaTSV).join("\n");
+  copiarParaClipboard(bloco, `✅ Bloco com ${alunos.length} aluno(s) copiado! No Access, clique na 1ª célula do 1º aluno (na mesma ordem em que aparecem aqui) e dê Ctrl+V.`);
+}
+
+/* =========================
+   Salvar no banco (Firestore)
+========================= */
+// Guarda o _id só durante esta sessão da página, pra evitar duplicar
+// o documento se você clicar em "Salvar" mais de uma vez na mesma turma.
+// Escolher/reabrir um registro salvo depois fica por conta do hub.
+let registroAtualId = null;
+
+async function salvarNoBanco() {
+  const nomeTurma = $("turmaNome").value.trim();
+  if (!nomeTurma) { setStatus("err", "⚠️ Informe o nome/identificação da turma antes de salvar."); return; }
+
+  const registro = {
+    ano: $("ano").value,
+    schemaId: schemaSelecionadoId,
+    turmaNome: nomeTurma,
+    serie: $("serieTurma").value,
+    alunos,
+    atualizadoEm: new Date().toISOString()
+  };
+  if (registroAtualId) registro._id = registroAtualId;
+
+  setStatus("", "Salvando...");
+  try {
+    const salvo = await getNotasCollection().save(registro);
+    registroAtualId = salvo._id;
+    setStatus("ok", `✅ Salvo no banco (${nomeTurma} — ${registro.ano}).`);
+  } catch (e) {
+    console.error(e);
+    setStatus("err", "❌ Erro ao salvar: " + (e.message || e));
+  }
+}
+
+/* =========================
+   Init
+========================= */
+document.addEventListener("DOMContentLoaded", () => {
+  preencherAnos();
+  preencherSeries();
+  renderSelectSchemas();
+  onSchemaChange();
+});
+</script>
+
+<script src="../header-logic.js"></script>
+
+</body>
+</html>
