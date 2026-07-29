@@ -550,6 +550,12 @@ function _normalizarAlunosDB(arr){
   if(!Array.isArray(arr)) return [];
   return arr.map(a => ({...a, id: a.id||a.alunoId||'', nomeOficial: a.nomeOficial||a.nome||''}));
 }
+// Turmas inativas não devem alimentar o histórico oficial (índice de busca,
+// resumo, anos disponíveis, placeholders) — só os dados das turmas ativas.
+function _filtrarTurmasAtivas(arr){
+  if(!Array.isArray(arr)) return [];
+  return arr.filter(t => String(t?.status || 'ATIVA').toUpperCase() !== 'INATIVA');
+}
 
 async function carregarDB(){
   // 1) Carrega do localStorage IMEDIATAMENTE — UI disponível em < 100ms
@@ -557,7 +563,7 @@ async function carregarDB(){
     dadosEscola:  getLS(__getDadosEscolaKey(), {}) || getLS('dadosEscola', {}),
     alunosDB:     _normalizarAlunosDB(__getLS('alunosDB', [])),
     matriculasDB: __getLS('matriculasDB', []),
-    turmasDB:     __getLS('turmasDB', []),
+    turmasDB:     _filtrarTurmasAtivas(__getLS('turmasDB', [])),
     atasDB:       __getLS('atasDB', [])
   };
   construirIndex();
@@ -578,6 +584,7 @@ async function carregarDB(){
       const dados = await DB.loadAll();
       if(dados && Array.isArray(dados.turmasDB)){
         dados.alunosDB = _normalizarAlunosDB(dados.alunosDB);
+        dados.turmasDB = _filtrarTurmasAtivas(dados.turmasDB);
         state.db = dados;
         construirIndex();
         _atualizarDbInfo();
