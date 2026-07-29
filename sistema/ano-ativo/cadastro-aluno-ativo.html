@@ -1841,25 +1841,43 @@ function normSerie(s){
   );
   if(matExistente) return setMsg(`Aluno já matriculado nessa turma em ${ano}.`, "err");
 
-  // ── Barreira: aluno não pode ter 2 matrículas ATIVAS no mesmo ano ──
-  // Não existe motivo lógico pra um aluno estar em 2 turmas ao mesmo tempo
-  // no mesmo ano letivo. Trocar de turma no meio do ano NÃO deve criar uma
-  // segunda matrícula ativa em paralelo — a matrícula antiga precisa ser
-  // encerrada primeiro (tela de edição → "Encerrar matrícula").
-  const matAtivaOutraTurma = mats.find(m =>
+  // ── Barreira: aluno não pode estar em 2 turmas ao mesmo tempo no mesmo ano ──
+  // Não existe motivo lógico pra isso. MAS: em anos retroativos, TODA
+  // matrícula nasce com status 'INATIVO' + uma situação terminal
+  // (TRANSFERIDO/DESISTENTE/FALECIDO/APROVADO/REPROVADO) — nunca 'ATIVO'.
+  // Então não dá pra usar status==='ATIVO' como sinal de duplicidade aqui
+  // como fazemos no ano corrente: uma transferência real no meio do ano
+  // (2 matrículas legítimas, mesmo aluno, mesmo ano, turmas diferentes) é
+  // um cenário válido que também bateria nesse filtro. Por isso:
+  //   • ano ativo (corrente)  → BLOQUEIA de vez (nunca é legítimo)
+  //   • ano retroativo        → AVISA e pede confirmação (pode ser
+  //     transferência real, mas também pode ser erro humano/duplicidade)
+  const outraMatriculaNoAno = mats.find(m =>
     m.alunoId === alunoId &&
     String(m.anoLetivo) === String(ano) &&
-    m.turmaId !== tid &&
-    (m.status || 'ATIVO').toUpperCase() === 'ATIVO'
+    m.turmaId !== tid
   );
-  if(matAtivaOutraTurma){
-    const turmaAtual = getTurmas().find(t => t.turmaId === matAtivaOutraTurma.turmaId);
-    const nomeTurmaAtual = turmaAtual ? (turmaAtual.nome || turmaAtual.turmaId) : matAtivaOutraTurma.turmaId;
-    return setMsg(
-      `Este aluno já tem uma matrícula ATIVA em ${ano} na turma "${nomeTurmaAtual}". ` +
-      `Encerre essa matrícula (na tela de edição do aluno) antes de matricular em outra turma no mesmo ano.`,
-      "err"
-    );
+  if(outraMatriculaNoAno){
+    const turmaOutra = getTurmas().find(t => t.turmaId === outraMatriculaNoAno.turmaId);
+    const nomeTurmaOutra = turmaOutra ? (turmaOutra.nome || turmaOutra.turmaId) : outraMatriculaNoAno.turmaId;
+
+    if(anoEhAtivo && (outraMatriculaNoAno.status || 'ATIVO').toUpperCase() === 'ATIVO'){
+      return setMsg(
+        `Este aluno já tem uma matrícula ATIVA em ${ano} na turma "${nomeTurmaOutra}". ` +
+        `Encerre essa matrícula (na tela de edição do aluno) antes de matricular em outra turma no mesmo ano.`,
+        "err"
+      );
+    }
+
+    if(!anoEhAtivo){
+      const situacaoOutra = outraMatriculaNoAno.situacao || '—';
+      const msg =
+        `⚠️ Este aluno já tem outra matrícula em ${ano}, na turma "${nomeTurmaOutra}" (situação: ${situacaoOutra}).\n\n` +
+        `Isso só faz sentido se ele realmente estudou nas duas turmas naquele ano (ex.: transferência no meio do ano). ` +
+        `Se não for o caso, cancele e confira se não é um cadastro duplicado.\n\n` +
+        `Deseja continuar e criar esta matrícula mesmo assim?`;
+      if(!confirm(msg)) return setMsg('Matrícula cancelada.', 'err');
+    }
   }
 
   const modeloFinal = modelo || 'REGULAR';
