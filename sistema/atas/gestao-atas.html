@@ -193,7 +193,7 @@ html[data-theme="dark"] .badge.ok   { color:#86efac; }
       <span class="sec-toggle" id="togSecApagar">▼</span>
     </div>
     <div class="sec-body" id="secApagar">
-      <p class="muted">Selecione as turmas a remover. Os bancos auxiliares (atasDB, matriculasDB, turmasMetaDB) são reconstruídos automaticamente.</p>
+      <p class="muted">Selecione as turmas a remover. Os bancos auxiliares (atasDB, matriculasDB, turmasMetaDB) são reconstruídos automaticamente. Turmas marcadas com <span class="badge warn">⚠️ suspeita/legado</span> não têm arquivo de origem/aba reconhecidos — geralmente são resquícios antigos e não devem existir aqui.</p>
       <div class="row-btns" style="margin-bottom:10px;">
         <button class="btn btn-gray"   onclick="selecionarTodasTurmas(true)">Marcar todas</button>
         <button class="btn btn-gray"   onclick="selecionarTodasTurmas(false)">Desmarcar todas</button>
@@ -393,10 +393,11 @@ async function inicializar() {
     });
     if (window.DB && window.DB.turmas) {
       const todasFirestore = await window.DB.turmas.list();
-      const apenasAtas = todasFirestore.filter(ehTurmaDeAtas);
-      // Sobrescreve localStorage apenas com turmas de atas
-      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(apenasAtas));
-      logEl(`Firestore: ${todasFirestore.length} turma(s) total → ${apenasAtas.length} de atas (${todasFirestore.length - apenasAtas.length} do ano-ativo ignoradas)`, 'logGeral');
+      const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
+      // Mantém TODAS as turmas no cache local (não esconde as suspeitas) —
+      // elas são marcadas visualmente na tabela e continuam selecionáveis para apagar.
+      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(todasFirestore));
+      logEl(`Firestore: ${todasFirestore.length} turma(s) total (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado — marcada${suspeitas.length===1?'':'s'} na tabela, não escondida${suspeitas.length===1?'':'s'})`, 'logGeral');
     }
   } catch(e) {
     logEl('⚠️ Sem conexão com Firestore — usando cache local.', 'logGeral');
@@ -429,9 +430,9 @@ async function recarregar() {
       // O cache real fica em _cache['turmas'] dentro do db.firebase.js — não acessível diretamente;
       // basta chamar list() que ele já verifica o timestamp.
       const todasFirestore = await window.DB.turmas.list();
-      const apenasAtas = todasFirestore.filter(ehTurmaDeAtas);
-      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(apenasAtas));
-      logEl(`Firestore: ${todasFirestore.length} turma(s) → ${apenasAtas.length} de atas`, 'logGeral');
+      const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
+      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(todasFirestore));
+      logEl(`Firestore: ${todasFirestore.length} turma(s) (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado)`, 'logGeral');
     }
   } catch(e) {
     logEl('⚠️ Sem conexão com Firestore — usando cache local.', 'logGeral');
@@ -477,12 +478,13 @@ function renderTabelaTurmas() {
   tbody.innerHTML = turmas.map((t, i) => {
     const alunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
     const semId  = Array.isArray(t.alunos) ? t.alunos.filter(a => !String(a.alunoId||'').trim()).length : 0;
-    const badge  = semId ? `<span class="badge warn">${semId} sem ID</span>` : '';
+    const badgeSemId = semId ? `<span class="badge warn">${semId} sem ID</span>` : '';
+    const badgeLegado = !ehTurmaDeAtas(t) ? `<span class="badge warn" title="Não parece uma turma de atas (sem origemArquivo/aba) — possível resquício legado do ano-ativo">⚠️ suspeita/legado</span>` : '';
     const origem = (t.origemArquivo||'').replace(/^.+[/\\]/,'') || '—';
     return `
       <tr>
         <td class="center"><input type="checkbox" class="chk-turma" data-idx="${i}" onchange="onCheckTurma()"></td>
-        <td><b>${esc(t.aba||t.id||'—')}</b> ${badge}</td>
+        <td><b>${esc(t.aba||t.id||t._id||t.turmaId||'—')}</b> ${badgeLegado} ${badgeSemId}</td>
         <td>${esc(t.anoLetivo||'—')}</td>
         <td>${esc(t.turno||'—')}</td>
         <td>${esc(t.serieTexto||'—')}</td>
@@ -552,7 +554,7 @@ async function apagarSelecionadas() {
   const indices = checks.map(c => Number(c.dataset.idx));
   const turmas  = lerTurmasDB();
   const aApagar = indices.map(i => turmas[i]).filter(Boolean);
-  const nomes   = aApagar.map(t => t.aba || t.id || '?');
+  const nomes   = aApagar.map(t => t.aba || t.id || t._id || t.turmaId || '?');
   if (!confirm(`Apagar ${aApagar.length} turma(s)?\n\n${nomes.join('\n')}\n\nEsta ação não pode ser desfeita.`)) return;
 
   const btnAp = document.getElementById('btnApagarSel');
