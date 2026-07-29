@@ -190,34 +190,12 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 .scans-status.ok { color:#16a34a; }
 .scans-status.err{ color:#dc2626; }
 
-
-/* ── Badge de confirmação de exclusão de turma ── */
-.confirm-badge {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  background: #fef2f2;
-  border: 1.5px solid #fca5a5;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: #991b1b;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-html[data-theme="dark"] .confirm-badge {
-  background: rgba(185,28,28,0.12);
-  border-color: #b91c1c;
-  color: #fca5a5;
-}
-.confirm-badge.show { display: flex; }
-.confirm-badge strong { flex: 1; }
-.confirm-badge-btns { display: flex; gap: 8px; }
-
 @keyframes toastSubir {
   from { opacity: 0; transform: translateX(-50%) translateY(16px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
 
 </style>
 <script src="../db.firebase.js"></script>
@@ -319,17 +297,8 @@ html[data-theme="dark"] .confirm-badge {
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
       <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
-      <button class="btn btn-danger-outline" id="btnInativarTurma" onclick="mostrarConfirmInativacao()" style="display:none; margin-left:auto;">🚫 Inativar turma</button>
+      <button class="btn btn-danger-outline" id="btnInativarTurma" onclick="confirmarInativacaoTurma()" style="display:none; margin-left:auto;">🚫 Inativar turma</button>
       <button class="btn btn-secondary" id="btnReativarTurma" onclick="reativarTurma()" style="display:none; margin-left:auto;">✅ Reativar turma</button>
-    </div>
-
-    <!-- Badge de confirmação de inativação -->
-    <div class="confirm-badge" id="confirmBadgeInativacao">
-      <strong>⚠️ Inativar esta turma? Ela deixa de aparecer na pesquisa de atas, mas os dados continuam salvos e podem ser reativados depois.</strong>
-      <div class="confirm-badge-btns">
-        <button class="btn btn-danger-outline btn-mini" onclick="confirmarInativacaoTurma()">Sim, inativar</button>
-        <button class="btn btn-secondary btn-mini" onclick="fecharConfirmInativacao()">Cancelar</button>
-      </div>
     </div>
 
     <div class="table-wrap"><table>
@@ -420,7 +389,7 @@ const DB = (() => {
   function write(baseKey, value){
     const k = key(baseKey);
     if (!k){
-      alert("Sua conta não está vinculada a uma escola (schoolId). Peça ao admin para configurar.");
+      _toastErro("❌ Sua conta não está vinculada a uma escola (schoolId). Peça ao admin para configurar.");
       return false;
     }
     localStorage.setItem(k, JSON.stringify(value));
@@ -610,7 +579,7 @@ function renderSelectSchemasCadastro() {
 
 function onTrocarSchemaTurma(id) {
   if (modoEdicao) {
-    alert("Esta turma já existe e usa o schema salvo nela (snapshot).");
+    _toastErro("⚠️ Esta turma já existe e usa o schema salvo nela (snapshot).");
     renderSelectSchemasCadastro();
     return;
   }
@@ -1060,12 +1029,12 @@ function adicionarAluno() {
   const nomeEl = $("nome");
   if (!nomeEl) return;
 
-  if (!nomeEl.value.trim()) { alert("Informe o nome do aluno."); return; }
+  if (!nomeEl.value.trim()) { _toastErro("⚠️ Informe o nome do aluno."); return; }
 
   if (schema.serieAtiva) {
     const serieEl = $("serie");
-    if (seriesTurma.length === 0) { alert("Defina a(s) série(s) da turma no cabeçalho antes de adicionar alunos."); return; }
-    if (!serieEl || !serieEl.value) { alert("Selecione a série do aluno (limitada pela série da turma)."); return; }
+    if (seriesTurma.length === 0) { _toastErro("⚠️ Defina a(s) série(s) da turma no cabeçalho antes de adicionar alunos."); return; }
+    if (!serieEl || !serieEl.value) { _toastErro("⚠️ Selecione a série do aluno (limitada pela série da turma)."); return; }
   }
 
   const aluno = { nome: nomeEl.value.trim() };
@@ -1173,7 +1142,7 @@ function editarAluno(i) {
 ========================= */
 function exportarPDF() {
   // Garante libs
-  if (!window.jspdf || !window.jspdf.jsPDF) { alert("Biblioteca jsPDF não carregou."); return; }
+  if (!window.jspdf || !window.jspdf.jsPDF) { _toastErro("❌ Biblioteca jsPDF não carregou."); return; }
 
   const schema = getSchemaAtivoParaTela();
   const colAtivas = getColunasAtivas(schema);
@@ -1509,7 +1478,7 @@ async function carregarTurmaParaEdicao(id) {
   const db = await lerTurmasDB();
   const turma = db.find(t => t.id === id || t._id === id);
 
-  if (!turma) { alert("Turma não encontrada no banco."); return; }
+  if (!turma) { _toastErro("❌ Turma não encontrada no banco."); return; }
 
   // ✅ aplica snapshot do schema dessa turma
   SCHEMA_ATIVO = turma.schemaSnapshot ? normalizeSchema(turma.schemaSnapshot) : null;
@@ -1630,6 +1599,38 @@ function _showToast(msg, bg, shadow, duration){
   setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
 }
 
+// Modal de confirmação para decisões importantes (padrão do sistema).
+// Retorna uma Promise<boolean>: true = confirmou, false = cancelou/fechou fora.
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309'; // amber-700 (padrão do sistema)
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${escHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+
+    function fechar(resultado){
+      backdrop.remove();
+      resolve(resultado);
+    }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
+}
+
 async function salvarNoBanco() {
   // Anti-duplo-clique: desabilita o botão durante o save
   const btnSalvar = document.querySelector('button[onclick="salvarNoBanco()"]');
@@ -1648,18 +1649,18 @@ async function _salvarNoBancoInterno() {
   const elTurno = $("turno");
   const elSerieHidden = $("serieAta");
 
-  if (!elAno?.value) { alert("Selecione o ano."); return; }
-  if (!elTurno?.value) { alert("Selecione o turno."); return; }
+  if (!elAno?.value) { _toastErro("⚠️ Selecione o ano."); return; }
+  if (!elTurno?.value) { _toastErro("⚠️ Selecione o turno."); return; }
 
   if (schema.serieAtiva) {
     if (!elSerieHidden?.value || !elSerieHidden.value.trim()) {
-      alert("Defina a(s) série(s) da turma no cabeçalho.");
+      _toastErro("⚠️ Defina a(s) série(s) da turma no cabeçalho.");
       return;
     }
   }
 
   if (!Array.isArray(alunos) || alunos.length === 0) {
-    alert("Adicione pelo menos 1 aluno antes de salvar.");
+    _toastErro("⚠️ Adicione pelo menos 1 aluno antes de salvar.");
     return;
   }
 
@@ -1780,19 +1781,16 @@ function atualizarBotaoStatusTurma() {
   if (btnReativar) btnReativar.style.display = status === 'INATIVA' ? 'inline-flex' : 'none';
 }
 
-function mostrarConfirmInativacao() {
-  const badge = document.getElementById('confirmBadgeInativacao');
-  if (badge) badge.classList.add('show');
-}
-
-function fecharConfirmInativacao() {
-  const badge = document.getElementById('confirmBadgeInativacao');
-  if (badge) badge.classList.remove('show');
-}
-
 async function confirmarInativacaoTurma() {
   if (!modoEdicao || !idTurmaEditando) return;
-  fecharConfirmInativacao();
+
+  const ok = await _confirmModal({
+    titulo: '⚠️ Inativar esta turma?',
+    corpo: 'Ela deixa de aparecer na pesquisa de atas, mas os dados continuam salvos e podem ser reativados aqui mesmo depois.',
+    corDestaque: '#b91c1c',
+    textoConfirmar: 'Sim, inativar',
+  });
+  if (!ok) return;
 
   const btn = document.getElementById('btnInativarTurma');
   if (btn) { btn.disabled = true; btn.textContent = 'Inativando…'; }
@@ -1815,7 +1813,14 @@ async function confirmarInativacaoTurma() {
 
 async function reativarTurma() {
   if (!modoEdicao || !idTurmaEditando) return;
-  if (!confirm('Reativar esta turma? Ela volta a aparecer na pesquisa de atas.')) return;
+
+  const ok = await _confirmModal({
+    titulo: '✅ Reativar esta turma?',
+    corpo: 'Ela volta a aparecer na pesquisa de atas normalmente.',
+    corDestaque: '#166534',
+    textoConfirmar: 'Sim, reativar',
+  });
+  if (!ok) return;
 
   const btn = document.getElementById('btnReativarTurma');
   if (btn) { btn.disabled = true; btn.textContent = 'Reativando…'; }
