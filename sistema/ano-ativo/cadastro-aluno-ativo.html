@@ -1841,6 +1841,27 @@ function normSerie(s){
   );
   if(matExistente) return setMsg(`Aluno já matriculado nessa turma em ${ano}.`, "err");
 
+  // ── Barreira: aluno não pode ter 2 matrículas ATIVAS no mesmo ano ──
+  // Não existe motivo lógico pra um aluno estar em 2 turmas ao mesmo tempo
+  // no mesmo ano letivo. Trocar de turma no meio do ano NÃO deve criar uma
+  // segunda matrícula ativa em paralelo — a matrícula antiga precisa ser
+  // encerrada primeiro (tela de edição → "Encerrar matrícula").
+  const matAtivaOutraTurma = mats.find(m =>
+    m.alunoId === alunoId &&
+    String(m.anoLetivo) === String(ano) &&
+    m.turmaId !== tid &&
+    (m.status || 'ATIVO').toUpperCase() === 'ATIVO'
+  );
+  if(matAtivaOutraTurma){
+    const turmaAtual = getTurmas().find(t => t.turmaId === matAtivaOutraTurma.turmaId);
+    const nomeTurmaAtual = turmaAtual ? (turmaAtual.nome || turmaAtual.turmaId) : matAtivaOutraTurma.turmaId;
+    return setMsg(
+      `Este aluno já tem uma matrícula ATIVA em ${ano} na turma "${nomeTurmaAtual}". ` +
+      `Encerre essa matrícula (na tela de edição do aluno) antes de matricular em outra turma no mesmo ano.`,
+      "err"
+    );
+  }
+
   const modeloFinal = modelo || 'REGULAR';
   let novaMatricula = {
     matriculaId,
