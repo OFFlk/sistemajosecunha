@@ -1,26 +1,44 @@
 /**
  * functions/api/avatar-upload.js
  * POST /api/avatar-upload
- * Body: { tipo, entidadeId, fileBase64, mimeType }
+ *
+ * Body (upload direto — arquivo escolhido pelo usuário):
+ *   { tipo, entidadeId, ano, fileBase64, mimeType }
+ *
+ * Body (copiar de uma foto já existente no Cloudinary):
+ *   { tipo, entidadeId, ano, sourceUrl }
+ *
  *   tipo: 'aluno' (por enquanto — 'funcionario' entra quando esse módulo existir)
  *   entidadeId: alunoId hoje; futuramente também funcionarioId
+ *   ano: ano letivo da matrícula. OBRIGATÓRIO para tipo:'aluno' — a foto do
+ *        aluno agora é versionada por matrícula/ano, não mais global pro
+ *        aluno inteiro (ver TIPOS_COM_ANO abaixo).
+ *
  * Retorna: { fotoUrl, fotoFileId }
  *
- * public_id é FIXO por entidade (sem timestamp) + overwrite:true — reenviar
- * uma foto nova substitui a antiga automaticamente no Cloudinary, sem
- * acumular versões velhas do avatar.
+ * public_id é FIXO por entidade(+ano) — sem timestamp — e overwrite:true:
+ * reenviar uma foto nova pro mesmo aluno+ano substitui a antiga
+ * automaticamente no Cloudinary, sem acumular versões velhas do avatar.
  *
  * invalidate:true é essencial: sem isso, o CDN do Cloudinary continua
- * servindo a versão antiga da imagem em cache mesmo depois do overwrite,
- * já que o public_id (e portanto a URL de entrega) não muda entre uploads.
+ * servindo a versão antiga da imagem em cache mesmo depois do overwrite
+ * ter substituído o arquivo de verdade, já que o public_id (e portanto a
+ * URL de entrega) não muda entre uploads.
  *
  * asset_folder é enviado à parte pra contas em "Dynamic Folder Mode" (padrão
  * em contas Cloudinary criadas a partir de meados de 2024): nesse modo, as
  * barras do public_id NÃO definem sozinhas a pasta exibida no Media Library
  * — é preciso mandar esse parâmetro explicitamente, senão o Cloudinary joga
- * o asset solto na raiz mesmo com um public_id "avatares/alunos/ALU-000874".
- * Isso é só organização visual no painel, não afeta a URL de entrega — mas
- * já resolvemos aqui pra evitar confusão depois.
+ * o asset solto na raiz mesmo com um public_id "avatares/alunos/ALU-000874/2026".
+ * Isso é só organização visual no painel, não afeta a URL de entrega.
+ *
+ * MODO "copiar de URL" (sourceUrl): usado pela sugestão de foto na
+ * rematrícula — copia a foto de uma matrícula anterior do mesmo aluno pro
+ * public_id do ano novo, sem o arquivo passar de novo pelo navegador. O
+ * Cloudinary busca a URL remota (deve ser uma URL já hospedada nele mesmo,
+ * https://res.cloudinary.com/...) e cria uma cópia independente sob o novo
+ * public_id — a foto original (ano antigo) continua intacta, já que isso é
+ * uma cópia, não uma movimentação.
  */
 
 function corsHeaders() {
@@ -44,6 +62,12 @@ const PASTAS_POR_TIPO = {
   funcionario: 'avatares/funcionarios',
 };
 
+// Tipos cuja foto é versionada por ano letivo (public_id ganha /{ano} no
+// final, ex.: avatares/alunos/ALU-000874/2026). Ajustar aqui se algum dia
+// "funcionario" também precisar de histórico por ano — hoje não precisa,
+// já que funcionário não tem "matrícula".
+const TIPOS_COM_ANO = new Set(['aluno']);
+
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: corsHeaders() });
 }
@@ -52,11 +76,11 @@ export async function onRequestPost({ request, env }) {
   const headers = corsHeaders();
 
   try {
-    const { tipo, entidadeId, fileBase64, mimeType } = await request.json();
+    const { tipo, entidadeId, ano, fileBase64, mimeType, sourceUrl } = await request.json();
 
-    if (!tipo || !entidadeId || !fileBase64 || !mimeType) {
+    if (!tipo || !entidadeId) {
       return new Response(
-        JSON.stringify({ error: 'Campos obrigatórios: tipo, entidadeId, fileBase64, mimeType' }),
+        JSON.stringify({ error: 'Campos obrigatórios: tipo, entidadeId' }),
         { status: 400, headers }
       );
     }
@@ -69,7 +93,25 @@ export async function onRequestPost({ request, env }) {
       );
     }
 
-    const publicId = `${pasta}/${entidadeId}`;
+    const precisaAno = TIPOS_COM_ANO.has(tipo);
+    if (precisaAno && !ano) {
+      return new Response(
+        JSON.stringify({ error: `Campo obrigatório pra tipo "${tipo}": ano` }),
+        { status: 400, headers }
+      );
+    }
+
+    // Upload direto (fileBase64) OU cópia de uma foto já existente (sourceUrl).
+    // Exatamente um dos dois precisa vir preenchido.
+    const file = sourceUrl || (fileBase64 && mimeType ? `data:${mimeType};base64,${fileBase64}` : null);
+    if (!file) {
+      return new Response(
+        JSON.stringify({ error: 'Envie fileBase64+mimeType (upload direto) ou sourceUrl (copiar de foto existente)' }),
+        { status: 400, headers }
+      );
+    }
+
+    const publicId = precisaAno ? `${pasta}/${entidadeId}/${ano}` : `${pasta}/${entidadeId}`;
     const timestamp = Math.floor(Date.now() / 1000);
 
     // Todo parâmetro que vai no body (exceto file, api_key, signature e
@@ -88,9 +130,8 @@ export async function onRequestPost({ request, env }) {
       .join('&') + env.CLOUDINARY_API_SECRET;
     const signature = await sha256Hex(sigStr);
 
-    const dataUri = `data:${mimeType};base64,${fileBase64}`;
     const body = JSON.stringify({
-      file: dataUri,
+      file,
       public_id: publicId,
       asset_folder: pasta,
       overwrite: true,
@@ -100,7 +141,10 @@ export async function onRequestPost({ request, env }) {
       signature,
     });
 
-    console.log('[avatar-upload] enviando pro Cloudinary:', { publicId, pasta, timestamp });
+    console.log(
+      sourceUrl ? '[avatar-upload] copiando de URL existente:' : '[avatar-upload] enviando upload direto pro Cloudinary:',
+      { publicId, pasta, ano: ano ?? null, timestamp, sourceUrl: sourceUrl || undefined }
+    );
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/image/upload`,
