@@ -214,33 +214,10 @@ html[data-theme="dark"] .confirm-badge {
 .confirm-badge strong { flex: 1; }
 .confirm-badge-btns { display: flex; gap: 8px; }
 
-/* ── Toast de feedback (salvar turma) ── */
-.toast-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-.toast {
-  min-width: 240px;
-  max-width: 360px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: 'Nunito', sans-serif;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.25s, transform 0.25s;
-}
-.toast.show { opacity: 1; transform: translateY(0); }
-.toast.ok    { background: #16a34a; color: #fff; }
-.toast.erro  { background: #b91c1c; color: #fff; }
 
 </style>
 <script src="../db.firebase.js"></script>
@@ -249,7 +226,6 @@ html[data-theme="dark"] .confirm-badge {
 
 <body>
 <div id="header-placeholder"></div>
-<div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
 
@@ -1613,18 +1589,45 @@ async function carregarTurmaParaEdicao(id) {
 /* =========================
    Salvar turma no banco
 ========================= */
-function showToast(msg, tipo) {
-  const container = document.getElementById('toastContainer');
-  if (!container) { alert(msg); return; }
-  const el = document.createElement('div');
-  el.className = 'toast ' + (tipo === 'erro' ? 'erro' : 'ok');
-  el.textContent = msg;
-  container.appendChild(el);
-  requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(() => {
-    el.classList.remove('show');
-    setTimeout(() => el.remove(), 300);
-  }, tipo === 'erro' ? 6000 : 3500);
+// Toast fixo padrão do sistema — aparece no centro/base da tela, independente do scroll
+function _toastSucesso(msg){
+  _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+}
+function _toastErro(msg){
+  _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+}
+function _toastLoading(msg){
+  // Duração longa: é substituído pelo toast de sucesso/erro assim que a ação terminar
+  _showToast(msg, '#1e40af', 'rgba(37,99,235,0.95)', 60000);
+}
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
 }
 
 async function salvarNoBanco() {
@@ -1696,11 +1699,12 @@ async function _salvarNoBancoInterno() {
   };
 
   // Salva direto no Firebase (upsert via _id)
+  _toastLoading('⏳ Salvando…');
   try {
     await salvarTurmasDB({ ...turmaObj, _id: existente?._id || idFinal });
   } catch(e) {
     console.error('[salvarNoBanco]', e);
-    showToast('❌ Erro ao salvar — ' + (e.message || e), 'erro');
+    _toastErro('❌ Erro ao salvar — ' + (e.message || e));
     return;
   }
 
@@ -1714,10 +1718,10 @@ async function _salvarNoBancoInterno() {
   console.log('✅ Turma salva:', idFinal);
 
   if (modoEdicao) {
-    showToast('✅ Turma atualizada no banco.', 'ok');
+    _toastSucesso('✅ Turma atualizada no banco.');
     setTimeout(() => { window.location.href = 'pesquisa-ata.html'; }, 1200);
   } else {
-    showToast('✅ Turma salva no banco.', 'ok');
+    _toastSucesso('✅ Turma salva no banco.');
   }
 }
 
@@ -1792,6 +1796,7 @@ async function confirmarInativacaoTurma() {
 
   const btn = document.getElementById('btnInativarTurma');
   if (btn) { btn.disabled = true; btn.textContent = 'Inativando…'; }
+  _toastLoading('⏳ Inativando…');
 
   try {
     const _id = turmaEditandoObj?._id || turmaEditandoObj?.id || turmaEditandoObj?.turmaId || idTurmaEditando;
@@ -1799,10 +1804,10 @@ async function confirmarInativacaoTurma() {
     if (turmaEditandoObj) turmaEditandoObj.status = 'INATIVA';
     _invalidarCacheTurmas();
     atualizarBotaoStatusTurma();
-    alert('Turma inativada. Ela não aparecerá mais na pesquisa de atas — os dados continuam salvos e podem ser reativados aqui mesmo.');
+    _toastSucesso('✅ Turma inativada. Não aparece mais na pesquisa de atas — os dados continuam salvos.');
   } catch(err) {
     console.error('[inativarTurma]', err);
-    alert('Erro ao inativar a turma: ' + err.message);
+    _toastErro('❌ Erro ao inativar a turma: ' + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🚫 Inativar turma'; }
   }
@@ -1814,6 +1819,7 @@ async function reativarTurma() {
 
   const btn = document.getElementById('btnReativarTurma');
   if (btn) { btn.disabled = true; btn.textContent = 'Reativando…'; }
+  _toastLoading('⏳ Reativando…');
 
   try {
     const _id = turmaEditandoObj?._id || turmaEditandoObj?.id || turmaEditandoObj?.turmaId || idTurmaEditando;
@@ -1821,10 +1827,10 @@ async function reativarTurma() {
     if (turmaEditandoObj) turmaEditandoObj.status = 'ATIVA';
     _invalidarCacheTurmas();
     atualizarBotaoStatusTurma();
-    alert('Turma reativada.');
+    _toastSucesso('✅ Turma reativada.');
   } catch(err) {
     console.error('[reativarTurma]', err);
-    alert('Erro ao reativar a turma: ' + err.message);
+    _toastErro('❌ Erro ao reativar a turma: ' + err.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '✅ Reativar turma'; }
   }
