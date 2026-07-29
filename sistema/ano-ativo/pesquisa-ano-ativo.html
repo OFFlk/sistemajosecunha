@@ -1940,7 +1940,7 @@ function exportFichasIndividuais(titulo, alunosList){
 
       const bX = 20, bW = pw - 40, colW = bW / 2;
       const fotoDataUrl = fotoDataUrls[a.alunoId];
-      const fotoSize = 40;
+      const fotoSize = 100; // 2,5x do tamanho antigo (40pt)
       const bannerW = fotoDataUrl ? bW - fotoSize - 10 : bW;
 
       // Faixa com o nome do aluno em destaque (encolhe se houver foto)
@@ -1951,10 +1951,16 @@ function exportFichasIndividuais(titulo, alunosList){
 
       if(fotoDataUrl){
         try{
-          doc.addImage(fotoDataUrl, 'JPEG', bX + bannerW + 10, y - 7, fotoSize, fotoSize, undefined, 'FAST');
+          // Alinhada pelo topo com a faixa do nome (antes era centralizada
+          // com um offset fixo de -7, pensado pra quando a foto era do
+          // mesmo tamanho da faixa — com a foto maior que a faixa agora,
+          // top-align fica mais previsível).
+          doc.addImage(fotoDataUrl, 'JPEG', bX + bannerW + 10, y, fotoSize, fotoSize, undefined, 'FAST');
         }catch(e){ /* imagem corrompida/formato inesperado — segue sem travar a ficha */ }
       }
-      y += 26 + 14;
+      // Reserva o maior entre a faixa (26pt) e a foto (fotoSize), senão a
+      // foto grande invadiria a seção "Identificação" logo abaixo.
+      y += Math.max(26, fotoDataUrl ? fotoSize : 0) + 14;
 
       secoes.forEach(sec => {
         doc.setFontSize(9.5); doc.setFont(undefined,'bold'); doc.setTextColor(11,63,191);
