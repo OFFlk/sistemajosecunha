@@ -294,6 +294,10 @@
     // ── Módulo de Funcionários (Educacenso) ──
     funcionarios: makeCollection('funcionarios'),
 
+    // ── Módulo de Notas Trimestrais (bridge p/ colar no Access) ──
+    // Isolado dos demais módulos, sem interação com turmas/alunos/atas.
+    notasTrimestrais: makeCollection('notasTrimestrais'),
+
     // ── Compartilhados ──
     escola:    escolaStore,
     schemas:   schemasStore,
