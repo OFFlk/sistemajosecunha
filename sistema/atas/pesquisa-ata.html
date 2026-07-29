@@ -551,10 +551,11 @@ function renderListaTurmas(lista) {
   }
 
   lista.forEach(t => {
+    const tid = t.id || t._id || t.turmaId;
     const div = document.createElement("div");
     div.className = "list-item";
-    div.dataset.turmaId = t.id;
-    div.addEventListener("click", () => selecionarTurma(t.id));
+    div.dataset.turmaId = tid;
+    div.addEventListener("click", () => selecionarTurma(tid));
 
     const serieTxt = t.serieTexto || (t.seriesTurma && t.seriesTurma.length ? formatarListaBonita(t.seriesTurma) : "");
     const anoTxt = t.anoLetivo ? String(t.anoLetivo) : "?";
@@ -580,7 +581,7 @@ function renderListaTurmas(lista) {
         </div>
       </div>
       <div class="right" onclick="event.stopPropagation()">
-        <button class="btn primary small" type="button" onclick="selecionarTurma('${t.id}')">Abrir</button>
+        <button class="btn primary small" type="button" onclick="selecionarTurma('${tid}')">Abrir</button>
       </div>
     `;
 
@@ -595,7 +596,7 @@ function editarTurma(id) {
    Selecionar turma
 ========================= */
 function selecionarTurma(id) {
-  turmaSelecionada = turmas.find(t => t.id === id) || null;
+  turmaSelecionada = turmas.find(t => (t.id || t._id || t.turmaId) === id) || null;
 
   document.getElementById("detalhesVazio").style.display = turmaSelecionada ? "none" : "block";
   document.getElementById("detalhesBox").style.display = turmaSelecionada ? "block" : "none";
@@ -609,11 +610,11 @@ function selecionarTurma(id) {
     (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "?");
 
   const isAnoAtivo = turmaSelecionada.origem === 'ano-ativo' ||
-    String(turmaSelecionada.turmaId||turmaSelecionada.id||'').endsWith('-AATIVO');
+    String(turmaSelecionada.turmaId||turmaSelecionada.id||turmaSelecionada._id||'').endsWith('-AATIVO');
 
   document.getElementById("detalhesMeta").innerHTML =
     `<b>${turmaSelecionada.aba || turmaSelecionada.nome || "Turma"}</b><br>` +
-    `ID: ${turmaSelecionada.id}<br>` +
+    `ID: ${turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId || "?"}<br>` +
     (turmaSelecionada.origemArquivo ? `Arquivo: ${turmaSelecionada.origemArquivo}<br>` : '') +
     `Ano: <b>${turmaSelecionada.anoLetivo || "?"}</b> · Turno: <b>${turmaSelecionada.turno || "?"}</b> · Série: <b>${serieTxt}</b>` +
     (isAnoAtivo ? ` <span class="badge-ativo">Gerada pelo Ano Ativo</span>` : '');
@@ -684,7 +685,7 @@ function editarTurmaSelecionada() {
     return;
   }
   
-  const turmaId = turmaSelecionada.id || turmaSelecionada._id;
+  const turmaId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
   if (!turmaId) {
     alert("ID da turma não encontrado.");
     return;
@@ -865,7 +866,7 @@ function exportarPDFDaTurma() {
 ========================= */
 function abrirNoCadastro() {
   if (!turmaSelecionada) return;
-  localStorage.setItem("turmaSelecionadaId", turmaSelecionada.id);
+  localStorage.setItem("turmaSelecionadaId", turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId);
   window.location.href = "cadastro-turma.html";
 }
 
@@ -1039,7 +1040,8 @@ function salvarNotas(){
   });
 
   turmaSelecionada.alunos = alunos;
-  const idx = turmas.findIndex(t => t.id === turmaSelecionada.id);
+  const selId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
+  const idx = turmas.findIndex(t => (t.id || t._id || t.turmaId) === selId);
   if(idx >= 0) turmas[idx] = turmaSelecionada;
 
   salvarTurmasDB(turmas);
@@ -1120,7 +1122,7 @@ function salvarNotas(){
           ano: t?.anoLetivo || "",
           serie: a?.serie || t?.serieTexto || "",
           turno: t?.turno || "",
-          id: t?.id || ""
+          id: t?.id || t?._id || t?.turmaId || ""
         });
       }
     }
