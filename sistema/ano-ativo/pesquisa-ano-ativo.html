@@ -933,6 +933,14 @@ function _enriquecerComMeta(list){
       _status: (mat && mat.status) ? mat.status.toUpperCase() : (a.status||'ATIVO').toUpperCase(),
       _situacao: (mat && mat.situacao) ? mat.situacao.toUpperCase() : '',
       _modelo: (mat && mat.modelo) ? mat.modelo.toUpperCase() : 'REGULAR',
+      // A foto agora vive na MATRÍCULA (anoAtivoMatriculas), não mais no
+      // documento do aluno — por isso sobrescreve fotoUrl/fotoFileId aqui
+      // em vez de herdar do spread de `a`. _matriculaId fica disponível
+      // pra quem precisar buscar/atualizar essa matrícula depois (ex.:
+      // abrirFichaAluno, mais abaixo).
+      _matriculaId: (mat && mat._id) || null,
+      fotoUrl:     (mat && mat.fotoUrl)    || null,
+      fotoFileId:  (mat && mat.fotoFileId) || null,
     };
   });
 }
@@ -1286,10 +1294,31 @@ async function abrirFichaAluno(alunoId){
   // ficha é justamente onde a pessoa quer ver o dado mais atual, buscamos o
   // documento do aluno fresco aqui, e mesclamos por cima do "raw" (que já traz
   // turno/status/situação calculados a partir da matrícula).
-  let fresco = null;
-  try{ fresco = await window.DB.anoAtivoAlunos.get(alunoId); }catch(e){ /* segue só com o raw */ }
-  console.log('[ficha-aluno] doc fresco do Firestore:', fresco);
-  const base = fresco ? { ...raw, ...fresco } : raw;
+  let frescoAluno = null;
+  try{ frescoAluno = await window.DB.anoAtivoAlunos.get(alunoId); }catch(e){ /* segue só com o raw */ }
+  console.log('[ficha-aluno] doc fresco do Firestore (aluno):', frescoAluno);
+
+  // A FOTO não vem mais do documento do aluno — vive na matrícula
+  // (anoAtivoMatriculas), específica desta matrícula/ano. Busca ela à
+  // parte, usando o _matriculaId que _enriquecerComMeta já calculou pro
+  // "raw". Sem isso, a ficha mostraria a foto salva no carregamento da
+  // página em vez da mais recente.
+  let frescoMat = null;
+  if(raw._matriculaId){
+    try{ frescoMat = await window.DB.anoAtivoMatriculas.get(raw._matriculaId); }catch(e){ /* segue só com o raw */ }
+  }
+  console.log('[ficha-aluno] doc fresco do Firestore (matrícula, foto):', frescoMat);
+
+  const base = {
+    ...raw,
+    ...(frescoAluno || {}),
+    // Sobrescreve por último: frescoAluno pode trazer fotoUrl/fotoFileId
+    // antigos (campo legado em anoAtivoAlunos, ainda não migrado/apagado —
+    // ver TAREFA de migração) e não queremos que eles pisem na foto real
+    // desta matrícula.
+    fotoUrl:    (frescoMat && frescoMat.fotoUrl)    ?? raw.fotoUrl    ?? null,
+    fotoFileId: (frescoMat && frescoMat.fotoFileId) ?? raw.fotoFileId ?? null,
+  };
   // alunosOrdenados só passa por _enriquecerComMeta (turno/status/modelo);
   // aqui garantimos também o cálculo de _neeResumo/etc via enriquecerAlunos.
   const a = enriquecerAlunos([base])[0];
