@@ -114,7 +114,16 @@ td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(
 .status-msg.ok{ color:#16a34a; }
 .status-msg.err{ color:#dc2626; }
 
+#detalhesOrdemAccess summary::-webkit-details-marker{ display:none; }
+#detalhesOrdemAccess summary{ outline:none; }
+#detalhesOrdemAccess .seta-detalhes{ display:inline-block; transition:transform 0.15s; font-size:12px; color:var(--brand,#7c3aed); }
+#detalhesOrdemAccess[open] .seta-detalhes{ transform:rotate(90deg); }
+
 .hidden{ display:none !important; }
+
+#bannerTopo.loading{ background:rgba(59,130,246,.12); border:1px solid rgba(59,130,246,.35); color:var(--ink); }
+#bannerTopo.ok{ background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35); color:var(--ink); }
+#bannerTopo.err{ background:rgba(220,38,38,.12); border:1px solid rgba(220,38,38,.35); color:var(--ink); }
 </style>
 <script src="../db.firebase.js"></script>
 </head>
@@ -123,6 +132,8 @@ td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(
 <div id="header-placeholder"></div>
 
 <div class="container">
+
+<div id="bannerTopo" class="hidden" style="padding:12px 16px;border-radius:10px;margin-bottom:14px;font-weight:700;font-size:14px;"></div>
 
   <div class="card">
     <h2 style="margin-top:0;">📥 Lançamento de Notas Trimestrais</h2>
@@ -156,26 +167,41 @@ td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(
        CONFIGURAÇÃO DE ORDEM PARA O ACCESS
   ═══════════════════════════════════ -->
   <div class="card">
-    <h3 style="margin-top:0;">🗂️ Ordem de cópia para o Access</h3>
-    <div class="aviso-warn">
-      Isso é o que resolve o problema do Ctrl+V: o Access no modo grade (datasheet) até aceita colar
-      várias células de uma vez, mas só se a <b>quantidade e a ordem das colunas coladas forem
-      idênticas</b> à ordem dos campos na tela do Access — inclusive pulando os que a matéria não usa lá.
-      Se não bater, ele realmente joga tudo dentro da célula onde você colou.<br><br>
-      Monte abaixo a lista <b>exatamente na ordem que aparece no Access</b> (use as setas ↑ ↓),
-      e desmarque os campos que não existem lá pra essa turma. Isso fica salvo no seu navegador.
-    </div>
-    <div class="ordem-lista" id="ordemLista"></div>
+    <details id="detalhesOrdemAccess">
+      <summary style="cursor:pointer;font-weight:800;font-size:16px;list-style:none;display:flex;align-items:center;gap:8px;">
+        <span class="seta-detalhes">▶</span> 🗂️ Ordem de cópia para o Access
+      </summary>
+      <div style="margin-top:12px;">
+        <div class="aviso-warn">
+          No Access, cada aluno tem <b>uma tela própria</b> com todas as matérias/trimestres — não existe
+          lançamento em lote pra vários alunos de uma vez. Por isso, a cópia aqui é sempre <b>de 1 aluno por vez</b>
+          (botão 📋 na linha do aluno, na tabela abaixo): ela gera os valores desse aluno na
+          <b>mesma ordem em que os campos aparecem na tela do Access</b>, pulando as matérias que não
+          existem lá. A média não entra na cópia — o próprio Access já calcula isso sozinho.<br><br>
+          Monte a lista abaixo <b>exatamente na ordem dos campos na tela do Access</b> (setas ↑ ↓),
+          e desmarque o que não existe lá. Fica salvo no seu navegador.
+        </div>
+        <div class="ordem-lista" id="ordemLista"></div>
+      </div>
+    </details>
   </div>
 
   <div class="card">
     <h3 style="margin-top:0;">Alunos</h3>
+
+    <div class="campo" style="max-width:320px;margin-bottom:10px;">
+      <label>Ordem de preenchimento do formulário</label>
+      <select id="modoPreenchimento" onchange="mudarModoPreenchimento()">
+        <option value="materia">Por matéria (Port. T1,T2,T3 → Mat. T1,T2,T3 → ...)</option>
+        <option value="trimestre">Por trimestre (1º de todas as matérias → 2º de todas → ...)</option>
+      </select>
+    </div>
+
     <div class="form-grid" id="formGridDinamico"></div>
 
     <div class="actions">
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
-      <button class="btn btn-secondary" onclick="copiarTodasLinhas()">📋 Copiar todas as notas (bloco)</button>
     </div>
     <div class="status-msg" id="statusMsg"></div>
 
@@ -426,25 +452,77 @@ function calcularMedia(n1, n2, n3) {
 /* =========================
    Formulário dinâmico de aluno
 ========================= */
+let modoPreenchimento = localStorage.getItem("notasModoPreenchimento_v1") || "materia";
+
+function mudarModoPreenchimento() {
+  modoPreenchimento = $("modoPreenchimento").value;
+  localStorage.setItem("notasModoPreenchimento_v1", modoPreenchimento);
+  renderFormularioDinamico();
+}
+
 function renderFormularioDinamico() {
   const grid = $("formGridDinamico");
   const materias = getMateriasAtivas();
+  $("modoPreenchimento").value = modoPreenchimento;
 
   let html = `<div class="campo"><label>Nome do aluno *</label><input id="nome"></div>`;
-  for (const m of materias) {
-    html += `
-      <div class="campo" style="min-width:150px;">
-        <label>${m.label}</label>
-        <div style="display:flex;gap:4px;">
-          <input id="n1_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
-          <input id="n2_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
-          <input id="n3_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+
+  if (modoPreenchimento === "trimestre") {
+    // Agrupado por trimestre: preenche o 1º de TODAS as matérias antes de passar pro 2º.
+    // Útil quando só se tem as notas de um trimestre por vez (não precisa pular campo).
+    for (const tri of [1, 2, 3]) {
+      html += `<div class="campo" style="grid-column:1/-1;margin:8px 0 -2px;">
+        <label style="font-size:14px;color:var(--brand,#7c3aed);">${tri}º Trimestre</label>
+      </div>`;
+      for (const m of materias) {
+        html += `
+          <div class="campo" style="min-width:120px;">
+            <label>${m.label}</label>
+            <input id="n${tri}_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+          </div>
+        `;
+      }
+    }
+  } else {
+    // Agrupado por matéria (padrão): T1, T2, T3 lado a lado por matéria.
+    for (const m of materias) {
+      html += `
+        <div class="campo" style="min-width:150px;">
+          <label>${m.label}</label>
+          <div style="display:flex;gap:4px;">
+            <input id="n1_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+            <input id="n2_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+            <input id="n3_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
   }
   grid.innerHTML = html;
 }
+
+// Enter funciona igual Tab dentro do formulário de aluno (nome + notas).
+function irParaProximoCampo(campoAtual) {
+  const focaveis = Array.from(document.querySelectorAll("#formGridDinamico input"));
+  const idx = focaveis.indexOf(campoAtual);
+  if (idx === -1) return;
+  if (idx < focaveis.length - 1) {
+    const proximo = focaveis[idx + 1];
+    proximo.focus();
+    if (typeof proximo.select === "function") proximo.select();
+  } else {
+    campoAtual.blur();
+    $("nome").scrollIntoView?.({ block: "nearest" });
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("formGridDinamico").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    if (ev.target.tagName !== "INPUT") return;
+    ev.preventDefault();
+    irParaProximoCampo(ev.target);
+  });
+});
 
 // Roda quando o professor sai do campo de nota: valida (0,0 a 10,0) e já
 // deixa formatado com vírgula. Se digitou algo inválido, avisa e limpa.
@@ -600,15 +678,7 @@ function copiarLinha(idx) {
   const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
   if (!camposAtivos.length) { setStatus("err", "⚠️ Nenhum campo habilitado na ordem de cópia acima."); return; }
   const linha = montarLinhaTSV(aluno);
-  copiarParaClipboard(linha, `✅ Notas de "${aluno.nome}" copiadas! Clique na 1ª célula do aluno no Access e dê Ctrl+V.`);
-}
-
-function copiarTodasLinhas() {
-  const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
-  if (!camposAtivos.length) { setStatus("err", "⚠️ Nenhum campo habilitado na ordem de cópia acima."); return; }
-  if (!alunos.length) { setStatus("err", "⚠️ Nenhum aluno cadastrado."); return; }
-  const bloco = alunos.map(montarLinhaTSV).join("\n");
-  copiarParaClipboard(bloco, `✅ Bloco com ${alunos.length} aluno(s) copiado! No Access, clique na 1ª célula do 1º aluno (na mesma ordem em que aparecem aqui) e dê Ctrl+V.`);
+  copiarParaClipboard(linha, `✅ Notas de "${aluno.nome}" copiadas! Abra a tela desse aluno no Access, clique no 1º campo e dê Ctrl+V (ou cole campo por campo, se o Access não aceitar colar tudo de uma vez).`);
 }
 
 /* =========================
@@ -647,11 +717,64 @@ async function salvarNoBanco() {
 /* =========================
    Init
 ========================= */
+function setBanner(kind, msg) {
+  const el = $("bannerTopo");
+  if (!msg) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.className = kind; // reaplica classes (loading/ok/err) + reset hidden
+  el.textContent = msg;
+}
+
+async function carregarParaEdicao(id) {
+  console.log("[notas-trimestrais] Iniciando carregamento do registro:", id);
+  setBanner("loading", "⏳ Carregando dados da turma...");
+  try {
+    // Garante que a sessão de login já resolveu antes de bater no Firestore
+    // (evita corrida em que a busca dispara antes do Auth estar pronto).
+    await new Promise((res) => {
+      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener("auth:ready", res, { once: true });
+      setTimeout(res, 4000); // não trava pra sempre se o evento nunca disparar
+    });
+
+    const reg = await getNotasCollection().get(id);
+    console.log("[notas-trimestrais] Registro retornado do Firestore:", reg);
+
+    if (!reg) {
+      setBanner("err", "❌ Registro não encontrado no banco (pode ter sido excluído, ou o ID do link está errado).");
+      return;
+    }
+
+    registroAtualId = reg._id;
+    schemaSelecionadoId = reg.schemaId || schemaSelecionadoId;
+    renderSelectSchemas();
+
+    if (reg.ano) $("ano").value = reg.ano;
+    $("turmaNome").value = reg.turmaNome || "";
+    $("serieTurma").value = reg.serie || "";
+    alunos = Array.isArray(reg.alunos) ? reg.alunos : [];
+
+    renderOrdemAccess();
+    renderFormularioDinamico();
+    renderCabecalhoTabela();
+    atualizarTabela();
+
+    setBanner("ok", `✅ Editando "${reg.turmaNome || "turma sem nome"}" — ${alunos.length} aluno(s) carregado(s).`);
+  } catch (e) {
+    console.error("[notas-trimestrais] Erro ao carregar registro:", e);
+    setBanner("err", "❌ Erro ao carregar registro: " + (e.message || e) + " (abra o console do navegador — F12 — pra ver o erro completo)");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   preencherAnos();
   preencherSeries();
   renderSelectSchemas();
   onSchemaChange();
+
+  const params = new URLSearchParams(window.location.search);
+  const editId = params.get("edit");
+  if (editId) carregarParaEdicao(editId);
 });
 </script>
 
