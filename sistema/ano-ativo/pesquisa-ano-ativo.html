@@ -909,17 +909,45 @@ function _aplicarFiltrosComuns(list){
 }
 
 function _buildMatsMap(ano){
-  // Map alunoId → matrícula preferencial do ano (ou qualquer matrícula como fallback)
-  const byAluno = new Map();
+  // Map alunoId → matrícula "atual". Um aluno pode ter mais de uma
+  // matrícula no mesmo ano (ex.: encerrada na turma A + nova ativa na
+  // turma B após uma readmissão) — o antigo código pegava sempre a
+  // primeira que aparecesse na lista, o que fazia o status mostrado
+  // depender da ordem (arbitrária) de retorno do Firestore. Agora:
+  //  1) entre as matrículas do aluno NO ANO filtrado, prioriza status
+  //     ATIVO;
+  //  2) se não achar nenhuma do ano filtrado, cai pra qualquer matrícula
+  //     do aluno (comportamento antigo, mantido como fallback);
+  //  3) em empate (ex.: duas ATIVO, o que não deveria acontecer mas não
+  //     travamos por isso), desempata pela mais recente.
+  const porAluno = new Map();
   mats.forEach(m => {
-    const prev = byAluno.get(m.alunoId);
-    if(!prev){
-      byAluno.set(m.alunoId, m);
-    } else if(ano && String(m.anoLetivo) === String(ano) && String(prev.anoLetivo) !== String(ano)){
-      byAluno.set(m.alunoId, m); // prefere a matrícula do ano correto
-    }
+    if(!porAluno.has(m.alunoId)) porAluno.set(m.alunoId, []);
+    porAluno.get(m.alunoId).push(m);
+  });
+
+  const byAluno = new Map();
+  porAluno.forEach((lista, alunoId) => {
+    byAluno.set(alunoId, _matriculaAtualEntre(lista, ano));
   });
   return byAluno;
+}
+
+// Escolhe, dentre uma lista de matrículas de UM aluno, qual é "a atual".
+// Usado tanto por _buildMatsMap quanto por enriquecerAlunos, pra não
+// duplicar (e voltar a divergir) essa regra em dois lugares.
+function _matriculaAtualEntre(lista, ano){
+  if(!lista || !lista.length) return null;
+  const doAno = ano ? lista.filter(m => String(m.anoLetivo) === String(ano)) : lista;
+  const candidatos = doAno.length ? doAno : lista;
+  const ativos = candidatos.filter(m => (m.status||'ATIVO').toUpperCase() === 'ATIVO');
+  const pool = ativos.length ? ativos : candidatos;
+  function ts(m){
+    const t = m.encerradoEm || m.criadoEm || null;
+    const d = t ? new Date(t) : null;
+    return (d && !isNaN(d)) ? d.getTime() : 0;
+  }
+  return pool.reduce((melhor, atual) => (!melhor || ts(atual) > ts(melhor)) ? atual : melhor, null);
 }
 
 function _enriquecerComMeta(list){
@@ -1428,10 +1456,9 @@ modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) moda
 function enriquecerAlunos(lista){
   const ano = anoSelecionadoOuAtivo();
   return lista.map(a => {
-    const matMeta = mats.find(m => m.alunoId === a.alunoId && (!ano || String(m.anoLetivo) === String(ano))) || mats.find(m => m.alunoId === a.alunoId);
-    const matSerie = (!a.serie)
-      ? (mats.find(m => m.alunoId === a.alunoId && (!ano || String(m.anoLetivo) === String(ano))) || mats.find(m => m.alunoId === a.alunoId))
-      : null;
+    const matsDoAluno = mats.filter(m => m.alunoId === a.alunoId);
+    const matMeta = _matriculaAtualEntre(matsDoAluno, ano);
+    const matSerie = (!a.serie) ? matMeta : null;
     // turmaId: usa o da matrícula do ano correto se existir, senão mantém o que vier no objeto
     const turmaIdResolvido = (matMeta && matMeta.turmaId) ? matMeta.turmaId : (a.turmaId || '');
     const neeItens = [];

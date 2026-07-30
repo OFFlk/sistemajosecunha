@@ -2318,7 +2318,20 @@ function normSerie(s){
             fecharModalEncerrar();
 
             try{
-              const matAluno = (await window.DB.anoAtivoMatriculas.list()).find(m => m.alunoId === editId);
+              // Antes isso pegava a PRIMEIRA matrícula do aluno em
+              // qualquer turma/ano/status (find() sem critério) — se o
+              // aluno já tivesse passado por mais de um ciclo de
+              // matrícula (ex.: matriculado → encerrado → readmitido em
+              // outra turma), podia encerrar o documento errado e deixar
+              // a matrícula realmente ativa intocada. Agora filtramos
+              // especificamente pela(s) matrícula(s) com status ATIVO e,
+              // no caso (anômalo) de haver mais de uma, pegamos a mais
+              // recente.
+              const matsDoAluno = (await window.DB.anoAtivoMatriculas.list()).filter(m => m.alunoId === editId);
+              const matsAtivas = matsDoAluno.filter(m => (m.status || 'ATIVO').toUpperCase() === 'ATIVO');
+              const matAluno = matsAtivas.slice().sort((a, b) =>
+                new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0)
+              )[0];
 
               if(!matAluno){
                 _toastErro('❌ Nenhuma matrícula ativa encontrada para este aluno.');
