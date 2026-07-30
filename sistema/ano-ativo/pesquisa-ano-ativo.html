@@ -976,6 +976,9 @@ function turmasFiltradas(){
     // como card de turma na pesquisa. Comparação pelo turmaId fixo (mais
     // confiável que o nome, que pode variar/ter sido digitado diferente).
     if((t.turmaId||'').trim().toUpperCase() === 'TURMA_INATIVA') return false;
+    // Turma inativada pelo módulo de ano ativo (cadastro-turma-ativa.html)
+    // não deve aparecer na pesquisa — dado continua no banco, só some da lista.
+    if((t.status||'').toString().trim().toUpperCase() === 'INATIVA') return false;
     if(!(!ano || String(t.anoLetivo) === String(ano))) return false;
     if(setSeries.size === 0) return true;
     const seriesDaTurma = new Set();
