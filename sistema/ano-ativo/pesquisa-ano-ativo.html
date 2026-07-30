@@ -1042,17 +1042,18 @@ function _buildMatsMap(ano){
 // recente quando não há nenhuma ATIVO, o que resolve o zero nos anos
 // retroativos sem voltar a contar matrícula duplicada por aluno.
 function _matsAtuaisDaTurma(turmaId, ano){
-  const doTurmaEAno = mats.filter(m => m.turmaId === turmaId && (!ano || String(m.anoLetivo) === String(ano)));
-  const porAluno = new Map();
-  doTurmaEAno.forEach(m => {
-    if(!porAluno.has(m.alunoId)) porAluno.set(m.alunoId, []);
-    porAluno.get(m.alunoId).push(m);
-  });
+  // Resolve a matrícula "atual" de CADA aluno olhando TODAS as matrículas
+  // dele naquele ano (não só as desta turma) — é o mesmo _buildMatsMap já
+  // usado pra decidir status/situação exibidos. Só depois disso checa se
+  // essa matrícula atual aponta pra esta turma.
+  // Correção de um bug introduzido na versão anterior: ali o filtro por
+  // turmaId acontecia ANTES de decidir a matrícula atual do aluno, então
+  // uma matrícula antiga/inativa (de um aluno já transferido pra outra
+  // turma) sobrava como "a única candidata" e era contada por engano —
+  // mesmo o aluno já tendo uma matrícula ATIVO em outra turma.
+  const mapaAtualPorAluno = _buildMatsMap(ano);
   const atuais = [];
-  porAluno.forEach(lista => {
-    const atual = _matriculaAtualEntre(lista, ano);
-    if(atual) atuais.push(atual);
-  });
+  mapaAtualPorAluno.forEach(m => { if(m && m.turmaId === turmaId) atuais.push(m); });
   return atuais;
 }
 
