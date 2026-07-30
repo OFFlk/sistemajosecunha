@@ -672,9 +672,16 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
         <h2 style="margin:0">Turmas cadastradas</h2>
         <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
         <span id="countTurmasLista" class="help" style="margin:0"></span>
-        <button type="button" id="btnOrdenarCriacao" class="btn ghost small" style="margin-left:auto;">
-          Data de criação <span id="iconOrdenar">▼</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+          <select id="criterioOrdenacao" class="input" style="max-width:150px;font-size:13px;">
+            <option value="criadoEm">Data de criação</option>
+            <option value="serie">Série</option>
+            <option value="nome">Nome</option>
+          </select>
+          <button type="button" id="btnOrdenarCriacao" class="btn ghost small">
+            <span id="iconOrdenar">▼</span>
+          </button>
+        </div>
       </div>
       <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Inativar</b> só marca a turma como inativa — a exclusão definitiva agora é feita na página de gestão de dados.</div>
       <div id="listaTurmas" class="list"></div>
@@ -872,7 +879,8 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
   let seriesSel = [];
   let editingTurmaId = null;
   let nomeManual = false;
-  let ordemCriacao = "desc"; // "desc" = mais recente no topo (padrão)
+  let ordemCriacao = "desc"; // "desc"/"asc" — direção da ordenação atual
+  let criterioOrdenacao = "criadoEm"; // "criadoEm" | "serie" | "nome"
 
   // ---------- storage helpers (compatível com outras páginas) ----------
   function safeParseRaw(raw){
@@ -1274,9 +1282,12 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     }
 
     turmas.sort((a,b)=>{
-      const ca = Number(a.criadoEm) || 0;
-      const cb = Number(b.criadoEm) || 0;
-      const diff = ordemCriacao === "desc" ? (cb - ca) : (ca - cb);
+      const va = _valorOrdenacao(a, criterioOrdenacao);
+      const vb = _valorOrdenacao(b, criterioOrdenacao);
+      let diff = (typeof va === "number" && typeof vb === "number")
+        ? (va - vb)
+        : String(va).localeCompare(String(vb), "pt-BR", {numeric:true});
+      diff = ordemCriacao === "desc" ? -diff : diff;
       if(diff !== 0) return diff;
       return String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR");
     });
@@ -1340,6 +1351,16 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       div.appendChild(right);
       list.appendChild(div);
     }
+  }
+
+  function _valorOrdenacao(t, criterio){
+    if(criterio === "nome") return String(t.nome||"").toLocaleUpperCase("pt-BR");
+    if(criterio === "serie"){
+      const arr = Array.isArray(t.series) ? t.series.slice() : [];
+      arr.sort((a,b)=> String(a).localeCompare(String(b), "pt-BR", {numeric:true}));
+      return arr.length ? arr[0] : "";
+    }
+    return Number(t.criadoEm) || 0;
   }
 
   function toggleOrdemCriacao(){
@@ -1623,6 +1644,10 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
   $("filtroAnoLista")?.addEventListener("change", renderListaTurmas);
   $("btnOrdenarCriacao")?.addEventListener("click", toggleOrdemCriacao);
+  $("criterioOrdenacao")?.addEventListener("change", (e)=>{
+    criterioOrdenacao = e.target.value || "criadoEm";
+    renderListaTurmas();
+  });
 
   // ---------- init ----------
   buildAnoInput();
