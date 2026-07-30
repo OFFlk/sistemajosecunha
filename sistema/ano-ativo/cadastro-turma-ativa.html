@@ -590,8 +590,8 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
         <div class="form-row">
           <div>
             <label class="label">Ano letivo</label>
-            <select id="anoSelect" class="input"></select>
-            <div class="help">Por padrão, usa o ano ativo detectado. Você pode cadastrar turmas de outros anos também.</div>
+            <input type="number" id="anoSelect" class="input" inputmode="numeric" step="1" min="2000" max="2100">
+            <div class="help">Preenchido automaticamente a partir da turma/ano ativo.</div>
           </div>
 
           <div>
@@ -664,6 +664,9 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
         <h2 style="margin:0">Turmas cadastradas</h2>
         <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
         <span id="countTurmasLista" class="help" style="margin:0"></span>
+        <button type="button" id="btnOrdenarCriacao" class="btn ghost small" style="margin-left:auto;">
+          Data de criação <span id="iconOrdenar">▼</span>
+        </button>
       </div>
       <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Excluir</b> remove somente do banco do Ano Ativo.</div>
       <div id="listaTurmas" class="list"></div>
@@ -769,6 +772,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
   let seriesSel = [];
   let editingTurmaId = null;
   let nomeManual = false;
+  let ordemCriacao = "desc"; // "desc" = mais recente no topo (padrão)
 
   // ---------- storage helpers (compatível com outras páginas) ----------
   function safeParseRaw(raw){
@@ -867,20 +871,21 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
   }
 
   // ---------- UI builders ----------
-  function buildAnoOptions(){
+
+  // Card ESQUERDO (form): input number, preenchido com o ano ativo/da turma sendo editada
+  function buildAnoInput(){
+    const anoEl = $("anoSelect");
+    if(!anoEl) return;
+    anoEl.value = getAnoAtivoDefault();
+  }
+
+  // Card DIREITO (filtro da lista): select dinâmico — só anos que têm turma cadastrada no banco
+  function buildFiltroAnoOptions(){
     const turmas = getTurmas();
     const anos = new Set();
 
     for(const t of turmas){
       if(t && t.anoLetivo) anos.add(String(t.anoLetivo));
-    }
-
-    const anoAtivo = String(getAnoAtivoDefault());
-    anos.add(anoAtivo);
-
-    const base = parseInt(anoAtivo, 10);
-    if(!isNaN(base)){
-      for(let d=-1; d<=1; d++) anos.add(String(base + d));
     }
 
     const arr = Array.from(anos)
@@ -889,35 +894,29 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       .sort((a,b)=>b-a)
       .map(String);
 
-    const sel = $("anoSelect");
     const filtroLista = $("filtroAnoLista");
-    if(!sel) return;
+    if(!filtroLista) return;
 
-    sel.innerHTML = "";
+    const anoAtivo = String(getAnoAtivoDefault());
+    const valorAnterior = filtroLista.value;
+
+    filtroLista.innerHTML = "";
+    const optTodos = document.createElement("option");
+    optTodos.value = "";
+    optTodos.textContent = "Todos os anos";
+    filtroLista.appendChild(optTodos);
     for(const a of arr){
       const opt = document.createElement("option");
       opt.value = a;
       opt.textContent = a;
-      sel.appendChild(opt);
+      filtroLista.appendChild(opt);
     }
-    sel.value = anoAtivo;
 
-    // Popula o filtro da lista com os mesmos anos + opção "Todos"
-    if(filtroLista){
-      filtroLista.innerHTML = "";
-      const optTodos = document.createElement("option");
-      optTodos.value = "";
-      optTodos.textContent = "Todos os anos";
-      filtroLista.appendChild(optTodos);
-      for(const a of arr){
-        const opt = document.createElement("option");
-        opt.value = a;
-        opt.textContent = a;
-        filtroLista.appendChild(opt);
-      }
-      filtroLista.value = anoAtivo; // default = ano ativo
-      filtroLista.addEventListener("change", renderListaTurmas);
-    }
+    // Preserva a seleção do usuário se o ano ainda existir na lista;
+    // senão tenta o ano ativo; senão cai em "Todos os anos"
+    if(valorAnterior && arr.includes(valorAnterior)) filtroLista.value = valorAnterior;
+    else if(arr.includes(anoAtivo)) filtroLista.value = anoAtivo;
+    else filtroLista.value = "";
   }
 
   function serieOptions(){
@@ -1174,10 +1173,13 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       return;
     }
 
-    turmas.sort((a,b)=>
-      (parseInt(b.anoLetivo||0,10) - parseInt(a.anoLetivo||0,10)) ||
-      String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR")
-    );
+    turmas.sort((a,b)=>{
+      const ca = Number(a.criadoEm) || 0;
+      const cb = Number(b.criadoEm) || 0;
+      const diff = ordemCriacao === "desc" ? (cb - ca) : (ca - cb);
+      if(diff !== 0) return diff;
+      return String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR");
+    });
 
     list.innerHTML = "";
 
@@ -1231,6 +1233,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
               window.DB.anoAtivoTurmas.removeWhere('turmaId', t.turmaId).catch(()=>{});
           }catch(_){}
           if(editingTurmaId === t.turmaId) resetForm();
+          buildFiltroAnoOptions();
           renderListaTurmas();
           updateDbInfo();
         });
@@ -1241,6 +1244,13 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       div.appendChild(right);
       list.appendChild(div);
     }
+  }
+
+  function toggleOrdemCriacao(){
+    ordemCriacao = ordemCriacao === "desc" ? "asc" : "desc";
+    const icon = $("iconOrdenar");
+    if(icon) icon.textContent = ordemCriacao === "desc" ? "▼" : "▲";
+    renderListaTurmas();
   }
 
   function loadTurma(turmaId){
@@ -1303,7 +1313,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     const profEl = $("prof");
     if(profEl) profEl.value = "";
 
-    buildAnoOptions();
+    buildAnoInput();
 
     const turnoEl = $("turno");
     if(turnoEl) turnoEl.value = "MATUTINO";
@@ -1336,9 +1346,13 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     let turmas = getTurmas();
 
     // Se estamos editando, removemos o registro antigo antes de recalcular o ID (caso a base mude)
+    // — mas preservamos a data de criação original antes de removê-lo.
     let oldId = null;
+    let criadoEmExistente = null;
     if(editingTurmaId){
       oldId = editingTurmaId;
+      const existente = turmas.find(t => t && t.turmaId === oldId);
+      if(existente && existente.criadoEm) criadoEmExistente = existente.criadoEm;
       turmas = turmas.filter(t => t && t.turmaId !== oldId);
     }
 
@@ -1371,7 +1385,8 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       anoLetivo: ano,
       series: [...seriesSel],
       turno,
-      professor: professor || ""
+      professor: professor || "",
+      criadoEm: criadoEmExistente || Date.now()
     };
 
     // upsert
@@ -1385,10 +1400,10 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     save(KEYS.turmas, turmas);
     setAnoAtivoIfMissingOrCompat(ano);
 
-    renderListaTurmas();
+    buildFiltroAnoOptions();
     updateDbInfo();
-    editingTurmaId = turmaId;
     alert("Turma salva no banco do Ano Ativo!");
+    resetForm(); // limpa todos os campos e já atualiza a lista
   }
 
   // ---------- professores do DB ----------
@@ -1463,6 +1478,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     renderChips();
   });
 
+  $("anoSelect")?.addEventListener("input", syncDerived);
   $("anoSelect")?.addEventListener("change", syncDerived);
   $("turno")?.addEventListener("change", syncDerived);
 
@@ -1475,8 +1491,12 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     resetForm();
   });
 
+  $("filtroAnoLista")?.addEventListener("change", renderListaTurmas);
+  $("btnOrdenarCriacao")?.addEventListener("click", toggleOrdemCriacao);
+
   // ---------- init ----------
-  buildAnoOptions();
+  buildAnoInput();
+  buildFiltroAnoOptions();
   fillSerieSelect();
   resetForm();
   renderListaTurmas();
@@ -1522,6 +1542,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
         if(dados.dadosEscola?.configAnoAtivo)
           localStorage.setItem(pre('configAnoAtivoAtual_v1'), JSON.stringify(dados.dadosEscola.configAnoAtivo));
         // Re-renderiza a lista após Firestore carregar
+        if(typeof buildFiltroAnoOptions === 'function') buildFiltroAnoOptions();
         if(typeof renderListaTurmas === 'function') renderListaTurmas();
         if(typeof updateDbInfo === 'function') updateDbInfo();
       }
