@@ -268,6 +268,10 @@ html[data-theme="dark"] .sort-control button { background: rgba(148,163,184,0.10
 html[data-theme="dark"] .sort-control button:hover { background: var(--brand-d); border-color: var(--brand-hover-d); color: #fff; }
 
 /* ── Modal ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
 .modal          { width: min(1100px, 96vw); max-height: 86vh; overflow: auto; background: var(--card-bg); border-radius: 14px; border: 1px solid var(--card-border); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
 .modal-head     { position: sticky; top: 0; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border); }
@@ -524,6 +528,96 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
 ========================= */
 const _session = (window.Auth && typeof Auth.getSession === 'function') ? Auth.getSession() : null;
 const _podeEditar = !!_session && _session.role === 'admin';
+
+/* =========================
+   Toasts padronizados (ver guia-toasts.md)
+========================= */
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+
+function _toastSucesso(msg){
+  _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+}
+function _toastErro(msg){
+  _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+}
+function _toastAviso(msg){
+  _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
+}
+function _toastCarregando(msg){
+  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
+}
+
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
+/* ── Modal de confirmação (substitui confirm() nativo) ── */
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted,#6b7280);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${escapeHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${escapeHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+
+    function fechar(resultado){
+      backdrop.remove();
+      resolve(resultado);
+    }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
+}
 
 /* =========================
    Helpers de persistência
@@ -1752,9 +1846,9 @@ function _buildFilename(prefixo, escola){
 }
 
 function exportTurmasPdf(titulo, turmasList){
-  if(!turmasList.length){ alert("Nenhuma turma selecionada para exportar."); return; }
+  if(!turmasList.length){ setMsg("Nenhuma turma selecionada para exportar.", "warn"); return; }
   const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  if(!jsPDF){ setMsg("Falha ao carregar jsPDF.", "err"); return; }
   _carregarDadosEscola().then(escola => {
     const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
     const pw = doc.internal.pageSize.getWidth();
@@ -1780,9 +1874,9 @@ function exportTurmasPdf(titulo, turmasList){
 
 // Export simples (lista plana)
 function exportPdf(titulo, alunosList){
-  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  if(!alunosList.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
   const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("Falha ao carregar jsPDF. Verifique sua conexão."); return; }
+  if(!jsPDF){ setMsg("Falha ao carregar jsPDF. Verifique sua conexão.", "err"); return; }
   _carregarDadosEscola().then(escola => {
     // Respeita a ordenação já aplicada na tela (currentSortField/currentSortOrder)
     const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
@@ -1795,9 +1889,9 @@ function exportPdf(titulo, alunosList){
 
 // Export separado por turma
 function exportPdfPorTurma(titulo, alunosList){
-  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  if(!alunosList.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
   const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  if(!jsPDF){ setMsg("Falha ao carregar jsPDF.", "err"); return; }
   _carregarDadosEscola().then(escola => {
     const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
     const pw = doc.internal.pageSize.getWidth();
@@ -1866,9 +1960,9 @@ function exportPdfPorTurma(titulo, alunosList){
 
 // Export separado por série
 function exportPdfPorSerie(titulo, alunosList){
-  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  if(!alunosList.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
   const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  if(!jsPDF){ setMsg("Falha ao carregar jsPDF.", "err"); return; }
   _carregarDadosEscola().then(escola => {
     const doc = new jsPDF({orientation:"l", unit:"pt", format:"a4"});
     const pw = doc.internal.pageSize.getWidth();
@@ -1914,7 +2008,7 @@ function exportPdfPorSerie(titulo, alunosList){
 // sistema/planilha. Abre certinho no Excel em pt-BR (separador ; + BOM
 // UTF-8 pra acentuação não quebrar).
 function exportCsvCompleto(alunosList){
-  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  if(!alunosList.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
   const linhas = [COLS.map(c => c.label), ..._bodyAlunos(alunosList, COLS)];
   const csv = linhas
     .map(cols => cols.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(';'))
@@ -1947,9 +2041,9 @@ function _fetchImagemComoDataUrl(url){
 }
 
 function exportFichasIndividuais(titulo, alunosList){
-  if(!alunosList.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+  if(!alunosList.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
   const { jsPDF } = window.jspdf || {};
-  if(!jsPDF){ alert("Falha ao carregar jsPDF."); return; }
+  if(!jsPDF){ setMsg("Falha ao carregar jsPDF.", "err"); return; }
   _carregarDadosEscola().then(async escola => {
     // Busca todas as fotos em paralelo antes de montar as páginas
     const comFoto = alunosList.filter(a => a.fotoUrl);
@@ -2117,11 +2211,11 @@ document.getElementById("sortTurmaField").addEventListener("change", (e)=>{
 });
 
 document.getElementById("btnTurmasTabela").addEventListener("click", ()=>{
-  const tSel = turmasSelecionadas(); if(!tSel.length){ alert("Selecione pelo menos uma turma."); return; }
+  const tSel = turmasSelecionadas(); if(!tSel.length){ setMsg("Selecione pelo menos uma turma.", "warn"); return; }
   abrirModal(`Tabela de Turmas • ${anoSelecionadoOuAtivo() || "todos os anos"}`, buildTurmasTableHtml(tSel));
 });
 document.getElementById("btnTurmasPdf").addEventListener("click", ()=>{
-  const tSel = turmasSelecionadas(); if(!tSel.length){ alert("Selecione pelo menos uma turma."); return; }
+  const tSel = turmasSelecionadas(); if(!tSel.length){ setMsg("Selecione pelo menos uma turma.", "warn"); return; }
   exportTurmasPdf(`Turmas Ano Ativo ${anoSelecionadoOuAtivo() || ""}`, tSel);
 });
 document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
@@ -2151,7 +2245,7 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
   document.getElementById("btnExportLista").addEventListener("click", ()=>{
     drop.style.display = "none";
     const selA = alunosSelecionados();
-    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportPdf(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Relação de Alunos`, selA);
   });
 
@@ -2159,7 +2253,7 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
   document.getElementById("btnExportTurma").addEventListener("click", ()=>{
     drop.style.display = "none";
     const selA = alunosSelecionados();
-    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportPdfPorTurma(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Turma`, selA);
   });
 
@@ -2167,7 +2261,7 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
   document.getElementById("btnExportSerie").addEventListener("click", ()=>{
     drop.style.display = "none";
     const selA = alunosSelecionados();
-    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportPdfPorSerie(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Série`, selA);
   });
 
@@ -2175,7 +2269,7 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
   document.getElementById("btnExportFichas").addEventListener("click", ()=>{
     drop.style.display = "none";
     const selA = alunosSelecionados();
-    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportFichasIndividuais(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Ficha Individual`, selA);
   });
 
@@ -2183,7 +2277,7 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
   document.getElementById("btnExportCsv").addEventListener("click", ()=>{
     drop.style.display = "none";
     const selA = alunosSelecionados();
-    if(!selA.length){ alert("Nenhum aluno selecionado para exportar."); return; }
+    if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportCsvCompleto(selA);
   });
 })();
@@ -2248,7 +2342,7 @@ function _schemaPreviewText(schema){
 
 async function gerarAtaDaTurma(turmaId){
   const turmaAA = turmas.find(t => t.turmaId === turmaId);
-  if(!turmaAA){ alert('Turma não encontrada.'); return; }
+  if(!turmaAA){ setMsg('Turma não encontrada.', 'err'); return; }
   const matsDestaT = mats.filter(m => m.turmaId === turmaId);
   const alunosDestaT = matsDestaT.map(m => {
     const alu = alunos.find(a => (a.alunoId||a.id) === m.alunoId) || {};
