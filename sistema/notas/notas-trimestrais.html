@@ -98,6 +98,7 @@ html[data-theme="dark"] th.th-materia{ background:rgba(124,58,237,0.15); }
 th.th-sub{ font-size:10px; font-weight:700; color:var(--muted); width:44px; }
 td.col-nota input{ width:42px; padding:4px; font-size:12px; text-align:center; border:1px solid var(--field-border); border-radius:6px; background:var(--field-bg); color:var(--ink); }
 td.col-media{ font-weight:800; color:var(--brand,#7c3aed); width:48px; }
+td.col-media.parcial{ color:#d97706; font-style:italic; cursor:help; }
 td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(0,0,0,0.03) 4px, transparent 4px, transparent 8px); }
 
 .aviso-warn{ background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
@@ -114,10 +115,10 @@ td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(
 .status-msg.ok{ color:#16a34a; }
 .status-msg.err{ color:#dc2626; }
 
-#detalhesOrdemAccess summary::-webkit-details-marker{ display:none; }
-#detalhesOrdemAccess summary{ outline:none; }
-#detalhesOrdemAccess .seta-detalhes{ display:inline-block; transition:transform 0.15s; font-size:12px; color:var(--brand,#7c3aed); }
-#detalhesOrdemAccess[open] .seta-detalhes{ transform:rotate(90deg); }
+details summary::-webkit-details-marker{ display:none; }
+details summary{ outline:none; }
+details .seta-detalhes{ display:inline-block; transition:transform 0.15s; font-size:12px; color:var(--brand,#7c3aed); }
+details[open] .seta-detalhes{ transform:rotate(90deg); }
 
 .hidden{ display:none !important; }
 
@@ -136,7 +137,10 @@ td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(
 <div id="bannerTopo" class="hidden" style="padding:12px 16px;border-radius:10px;margin-bottom:14px;font-weight:700;font-size:14px;"></div>
 
   <div class="card">
-    <h2 style="margin-top:0;">📥 Lançamento de Notas Trimestrais</h2>
+    <h2 style="margin-top:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      📥 Lançamento de Notas Trimestrais
+      <span id="indicadorSujo" class="hidden" style="font-size:12px;font-weight:800;color:#d97706;background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.35);padding:3px 10px;border-radius:20px;">● Alterações não salvas</span>
+    </h2>
     <div class="aviso-info">
       <strong>Pra que serve esta página:</strong> ela NÃO substitui o sistema da prefeitura.
       Serve só pra você digitar as notas de forma rápida aqui, conferir a média de cada aluno,
@@ -188,6 +192,22 @@ td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(
 
   <div class="card">
     <h3 style="margin-top:0;">Alunos</h3>
+
+    <details id="detalhesLote" style="margin-bottom:14px;">
+      <summary style="cursor:pointer;font-weight:800;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--brand,#7c3aed);">
+        <span class="seta-detalhes">▶</span> ➕ Adicionar vários alunos de uma vez (colar lista de nomes)
+      </summary>
+      <div style="margin-top:10px;">
+        <div class="campo">
+          <label>Um nome por linha</label>
+          <textarea id="listaNomesLote" rows="5" placeholder="José da Silva&#10;Maria Oliveira&#10;João Pereira" style="width:100%;padding:10px 12px;font-size:14px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--ink);font-family:'Nunito',sans-serif;resize:vertical;"></textarea>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" type="button" onclick="adicionarAlunosEmLote()">Adicionar todos</button>
+        </div>
+        <div class="status-msg" id="statusLote"></div>
+      </div>
+    </details>
 
     <div class="campo" style="max-width:320px;margin-bottom:10px;">
       <label>Ordem de preenchimento do formulário</label>
@@ -550,6 +570,20 @@ function limparCamposAluno() {
 let alunos = [];
 let editandoIdx = -1;
 
+/* =========================
+   Alterações não salvas (aviso visual + confirmação ao sair)
+========================= */
+let sujo = false;
+function marcarSujo(v = true) {
+  sujo = v;
+  $("indicadorSujo").classList.toggle("hidden", !sujo);
+}
+window.addEventListener("beforeunload", (e) => {
+  if (!sujo) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
 function adicionarAluno() {
   const nomeEl = $("nome");
   if (!nomeEl.value.trim()) { alert("Informe o nome do aluno."); return; }
@@ -576,6 +610,7 @@ function adicionarAluno() {
 
   if (editandoIdx >= 0) { alunos[editandoIdx] = aluno; editandoIdx = -1; }
   else alunos.push(aluno);
+  marcarSujo();
 
   alunos.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   atualizarTabela();
@@ -585,11 +620,11 @@ function adicionarAluno() {
 function editarAluno(idx) {
   const a = alunos[idx];
   $("nome").value = a.nome;
-  for (const key in a.notas) {
-    const n = a.notas[key];
-    if ($(`n1_${key}`)) $(`n1_${key}`).value = n.n1 || "";
-    if ($(`n2_${key}`)) $(`n2_${key}`).value = n.n2 || "";
-    if ($(`n3_${key}`)) $(`n3_${key}`).value = n.n3 || "";
+  for (const m of getMateriasAtivas()) {
+    const n = (a.notas && a.notas[m.key]) || {};
+    if ($(`n1_${m.key}`)) $(`n1_${m.key}`).value = n.n1 || "";
+    if ($(`n2_${m.key}`)) $(`n2_${m.key}`).value = n.n2 || "";
+    if ($(`n3_${m.key}`)) $(`n3_${m.key}`).value = n.n3 || "";
   }
   editandoIdx = idx;
   window.scrollTo({ top: $("formGridDinamico").offsetTop - 100, behavior: "smooth" });
@@ -598,7 +633,25 @@ function editarAluno(idx) {
 function excluirAluno(idx) {
   if (!confirm(`Remover "${alunos[idx].nome}"?`)) return;
   alunos.splice(idx, 1);
+  marcarSujo();
   atualizarTabela();
+}
+
+function adicionarAlunosEmLote() {
+  const texto = $("listaNomesLote").value;
+  const nomes = texto.split("\n").map(n => n.trim()).filter(Boolean);
+  const status = $("statusLote");
+
+  if (!nomes.length) { status.className = "status-msg err"; status.textContent = "⚠️ Cole ao menos um nome, um por linha."; return; }
+
+  for (const nome of nomes) alunos.push({ nome, notas: {} });
+  alunos.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  marcarSujo();
+  atualizarTabela();
+  $("listaNomesLote").value = "";
+  status.className = "status-msg ok";
+  status.textContent = `✅ ${nomes.length} aluno(s) adicionado(s) (sem notas ainda — preencha na tabela ou no formulário acima).`;
 }
 
 /* =========================
@@ -634,10 +687,14 @@ function atualizarTabela() {
     for (const m of materias) {
       const n = a.notas[m.key] || {};
       const media = calcularMedia(n.n1, n.n2, n.n3);
+      const qtdPreenchida = [n.n1, n.n2, n.n3].filter(v => parseNota(v) !== null).length;
+      const parcial = media !== null && qtdPreenchida < 3;
       cells += `<td class="col-nota">${n.n1 || "<span style=color:var(--muted)>—</span>"}</td>`;
       cells += `<td class="col-nota">${n.n2 || "<span style=color:var(--muted)>—</span>"}</td>`;
       cells += `<td class="col-nota">${n.n3 || "<span style=color:var(--muted)>—</span>"}</td>`;
-      cells += `<td class="col-media">${media !== null ? formatarNotaExibicao(media.toFixed(1)) : "—"}</td>`;
+      cells += media === null
+        ? `<td class="col-media">—</td>`
+        : `<td class="col-media${parcial ? " parcial" : ""}" title="${parcial ? `Média parcial — só ${qtdPreenchida} de 3 trimestres preenchidos` : "Média final (3 trimestres)"}">${formatarNotaExibicao(media.toFixed(1))}${parcial ? "*" : ""}</td>`;
     }
     cells += `<td style="white-space:nowrap;">
       <button class="btn-mini btn-secondary" onclick="editarAluno(${idx})" title="Editar">✏️</button>
@@ -689,12 +746,29 @@ function copiarLinha(idx) {
 // Escolher/reabrir um registro salvo depois fica por conta do hub.
 let registroAtualId = null;
 
+let todosRegistros = []; // cache leve, carregado no início, só pra checar duplicidade
+
 async function salvarNoBanco() {
   const nomeTurma = $("turmaNome").value.trim();
   if (!nomeTurma) { setStatus("err", "⚠️ Informe o nome/identificação da turma antes de salvar."); return; }
 
+  const anoAtual = $("ano").value;
+  const duplicada = todosRegistros.find(r =>
+    r._id !== registroAtualId &&
+    String(r.ano || "") === anoAtual &&
+    normStr(r.turmaNome || "").toLowerCase() === nomeTurma.toLowerCase()
+  );
+  if (duplicada) {
+    const seguir = confirm(
+      `Já existe uma turma chamada "${duplicada.turmaNome}" no ano ${anoAtual}.\n\n` +
+      `Se você queria continuar uma turma já existente, cancele e abra ela pela Pesquisa em vez de criar outra.\n\n` +
+      `Deseja salvar mesmo assim como um registro novo e separado?`
+    );
+    if (!seguir) return;
+  }
+
   const registro = {
-    ano: $("ano").value,
+    ano: anoAtual,
     schemaId: schemaSelecionadoId,
     turmaNome: nomeTurma,
     serie: $("serieTurma").value,
@@ -707,7 +781,11 @@ async function salvarNoBanco() {
   try {
     const salvo = await getNotasCollection().save(registro);
     registroAtualId = salvo._id;
+    marcarSujo(false);
     setStatus("ok", `✅ Salvo no banco (${nomeTurma} — ${registro.ano}).`);
+
+    const idxCache = todosRegistros.findIndex(r => r._id === salvo._id);
+    if (idxCache >= 0) todosRegistros[idxCache] = salvo; else todosRegistros.push(salvo);
   } catch (e) {
     console.error(e);
     setStatus("err", "❌ Erro ao salvar: " + (e.message || e));
@@ -760,17 +838,28 @@ async function carregarParaEdicao(id) {
     atualizarTabela();
 
     setBanner("ok", `✅ Editando "${reg.turmaNome || "turma sem nome"}" — ${alunos.length} aluno(s) carregado(s).`);
+    marcarSujo(false);
   } catch (e) {
     console.error("[notas-trimestrais] Erro ao carregar registro:", e);
     setBanner("err", "❌ Erro ao carregar registro: " + (e.message || e) + " (abra o console do navegador — F12 — pra ver o erro completo)");
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   preencherAnos();
   preencherSeries();
   renderSelectSchemas();
   onSchemaChange();
+
+  ["ano", "turmaNome", "serieTurma"].forEach(id => {
+    $(id).addEventListener("input", () => marcarSujo());
+    $(id).addEventListener("change", () => marcarSujo());
+  });
+
+  // Carrega a lista de turmas já salvas em segundo plano, só pra poder
+  // avisar sobre duplicidade na hora de salvar (não bloqueia o uso da página).
+  try { todosRegistros = await getNotasCollection().list(); }
+  catch (e) { console.warn("[notas-trimestrais] Não consegui pré-carregar turmas existentes:", e); }
 
   const params = new URLSearchParams(window.location.search);
   const editId = params.get("edit");

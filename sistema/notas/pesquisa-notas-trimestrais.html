@@ -185,6 +185,7 @@ html[data-theme="dark"] .btn.primary { background: var(--brand-d); border-color:
         <div class="detalhe-actions">
           <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
           <a class="btn" id="btnEditarNotas" href="#">✏️ Editar turma</a>
+          <button class="btn danger small" type="button" onclick="excluirTurmaSelecionada()">🗑️ Excluir turma</button>
           <button class="btn secondary small" type="button" onclick="fecharRegistro()" style="margin-left:auto;">✕ Fechar</button>
         </div>
 
@@ -345,6 +346,29 @@ function fecharRegistro() {
   container.classList.add("layout-normal");
 
   document.querySelectorAll("#listaRegistros .list-item").forEach(el => el.classList.remove("selected"));
+}
+
+async function excluirTurmaSelecionada() {
+  if (!registroSelecionado) return;
+  const nome = registroSelecionado.turmaNome || "esta turma";
+  const qtdAlunos = (registroSelecionado.alunos || []).length;
+
+  const confirmado = confirm(
+    `Excluir "${nome}" (${registroSelecionado.ano || "?"}) e TODOS os ${qtdAlunos} aluno(s) dela?\n\n` +
+    `Essa ação não pode ser desfeita.`
+  );
+  if (!confirmado) return;
+
+  try {
+    await getNotasCollection().remove(registroSelecionado._id);
+    registros = registros.filter(r => r._id !== registroSelecionado._id);
+    fecharRegistro();
+    if (_jaFoiPesquisado) aplicarFiltros();
+    $("dbInfo").textContent = `${registros.length} turma(s) — clique em Pesquisar para exibir`;
+  } catch (e) {
+    console.error(e);
+    alert("❌ Erro ao excluir: " + (e.message || e));
+  }
 }
 
 /* =========================
