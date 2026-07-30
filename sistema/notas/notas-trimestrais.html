@@ -99,6 +99,8 @@ th.th-sub{ font-size:10px; font-weight:700; color:var(--muted); width:44px; }
 td.col-nota input{ width:42px; padding:4px; font-size:12px; text-align:center; border:1px solid var(--field-border); border-radius:6px; background:var(--field-bg); color:var(--ink); }
 td.col-media{ font-weight:800; color:var(--brand,#7c3aed); width:48px; }
 td.col-media.parcial{ color:#d97706; font-style:italic; cursor:help; }
+td.col-media.aprovado{ color:#16a34a; cursor:help; }
+td.col-media.reprovado{ color:#dc2626; cursor:help; }
 td.col-fora{ background:repeating-linear-gradient(45deg, rgba(0,0,0,0.03), rgba(0,0,0,0.03) 4px, transparent 4px, transparent 8px); }
 
 .aviso-warn{ background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
@@ -153,10 +155,6 @@ details[open] .seta-detalhes{ transform:rotate(90deg); }
         <select id="ano"></select>
       </div>
       <div class="campo">
-        <label>Schema (matérias)</label>
-        <select id="schemaTurma" title="Escolha o schema salvo no Admin — define quais matérias aparecem"></select>
-      </div>
-      <div class="campo">
         <label>Turma (identificação livre)</label>
         <input id="turmaNome" placeholder="ex: 5º ano A - Matutino">
       </div>
@@ -168,54 +166,81 @@ details[open] .seta-detalhes{ transform:rotate(90deg); }
   </div>
 
   <!-- ═══════════════════════════════════
-       CONFIGURAÇÃO DE ORDEM PARA O ACCESS
+       CONFIGURAÇÕES (oculto por padrão — coisas usadas raramente)
   ═══════════════════════════════════ -->
   <div class="card">
-    <details id="detalhesOrdemAccess">
+    <details id="detalhesConfig">
       <summary style="cursor:pointer;font-weight:800;font-size:16px;list-style:none;display:flex;align-items:center;gap:8px;">
-        <span class="seta-detalhes">▶</span> 🗂️ Ordem de cópia para o Access
+        <span class="seta-detalhes">▶</span> ⚙️ Configurações
       </summary>
-      <div style="margin-top:12px;">
-        <div class="aviso-warn">
-          No Access, cada aluno tem <b>uma tela própria</b> com todas as matérias/trimestres — não existe
-          lançamento em lote pra vários alunos de uma vez. Por isso, a cópia aqui é sempre <b>de 1 aluno por vez</b>
-          (botão 📋 na linha do aluno, na tabela abaixo): ela gera os valores desse aluno na
-          <b>mesma ordem em que os campos aparecem na tela do Access</b>, pulando as matérias que não
-          existem lá. A média não entra na cópia — o próprio Access já calcula isso sozinho.<br><br>
-          Monte a lista abaixo <b>exatamente na ordem dos campos na tela do Access</b> (setas ↑ ↓),
-          e desmarque o que não existe lá. Fica salvo no seu navegador.
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:20px;">
+
+        <div class="campo" style="max-width:340px;">
+          <label>Schema (matérias)</label>
+          <select id="schemaTurma" title="Escolha o schema salvo no Admin — define quais matérias aparecem"></select>
         </div>
-        <div class="ordem-lista" id="ordemLista"></div>
+
+        <div class="campo" style="max-width:340px;">
+          <label>Ordem de preenchimento do formulário</label>
+          <select id="modoPreenchimento" onchange="mudarModoPreenchimento()">
+            <option value="materia">Por matéria (Port. T1,T2,T3 → Mat. T1,T2,T3 → ...)</option>
+            <option value="trimestre">Por trimestre (1º de todas as matérias → 2º de todas → ...)</option>
+          </select>
+        </div>
+
+        <div class="campo" style="max-width:220px;">
+          <label>Média mínima para aprovação</label>
+          <input id="mediaAprovacao" placeholder="ex: 6,0" inputmode="decimal" onblur="aplicarMascaraMediaAprovacao(this)">
+          <span class="muted" style="font-size:12px;margin-top:4px;">De 0,0 a 10,0. Cada escola/turma pode usar um valor diferente — some campo é só pra colorir a média na tabela (verde/vermelho), não afeta o que é salvo pro Access.</span>
+        </div>
+
+        <div>
+          <b style="font-size:14px;">➕ Adicionar vários alunos de uma vez</b>
+          <div class="campo" style="margin-top:8px;">
+            <label>Um nome por linha</label>
+            <textarea id="listaNomesLote" rows="5" placeholder="José da Silva&#10;Maria Oliveira&#10;João Pereira" style="width:100%;padding:10px 12px;font-size:14px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--ink);font-family:'Nunito',sans-serif;resize:vertical;"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-secondary" type="button" onclick="adicionarAlunosEmLote()">Adicionar todos</button>
+          </div>
+          <div class="status-msg" id="statusLote"></div>
+        </div>
+
+        <details id="detalhesOrdemAccess">
+          <summary style="cursor:pointer;font-weight:800;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--brand,#7c3aed);">
+            <span class="seta-detalhes">▶</span> 🗂️ Ordem de cópia para o Access
+          </summary>
+          <div style="margin-top:12px;">
+            <div class="aviso-warn">
+              No Access, cada aluno tem <b>uma tela própria</b> com todas as matérias/trimestres — não existe
+              lançamento em lote pra vários alunos de uma vez. Por isso, a cópia aqui é sempre <b>de 1 aluno por vez</b>
+              (botão 📋 na linha do aluno, na tabela abaixo): ela gera os valores desse aluno na
+              <b>mesma ordem em que os campos aparecem na tela do Access</b>, pulando as matérias que não
+              existem lá. A média não entra na cópia — o próprio Access já calcula isso sozinho.<br><br>
+              Monte a lista abaixo <b>exatamente na ordem dos campos na tela do Access</b> (setas ↑ ↓),
+              e desmarque o que não existe lá. Fica salvo no seu navegador.
+            </div>
+            <div class="ordem-lista" id="ordemLista"></div>
+          </div>
+        </details>
+
+        <div>
+          <b style="font-size:14px;">📤 Exportação</b>
+          <div class="muted" style="font-size:13px;margin-top:6px;">Em breve: exportar a turma em planilha/PDF.</div>
+        </div>
+
+        <div>
+          <b style="font-size:14px;color:#b91c1c;">🗑️ Excluir turma</b>
+          <div class="muted" style="font-size:13px;margin:6px 0 8px;">Apaga esta turma e todos os alunos/notas dela do banco. Não pode ser desfeito.</div>
+          <button class="btn btn-danger-outline" type="button" onclick="excluirTurmaAtual()">Excluir esta turma</button>
+        </div>
+
       </div>
     </details>
   </div>
 
   <div class="card">
     <h3 style="margin-top:0;">Alunos</h3>
-
-    <details id="detalhesLote" style="margin-bottom:14px;">
-      <summary style="cursor:pointer;font-weight:800;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--brand,#7c3aed);">
-        <span class="seta-detalhes">▶</span> ➕ Adicionar vários alunos de uma vez (colar lista de nomes)
-      </summary>
-      <div style="margin-top:10px;">
-        <div class="campo">
-          <label>Um nome por linha</label>
-          <textarea id="listaNomesLote" rows="5" placeholder="José da Silva&#10;Maria Oliveira&#10;João Pereira" style="width:100%;padding:10px 12px;font-size:14px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--ink);font-family:'Nunito',sans-serif;resize:vertical;"></textarea>
-        </div>
-        <div class="actions">
-          <button class="btn btn-secondary" type="button" onclick="adicionarAlunosEmLote()">Adicionar todos</button>
-        </div>
-        <div class="status-msg" id="statusLote"></div>
-      </div>
-    </details>
-
-    <div class="campo" style="max-width:320px;margin-bottom:10px;">
-      <label>Ordem de preenchimento do formulário</label>
-      <select id="modoPreenchimento" onchange="mudarModoPreenchimento()">
-        <option value="materia">Por matéria (Port. T1,T2,T3 → Mat. T1,T2,T3 → ...)</option>
-        <option value="trimestre">Por trimestre (1º de todas as matérias → 2º de todas → ...)</option>
-      </select>
-    </div>
 
     <div class="form-grid" id="formGridDinamico"></div>
 
@@ -559,6 +584,12 @@ function aplicarMascaraNota(el) {
   el.value = normalizado;
 }
 
+function aplicarMascaraMediaAprovacao(el) {
+  aplicarMascaraNota(el);
+  marcarSujo();
+  atualizarTabela(); // recolore as médias já lançadas de acordo com o novo valor
+}
+
 function limparCamposAluno() {
   $("nome").value = "";
   for (const m of getMateriasAtivas()) {
@@ -662,13 +693,12 @@ function renderCabecalhoTabela() {
   const trM = $("theadMaterias");
   const trS = $("theadSub");
 
-  let htmlM = `<th class="th-nome" rowspan="2">Nome</th>`;
+  let htmlM = `<th class="th-nome" rowspan="2">Nome</th><th rowspan="2">Ações</th>`;
   let htmlS = ``;
   for (const m of materias) {
     htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
     htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
   }
-  htmlM += `<th rowspan="2">Ações</th>`;
   trM.innerHTML = htmlM;
   trS.innerHTML = htmlS;
 }
@@ -684,23 +714,35 @@ function atualizarTabela() {
 
   tb.innerHTML = alunos.map((a, idx) => {
     let cells = `<td class="col-nome">${a.nome}</td>`;
-    for (const m of materias) {
-      const n = a.notas[m.key] || {};
-      const media = calcularMedia(n.n1, n.n2, n.n3);
-      const qtdPreenchida = [n.n1, n.n2, n.n3].filter(v => parseNota(v) !== null).length;
-      const parcial = media !== null && qtdPreenchida < 3;
-      cells += `<td class="col-nota">${n.n1 || "<span style=color:var(--muted)>—</span>"}</td>`;
-      cells += `<td class="col-nota">${n.n2 || "<span style=color:var(--muted)>—</span>"}</td>`;
-      cells += `<td class="col-nota">${n.n3 || "<span style=color:var(--muted)>—</span>"}</td>`;
-      cells += media === null
-        ? `<td class="col-media">—</td>`
-        : `<td class="col-media${parcial ? " parcial" : ""}" title="${parcial ? `Média parcial — só ${qtdPreenchida} de 3 trimestres preenchidos` : "Média final (3 trimestres)"}">${formatarNotaExibicao(media.toFixed(1))}${parcial ? "*" : ""}</td>`;
-    }
     cells += `<td style="white-space:nowrap;">
       <button class="btn-mini btn-secondary" onclick="editarAluno(${idx})" title="Editar">✏️</button>
       <button class="btn-mini btn-secondary" onclick="copiarLinha(${idx})" title="Copiar notas deste aluno p/ Access">📋</button>
       <button class="btn-mini btn-danger-outline" onclick="excluirAluno(${idx})" title="Excluir">🗑️</button>
     </td>`;
+    const minimaAprovacao = parseNota($("mediaAprovacao")?.value);
+    for (const m of materias) {
+      const n = a.notas[m.key] || {};
+      const media = calcularMedia(n.n1, n.n2, n.n3);
+      const qtdPreenchida = [n.n1, n.n2, n.n3].filter(v => parseNota(v) !== null).length;
+      const parcial = media !== null && qtdPreenchida < 3;
+
+      let classeMedia = "col-media";
+      let tituloMedia = "Média final (3 trimestres)";
+      if (parcial) { classeMedia += " parcial"; tituloMedia = `Média parcial — só ${qtdPreenchida} de 3 trimestres preenchidos`; }
+      else if (media !== null && minimaAprovacao !== null) {
+        classeMedia += media >= minimaAprovacao ? " aprovado" : " reprovado";
+        tituloMedia = media >= minimaAprovacao
+          ? `Acima da média mínima (${formatarNotaExibicao(minimaAprovacao.toFixed(1))})`
+          : `Abaixo da média mínima (${formatarNotaExibicao(minimaAprovacao.toFixed(1))})`;
+      }
+
+      cells += `<td class="col-nota">${n.n1 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      cells += `<td class="col-nota">${n.n2 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      cells += `<td class="col-nota">${n.n3 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      cells += media === null
+        ? `<td class="col-media">—</td>`
+        : `<td class="${classeMedia}" title="${tituloMedia}">${formatarNotaExibicao(media.toFixed(1))}${parcial ? "*" : ""}</td>`;
+    }
     return `<tr>${cells}</tr>`;
   }).join("");
 }
@@ -772,6 +814,7 @@ async function salvarNoBanco() {
     schemaId: schemaSelecionadoId,
     turmaNome: nomeTurma,
     serie: $("serieTurma").value,
+    mediaAprovacao: $("mediaAprovacao").value || "",
     alunos,
     atualizadoEm: new Date().toISOString()
   };
@@ -830,6 +873,7 @@ async function carregarParaEdicao(id) {
     if (reg.ano) $("ano").value = reg.ano;
     $("turmaNome").value = reg.turmaNome || "";
     $("serieTurma").value = reg.serie || "";
+    $("mediaAprovacao").value = reg.mediaAprovacao || "";
     alunos = Array.isArray(reg.alunos) ? reg.alunos : [];
 
     renderOrdemAccess();
@@ -837,11 +881,53 @@ async function carregarParaEdicao(id) {
     renderCabecalhoTabela();
     atualizarTabela();
 
+    if (reg.mediaAprovacao) $("detalhesConfig").open = true;
+
     setBanner("ok", `✅ Editando "${reg.turmaNome || "turma sem nome"}" — ${alunos.length} aluno(s) carregado(s).`);
     marcarSujo(false);
   } catch (e) {
     console.error("[notas-trimestrais] Erro ao carregar registro:", e);
     setBanner("err", "❌ Erro ao carregar registro: " + (e.message || e) + " (abra o console do navegador — F12 — pra ver o erro completo)");
+  }
+}
+
+async function excluirTurmaAtual() {
+  const nomeAtual = $("turmaNome").value.trim() || "esta turma";
+
+  if (!registroAtualId) {
+    // Nada salvo ainda no banco — só limpa o formulário local.
+    if (!confirm(`"${nomeAtual}" ainda não foi salva no banco. Deseja só limpar o formulário?`)) return;
+    alunos = [];
+    $("turmaNome").value = "";
+    $("serieTurma").value = "";
+    $("mediaAprovacao").value = "";
+    atualizarTabela();
+    marcarSujo(false);
+    setStatus("ok", "Formulário limpo.");
+    return;
+  }
+
+  const qtdAlunos = alunos.length;
+  const confirmado = confirm(
+    `Excluir "${nomeAtual}" e TODOS os ${qtdAlunos} aluno(s) dela do banco?\n\nEssa ação não pode ser desfeita.`
+  );
+  if (!confirmado) return;
+
+  try {
+    await getNotasCollection().remove(registroAtualId);
+    todosRegistros = todosRegistros.filter(r => r._id !== registroAtualId);
+
+    registroAtualId = null;
+    alunos = [];
+    $("turmaNome").value = "";
+    $("serieTurma").value = "";
+    $("mediaAprovacao").value = "";
+    atualizarTabela();
+    marcarSujo(false);
+    setStatus("ok", `✅ "${nomeAtual}" excluída do banco.`);
+  } catch (e) {
+    console.error(e);
+    setStatus("err", "❌ Erro ao excluir: " + (e.message || e));
   }
 }
 
