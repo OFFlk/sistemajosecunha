@@ -976,11 +976,24 @@ function _enriquecerComMeta(list){
 function alunosFiltradosPorTurmas(turmasScope){
   const ano = anoSelecionadoOuAtivo();
   const turmaIds = new Set(turmasScope.map(t=>t.turmaId));
+
+  // Agrupa TODAS as matrículas de cada aluno (não só as que já batem com
+  // o escopo de turmas) — precisamos disso pra decidir qual é a matrícula
+  // ATUAL do aluno. Antes, um aluno que já passou por outras turmas nesse
+  // mesmo ano (readmissão em turma diferente, por ex.) continuava sendo
+  // listado em TODAS elas pra sempre, porque qualquer registro histórico
+  // de matrícula (mesmo já encerrado/substituído) bastava pra incluí-lo.
+  const matsPorAluno = new Map();
+  mats.forEach(m => {
+    if(!matsPorAluno.has(m.alunoId)) matsPorAluno.set(m.alunoId, []);
+    matsPorAluno.get(m.alunoId).push(m);
+  });
+
   let alunoIds = new Set();
   if(mats.length){
-    mats.forEach(m=>{
-      if((!ano || String(m.anoLetivo) === String(ano)) && turmaIds.has(m.turmaId))
-        alunoIds.add(m.alunoId);
+    matsPorAluno.forEach((lista, alunoId) => {
+      const atual = _matriculaAtualEntre(lista, ano);
+      if(atual && turmaIds.has(atual.turmaId)) alunoIds.add(alunoId);
     });
   } else {
     alunos.forEach(a=>{
@@ -991,7 +1004,7 @@ function alunosFiltradosPorTurmas(turmasScope){
   let list = alunos.filter(a=>a.alunoId && alunoIds.has(a.alunoId));
   list = list.map(a => {
     if(a.serie) return a;
-    const mat = _matriculaAtualEntre(mats.filter(m => m.alunoId === a.alunoId && turmaIds.has(m.turmaId)), ano);
+    const mat = _matriculaAtualEntre(matsPorAluno.get(a.alunoId) || [], ano);
     return mat ? { ...a, serie: mat.serie || a.serie, turmaId: mat.turmaId || a.turmaId } : a;
   });
   const _seriesFiltroSet = new Set(seriesSelecionadas.map(s => normSerie(s)));

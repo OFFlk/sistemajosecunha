@@ -181,6 +181,181 @@ function montarNeeDetalhado(a){
 }
 
 /* =========================
+   Foto do aluno (adaptado do widget de cadastro-aluno-ativo.html)
+   — na readmissão não editamos uma matrícula existente, então não há
+   "initFoto"; em vez disso, sempre sugerimos a foto mais recente do
+   aluno (de qualquer matrícula/ano) e deixamos escolher outra. A cópia
+   de fato só acontece em _enviarFotoPendenteReadmissao, já com a
+   matrícula nova confirmada — a matrícula de origem nunca é tocada.
+========================= */
+let _fotoPendente = null; // { base64, mimeType } ou { reaproveitar:true, fotoUrl }
+
+function _comprimirFoto(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const MAX = 480;
+        let { width, height } = img;
+        if(width > height && width > MAX){ height = Math.round(height * MAX / width); width = MAX; }
+        else if(height >= width && height > MAX){ width = Math.round(width * MAX / height); height = MAX; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+        resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg', preview: dataUrl });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Chamado toda vez que o formulário é (re)montado — precisa reconsultar
+// os elementos porque o painel inteiro é substituído a cada render
+// (ex.: ao trocar o ano letivo).
+function _setupFotoWidget(alunoId){
+  const inpFoto    = document.getElementById('inpFotoAluno');
+  const previewImg = document.getElementById('fotoAlunoPreview');
+  const placeholder= document.getElementById('fotoAlunoPlaceholder');
+  const btnRemover = document.getElementById('btnRemoverFoto');
+  const statusEl   = document.getElementById('fotoAlunoStatus');
+  if(!inpFoto) return;
+
+  _fotoPendente = null;
+
+  function setStatus(txt, cor){
+    statusEl.textContent = txt || '';
+    statusEl.style.color = cor || 'var(--muted)';
+  }
+
+  inpFoto.addEventListener('change', async () => {
+    const file = inpFoto.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){
+      setStatus('⚠️ Selecione um arquivo de imagem.', '#b91c1c');
+      return;
+    }
+    setStatus('Comprimindo...');
+    try{
+      const { base64, mimeType, preview } = await _comprimirFoto(file);
+      previewImg.src = preview;
+      previewImg.style.display = 'block';
+      placeholder.style.display = 'none';
+      btnRemover.style.display = '';
+      _fotoPendente = { base64, mimeType };
+      setStatus('Foto pronta — será enviada ao confirmar a readmissão.', '#166534');
+    }catch(e){
+      setStatus('❌ Falha ao processar a foto: ' + e.message, '#b91c1c');
+    }
+  });
+
+  btnRemover.addEventListener('click', () => {
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    placeholder.style.display = '';
+    btnRemover.style.display = 'none';
+    inpFoto.value = '';
+    setStatus('');
+    // Nada foi copiado/salvo ainda nesse ponto (a cópia só acontece ao
+    // confirmar a readmissão) — então só precisamos limpar o estado local,
+    // sem chamar drive-delete. A foto de origem (matrícula anterior) nunca
+    // foi tocada e continua intacta.
+    _fotoPendente = null;
+  });
+
+  // Sugere a foto mais recente já salva (qualquer matrícula/ano) pra esse aluno.
+  (async () => {
+    try{
+      const mats = await window.DB.anoAtivoMatriculas.list();
+      const maisRecente = mats
+        .filter(m => m.alunoId === String(alunoId) && m.fotoUrl)
+        .sort((a, b) => Number(b.anoLetivo) - Number(a.anoLetivo))[0];
+      if(maisRecente){
+        _fotoPendente = { reaproveitar: true, fotoUrl: maisRecente.fotoUrl };
+        previewImg.src = maisRecente.fotoUrl;
+        previewImg.style.display = 'block';
+        placeholder.style.display = 'none';
+        btnRemover.style.display = '';
+        setStatus(`Foto de uma matrícula anterior (${maisRecente.anoLetivo}) — mantenha ou clique em "Remover" pra trocar.`, 'var(--muted)');
+      }
+    }catch(e){ console.warn('[foto-readmissao] falha ao buscar foto anterior:', e); }
+  })();
+}
+
+// Chamado depois que a matrícula nova é salva com sucesso. Resolve o que
+// estiver pendente no widget: uma foto nova escolhida manualmente, ou a
+// sugestão de matrícula anterior aceita (precisa ser COPIADA pro
+// public_id desta matrícula/ano — cada ano tem seu próprio arquivo no
+// Cloudinary). A matrícula de origem nunca é alterada.
+async function enviarFotoPendenteReadmissao(alunoId, ano, matriculaId){
+  if(!_fotoPendente) return;
+
+  if(_fotoPendente.reaproveitar){
+    const { fotoUrl } = _fotoPendente;
+    _fotoPendente = null;
+    try{
+      const resp = await fetch('/api/avatar-upload', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, ano, sourceUrl: fotoUrl }),
+      });
+      const data = await resp.json();
+      if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
+      await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
+    }catch(e){ console.warn('[foto-readmissao] erro ao copiar foto reaproveitada:', e); }
+    return;
+  }
+
+  const { base64, mimeType } = _fotoPendente;
+  _fotoPendente = null;
+  try{
+    const resp = await fetch('/api/avatar-upload', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tipo: 'aluno', entidadeId: alunoId, ano, fileBase64: base64, mimeType }),
+    });
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
+    await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
+  }catch(e){ console.warn('[foto-readmissao] erro ao enviar foto nova:', e); }
+}
+
+/* =========================
+   Documentos já anexados (somente leitura)
+   — a readmissão não é o lugar de anexar/remover documentos (isso
+   continua na tela de cadastro/edição); aqui é só pra confirmar
+   visualmente que é o aluno certo antes de readmitir.
+========================= */
+async function _carregarDocsExistentes(alunoId){
+  const wrap  = document.getElementById('docsExistentesWrap');
+  const lista = document.getElementById('docsExistentesLista');
+  if(!wrap || !lista) return;
+  try{
+    const resp = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(alunoId)}`);
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error);
+    const files = data.files || [];
+    if(!files.length) return;
+    wrap.style.display = '';
+    lista.innerHTML = files.map(f => {
+      const icon = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
+      const dataFmt = f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR') : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--card-border,#ddd6fe);border-radius:10px;background:var(--card-bg,#fff);">`+
+        `<span style="font-size:18px;">${icon}</span>`+
+        `<div style="flex:1;min-width:0;">`+
+          `<div style="font-size:13px;font-weight:700;">${escapeHtml(f.label||f.fileName)}</div>`+
+          `<div style="font-size:11px;color:var(--muted);">${escapeHtml(f.fileName)}${dataFmt ? ' · ' + dataFmt : ''}</div>`+
+        `</div>`+
+        `<a href="${f.webViewLink}" target="_blank" rel="noopener" style="padding:4px 10px;border-radius:8px;font-size:12px;font-weight:800;border:1px solid var(--card-border,#ddd6fe);background:var(--field-bg,#fff);color:inherit;text-decoration:none;white-space:nowrap;">👁️ Ver</a>`+
+      `</div>`;
+    }).join('');
+  }catch(e){ console.warn('[docs-readmissao] erro ao carregar documentos:', e); }
+}
+
+
+/* =========================
    Toasts padronizados (ver guia-toasts.md)
 ========================= */
 function _showToast(msg, bg, shadow, duration){
@@ -399,6 +574,37 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
       <h2>Nova matrícula</h2>
       ${matAtual ? `<div class="info">Última matrícula encontrada: <b>${escapeHtml(matAtual.status||'—')}</b>${matAtual.situacao ? ' • ' + escapeHtml(matAtual.situacao) : ''} em ${escapeHtml(matAtual.anoLetivo||'—')} (turma ${escapeHtml(matAtual.turmaId||'—')}). A readmissão cria uma matrícula nova, independente da situação anterior.</div>` : ''}
 
+      <!-- Foto do aluno (herdada da matrícula anterior, se houver) -->
+      <div id="fotoAlunoBox" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:14px;
+        border:1.5px dashed var(--card-border,#ddd6fe);border-radius:14px;background:var(--card-bg,#fff);">
+        <div style="width:88px;height:88px;border-radius:50%;overflow:hidden;
+          background:var(--field-bg,#f3f0ff);display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          border:2px solid var(--field-border,#ddd6fe);">
+          <img id="fotoAlunoPreview" src="" alt="Foto do aluno" style="display:none;width:100%;height:100%;object-fit:cover;">
+          <span id="fotoAlunoPlaceholder" style="font-size:30px;">🧑</span>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Foto do aluno (opcional)</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+            Puxamos automaticamente a foto mais recente já salva para este aluno, se houver. Mantenha ou troque abaixo.
+          </div>
+          <input type="file" id="inpFotoAluno" accept="image/*" style="display:none;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn small" id="btnEscolherFoto" onclick="document.getElementById('inpFotoAluno').click()">📷 Escolher foto</button>
+            <button type="button" class="btn small" id="btnRemoverFoto" style="display:none;">🗑️ Remover</button>
+          </div>
+          <div id="fotoAlunoStatus" style="font-size:12px;margin-top:6px;"></div>
+        </div>
+      </div>
+
+      <!-- Documentos já anexados (somente leitura — pra confirmar que é o aluno certo) -->
+      <div id="docsExistentesWrap" style="display:none;margin-bottom:16px;">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
+          Documentos já anexados
+        </div>
+        <div id="docsExistentesLista" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
       <div class="grid2">
         <div class="field">
           <label for="selAnoReadmissao">Ano letivo</label>
@@ -437,6 +643,9 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
       </div>
     </div>
   `;
+
+  _setupFotoWidget(alunoId);
+  _carregarDocsExistentes(alunoId);
 
   const selAno   = document.getElementById('selAnoReadmissao');
   const selTurma = document.getElementById('selTurmaReadmissao');
@@ -501,6 +710,7 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
 
       const turmaObj = turmasDoAno.find(x => x.turmaId === turmaId);
       const matriculaId = window.MatriculaUtils.buildMatriculaId(turmaId, alunoId, ano);
+
       const novaMatricula = window.MatriculaUtils.validarMatricula({
         _id: matriculaId,
         alunoId,
@@ -514,6 +724,7 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
       });
 
       await window.DB.anoAtivoMatriculas.save(novaMatricula);
+      await enviarFotoPendenteReadmissao(alunoId, ano, matriculaId);
       setMsg('Readmissão concluída com sucesso!', 'ok');
 
       painel.innerHTML = `
@@ -524,6 +735,10 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
             <a class="btn primary" href="pesquisa-ano-ativo.html">Voltar à pesquisa</a>
           </div>
         </div>`;
+      // Padrão do sistema: redireciona automaticamente pra pesquisa depois
+      // de uma ação concluída (mesmo comportamento do "encerrar matrícula").
+      // O link acima fica como atalho pra quem não quiser esperar.
+      setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
     }catch(e){
       console.error(e);
       aviso.innerHTML = `<div class="warn">Erro ao gravar matrícula: ${escapeHtml(e.message || String(e))}</div>`;
