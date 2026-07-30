@@ -1744,15 +1744,14 @@ function normSerie(s){
       return n === nomeNorm;
     });
     if(atasAluno){
-      const msg =
-        `⚠️ Atenção: já existe um aluno com o nome "${nomeVal}" cadastrado no sistema (ID: ${atasAluno.alunoId||atasAluno.id}).
-
-` +
-        `Se for a mesma pessoa, use o modo 👤 Nome para vinculá-la ao mesmo ID — assim o histórico ficará completo.
-
-` +
-        `Deseja continuar mesmo assim e criar um ID separado?`;
-      if(!confirm(msg)) return;
+      const confirmou = await _confirmModal({
+        titulo: '⚠️ Nome já cadastrado',
+        corpo: `Já existe um aluno com o nome "${nomeVal}" cadastrado no sistema (ID: ${atasAluno.alunoId||atasAluno.id}).\n\n` +
+          `Se for a mesma pessoa, use o modo 👤 Nome para vinculá-la ao mesmo ID — assim o histórico ficará completo.\n\n` +
+          `Deseja continuar mesmo assim e criar um ID separado?`,
+        textoConfirmar: 'Sim, criar ID separado',
+      });
+      if(!confirmou) return;
     }
   }
 
@@ -2313,7 +2312,11 @@ function normSerie(s){
             const situacaoEscolhida = btn.dataset.situacao;
             const nomeAluno = aluno.nome || editId;
             const rotulo = { TRANSFERIDO: 'Transferido', DESISTENTE: 'Desistente', FALECIDO: 'Faleceu' }[situacaoEscolhida];
-            if(!confirm(`Encerrar matrícula de "${nomeAluno}" como "${rotulo}"?\n\nO cadastro do aluno será preservado.\nEsta ação não pode ser desfeita.`)) return;
+            if(!(await _confirmModal({
+              titulo: '⚠️ Encerrar matrícula',
+              corpo: `Encerrar matrícula de "${nomeAluno}" como "${rotulo}"?\n\nO cadastro do aluno será preservado.\nEsta ação não pode ser desfeita.`,
+              textoConfirmar: 'Sim, encerrar',
+            }))) return;
 
             fecharModalEncerrar();
 
@@ -3871,7 +3874,13 @@ function normSerie(s){
       });
       lista.querySelectorAll('.docs-existente .docs-fila-rm').forEach(btn => {
         btn.addEventListener('click', async () => {
-          if(!confirm(`Remover "${btn.dataset.name}"?\n\nEssa ação não pode ser desfeita.`)) return;
+          const confirmou = await _confirmModal({
+            titulo: '⚠️ Remover documento',
+            corDestaque: '#b91c1c',
+            corpo: `Remover "${btn.dataset.name}"?\n\nEssa ação não pode ser desfeita.`,
+            textoConfirmar: 'Sim, remover',
+          });
+          if(!confirmou) return;
           setStatus('loading','⏳ Removendo…');
           try{
             const r = await fetch('/api/drive-delete',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:btn.dataset.fileid,resourceType:btn.dataset.restype||'image'})});
