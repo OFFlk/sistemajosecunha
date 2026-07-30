@@ -540,6 +540,14 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
 
 /* ============================================================
+   TOAST
+   ============================================================ */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ============================================================
    MODAL
    ============================================================ */
 .modal-backdrop {
@@ -668,7 +676,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
           Data de criação <span id="iconOrdenar">▼</span>
         </button>
       </div>
-      <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Excluir</b> remove somente do banco do Ano Ativo.</div>
+      <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> para carregar no formulário. <b>Inativar</b> só marca a turma como inativa — a exclusão definitiva agora é feita na página de gestão de dados.</div>
       <div id="listaTurmas" class="list"></div>
     </div>
 
@@ -760,6 +768,98 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
 
   const $ = (id)=>document.getElementById(id);
+
+  // ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+  function _showToast(msg, bg, shadow, duration){
+    const existing = document.getElementById('_toastGlobal');
+    if(existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_toastGlobal';
+    toast.style.cssText =
+      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
+      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
+    document.body.appendChild(toast);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+
+  function _toastSucesso(msg){
+    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+  }
+  function _toastErro(msg){
+    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+  }
+  function _toastAviso(msg){
+    _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
+  }
+  function _toastCarregando(msg){
+    _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
+  }
+
+  function setMsg(text, kind){
+    const t = (text||"").toString();
+    if(!t) return;
+    if(kind === "err") _toastErro('⚠️ ' + t);
+    else if(kind === "ok") _toastSucesso('✅ ' + t);
+    else if(kind === "warn") _toastAviso('⚠️ ' + t);
+    else if(kind === "loading") _toastCarregando('⏳ ' + t);
+    else {
+      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+      _toastAviso(t);
+    }
+  }
+
+  // ── Modal de confirmação (substitui confirm() nativo) ─────────────────
+  function _escHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+    return new Promise((resolve) => {
+      const cor = corDestaque || '#b45309';
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.style.display = 'flex';
+      backdrop.innerHTML =
+        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+              `${_escHtml(textoConfirmar || 'Continuar')}`+
+            `</button>`+
+          `</div>`+
+        `</div>`;
+      document.body.appendChild(backdrop);
+
+      function fechar(resultado){
+        backdrop.remove();
+        resolve(resultado);
+      }
+      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+      backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+      backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    });
+  }
 
   /* ========================= */
   /* Permissões               */
@@ -1197,10 +1297,12 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       meta.className = "meta";
 
       const seriesTxt = (Array.isArray(t.series) ? t.series : []).join(", ") || "—";
+      const isInativa = t.status === "INATIVA";
 
       meta.innerHTML = `
         <span class="badge small">Ano: ${t.anoLetivo||"—"}</span>
         <span class="badge small">Turno: ${t.turno||"—"}</span>
+        ${isInativa ? `<span class="badge small" style="background:rgba(153,27,27,0.12);border-color:rgba(153,27,27,0.35);color:#991b1b;">INATIVA</span>` : ""}
         <div style="margin-top:6px"><span class="mono">ID:</span> <span class="mono">${t.turmaId||"—"}</span></div>
         <div style="margin-top:4px">Séries: ${seriesTxt}</div>
         ${t.professor ? `<div style="margin-top:4px">Prof.: ${t.professor}</div>` : ""}
@@ -1220,24 +1322,18 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
         btnEdit.addEventListener("click", ()=> loadTurma(t.turmaId));
         right.appendChild(btnEdit);
 
-        const btnDel = document.createElement("button");
-        btnDel.className = "btn danger";
-        btnDel.type = "button";
-        btnDel.textContent = "Excluir";
-        btnDel.addEventListener("click", ()=>{
-          if(!confirm("Excluir esta turma do Ano Ativo? (não afeta o módulo de atas)")) return;
-          const arr = getTurmas().filter(x => x.turmaId !== t.turmaId);
-          save(KEYS.turmas, arr);
-          try{
-            if(window.DB && window.Auth && window.Auth.getSession())
-              window.DB.anoAtivoTurmas.removeWhere('turmaId', t.turmaId).catch(()=>{});
-          }catch(_){}
-          if(editingTurmaId === t.turmaId) resetForm();
-          buildFiltroAnoOptions();
-          renderListaTurmas();
-          updateDbInfo();
-        });
-        right.appendChild(btnDel);
+        const btnStatus = document.createElement("button");
+        btnStatus.type = "button";
+        if(isInativa){
+          btnStatus.className = "btn";
+          btnStatus.style.cssText = "background:rgba(22,163,74,0.10);border-color:rgba(22,163,74,0.35);color:#166534;";
+          btnStatus.textContent = "Reativar";
+        } else {
+          btnStatus.className = "btn danger";
+          btnStatus.textContent = "Inativar";
+        }
+        btnStatus.addEventListener("click", ()=> toggleStatusTurma(t.turmaId));
+        right.appendChild(btnStatus);
       }
 
       div.appendChild(left);
@@ -1251,6 +1347,32 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     const icon = $("iconOrdenar");
     if(icon) icon.textContent = ordemCriacao === "desc" ? "▼" : "▲";
     renderListaTurmas();
+  }
+
+  async function toggleStatusTurma(turmaId){
+    const turmas = getTurmas();
+    const t = turmas.find(x => x && x.turmaId === turmaId);
+    if(!t) return;
+
+    const vaiInativar = t.status !== "INATIVA";
+
+    const confirmou = await _confirmModal({
+      titulo: vaiInativar ? "🚫 Inativar turma?" : "✅ Reativar turma?",
+      corpo: vaiInativar
+        ? "A turma deixa de contar como ativa (some do histórico automático), mas os dados continuam no banco.\n\nPara excluir de vez, use a página de gestão de dados.\n\nDeseja continuar?"
+        : "A turma volta a ficar disponível como ativa.\n\nDeseja continuar?",
+      corDestaque: vaiInativar ? "#991b1b" : "#166534",
+      textoConfirmar: vaiInativar ? "Sim, inativar" : "Sim, reativar"
+    });
+    if(!confirmou) return;
+
+    t.status = vaiInativar ? "INATIVA" : "ATIVA";
+    save(KEYS.turmas, turmas);
+
+    buildFiltroAnoOptions();
+    renderListaTurmas();
+    updateDbInfo();
+    setMsg(vaiInativar ? "Turma inativada." : "Turma reativada.", "ok");
   }
 
   function loadTurma(turmaId){
@@ -1334,11 +1456,11 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     const professor = ($("prof")?.value || "").trim();
 
     if(!seriesSel.length){
-      alert("Selecione pelo menos 1 série para cadastrar a turma.");
+      setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err");
       return;
     }
     if(!nome){
-      alert("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).");
+      setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err");
       return;
     }
 
@@ -1349,10 +1471,12 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     // — mas preservamos a data de criação original antes de removê-lo.
     let oldId = null;
     let criadoEmExistente = null;
+    let statusExistente = null;
     if(editingTurmaId){
       oldId = editingTurmaId;
       const existente = turmas.find(t => t && t.turmaId === oldId);
       if(existente && existente.criadoEm) criadoEmExistente = existente.criadoEm;
+      if(existente && existente.status) statusExistente = existente.status;
       turmas = turmas.filter(t => t && t.turmaId !== oldId);
     }
 
@@ -1386,7 +1510,8 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       series: [...seriesSel],
       turno,
       professor: professor || "",
-      criadoEm: criadoEmExistente || Date.now()
+      criadoEm: criadoEmExistente || Date.now(),
+      status: statusExistente || "ATIVA"
     };
 
     // upsert
@@ -1402,7 +1527,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
     buildFiltroAnoOptions();
     updateDbInfo();
-    alert("Turma salva no banco do Ano Ativo!");
+    setMsg("Turma salva no banco do Ano Ativo!", "ok");
     resetForm(); // limpa todos os campos e já atualiza a lista
   }
 
@@ -1486,8 +1611,13 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
 
   $("btnSalvar")?.addEventListener("click", salvarTurma);
 
-  $("btnResetForm")?.addEventListener("click", ()=>{
-    if(!confirm("Limpar o formulário?")) return;
+  $("btnResetForm")?.addEventListener("click", async ()=>{
+    const confirmou = await _confirmModal({
+      titulo: "⚠️ Limpar o formulário?",
+      corpo: "Os dados preenchidos aqui serão perdidos (a turma ainda não foi salva).\n\nDeseja continuar?",
+      textoConfirmar: "Sim, limpar"
+    });
+    if(!confirmou) return;
     resetForm();
   });
 
