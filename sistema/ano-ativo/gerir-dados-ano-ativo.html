@@ -126,6 +126,20 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 /* ── Barra de progresso ── */
 .progress-wrap { background:var(--border,#ddd6fe); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
 .progress-bar  { background:var(--brand,#7c3aed); height:100%; border-radius:999px; transition:width .3s; width:0%; }
+
+/* ── Toasts e modal de confirmação (ver guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; z-index: 50;
+}
+.btn.ghost, .btn.secondary {
+  background: var(--chip); border-color: var(--border,#ddd6fe); color: var(--chipTxt);
+}
 </style>
 </head>
 <body>
@@ -431,6 +445,7 @@ async function inicializar() {
     logEl('✅ Pronto.', 'logGeral');
   } catch(e) {
     logEl('❌ Erro ao carregar dados: ' + e.message, 'logGeral');
+    setMsg('Erro ao carregar dados: ' + e.message, 'err');
   }
 }
 
@@ -462,6 +477,96 @@ function _baixar(conteudo, nome, tipo) {
 }
 
 function _hoje() { return new Date().toISOString().slice(0,10); }
+
+/* =============================================
+   TOASTS PADRONIZADOS (ver guia-toasts.md)
+============================================= */
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+
+function _toastSucesso(msg){
+  _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+}
+function _toastErro(msg){
+  _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
+}
+function _toastAviso(msg){
+  _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
+}
+function _toastCarregando(msg){
+  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
+}
+
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
+/* ── Modal de confirmação (substitui confirm() nativo) ── */
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${esc(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted,#6b7280);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${esc(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+
+    function fechar(resultado){
+      backdrop.remove();
+      resolve(resultado);
+    }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
+}
 
 /* =============================================
    MIGRAÇÃO
@@ -519,6 +624,7 @@ async function analisarMigracao() {
 
   } catch(e) {
     logEl('❌ Erro na análise: ' + e.message, 'logMigrar');
+    setMsg('Erro na análise: ' + e.message, 'err');
   } finally {
     btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
   }
@@ -527,9 +633,14 @@ async function analisarMigracao() {
 async function executarMigracao() {
   if (!IS_ADMIN || !_turmasParaMigrar.length) return;
 
-  if (!confirm(
-    `Migrar ${_turmasParaMigrar.length} turma(s) de "turmas" → "anoAtivoTurmas" e removê-las da coleção antiga?\n\nEsta ação não pode ser desfeita. Faça um backup antes.`
-  )) return;
+  const confirmou = await _confirmModal({
+    titulo: '⚠️ Confirmar migração',
+    corpo: `Migrar ${_turmasParaMigrar.length} turma(s) de "turmas" → "anoAtivoTurmas" e removê-las da coleção antiga?\n\nEsta ação não pode ser desfeita. Faça um backup antes.`,
+    textoConfirmar: 'Sim, migrar',
+  });
+  if (!confirmou) return;
+
+  setMsg('Migrando turmas…', 'loading');
 
   const btnMig = document.getElementById('btnMigrar');
   const btnAn  = document.getElementById('btnAnalisar');
@@ -570,6 +681,8 @@ async function executarMigracao() {
 
   logEl('', 'logMigrar');
   logEl(`Migração concluída: ${ok} turma(s) migrada(s) · ${erros} erro(s).`, 'logMigrar');
+  if (erros > 0) setMsg(`Migração concluída com ${erros} erro(s) — ${ok} turma(s) migrada(s).`, ok > 0 ? 'warn' : 'err');
+  else setMsg(`${ok} turma(s) migrada(s) com sucesso!`, 'ok');
 
   _turmasParaMigrar = [];
   document.getElementById('btnMigrar').disabled = true;
@@ -614,6 +727,7 @@ async function analisarMigracaoAlunos() {
 
     if (turmaIdsNovos.size === 0) {
       logEl('⚠️ Nenhuma turma encontrada em anoAtivoTurmas. Migre as turmas primeiro.', 'logMigrarAlunos');
+      setMsg('Nenhuma turma encontrada em anoAtivoTurmas. Migre as turmas primeiro.', 'warn');
       btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
       return;
     }
@@ -679,6 +793,7 @@ async function analisarMigracaoAlunos() {
 
   } catch(e) {
     logEl('❌ Erro na análise: ' + e.message, 'logMigrarAlunos');
+    setMsg('Erro na análise: ' + e.message, 'err');
   } finally {
     btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
   }
@@ -688,9 +803,14 @@ async function executarMigracaoAlunos() {
   if (!IS_ADMIN) return;
   if (!_alunosParaMigrar.length && !_matriculasParaMigrar.length) return;
 
-  if (!confirm(
-    `Copiar ${_alunosParaMigrar.length} aluno(s) e ${_matriculasParaMigrar.length} matrícula(s) para as novas coleções?\n\nOs dados originais NÃO serão removidos. Esta operação é segura.`
-  )) return;
+  const confirmou = await _confirmModal({
+    titulo: '⚠️ Confirmar cópia',
+    corpo: `Copiar ${_alunosParaMigrar.length} aluno(s) e ${_matriculasParaMigrar.length} matrícula(s) para as novas coleções?\n\nOs dados originais NÃO serão removidos. Esta operação é segura.`,
+    textoConfirmar: 'Sim, copiar',
+  });
+  if (!confirmou) return;
+
+  setMsg('Copiando alunos e matrículas…', 'loading');
 
   const btnMig = document.getElementById('btnMigrarAlunos');
   const btnAn  = document.getElementById('btnAnalisarAlunos');
@@ -727,6 +847,7 @@ async function executarMigracaoAlunos() {
 
     logEl('', 'logMigrarAlunos');
     logEl('🎉 Migração concluída! Alunos e matrículas agora estão nas novas coleções.', 'logMigrarAlunos');
+    setMsg('Alunos e matrículas migrados com sucesso!', 'ok');
 
     _alunosParaMigrar = [];
     _matriculasParaMigrar = [];
@@ -737,6 +858,7 @@ async function executarMigracaoAlunos() {
 
   } catch(e) {
     logEl('❌ Erro durante a migração: ' + e.message, 'logMigrarAlunos');
+    setMsg('Erro durante a migração: ' + e.message, 'err');
   } finally {
     btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
     btnMig.textContent = '👥 Migrar alunos e matrículas';
@@ -749,6 +871,7 @@ async function exportarJSON() {
 
   const btnExp = document.getElementById('btnExportJSON');
   btnExp.disabled = true; btnExp.textContent = 'Exportando...';
+  setMsg('Gerando backup…', 'loading');
 
   try {
     await waitAuth();
@@ -779,8 +902,10 @@ async function exportarJSON() {
     );
 
     logEl(`✅ JSON exportado: ${turmasDB.length} turma(s) + ${legadasAnoAtivo.length} legada(s).`, 'logGeral');
+    setMsg('Backup exportado com sucesso!', 'ok');
   } catch(e) {
     logEl('❌ Erro ao exportar: ' + e.message, 'logGeral');
+    setMsg('Erro ao exportar: ' + e.message, 'err');
   } finally {
     btnExp.disabled = false; btnExp.textContent = '⬇ Exportar JSON';
   }
@@ -806,10 +931,13 @@ async function importarJSON(event) {
 
       // Valida que é um backup do ano-ativo
       if (!Array.isArray(dump.turmasDB)) {
-        logEl('❌ JSON inválido: campo turmasDB ausente.', 'logImport'); return;
+        logEl('❌ JSON inválido: campo turmasDB ausente.', 'logImport');
+        setMsg('JSON inválido: campo turmasDB ausente.', 'err');
+        return;
       }
       if (dump.modulo && dump.modulo !== 'ano-ativo') {
         logEl('⚠️ Atenção: este backup parece ser de outro módulo ("' + dump.modulo + '"). Continuando mesmo assim...', 'logImport');
+        setMsg('Este backup parece ser de outro módulo ("' + dump.modulo + '"). Continuando mesmo assim...', 'warn');
       }
 
       await waitAuth();
@@ -819,6 +947,7 @@ async function importarJSON(event) {
       const matriculas = dump.matriculasDB || [];
 
       logEl(`Importando: ${turmas.length} turma(s) · ${alunos.length} aluno(s) · ${matriculas.length} matrícula(s)...`, 'logImport');
+      setMsg('Importando backup…', 'loading');
 
       // Salva em lotes nas coleções novas
       if (turmas.length)     await window.DB.anoAtivoTurmas.saveAll(turmas);
@@ -827,11 +956,13 @@ async function importarJSON(event) {
 
       logEl(`✅ Importação concluída.`, 'logImport');
       logEl(`  Turmas: ${turmas.length} · Alunos: ${alunos.length} · Matrículas: ${matriculas.length}`, 'logImport');
+      setMsg('Importação concluída com sucesso!', 'ok');
 
       await inicializar();
 
     } catch(e) {
       logEl('❌ Erro ao importar: ' + e.message, 'logImport');
+      setMsg('Erro ao importar: ' + e.message, 'err');
     } finally {
       if (lblImp) { lblImp.style.pointerEvents = ''; lblImp.style.opacity = ''; }
       event.target.value = '';
@@ -853,7 +984,7 @@ async function buscarAlunoExcluir() {
   clearLogEl('logExcluirAluno');
   _alunoParaExcluir = null;
 
-  if (!alunoId) { logEl('⚠️ Informe o alunoId.', 'logExcluirAluno'); return; }
+  if (!alunoId) { logEl('⚠️ Informe o alunoId.', 'logExcluirAluno'); setMsg('Informe o alunoId.', 'warn'); return; }
 
   const btn = document.getElementById('btnBuscarAluno');
   btn.disabled = true; btn.textContent = 'Buscando...';
@@ -868,6 +999,7 @@ async function buscarAlunoExcluir() {
     const aluno = alunos.find(a => (a.alunoId || a._id) === alunoId);
     if (!aluno) {
       logEl(`❌ Nenhum aluno encontrado com alunoId "${alunoId}" em anoAtivoAlunos.`, 'logExcluirAluno');
+      setMsg(`Nenhum aluno encontrado com alunoId "${alunoId}".`, 'err');
       return;
     }
 
@@ -935,6 +1067,7 @@ async function buscarAlunoExcluir() {
 
   } catch (e) {
     logEl('❌ Erro ao buscar: ' + e.message, 'logExcluirAluno');
+    setMsg('Erro ao buscar: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = '🔍 Buscar';
   }
@@ -946,13 +1079,19 @@ async function executarExclusaoAluno() {
   const alunoId = aluno.alunoId || aluno._id;
   const apagarCatalogo = document.getElementById('chkApagarCatalogo').checked;
 
-  if (!confirm(
-    `Excluir definitivamente o aluno "${aluno.nome || alunoId}"?\n\n` +
-    `- ${mats.length} matrícula(s)\n` +
-    `- ${docs.length} documento(s) anexado(s)\n` +
-    (apagarCatalogo ? '- Registro no catálogo/atas\n' : '') +
-    `\nEsta ação NÃO PODE ser desfeita.`
-  )) return;
+  const confirmou = await _confirmModal({
+    titulo: '⚠️ Excluir aluno definitivamente',
+    corDestaque: '#b91c1c',
+    corpo: `Excluir definitivamente o aluno "${aluno.nome || alunoId}"?\n\n` +
+      `- ${mats.length} matrícula(s)\n` +
+      `- ${docs.length} documento(s) anexado(s)\n` +
+      (apagarCatalogo ? '- Registro no catálogo/atas\n' : '') +
+      `\nEsta ação NÃO PODE ser desfeita.`,
+    textoConfirmar: 'Sim, excluir',
+  });
+  if (!confirmou) return;
+
+  setMsg('Excluindo aluno…', 'loading');
 
   const btn = document.getElementById('btnExcluirAluno');
   btn.disabled = true; btn.textContent = 'Excluindo...';
@@ -1008,6 +1147,7 @@ async function executarExclusaoAluno() {
 
     logEl('', 'logExcluirAluno');
     logEl('🎉 Exclusão concluída.', 'logExcluirAluno');
+    setMsg('Aluno excluído com sucesso!', 'ok');
 
     document.getElementById('previewAluno').style.display = 'none';
     document.getElementById('inpAlunoIdExcluir').value = '';
@@ -1016,6 +1156,7 @@ async function executarExclusaoAluno() {
 
   } catch (e) {
     logEl('❌ Erro durante a exclusão: ' + e.message, 'logExcluirAluno');
+    setMsg('Erro durante a exclusão: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
   }
@@ -1033,7 +1174,7 @@ async function buscarTurmaExcluir() {
   clearLogEl('logExcluirTurma');
   _turmaParaExcluir = null;
 
-  if (!turmaId) { logEl('⚠️ Informe o turmaId.', 'logExcluirTurma'); return; }
+  if (!turmaId) { logEl('⚠️ Informe o turmaId.', 'logExcluirTurma'); setMsg('Informe o turmaId.', 'warn'); return; }
 
   const btn = document.getElementById('btnBuscarTurma');
   btn.disabled = true; btn.textContent = 'Buscando...';
@@ -1048,6 +1189,7 @@ async function buscarTurmaExcluir() {
     const turma = turmas.find(t => (t.turmaId || t._id) === turmaId);
     if (!turma) {
       logEl(`❌ Nenhuma turma encontrada com turmaId "${turmaId}" em anoAtivoTurmas.`, 'logExcluirTurma');
+      setMsg(`Nenhuma turma encontrada com turmaId "${turmaId}".`, 'err');
       return;
     }
 
@@ -1071,6 +1213,7 @@ async function buscarTurmaExcluir() {
 
   } catch (e) {
     logEl('❌ Erro ao buscar: ' + e.message, 'logExcluirTurma');
+    setMsg('Erro ao buscar: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = '🔍 Buscar';
   }
@@ -1081,11 +1224,17 @@ async function executarExclusaoTurma() {
   const { turma, mats } = _turmaParaExcluir;
   const turmaId = turma.turmaId || turma._id;
 
-  if (!confirm(
-    `Excluir definitivamente a turma "${turma.nome || turmaId}"?\n\n` +
-    `- ${mats.length} matrícula(s) que apontam pra ela\n\n` +
-    `Esta ação NÃO PODE ser desfeita.`
-  )) return;
+  const confirmou = await _confirmModal({
+    titulo: '⚠️ Excluir turma definitivamente',
+    corDestaque: '#b91c1c',
+    corpo: `Excluir definitivamente a turma "${turma.nome || turmaId}"?\n\n` +
+      `- ${mats.length} matrícula(s) que apontam pra ela\n\n` +
+      `Esta ação NÃO PODE ser desfeita.`,
+    textoConfirmar: 'Sim, excluir',
+  });
+  if (!confirmou) return;
+
+  setMsg('Excluindo turma…', 'loading');
 
   const btn = document.getElementById('btnExcluirTurma');
   btn.disabled = true; btn.textContent = 'Excluindo...';
@@ -1104,6 +1253,7 @@ async function executarExclusaoTurma() {
 
     logEl('', 'logExcluirTurma');
     logEl('🎉 Exclusão concluída.', 'logExcluirTurma');
+    setMsg('Turma excluída com sucesso!', 'ok');
 
     document.getElementById('previewTurma').style.display = 'none';
     document.getElementById('inpTurmaIdExcluir').value = '';
@@ -1112,6 +1262,7 @@ async function executarExclusaoTurma() {
 
   } catch (e) {
     logEl('❌ Erro durante a exclusão: ' + e.message, 'logExcluirTurma');
+    setMsg('Erro durante a exclusão: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
   }
