@@ -991,8 +991,7 @@ function alunosFiltradosPorTurmas(turmasScope){
   let list = alunos.filter(a=>a.alunoId && alunoIds.has(a.alunoId));
   list = list.map(a => {
     if(a.serie) return a;
-    const mat = mats.find(m => m.alunoId === a.alunoId && turmaIds.has(m.turmaId) && (!ano || String(m.anoLetivo) === String(ano)))
-             || mats.find(m => m.alunoId === a.alunoId && turmaIds.has(m.turmaId));
+    const mat = _matriculaAtualEntre(mats.filter(m => m.alunoId === a.alunoId && turmaIds.has(m.turmaId)), ano);
     return mat ? { ...a, serie: mat.serie || a.serie, turmaId: mat.turmaId || a.turmaId } : a;
   });
   const _seriesFiltroSet = new Set(seriesSelecionadas.map(s => normSerie(s)));
@@ -1008,8 +1007,7 @@ function alunosFiltradosPorSeries(){
   const seriesSel = seriesSelecionadasNorm();
   let list = alunos.map(a => {
     if(a.serie) return a;
-    const mat = mats.find(m => m.alunoId === a.alunoId && (!ano || String(m.anoLetivo) === String(ano)))
-             || mats.find(m => m.alunoId === a.alunoId);
+    const mat = _matriculaAtualEntre(mats.filter(m => m.alunoId === a.alunoId), ano);
     return mat ? { ...a, serie: mat.serie || a.serie } : a;
   });
   if(ano){
