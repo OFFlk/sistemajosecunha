@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
+<script>
+(function(){
+  const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/hub.css">
+
+<title>Notas Trimestrais • Menu</title>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+  <div class="l-section">
+    <div class="l-slabel">// módulos</div>
+    <div class="l-sline"></div>
+  </div>
+  <div class="grid grid-config">
+
+    <a class="card" href="notas-trimestrais.html">
+      <div class="card-icon">📥</div>
+      <div class="card-title">Lançamento de notas</div>
+      <div class="card-footer">
+        <div class="card-desc">Digite as 3 notas trimestrais de cada aluno e prepare a cópia para o Access.</div>
+      </div>
+    </a>
+
+    <a class="card" href="pesquisa-notas-trimestrais.html">
+      <div class="card-icon">🔎</div>
+      <div class="card-title">Pesquisa / Lista</div>
+      <div class="card-footer">
+        <div class="card-desc">Consulte as turmas já lançadas, veja os alunos e edite quando precisar.</div>
+      </div>
+    </a>
+
+  </div>
+</div>
+
+<footer>
+  <div class="l-fdot"></div>
+  sistema interno de gestão escolar · desenvolvido sob medida
+</footer>
+
+<!-- header-logic: monta header, tema, chip e auth guard -->
+<script src="../header-logic.js"></script>
+
+<script>
+(function () {
+  var bubble = null;
+
+  function getBrandColor() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var key     = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
+    var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
+                  || { '--brand': '#7c3aed', '--brand-d': '#7c3aed' };
+    var color = dark
+      ? (palette['--brand-d'] || '#7c3aed')
+      : (palette['--brand']   || '#7c3aed');
+    return { color: color, dark: dark };
+  }
+
+  function stylesBubble(b) {
+    var bc = getBrandColor();
+    b.style.background = bc.color;
+    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+  }
+
+  function initBubble(b) {
+    b.style.cssText = [
+      'position:fixed',
+      'z-index:9999',
+      'pointer-events:none',
+      'opacity:0',
+      'transition:opacity 0.15s ease, transform 0.15s ease',
+      'transform:translateX(-50%) translateY(4px)',
+      'font-size:12px',
+      'font-family:inherit',
+      'font-weight:700',
+      'letter-spacing:0.04em',
+      'text-transform:uppercase',
+      'white-space:nowrap',
+      'padding:5px 12px',
+      'border-radius:6px',
+    ].join(';');
+    stylesBubble(b);
+  }
+
+  function ensureBubble() {
+    if (bubble) return bubble;
+    bubble = document.createElement('span');
+    initBubble(bubble);
+    document.body.appendChild(bubble);
+    return bubble;
+  }
+
+  function positionBubble(card) {
+    var rect = card.getBoundingClientRect();
+    bubble.style.left      = (rect.left + rect.width / 2) + 'px';
+    bubble.style.top       = (rect.top - 8) + 'px';
+    bubble.style.transform = 'translateX(-50%) translateY(-100%)';
+  }
+
+  function showTooltip(e) {
+    var card = e.currentTarget;
+    var b    = ensureBubble();
+    b.textContent = card.getAttribute('data-tooltip');
+    stylesBubble(b);
+    positionBubble(card);
+    requestAnimationFrame(function () {
+      b.style.opacity   = '1';
+      b.style.transform = 'translateX(-50%) translateY(-100%)';
+    });
+  }
+
+  function hideTooltip() {
+    if (bubble) bubble.style.opacity = '0';
+  }
+
+  window.initTooltipCards = function () {
+    document.querySelectorAll('.card[data-tooltip]').forEach(function (card) {
+      if (card._tooltipBound) return;
+      card._tooltipBound = true;
+      card.addEventListener('mouseenter', showTooltip);
+      card.addEventListener('mouseleave', hideTooltip);
+    });
+  };
+
+  function onThemeChange() {
+    if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initTooltipCards);
+  } else {
+    window.initTooltipCards();
+  }
+
+  new MutationObserver(onThemeChange)
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  document.addEventListener('colorchange', onThemeChange);
+})();
+</script>
+
+</body>
+</html>
