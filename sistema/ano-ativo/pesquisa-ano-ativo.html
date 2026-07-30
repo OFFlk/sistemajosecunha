@@ -1030,11 +1030,30 @@ function _buildMatsMap(ano){
 // Escolhe, dentre uma lista de matrículas de UM aluno, qual é "a atual".
 // Usado tanto por _buildMatsMap quanto por enriquecerAlunos, pra não
 // duplicar (e voltar a divergir) essa regra em dois lugares.
-// Filtra só as matrículas com status ATIVO — usado em qualquer lugar que
-// precise "quantos alunos ativos" (badge de turma, tabela, export), em
-// vez de contar toda matrícula histórica (ativa ou não) daquela turma.
-function _apenasAtivas(lista){
-  return (lista || []).filter(m => (m.status || 'ATIVO').toUpperCase() === 'ATIVO');
+// Dado um turmaId e um ano, retorna 1 matrícula "atual" por aluno daquela
+// turma naquele ano (usado em qualquer lugar que precise "quantos alunos"
+// — badge de turma, tabela, export).
+// Substituiu o antigo _apenasAtivas (que só aceitava status ATIVO): no ano
+// ativo isso ainda dá prioridade à matrícula ATIVO do aluno, mas em anos
+// passados — onde TODA matrícula já está INATIVO/encerrada (aprovado,
+// reprovado, transferido etc.) — o filtro por status sempre dava zero.
+// Reaproveitando _matriculaAtualEntre (mesma regra de "matrícula atual"
+// já usada pra resolver duplicidade de readmissão) o fallback pega a mais
+// recente quando não há nenhuma ATIVO, o que resolve o zero nos anos
+// retroativos sem voltar a contar matrícula duplicada por aluno.
+function _matsAtuaisDaTurma(turmaId, ano){
+  const doTurmaEAno = mats.filter(m => m.turmaId === turmaId && (!ano || String(m.anoLetivo) === String(ano)));
+  const porAluno = new Map();
+  doTurmaEAno.forEach(m => {
+    if(!porAluno.has(m.alunoId)) porAluno.set(m.alunoId, []);
+    porAluno.get(m.alunoId).push(m);
+  });
+  const atuais = [];
+  porAluno.forEach(lista => {
+    const atual = _matriculaAtualEntre(lista, ano);
+    if(atual) atuais.push(atual);
+  });
+  return atuais;
 }
 
 function _matriculaAtualEntre(lista, ano){
@@ -1181,12 +1200,6 @@ function atualizarListas(){
   if(tScope.length===0){
     listaTurmas.innerHTML = `<div class="muted">Nenhuma turma encontrada para os filtros.</div>`;
   } else {
-    // Pré-calcular Map turmaId → mats para evitar filter() dentro do loop
-    const matsPorTurma = new Map();
-    mats.forEach(m => {
-      if(!matsPorTurma.has(m.turmaId)) matsPorTurma.set(m.turmaId, []);
-      matsPorTurma.get(m.turmaId).push(m);
-    });
     // Pré-calcular Map turmaId → turmaOriginal
     const turmasMap = new Map(turmas.map(t => [t.turmaId, t]));
 
@@ -1194,7 +1207,7 @@ function atualizarListas(){
       const el = document.createElement("div");
       el.className="item selecionavel";
       const titulo = t.nome || `${t.serie || "Turma"} ${t.anoLetivo || ""}`.trim();
-      const matsT = _apenasAtivas(matsPorTurma.get(t.turmaId) || []);
+      const matsT = _matsAtuaisDaTurma(t.turmaId, t.anoLetivo);
       const qtdAlunos = matsT.length;
       const turmaOriginal = turmasMap.get(t.turmaId) || t;
       const seriesArr = Array.isArray(turmaOriginal.series) ? turmaOriginal.series : (t.serie ? [t.serie] : []);
@@ -1635,7 +1648,7 @@ function buildTurmasTableHtml(turmasList){
   const ano = anoSelecionadoOuAtivo();
   const headers = COLS_TURMAS.map(c=>`<th>${c.label}</th>`).join("");
   const body = turmasList.map(t => {
-    const matsT = _apenasAtivas(mats.filter(m => m.turmaId === t.turmaId && (!ano || String(m.anoLetivo) === String(ano))));
+    const matsT = _matsAtuaisDaTurma(t.turmaId, ano);
     const qtd = matsT.length, qtdI = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
     const seriesTxt = Array.isArray(t.series) ? t.series.join(", ") : (t.serie || "—");
     const row = COLS_TURMAS.map(col => {
@@ -1856,7 +1869,7 @@ function exportTurmasPdf(titulo, turmasList){
     const ano = anoSelecionadoOuAtivo();
     const head = [COLS_TURMAS.map(c => c.label)];
     const body = turmasList.map(t => {
-      const matsT = _apenasAtivas(mats.filter(m => m.turmaId === t.turmaId && (!ano || String(m.anoLetivo) === String(ano))));
+      const matsT = _matsAtuaisDaTurma(t.turmaId, ano);
       const qtd = matsT.length, qtdI = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
       const seriesTxt = Array.isArray(t.series) ? t.series.join(", ") : (t.serie || "—");
       return COLS_TURMAS.map(col => {
