@@ -1046,14 +1046,24 @@ function _matsAtuaisDaTurma(turmaId, ano){
   // dele naquele ano (não só as desta turma) — é o mesmo _buildMatsMap já
   // usado pra decidir status/situação exibidos. Só depois disso checa se
   // essa matrícula atual aponta pra esta turma.
-  // Correção de um bug introduzido na versão anterior: ali o filtro por
-  // turmaId acontecia ANTES de decidir a matrícula atual do aluno, então
-  // uma matrícula antiga/inativa (de um aluno já transferido pra outra
-  // turma) sobrava como "a única candidata" e era contada por engano —
-  // mesmo o aluno já tendo uma matrícula ATIVO em outra turma.
   const mapaAtualPorAluno = _buildMatsMap(ano);
+  const ehAnoAtivo = String(ano).trim() === String(anoAtivo).trim();
   const atuais = [];
-  mapaAtualPorAluno.forEach(m => { if(m && m.turmaId === turmaId) atuais.push(m); });
+  mapaAtualPorAluno.forEach(m => {
+    if(!m || m.turmaId !== turmaId) return;
+    // No ANO ATIVO, só conta o aluno na turma se a matrícula atual dele
+    // estiver realmente ATIVO. Se a mais recente já foi encerrada (ex.:
+    // aluno foi readmitido numa turma nova e depois essa matrícula nova
+    // também foi encerrada), ele não está de fato ocupando turma nenhuma
+    // agora — só aparece pendente de readmissão — então não deve contar
+    // em lugar nenhum, nem na turma antiga nem na nova.
+    // Em ANOS PASSADOS não aplicamos esse filtro: lá TODA matrícula já
+    // está naturalmente encerrada (o ano acabou), então exigir ATIVO
+    // zeraria tudo de novo — o fallback de "mais recente" do
+    // _buildMatsMap já resolve a turma correta nesse caso.
+    if(ehAnoAtivo && (m.status||'ATIVO').toUpperCase() !== 'ATIVO') return;
+    atuais.push(m);
+  });
   return atuais;
 }
 
