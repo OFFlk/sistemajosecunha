@@ -97,22 +97,12 @@ html[data-theme="dark"] .btn.primary { background: var(--brand-d); border-color:
 }
 .aluno-search-checkbox input { cursor: pointer; accent-color: var(--brand); }
 
-/* Tabela de notas trimestrais: cabeçalho de matéria com 4 sub-colunas */
-.table-scroll table.notas-table{ width:max-content; min-width:100%; border-collapse:collapse; font-size:12px; }
-.notas-table th, .notas-table td{ padding:6px 5px; border-bottom:1px solid var(--line); text-align:center; white-space:nowrap; }
-.notas-table th.th-nome, .notas-table td.col-nome{ text-align:left; padding-left:8px; min-width:140px; position:sticky; left:0; background:var(--card-bg); z-index:1; }
-.notas-table th.th-materia{ background:var(--brand-faded,#f5f3ff); font-weight:800; color:var(--brand-text,#6d28d9); }
-html[data-theme="dark"] .notas-table th.th-materia{ background:rgba(124,58,237,0.15); }
-.notas-table th.th-sub{ font-size:10px; font-weight:700; color:var(--muted); width:42px; }
-.notas-table td.col-media{ font-weight:800; color:var(--brand,#7c3aed); width:46px; }
-.notas-table td.col-nota input{ width:42px; padding:4px; font-size:12px; text-align:center; border:1px solid var(--field-border); border-radius:6px; background:var(--field-bg); color:var(--ink); }
+/* Lista simples de alunos no detalhe da turma */
+.aluno-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px; }
+.aluno-item:last-child{ border-bottom:none; }
+.aluno-item .aluno-num{ color:var(--muted); font-size:12px; width:24px; text-align:right; flex-shrink:0; }
+.aluno-item .aluno-nome{ flex:1; }
 
-.ordem-lista{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
-.ordem-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:var(--field-bg); font-size:13px; }
-.ordem-item.desativado{ opacity:0.45; }
-.ordem-item .ordem-num{ font-weight:800; color:var(--brand,#7c3aed); width:22px; text-align:center; flex-shrink:0; }
-.ordem-item .ordem-label{ flex:1; }
-.ordem-item .ordem-btns{ display:flex; gap:4px; }
 .status-msg{ font-size:13px; margin-top:8px; min-height:18px; }
 .status-msg.ok{ color:#16a34a; }
 .status-msg.err{ color:#dc2626; }
@@ -194,50 +184,13 @@ html[data-theme="dark"] .notas-table th.th-materia{ background:rgba(124,58,237,0
 
         <div class="detalhe-actions">
           <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
-          <button class="btn" id="btnEditarNotas" type="button" onclick="alternarPainelEdicao()">✏️ Editar notas</button>
-          <button class="btn secondary" type="button" onclick="copiarTodasLinhasPesquisa()">📋 Copiar tudo p/ Access</button>
+          <a class="btn" id="btnEditarNotas" href="#">✏️ Editar turma</a>
           <button class="btn secondary small" type="button" onclick="fecharRegistro()" style="margin-left:auto;">✕ Fechar</button>
-        </div>
-
-        <div class="table-scroll">
-          <table class="notas-table">
-            <thead>
-              <tr id="theadMateriasView"></tr>
-              <tr id="theadSubView"></tr>
-            </thead>
-            <tbody id="tAlunosView"></tbody>
-          </table>
         </div>
 
         <div class="summary" id="resumoTurma"></div>
 
-        <!-- Painel de edição -->
-        <div id="painelEdicao" class="hidden" style="margin-top:16px;border-top:1px dashed var(--line);padding-top:14px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <b>✏️ Editar notas</b>
-            <div style="display:flex;gap:8px;">
-              <button class="btn primary small" type="button" onclick="salvarEdicaoNotas()">💾 Salvar</button>
-              <button class="btn secondary small" type="button" onclick="alternarPainelEdicao()">✕ Fechar edição</button>
-            </div>
-          </div>
-          <div class="table-scroll">
-            <table class="notas-table">
-              <thead>
-                <tr id="theadMateriasEdit"></tr>
-                <tr id="theadSubEdit"></tr>
-              </thead>
-              <tbody id="tAlunosEdit"></tbody>
-            </table>
-          </div>
-          <div class="status-msg" id="statusEdicao"></div>
-        </div>
-
-        <!-- Ordem de cópia p/ Access -->
-        <div style="margin-top:16px;border-top:1px dashed var(--line);padding-top:14px;">
-          <b>🗂️ Ordem de cópia para o Access</b>
-          <div class="ordem-lista" id="ordemLista"></div>
-          <div class="status-msg" id="statusCopia"></div>
-        </div>
+        <ul class="list" id="listaAlunos" style="margin-top:10px;"></ul>
 
       </div><!-- /detalhesBox -->
     </div><!-- /card-direita -->
@@ -263,65 +216,6 @@ function getNotasCollection() {
     throw new Error("window.DB.notasTrimestrais não existe. Confirme se a linha foi adicionada em db.firebase.js.");
   }
   return window.DB.notasTrimestrais;
-}
-
-/* =========================
-   Schemas (matérias) — mesmo formato usado no cadastro
-========================= */
-const SCHEMAS_KEY = "turmasSchemas_v1";
-function getDefaultConfig() {
-  return {
-    id: "default", nome: "Padrão",
-    colunas: [
-      { key:"port",  label:"Português",  type:"nota", enabled:true },
-      { key:"mat",   label:"Matemática", type:"nota", enabled:true },
-      { key:"hist",  label:"História",   type:"nota", enabled:true },
-      { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
-      { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
-      { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
-      { key:"arte",  label:"Arte",       type:"nota", enabled:true },
-      { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
-    ]
-  };
-}
-let SCHEMAS_CACHE = [];
-function loadSchemas() {
-  try {
-    const raw = localStorage.getItem(SCHEMAS_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) && arr.length ? arr : [getDefaultConfig()];
-  } catch { return [getDefaultConfig()]; }
-}
-function getSchemaById(id) {
-  return SCHEMAS_CACHE.find(s => s.id === id) || getDefaultConfig();
-}
-function getMateriasDoRegistro(reg) {
-  const schema = getSchemaById(reg?.schemaId);
-  return (schema.colunas || []).filter(c => c.enabled && c.type === "nota");
-}
-
-/* =========================
-   Notas / Média (mesma regra do cadastro: objetiva 0,0–10,0)
-========================= */
-function parseNota(v) {
-  v = normStr(v).replace(",", ".");
-  if (v === "") return null;
-  const n = parseFloat(v);
-  return isNaN(n) ? null : n;
-}
-function normalizarNotaObjetiva(raw) {
-  const v = normStr(raw);
-  if (v === "") return "";
-  let n = parseFloat(v.replace(",", "."));
-  if (isNaN(n)) return null;
-  if (n < 0) n = 0;
-  if (n > 10) n = 10;
-  return n.toFixed(1).replace(".", ",");
-}
-function calcularMedia(n1, n2, n3) {
-  const vals = [n1, n2, n3].map(parseNota).filter(v => v !== null);
-  if (!vals.length) return null;
-  return vals.reduce((a,b)=>a+b,0) / vals.length;
 }
 
 /* =========================
@@ -417,23 +311,20 @@ function selecionarRegistro(id) {
 
   $("detalhesMeta").innerHTML =
     `<b>${registroSelecionado.turmaNome || "Turma"}</b><br>` +
-    `ID: ${registroSelecionado._id}<br>` +
     `Ano: <b>${registroSelecionado.ano || "?"}</b> · Série: <b>${registroSelecionado.serie || "?"}</b>`;
 
-  $("painelEdicao").classList.add("hidden");
-  alunosView = (registroSelecionado.alunos || []).slice();
+  $("btnEditarNotas").href = `notas-trimestrais.html?edit=${encodeURIComponent(registroSelecionado._id)}`;
+  alunosView = (registroSelecionado.alunos || []).slice()
+    .sort((a,b) => String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR"));
 
-  renderCabecalhoView();
-  renderAlunosView(alunosView);
-  renderOrdemAccess(registroSelecionado);
+  renderListaAlunos(alunosView);
+  renderResumoTurma(registroSelecionado);
 
   $("fAluno").value = "";
   $("fAluno").oninput = () => {
     const q = norm($("fAluno").value);
-    renderAlunosView(alunosView.filter(a => norm(a.nome).includes(q)));
+    renderListaAlunos(alunosView.filter(a => norm(a.nome).includes(q)));
   };
-
-  renderResumoTurma(registroSelecionado);
 
   const container = $("container");
   container.classList.remove("layout-normal");
@@ -448,7 +339,6 @@ function fecharRegistro() {
   registroSelecionado = null;
   $("detalhesVazio").style.display = "block";
   $("detalhesBox").style.display = "none";
-  $("painelEdicao").classList.add("hidden");
 
   const container = $("container");
   container.classList.remove("layout-expandido");
@@ -458,253 +348,25 @@ function fecharRegistro() {
 }
 
 /* =========================
-   Render tabela (visualização)
+   Lista de alunos da turma (sem notas — pesquisa é só pra achar/identificar)
 ========================= */
-function renderCabecalhoView() {
-  const materias = getMateriasDoRegistro(registroSelecionado);
-  let htmlM = `<th class="th-nome" rowspan="2">Nome</th>`;
-  let htmlS = ``;
-  for (const m of materias) {
-    htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
-    htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
-  }
-  $("theadMateriasView").innerHTML = htmlM;
-  $("theadSubView").innerHTML = htmlS;
-}
-
-function renderAlunosView(lista) {
-  const tbody = $("tAlunosView");
-  const materias = getMateriasDoRegistro(registroSelecionado);
-
+function renderListaAlunos(lista) {
+  const box = $("listaAlunos");
   if (!lista.length) {
-    tbody.innerHTML = `<tr><td colspan="${materias.length*4+1}" style="text-align:center;color:var(--muted);padding:12px;">Nenhum aluno.</td></tr>`;
+    box.innerHTML = `<li class="aluno-item"><span class="muted">Nenhum aluno encontrado.</span></li>`;
     return;
   }
-
-  tbody.innerHTML = lista.map(a => {
-    let cells = `<td class="col-nome">${a.nome || ""}</td>`;
-    for (const m of materias) {
-      const n = a.notas?.[m.key] || {};
-      const media = calcularMedia(n.n1, n.n2, n.n3);
-      cells += `<td>${n.n1 || "—"}</td><td>${n.n2 || "—"}</td><td>${n.n3 || "—"}</td>`;
-      cells += `<td class="col-media">${media !== null ? media.toFixed(1).replace(".",",") : "—"}</td>`;
-    }
-    return `<tr>${cells}</tr>`;
-  }).join("");
+  box.innerHTML = lista.map((a, i) => `
+    <li class="aluno-item">
+      <span class="aluno-num">${i+1}.</span>
+      <span class="aluno-nome">${a.nome || "(sem nome)"}</span>
+    </li>
+  `).join("");
 }
 
 function renderResumoTurma(r) {
   const alunos = r.alunos || [];
-  const linhas = [
-    `Turma: ${r.turmaNome || "?"}`,
-    `Ano: ${r.ano || "?"} | Série: ${r.serie || "?"}`,
-    `Alunos: ${alunos.length}`,
-  ];
-  $("resumoTurma").textContent = linhas.join("\n");
-}
-
-/* =========================
-   Painel de edição de notas
-========================= */
-function alternarPainelEdicao() {
-  const painel = $("painelEdicao");
-  const abrindo = painel.classList.contains("hidden");
-  painel.classList.toggle("hidden");
-  if (abrindo) renderPainelEdicao();
-}
-
-function renderPainelEdicao() {
-  const materias = getMateriasDoRegistro(registroSelecionado);
-  let htmlM = `<th class="th-nome" rowspan="2">Nome</th>`;
-  let htmlS = ``;
-  for (const m of materias) {
-    htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
-    htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
-  }
-  $("theadMateriasEdit").innerHTML = htmlM;
-  $("theadSubEdit").innerHTML = htmlS;
-
-  const alunos = registroSelecionado.alunos || [];
-  $("tAlunosEdit").innerHTML = alunos.map((a, idx) => {
-    let cells = `<td class="col-nome">${a.nome || ""}</td>`;
-    for (const m of materias) {
-      const n = a.notas?.[m.key] || {};
-      cells += `<td class="col-nota"><input type="text" inputmode="decimal" value="${n.n1||""}" data-idx="${idx}" data-mat="${m.key}" data-tri="n1" onblur="aplicarMascaraNotaEdit(this)"></td>`;
-      cells += `<td class="col-nota"><input type="text" inputmode="decimal" value="${n.n2||""}" data-idx="${idx}" data-mat="${m.key}" data-tri="n2" onblur="aplicarMascaraNotaEdit(this)"></td>`;
-      cells += `<td class="col-nota"><input type="text" inputmode="decimal" value="${n.n3||""}" data-idx="${idx}" data-mat="${m.key}" data-tri="n3" onblur="aplicarMascaraNotaEdit(this)"></td>`;
-      cells += `<td class="col-media" data-media-idx="${idx}" data-media-mat="${m.key}">—</td>`;
-    }
-    return `<tr>${cells}</tr>`;
-  }).join("");
-
-  // calcula médias já na abertura
-  alunos.forEach((a, idx) => materias.forEach(m => atualizarMediaEdit(idx, m.key)));
-}
-
-function aplicarMascaraNotaEdit(el) {
-  const bruto = el.value;
-  if (normStr(bruto) !== "") {
-    const normalizado = normalizarNotaObjetiva(bruto);
-    if (normalizado === null) {
-      alert(`Nota inválida: "${bruto}". Digite um número de 0,0 a 10,0.`);
-      el.value = "";
-    } else {
-      el.value = normalizado;
-    }
-  }
-  atualizarMediaEdit(el.dataset.idx, el.dataset.mat);
-}
-
-function atualizarMediaEdit(idx, matKey) {
-  const linha = document.querySelector(`#tAlunosEdit tr:nth-child(${Number(idx)+1})`);
-  if (!linha) return;
-  const n1 = linha.querySelector(`input[data-mat="${matKey}"][data-tri="n1"]`)?.value || "";
-  const n2 = linha.querySelector(`input[data-mat="${matKey}"][data-tri="n2"]`)?.value || "";
-  const n3 = linha.querySelector(`input[data-mat="${matKey}"][data-tri="n3"]`)?.value || "";
-  const media = calcularMedia(n1, n2, n3);
-  const cel = document.querySelector(`#tAlunosEdit td[data-media-idx="${idx}"][data-media-mat="${matKey}"]`);
-  if (cel) cel.textContent = media !== null ? media.toFixed(1).replace(".",",") : "—";
-}
-
-async function salvarEdicaoNotas() {
-  const materias = getMateriasDoRegistro(registroSelecionado);
-  const alunos = (registroSelecionado.alunos || []).map(a => ({ ...a, notas: { ...(a.notas||{}) } }));
-
-  // valida tudo antes de gravar
-  const inputs = document.querySelectorAll("#tAlunosEdit input");
-  for (const el of inputs) {
-    const bruto = el.value;
-    if (normStr(bruto) === "") continue;
-    const normalizado = normalizarNotaObjetiva(bruto);
-    if (normalizado === null) {
-      alert(`Nota inválida (${el.dataset.mat}, ${el.dataset.tri}): "${bruto}". Corrija antes de salvar.`);
-      el.focus();
-      return;
-    }
-  }
-
-  inputs.forEach(el => {
-    const idx = Number(el.dataset.idx), mat = el.dataset.mat, tri = el.dataset.tri;
-    if (!alunos[idx]) return;
-    alunos[idx].notas[mat] = { ...(alunos[idx].notas[mat]||{}), [tri]: el.value };
-  });
-
-  registroSelecionado.alunos = alunos;
-  registroSelecionado.atualizadoEm = new Date().toISOString();
-
-  const msg = $("statusEdicao");
-  msg.className = "status-msg"; msg.textContent = "Salvando...";
-  try {
-    await getNotasCollection().save(registroSelecionado);
-    msg.className = "status-msg ok"; msg.textContent = `✅ Notas salvas — ${alunos.length} aluno(s) atualizados.`;
-
-    alunosView = alunos.slice();
-    renderAlunosView(alunosView);
-    renderResumoTurma(registroSelecionado);
-
-    const idxLista = registros.findIndex(r => r._id === registroSelecionado._id);
-    if (idxLista >= 0) registros[idxLista] = registroSelecionado;
-  } catch (e) {
-    console.error(e);
-    msg.className = "status-msg err"; msg.textContent = "❌ Erro ao salvar: " + (e.message || e);
-  }
-}
-
-/* =========================
-   Ordem de cópia p/ Access (mesma lógica do cadastro, por schemaId)
-========================= */
-let ORDEM_ACCESS = [];
-function ordemAccessKey(schemaId) { return `ordemAccessNotas_v1_${schemaId}`; }
-
-function gerarOrdemPadrao(reg) {
-  const materias = getMateriasDoRegistro(reg);
-  const campos = [];
-  for (const m of materias) for (const tri of [1,2,3])
-    campos.push({ materiaKey: m.key, materiaLabel: m.label, trimestre: tri, enabled: true });
-  return campos;
-}
-
-function carregarOrdemAccess(reg) {
-  try {
-    const raw = localStorage.getItem(ordemAccessKey(reg.schemaId));
-    if (!raw) return gerarOrdemPadrao(reg);
-    const salvo = JSON.parse(raw);
-    const padrao = gerarOrdemPadrao(reg);
-    const chaveOf = (c) => `${c.materiaKey}__${c.trimestre}`;
-    const salvoChaves = new Set(salvo.map(chaveOf));
-    const novos = padrao.filter(c => !salvoChaves.has(chaveOf(c)));
-    const padraoChaves = new Set(padrao.map(chaveOf));
-    const filtrado = salvo.filter(c => padraoChaves.has(chaveOf(c)));
-    return [...filtrado, ...novos];
-  } catch { return gerarOrdemPadrao(reg); }
-}
-
-function salvarOrdemAccess(reg) {
-  localStorage.setItem(ordemAccessKey(reg.schemaId), JSON.stringify(ORDEM_ACCESS));
-}
-
-function renderOrdemAccess(reg) {
-  ORDEM_ACCESS = carregarOrdemAccess(reg);
-  const wrap = $("ordemLista");
-  wrap.innerHTML = "";
-  ORDEM_ACCESS.forEach((campo, idx) => {
-    const div = document.createElement("div");
-    div.className = "ordem-item" + (campo.enabled ? "" : " desativado");
-    div.innerHTML = `
-      <span class="ordem-num">${idx + 1}</span>
-      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
-        <input type="checkbox" ${campo.enabled ? "checked" : ""} data-idx="${idx}" class="ordem-check">
-        <span class="ordem-label">${campo.materiaLabel} — ${campo.trimestre}º trimestre</span>
-      </label>
-      <div class="ordem-btns">
-        <button type="button" class="btn small secondary" data-idx="${idx}" data-dir="-1">↑</button>
-        <button type="button" class="btn small secondary" data-idx="${idx}" data-dir="1">↓</button>
-      </div>`;
-    wrap.appendChild(div);
-  });
-  wrap.querySelectorAll(".ordem-check").forEach(chk => {
-    chk.addEventListener("change", () => {
-      ORDEM_ACCESS[+chk.dataset.idx].enabled = chk.checked;
-      salvarOrdemAccess(reg);
-      renderOrdemAccess(reg);
-    });
-  });
-  wrap.querySelectorAll("button[data-dir]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const i = +btn.dataset.idx, j = i + (+btn.dataset.dir);
-      if (j < 0 || j >= ORDEM_ACCESS.length) return;
-      [ORDEM_ACCESS[i], ORDEM_ACCESS[j]] = [ORDEM_ACCESS[j], ORDEM_ACCESS[i]];
-      salvarOrdemAccess(reg);
-      renderOrdemAccess(reg);
-    });
-  });
-}
-
-function valorCampoAccess(aluno, campo) {
-  const n = aluno.notas?.[campo.materiaKey] || {};
-  return normStr(n["n"+campo.trimestre] || "");
-}
-function montarLinhaTSV(aluno) {
-  return ORDEM_ACCESS.filter(c=>c.enabled).map(c => valorCampoAccess(aluno, c)).join("\t");
-}
-async function copiarParaClipboard(texto, msgOk) {
-  const el = $("statusCopia");
-  try {
-    await navigator.clipboard.writeText(texto);
-    el.className = "status-msg ok"; el.textContent = msgOk;
-  } catch (e) {
-    el.className = "status-msg err"; el.textContent = "❌ Não consegui copiar automaticamente — copie manualmente:";
-    prompt("Copie manualmente (Ctrl+C):", texto);
-  }
-}
-function copiarTodasLinhasPesquisa() {
-  if (!registroSelecionado) return;
-  const camposAtivos = ORDEM_ACCESS.filter(c=>c.enabled);
-  if (!camposAtivos.length) { $("statusCopia").className="status-msg err"; $("statusCopia").textContent="⚠️ Nenhum campo habilitado na ordem de cópia."; return; }
-  const alunos = registroSelecionado.alunos || [];
-  if (!alunos.length) { $("statusCopia").className="status-msg err"; $("statusCopia").textContent="⚠️ Nenhum aluno."; return; }
-  const bloco = alunos.map(montarLinhaTSV).join("\n");
-  copiarParaClipboard(bloco, `✅ Bloco com ${alunos.length} aluno(s) copiado! Cole no Access a partir da 1ª célula do 1º aluno.`);
+  $("resumoTurma").textContent = `${alunos.length} aluno(s) cadastrado(s) nesta turma.`;
 }
 
 /* =========================
@@ -763,7 +425,6 @@ document.addEventListener("DOMContentLoaded", () => {
    Boot
 ========================= */
 async function carregar() {
-  SCHEMAS_CACHE = loadSchemas();
 
   await new Promise(res=>{
     if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
