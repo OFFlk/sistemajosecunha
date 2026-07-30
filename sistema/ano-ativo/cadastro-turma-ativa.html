@@ -671,6 +671,11 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
         <h2 style="margin:0">Turmas cadastradas</h2>
         <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
+        <select id="filtroStatusLista" class="input" style="max-width:130px;font-size:13px;">
+          <option value="">Todas</option>
+          <option value="ATIVA" selected>Ativas</option>
+          <option value="INATIVA">Inativas</option>
+        </select>
         <span id="countTurmasLista" class="help" style="margin:0"></span>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <select id="criterioOrdenacao" class="input" style="max-width:150px;font-size:13px;">
@@ -1269,8 +1274,14 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
     if(!list) return;
 
     const filtroAno = $("filtroAnoLista")?.value || "";
+    const filtroStatus = $("filtroStatusLista")?.value || "";
     const allTurmas = getTurmas().filter(t => String(t?.turmaId||'').startsWith('ATUR|'));
-    const turmas = filtroAno ? allTurmas.filter(t => String(t.anoLetivo||"") === filtroAno) : allTurmas;
+    let turmas = filtroAno ? allTurmas.filter(t => String(t.anoLetivo||"") === filtroAno) : allTurmas;
+    if(filtroStatus === "ATIVA"){
+      turmas = turmas.filter(t => (t.status||"ATIVA").toString().toUpperCase() !== "INATIVA");
+    } else if(filtroStatus === "INATIVA"){
+      turmas = turmas.filter(t => (t.status||"").toString().toUpperCase() === "INATIVA");
+    }
 
     // Atualiza contador
     const countEl = $("countTurmasLista");
@@ -1643,6 +1654,7 @@ html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--
   });
 
   $("filtroAnoLista")?.addEventListener("change", renderListaTurmas);
+  $("filtroStatusLista")?.addEventListener("change", renderListaTurmas);
   $("btnOrdenarCriacao")?.addEventListener("click", toggleOrdemCriacao);
   $("criterioOrdenacao")?.addEventListener("change", (e)=>{
     criterioOrdenacao = e.target.value || "criadoEm";
