@@ -2314,11 +2314,21 @@ async function maybeAutoRefresh(){
   if(now - __lastLoadAt < __MIN_REFRESH_MS) return;
   __lastLoadAt = now;
   
-  // Salvar estado das checkboxes de turma antes de recarregar
+  // Salvar estado das checkboxes de turma e do ano selecionado antes de
+  // recarregar. carregarDB() reconstrói o <select> do ano do zero e
+  // sempre volta pro ano ativo (comportamento certo na PRIMEIRA carga da
+  // página) — mas aqui, no auto-refresh (troca de aba, Alt+Tab), isso
+  // descartava silenciosamente qualquer ano retroativo que o usuário
+  // tivesse selecionado, porque só a carga inicial chama
+  // restaurarEstadoPagina(); o auto-refresh nunca restaurava nada.
   const turmasMarcadas = Array.from(document.querySelectorAll('.chkTurma:checked'))
     .map(cb => cb.dataset.turma).filter(Boolean);
+  const anoAntesDoRefresh = selAno.value;
   
   await carregarDB(); renderChips();
+  if(anoAntesDoRefresh && Array.from(selAno.options).some(o => o.value === anoAntesDoRefresh)){
+    selAno.value = anoAntesDoRefresh;
+  }
   if(_jaFoiPesquisado) {
     atualizarListas();
     // Restaurar checkboxes de turma após renderização
