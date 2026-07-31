@@ -213,7 +213,7 @@ details[open] .seta-detalhes{ transform:rotate(90deg); }
             do <b>schema</b> selecionado no topo desta seção. Isso permite usar o mesmo sistema em outras
             escolas/redes, cada uma com seu próprio schema.
           </div>
-          <a class="btn btn-secondary" href="notas-schema.html" target="_blank" rel="noopener">⚙️ Editar schema (matérias, períodos e ordem)</a>
+          <a class="btn btn-secondary" href="notas-schema.html">⚙️ Editar schema (matérias, períodos e ordem)</a>
           <div class="ordem-lista" id="previewOrdemAccess" style="margin-top:12px;"></div>
         </div>
 
@@ -677,9 +677,12 @@ function atualizarTabela() {
 
   tb.innerHTML = alunos.map((a, idx) => {
     let cells = `<td class="col-nome">${a.nome}</td>`;
+    const botoesCopiaPeriodo = Array.from({length: qtdPeriodos}, (_, i) => i+1)
+      .map(p => `<button class="btn-mini btn-secondary" onclick="copiarLinha(${idx}, ${p})" title="Copiar só o ${p}º ${getNomePeriodo().toLowerCase()} pro Access">📋${p}º</button>`)
+      .join("");
     cells += `<td style="white-space:nowrap;">
       <button class="btn-mini btn-secondary" onclick="editarAluno(${idx})" title="Editar">✏️</button>
-      <button class="btn-mini btn-secondary" onclick="copiarLinha(${idx})" title="Copiar notas deste aluno p/ Access">📋</button>
+      ${botoesCopiaPeriodo}
       <button class="btn-mini btn-danger-outline" onclick="excluirAluno(${idx})" title="Excluir">🗑️</button>
     </td>`;
     const minimaAprovacao = parseNota($("mediaAprovacao")?.value);
@@ -717,10 +720,10 @@ function atualizarTabela() {
 /* =========================
    Exportação p/ Access (TSV = separado por TAB)
 ========================= */
-function montarLinhaTSV(aluno) {
+function montarLinhaTSV(aluno, periodo = null) {
   const schema = getSchemaAtiva();
   return (schema.colunas || [])
-    .filter(c => c.enabled)
+    .filter(c => c.enabled && (periodo === null || c.periodo === periodo))
     .map(c => {
       if (c.tipo === "vazio") return "";
       const n = aluno.notas[c.key] || {};
@@ -740,12 +743,19 @@ async function copiarParaClipboard(texto, msgOk) {
   }
 }
 
-function copiarLinha(idx) {
+function copiarLinha(idx, periodo = null) {
   const aluno = alunos[idx];
   const schema = getSchemaAtiva();
-  if (!(schema.colunas || []).some(c => c.enabled)) { setStatus("err", "⚠️ O schema selecionado ainda não tem nenhuma linha configurada. Edite o schema primeiro."); return; }
-  const linha = montarLinhaTSV(aluno);
-  copiarParaClipboard(linha, `✅ Notas de "${aluno.nome}" copiadas! Abra a tela desse aluno no Access, clique no 1º campo e dê Ctrl+V (ou cole campo por campo, se o Access não aceitar colar tudo de uma vez).`);
+  const colunasRelevantes = (schema.colunas || []).filter(c => c.enabled && (periodo === null || c.periodo === periodo));
+
+  if (!colunasRelevantes.length) {
+    setStatus("err", `⚠️ O schema selecionado não tem nenhuma linha configurada${periodo ? ` pro ${periodo}º ${getNomePeriodo().toLowerCase()}` : ""}. Edite o schema primeiro.`);
+    return;
+  }
+
+  const linha = montarLinhaTSV(aluno, periodo);
+  const rotulo = periodo ? `${periodo}º ${getNomePeriodo().toLowerCase()} de ` : "";
+  copiarParaClipboard(linha, `✅ Notas (${rotulo}"${aluno.nome}") copiadas! Abra a tela desse aluno no Access, clique no 1º campo relevante e dê Ctrl+V.`);
 }
 
 /* =========================

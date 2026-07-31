@@ -147,6 +147,27 @@
   </div>
 
   <div class="card">
+    <h3 style="margin-top:0;">🔁 Repetir padrão entre períodos</h3>
+    <div class="muted">
+      Monte a ordem de <b>um período só</b> (matérias + espaços vazios, na ordem certa) e aplique essa
+      mesma sequência nos demais — evita ter que repetir tudo manualmente período por período.
+    </div>
+    <div style="margin-top:12px;" class="grid">
+      <div>
+        <label>Copiar o padrão do período</label>
+        <select id="periodoOrigemRepetir"></select>
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button class="btn btn-primary" style="width:100%;" onclick="repetirPadrao()">Aplicar aos demais períodos</button>
+      </div>
+    </div>
+    <div class="warn" style="margin-top:10px;">
+      Isso <b>substitui</b> todas as linhas dos outros períodos pela mesma ordem do período escolhido.
+      Se algum outro período já tinha algo diferente, será perdido.
+    </div>
+  </div>
+
+  <div class="card">
     <h3 style="margin-top:0;">Disciplinas por período</h3>
     <div class="muted">
       Cada linha é <b>uma disciplina em um período específico</b>. A ordem das linhas (setas ↑ ↓) é a
@@ -366,6 +387,37 @@ function preencherSelectPeriodos() {
   }
   sel.innerHTML = html;
   if (atual && Number(atual) <= CONFIG.quantidadeDePeriodos) sel.value = atual;
+
+  const selOrigem = document.getElementById("periodoOrigemRepetir");
+  const atualOrigem = selOrigem.value;
+  selOrigem.innerHTML = html;
+  if (atualOrigem && Number(atualOrigem) <= CONFIG.quantidadeDePeriodos) selOrigem.value = atualOrigem;
+}
+
+function repetirPadrao() {
+  const origem = parseInt(document.getElementById("periodoOrigemRepetir").value, 10) || 1;
+  const template = CONFIG.colunas.filter(c => c.periodo === origem);
+
+  if (!template.length) { showMsg(`⚠️ O ${origem}º ${CONFIG.nomePeriodo.toLowerCase()} ainda não tem nenhuma linha pra copiar.`, "warn"); return; }
+  if (CONFIG.quantidadeDePeriodos <= 1) { showMsg("⚠️ Só existe 1 período configurado — não há pra onde repetir.", "warn"); return; }
+
+  if (!confirm(`Isso vai APAGAR as linhas dos outros ${CONFIG.quantidadeDePeriodos - 1} período(s) e substituir pela mesma ordem do ${origem}º ${CONFIG.nomePeriodo} (${template.length} linha(s)). Continuar?`)) return;
+
+  const semOutros = CONFIG.colunas.filter(c => c.periodo === origem);
+  for (let p = 1; p <= CONFIG.quantidadeDePeriodos; p++) {
+    if (p === origem) continue;
+    for (const c of template) {
+      semOutros.push({
+        id: uid(), tipo: c.tipo, periodo: p,
+        key: c.key, label: c.label, abreviacao: c.abreviacao, enabled: c.enabled
+      });
+    }
+  }
+  semOutros.sort((a, b) => a.periodo - b.periodo); // sort estável: mantém a ordem interna de cada período
+  CONFIG.colunas = semOutros;
+
+  render();
+  showMsg(`✅ Padrão do ${origem}º ${CONFIG.nomePeriodo.toLowerCase()} aplicado aos demais períodos. Clique em "Salvar configuração" pra confirmar.`, "ok");
 }
 
 function render() {
