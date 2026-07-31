@@ -183,8 +183,8 @@ details[open] .seta-detalhes{ transform:rotate(90deg); }
         <div class="campo" style="max-width:340px;">
           <label>Ordem de preenchimento do formulário</label>
           <select id="modoPreenchimento" onchange="mudarModoPreenchimento()">
-            <option value="materia">Por matéria (Port. T1,T2,T3 → Mat. T1,T2,T3 → ...)</option>
-            <option value="trimestre">Por trimestre (1º de todas as matérias → 2º de todas → ...)</option>
+            <option value="materia">Por matéria (Port. 1º,2º,3º → Mat. 1º,2º,3º → ...)</option>
+            <option value="periodo">Por período (1º de todas as matérias → 2º de todas → ...)</option>
           </select>
         </div>
 
@@ -206,23 +206,16 @@ details[open] .seta-detalhes{ transform:rotate(90deg); }
           <div class="status-msg" id="statusLote"></div>
         </div>
 
-        <details id="detalhesOrdemAccess">
-          <summary style="cursor:pointer;font-weight:800;font-size:14px;list-style:none;display:flex;align-items:center;gap:8px;color:var(--brand,#7c3aed);">
-            <span class="seta-detalhes">▶</span> 🗂️ Ordem de cópia para o Access
-          </summary>
-          <div style="margin-top:12px;">
-            <div class="aviso-warn">
-              No Access, cada aluno tem <b>uma tela própria</b> com todas as matérias/trimestres — não existe
-              lançamento em lote pra vários alunos de uma vez. Por isso, a cópia aqui é sempre <b>de 1 aluno por vez</b>
-              (botão 📋 na linha do aluno, na tabela abaixo): ela gera os valores desse aluno na
-              <b>mesma ordem em que os campos aparecem na tela do Access</b>, pulando as matérias que não
-              existem lá. A média não entra na cópia — o próprio Access já calcula isso sozinho.<br><br>
-              Monte a lista abaixo <b>exatamente na ordem dos campos na tela do Access</b> (setas ↑ ↓),
-              e desmarque o que não existe lá. Fica salvo no seu navegador.
-            </div>
-            <div class="ordem-lista" id="ordemLista"></div>
+        <div>
+          <b style="font-size:14px;">🗂️ Ordem de cópia para o Access</b>
+          <div class="muted" style="font-size:13px;margin:6px 0 10px;">
+            Não é configurada mais aqui — a ordem (matérias, espaços vazios, quantos períodos) agora vem
+            do <b>schema</b> selecionado no topo desta seção. Isso permite usar o mesmo sistema em outras
+            escolas/redes, cada uma com seu próprio schema.
           </div>
-        </details>
+          <a class="btn btn-secondary" href="notas-schema.html" target="_blank" rel="noopener">⚙️ Editar schema (matérias, períodos e ordem)</a>
+          <div class="ordem-lista" id="previewOrdemAccess" style="margin-top:12px;"></div>
+        </div>
 
         <div>
           <b style="font-size:14px;">📤 Exportação</b>
@@ -292,33 +285,43 @@ function getNotasCollection() {
 }
 
 /* =========================
-   Schema (reaproveita o que o Admin já configurou)
+   Schema — coleção própria do módulo de notas (notasSchemas),
+   editada em notas-schema.html. Não usa mais o schema de atas.
 ========================= */
-const SCHEMAS_KEY = "turmasSchemas_v1";
-const ACTIVE_SCHEMA_ID_KEY = "turmasSchemaActiveId_v1";
+const SCHEMAS_KEY = "notasSchemas_v1";
+const ACTIVE_SCHEMA_ID_KEY = "notasSchemaActiveId_v1";
+
+function uid() { return Math.random().toString(16).slice(2) + Date.now().toString(16); }
+
+function slugify(texto) {
+  return String(texto || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function gerarColunasPadrao(qtdPeriodos) {
+  const base = [
+    { label:"Português", abreviacao:"Port" }, { label:"Matemática", abreviacao:"Mat" },
+    { label:"História", abreviacao:"Hist" }, { label:"Geografia", abreviacao:"Geo" },
+    { label:"Ciências", abreviacao:"Ciên" }, { label:"Ed. Física", abreviacao:"Ed.F" },
+    { label:"Arte", abreviacao:"Arte" }, { label:"Ens. Religioso", abreviacao:"E.Rel" }
+  ];
+  const colunas = [];
+  for (let p = 1; p <= qtdPeriodos; p++)
+    for (const m of base)
+      colunas.push({ id: uid(), tipo:"materia", periodo:p, key: slugify(m.label), label: m.label, abreviacao: m.abreviacao, enabled:true });
+  return colunas;
+}
 
 function getDefaultConfig() {
-  return {
-    id: "default", version: 1, nome: "Padrão (arquivo original)",
-    serieAtiva: true,
-    colunas: [
-      { key:"port",  label:"Português",  type:"nota", enabled:true },
-      { key:"mat",   label:"Matemática", type:"nota", enabled:true },
-      { key:"hist",  label:"História",   type:"nota", enabled:true },
-      { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
-      { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
-      { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
-      { key:"arte",  label:"Arte",       type:"nota", enabled:true },
-      { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
-    ]
-  };
+  return { id:"default", version:2, nome:"Padrão (3 trimestres)", quantidadeDePeriodos:3, nomePeriodo:"Trimestre", colunas: gerarColunasPadrao(3) };
 }
 
 function loadSchemas() {
   try {
     const raw = localStorage.getItem(SCHEMAS_KEY);
     const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr : [];
+    return Array.isArray(arr) && arr.length ? arr : [];
   } catch { return []; }
 }
 
@@ -339,106 +342,53 @@ function renderSelectSchemas() {
     `<option value="${s.id}" ${s.id === schemaSelecionadoId ? "selected" : ""}>${String(s.nome || s.id)}</option>`
   ).join("");
 
-  sel.onchange = () => {
-    schemaSelecionadoId = sel.value;
-    onSchemaChange();
-  };
+  sel.onchange = () => { schemaSelecionadoId = sel.value; onSchemaChange(); };
 }
 
 function getSchemaAtiva() {
   return SCHEMAS_CACHE.find(s => s.id === schemaSelecionadoId) || getDefaultConfig();
 }
+function getQuantidadePeriodos() { return getSchemaAtiva().quantidadeDePeriodos || 3; }
+function getNomePeriodo() { return getSchemaAtiva().nomePeriodo || "Trimestre"; }
+
+// Agrupa as linhas "materia" do schema por chave, preservando a 1ª ordem em que aparecem.
 function getMateriasAtivas() {
-  return (getSchemaAtiva().colunas || []).filter(c => c.enabled && c.type === "nota");
+  const porKey = new Map();
+  for (const c of (getSchemaAtiva().colunas || [])) {
+    if (c.tipo !== "materia" || !c.enabled) continue;
+    if (!porKey.has(c.key)) porKey.set(c.key, { key: c.key, label: c.label, abreviacao: c.abreviacao || c.label, periodos: new Set() });
+    porKey.get(c.key).periodos.add(c.periodo);
+  }
+  return Array.from(porKey.values());
 }
 
 function onSchemaChange() {
   alunos = [];
-  renderOrdemAccess();
+  renderPreviewOrdemAccess();
   renderFormularioDinamico();
   renderCabecalhoTabela();
   atualizarTabela();
 }
 
 /* =========================
-   Ordem de cópia p/ Access (por schema, salvo no navegador)
+   Preview (somente leitura) da ordem de cópia — vem direto do schema
 ========================= */
-function ordemAccessKey() { return `ordemAccessNotas_v1_${schemaSelecionadoId}`; }
+function renderPreviewOrdemAccess() {
+  const schema = getSchemaAtiva();
+  const wrap = $("previewOrdemAccess");
+  const colunas = (schema.colunas || []).filter(c => c.enabled);
 
-// gera a lista padrão: cada matéria ativa gera 3 campos (T1,T2,T3), todos habilitados
-function gerarOrdemPadrao() {
-  const materias = getMateriasAtivas();
-  const campos = [];
-  for (const m of materias) {
-    for (const tri of [1,2,3]) {
-      campos.push({ materiaKey: m.key, materiaLabel: m.label, trimestre: tri, enabled: true });
-    }
+  if (!colunas.length) {
+    wrap.innerHTML = `<span class="muted" style="font-size:13px;">Esse schema ainda não tem nenhuma linha configurada.</span>`;
+    return;
   }
-  return campos;
-}
 
-function carregarOrdemAccess() {
-  try {
-    const raw = localStorage.getItem(ordemAccessKey());
-    if (!raw) return gerarOrdemPadrao();
-    const salvo = JSON.parse(raw);
-    const padrao = gerarOrdemPadrao();
-    // funde: mantém ordem/estado salvo, mas adiciona campos novos (matéria nova no schema) no fim
-    const chaveOf = (c) => `${c.materiaKey}__${c.trimestre}`;
-    const salvoChaves = new Set(salvo.map(chaveOf));
-    const novos = padrao.filter(c => !salvoChaves.has(chaveOf(c)));
-    // remove do salvo campos de matérias que não existem mais no schema atual
-    const padraoChaves = new Set(padrao.map(chaveOf));
-    const filtrado = salvo.filter(c => padraoChaves.has(chaveOf(c)));
-    return [...filtrado, ...novos];
-  } catch { return gerarOrdemPadrao(); }
-}
-
-let ORDEM_ACCESS = [];
-
-function salvarOrdemAccess() {
-  localStorage.setItem(ordemAccessKey(), JSON.stringify(ORDEM_ACCESS));
-}
-
-function renderOrdemAccess() {
-  ORDEM_ACCESS = carregarOrdemAccess();
-  const wrap = $("ordemLista");
-  wrap.innerHTML = "";
-  ORDEM_ACCESS.forEach((campo, idx) => {
-    const div = document.createElement("div");
-    div.className = "ordem-item" + (campo.enabled ? "" : " desativado");
-    div.innerHTML = `
+  wrap.innerHTML = colunas.map((c, idx) => `
+    <div class="ordem-item${c.tipo === "vazio" ? " desativado" : ""}">
       <span class="ordem-num">${idx + 1}</span>
-      <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
-        <input type="checkbox" ${campo.enabled ? "checked" : ""} data-idx="${idx}" class="ordem-check">
-        <span class="ordem-label">${campo.materiaLabel} — ${campo.trimestre}º trimestre</span>
-      </label>
-      <div class="ordem-btns">
-        <button type="button" class="btn-mini btn-secondary" data-idx="${idx}" data-dir="-1">↑</button>
-        <button type="button" class="btn-mini btn-secondary" data-idx="${idx}" data-dir="1">↓</button>
-      </div>
-    `;
-    wrap.appendChild(div);
-  });
-
-  wrap.querySelectorAll(".ordem-check").forEach(chk => {
-    chk.addEventListener("change", () => {
-      ORDEM_ACCESS[+chk.dataset.idx].enabled = chk.checked;
-      salvarOrdemAccess();
-      renderOrdemAccess();
-    });
-  });
-  wrap.querySelectorAll("button[data-dir]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const i = +btn.dataset.idx;
-      const dir = +btn.dataset.dir;
-      const j = i + dir;
-      if (j < 0 || j >= ORDEM_ACCESS.length) return;
-      [ORDEM_ACCESS[i], ORDEM_ACCESS[j]] = [ORDEM_ACCESS[j], ORDEM_ACCESS[i]];
-      salvarOrdemAccess();
-      renderOrdemAccess();
-    });
-  });
+      <span class="ordem-label">${c.periodo}º ${getNomePeriodo()} — ${c.tipo === "vazio" ? "<i>(espaço vazio)</i>" : c.label}</span>
+    </div>
+  `).join("");
 }
 
 /* =========================
@@ -487,8 +437,8 @@ function formatarNotaExibicao(n) {
   if (n === null || n === undefined || n === "") return "";
   return String(n).replace(".", ",");
 }
-function calcularMedia(n1, n2, n3) {
-  const vals = [n1, n2, n3].map(parseNota).filter(v => v !== null);
+function calcularMedia(valores) {
+  const vals = (valores || []).map(parseNota).filter(v => v !== null);
   if (!vals.length) return null;
   const soma = vals.reduce((a,b) => a+b, 0);
   return soma / vals.length;
@@ -508,36 +458,38 @@ function mudarModoPreenchimento() {
 function renderFormularioDinamico() {
   const grid = $("formGridDinamico");
   const materias = getMateriasAtivas();
+  const qtdPeriodos = getQuantidadePeriodos();
   $("modoPreenchimento").value = modoPreenchimento;
 
   let html = `<div class="campo"><label>Nome do aluno *</label><input id="nome"></div>`;
 
-  if (modoPreenchimento === "trimestre") {
-    // Agrupado por trimestre: preenche o 1º de TODAS as matérias antes de passar pro 2º.
-    // Útil quando só se tem as notas de um trimestre por vez (não precisa pular campo).
-    for (const tri of [1, 2, 3]) {
+  if (modoPreenchimento === "periodo") {
+    // Agrupado por período: preenche o 1º de TODAS as matérias antes de passar pro 2º.
+    for (let p = 1; p <= qtdPeriodos; p++) {
       html += `<div class="campo" style="grid-column:1/-1;margin:8px 0 -2px;">
-        <label style="font-size:14px;color:var(--brand,#7c3aed);">${tri}º Trimestre</label>
+        <label style="font-size:14px;color:var(--brand,#7c3aed);">${p}º ${getNomePeriodo()}</label>
       </div>`;
       for (const m of materias) {
+        const existe = m.periodos.has(p);
         html += `
           <div class="campo" style="min-width:120px;">
             <label>${m.label}</label>
-            <input id="n${tri}_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+            <input id="p${p}_${m.key}" placeholder="${existe ? "0,0" : "—"}" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)" ${existe ? "" : "disabled title=\"Essa matéria não existe nesse período neste schema\""}>
           </div>
         `;
       }
     }
   } else {
-    // Agrupado por matéria (padrão): T1, T2, T3 lado a lado por matéria.
+    // Agrupado por matéria (padrão): todos os períodos lado a lado por matéria.
     for (const m of materias) {
       html += `
-        <div class="campo" style="min-width:150px;">
+        <div class="campo" style="min-width:${qtdPeriodos * 50}px;">
           <label>${m.label}</label>
           <div style="display:flex;gap:4px;">
-            <input id="n1_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
-            <input id="n2_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
-            <input id="n3_${m.key}" placeholder="0,0" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)">
+            ${Array.from({length: qtdPeriodos}, (_, i) => i+1).map(p => {
+              const existe = m.periodos.has(p);
+              return `<input id="p${p}_${m.key}" placeholder="${existe ? "0,0" : "—"}" inputmode="decimal" style="text-align:center;" onblur="aplicarMascaraNota(this)" ${existe ? "" : "disabled title=\"Essa matéria não existe nesse período neste schema\""}>`;
+            }).join("")}
           </div>
         </div>
       `;
@@ -548,7 +500,7 @@ function renderFormularioDinamico() {
 
 // Enter funciona igual Tab dentro do formulário de aluno (nome + notas).
 function irParaProximoCampo(campoAtual) {
-  const focaveis = Array.from(document.querySelectorAll("#formGridDinamico input"));
+  const focaveis = Array.from(document.querySelectorAll("#formGridDinamico input:not(:disabled)"));
   const idx = focaveis.indexOf(campoAtual);
   if (idx === -1) return;
   if (idx < focaveis.length - 1) {
@@ -592,8 +544,12 @@ function aplicarMascaraMediaAprovacao(el) {
 
 function limparCamposAluno() {
   $("nome").value = "";
+  const qtdPeriodos = getQuantidadePeriodos();
   for (const m of getMateriasAtivas()) {
-    ["n1","n2","n3"].forEach(p => { const el = $(`${p}_${m.key}`); if (el) el.value = ""; });
+    for (let p = 1; p <= qtdPeriodos; p++) {
+      const el = $(`p${p}_${m.key}`);
+      if (el) el.value = "";
+    }
   }
   $("nome").focus();
 }
@@ -620,15 +576,17 @@ function adicionarAluno() {
   if (!nomeEl.value.trim()) { alert("Informe o nome do aluno."); return; }
 
   const materias = getMateriasAtivas();
+  const qtdPeriodos = getQuantidadePeriodos();
   const notas = {};
   for (const m of materias) {
-    const camposDaMateria = { n1: "1º", n2: "2º", n3: "3º" };
-    for (const [chave, rotuloTri] of Object.entries(camposDaMateria)) {
+    for (let p = 1; p <= qtdPeriodos; p++) {
+      if (!m.periodos.has(p)) continue; // matéria não existe nesse período neste schema
+      const chave = `p${p}`;
       const el = $(`${chave}_${m.key}`);
       const bruto = el ? el.value : "";
       const normalizado = normalizarNotaObjetiva(bruto);
       if (normalizado === null) {
-        alert(`Nota inválida em "${m.label}" (${rotuloTri} trimestre): "${bruto}". Digite um número de 0,0 a 10,0.`);
+        alert(`Nota inválida em "${m.label}" (${p}º ${getNomePeriodo()}): "${bruto}". Digite um número de 0,0 a 10,0.`);
         el.focus();
         return;
       }
@@ -651,11 +609,13 @@ function adicionarAluno() {
 function editarAluno(idx) {
   const a = alunos[idx];
   $("nome").value = a.nome;
+  const qtdPeriodos = getQuantidadePeriodos();
   for (const m of getMateriasAtivas()) {
     const n = (a.notas && a.notas[m.key]) || {};
-    if ($(`n1_${m.key}`)) $(`n1_${m.key}`).value = n.n1 || "";
-    if ($(`n2_${m.key}`)) $(`n2_${m.key}`).value = n.n2 || "";
-    if ($(`n3_${m.key}`)) $(`n3_${m.key}`).value = n.n3 || "";
+    for (let p = 1; p <= qtdPeriodos; p++) {
+      const el = $(`p${p}_${m.key}`);
+      if (el) el.value = n[`p${p}`] || "";
+    }
   }
   editandoIdx = idx;
   window.scrollTo({ top: $("formGridDinamico").offsetTop - 100, behavior: "smooth" });
@@ -690,14 +650,16 @@ function adicionarAlunosEmLote() {
 ========================= */
 function renderCabecalhoTabela() {
   const materias = getMateriasAtivas();
+  const qtdPeriodos = getQuantidadePeriodos();
   const trM = $("theadMaterias");
   const trS = $("theadSub");
 
   let htmlM = `<th class="th-nome" rowspan="2">Nome</th><th rowspan="2">Ações</th>`;
   let htmlS = ``;
   for (const m of materias) {
-    htmlM += `<th class="th-materia" colspan="4">${m.label}</th>`;
-    htmlS += `<th class="th-sub">1º</th><th class="th-sub">2º</th><th class="th-sub">3º</th><th class="th-sub">Méd.</th>`;
+    htmlM += `<th class="th-materia" colspan="${qtdPeriodos + 1}">${m.label}</th>`;
+    for (let p = 1; p <= qtdPeriodos; p++) htmlS += `<th class="th-sub">${p}º</th>`;
+    htmlS += `<th class="th-sub">Méd.</th>`;
   }
   trM.innerHTML = htmlM;
   trS.innerHTML = htmlS;
@@ -706,9 +668,10 @@ function renderCabecalhoTabela() {
 function atualizarTabela() {
   const tb = $("tabela");
   const materias = getMateriasAtivas();
+  const qtdPeriodos = getQuantidadePeriodos();
 
   if (!alunos.length) {
-    tb.innerHTML = `<tr><td colspan="${materias.length*4+2}" style="text-align:center;color:var(--muted);padding:16px;">Nenhum aluno adicionado ainda.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="${materias.length*(qtdPeriodos+1)+2}" style="text-align:center;color:var(--muted);padding:16px;">Nenhum aluno adicionado ainda.</td></tr>`;
     return;
   }
 
@@ -722,13 +685,15 @@ function atualizarTabela() {
     const minimaAprovacao = parseNota($("mediaAprovacao")?.value);
     for (const m of materias) {
       const n = a.notas[m.key] || {};
-      const media = calcularMedia(n.n1, n.n2, n.n3);
-      const qtdPreenchida = [n.n1, n.n2, n.n3].filter(v => parseNota(v) !== null).length;
-      const parcial = media !== null && qtdPreenchida < 3;
+      const valoresPeriodos = Array.from({length: qtdPeriodos}, (_, i) => n[`p${i+1}`]);
+      const media = calcularMedia(valoresPeriodos);
+      const qtdPreenchida = valoresPeriodos.filter(v => parseNota(v) !== null).length;
+      const qtdEsperada = m.periodos.size || qtdPeriodos;
+      const parcial = media !== null && qtdPreenchida < qtdEsperada;
 
       let classeMedia = "col-media";
-      let tituloMedia = "Média final (3 trimestres)";
-      if (parcial) { classeMedia += " parcial"; tituloMedia = `Média parcial — só ${qtdPreenchida} de 3 trimestres preenchidos`; }
+      let tituloMedia = `Média final (${qtdEsperada} ${getNomePeriodo().toLowerCase()}(s))`;
+      if (parcial) { classeMedia += " parcial"; tituloMedia = `Média parcial — só ${qtdPreenchida} de ${qtdEsperada} preenchido(s)`; }
       else if (media !== null && minimaAprovacao !== null) {
         classeMedia += media >= minimaAprovacao ? " aprovado" : " reprovado";
         tituloMedia = media >= minimaAprovacao
@@ -736,9 +701,11 @@ function atualizarTabela() {
           : `Abaixo da média mínima (${formatarNotaExibicao(minimaAprovacao.toFixed(1))})`;
       }
 
-      cells += `<td class="col-nota">${n.n1 || "<span style=color:var(--muted)>—</span>"}</td>`;
-      cells += `<td class="col-nota">${n.n2 || "<span style=color:var(--muted)>—</span>"}</td>`;
-      cells += `<td class="col-nota">${n.n3 || "<span style=color:var(--muted)>—</span>"}</td>`;
+      for (let p = 1; p <= qtdPeriodos; p++) {
+        if (!m.periodos.has(p)) { cells += `<td class="col-nota col-fora">—</td>`; continue; }
+        const v = n[`p${p}`];
+        cells += `<td class="col-nota">${v || "<span style=color:var(--muted)>—</span>"}</td>`;
+      }
       cells += media === null
         ? `<td class="col-media">—</td>`
         : `<td class="${classeMedia}" title="${tituloMedia}">${formatarNotaExibicao(media.toFixed(1))}${parcial ? "*" : ""}</td>`;
@@ -750,15 +717,16 @@ function atualizarTabela() {
 /* =========================
    Exportação p/ Access (TSV = separado por TAB)
 ========================= */
-function valorCampo(aluno, campo) {
-  const n = aluno.notas[campo.materiaKey] || {};
-  const chave = "n" + campo.trimestre;
-  return normStr(n[chave] || "").replace(".", ",");
-}
-
 function montarLinhaTSV(aluno) {
-  const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
-  return camposAtivos.map(c => valorCampo(aluno, c)).join("\t");
+  const schema = getSchemaAtiva();
+  return (schema.colunas || [])
+    .filter(c => c.enabled)
+    .map(c => {
+      if (c.tipo === "vazio") return "";
+      const n = aluno.notas[c.key] || {};
+      return normStr(n[`p${c.periodo}`] || "");
+    })
+    .join("\t");
 }
 
 async function copiarParaClipboard(texto, msgOk) {
@@ -774,8 +742,8 @@ async function copiarParaClipboard(texto, msgOk) {
 
 function copiarLinha(idx) {
   const aluno = alunos[idx];
-  const camposAtivos = ORDEM_ACCESS.filter(c => c.enabled);
-  if (!camposAtivos.length) { setStatus("err", "⚠️ Nenhum campo habilitado na ordem de cópia acima."); return; }
+  const schema = getSchemaAtiva();
+  if (!(schema.colunas || []).some(c => c.enabled)) { setStatus("err", "⚠️ O schema selecionado ainda não tem nenhuma linha configurada. Edite o schema primeiro."); return; }
   const linha = montarLinhaTSV(aluno);
   copiarParaClipboard(linha, `✅ Notas de "${aluno.nome}" copiadas! Abra a tela desse aluno no Access, clique no 1º campo e dê Ctrl+V (ou cole campo por campo, se o Access não aceitar colar tudo de uma vez).`);
 }
@@ -876,7 +844,7 @@ async function carregarParaEdicao(id) {
     $("mediaAprovacao").value = reg.mediaAprovacao || "";
     alunos = Array.isArray(reg.alunos) ? reg.alunos : [];
 
-    renderOrdemAccess();
+    renderPreviewOrdemAccess();
     renderFormularioDinamico();
     renderCabecalhoTabela();
     atualizarTabela();
@@ -934,6 +902,21 @@ async function excluirTurmaAtual() {
 document.addEventListener("DOMContentLoaded", async () => {
   preencherAnos();
   preencherSeries();
+
+  // Sincroniza os schemas do Firestore pro cache local antes de montar o select
+  // (assim funcionam schemas criados em outro computador/navegador).
+  try {
+    await new Promise((res) => {
+      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener("auth:ready", res, { once: true });
+      setTimeout(res, 4000);
+    });
+    if (window.DB && window.DB.notasSchemas) {
+      const remotos = await window.DB.notasSchemas.list();
+      if (remotos && remotos.length) localStorage.setItem(SCHEMAS_KEY, JSON.stringify(remotos));
+    }
+  } catch (e) { console.warn("[notas-trimestrais] Não consegui sincronizar schemas:", e); }
+
   renderSelectSchemas();
   onSchemaChange();
 
