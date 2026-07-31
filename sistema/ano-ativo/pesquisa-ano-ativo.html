@@ -717,6 +717,25 @@ function calcIdade(dataStr){
   return (idade>=0 && idade<=130) ? String(idade) : "";
 }
 
+// Converte qualquer data reconhecida (YYYY-MM-DD, DD/MM/YYYY, etc.) para o
+// formato brasileiro DD-MM-YYYY, usado em toda a exibição da página
+// (lista, ficha, tabelas, PDFs e CSV). O valor ARMAZENADO continua em ISO —
+// isso é só formatação de exibição, não altera o dado salvo no banco.
+function formatarDataBR(dataStr){
+  if(!dataStr) return "";
+  const s = String(dataStr).trim();
+  if(!s || s === '—') return s;
+  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);      // DD/MM/YYYY
+  const m2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);        // YYYY-MM-DD
+  const m3 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);        // já em DD-MM-YYYY
+  let dd, mm, yyyy;
+  if(m1){ dd=m1[1]; mm=m1[2]; yyyy=m1[3]; }
+  else if(m2){ yyyy=m2[1]; mm=m2[2]; dd=m2[3]; }
+  else if(m3){ dd=m3[1]; mm=m3[2]; yyyy=m3[3]; }
+  else { return s; } // formato não reconhecido — exibe como veio, sem quebrar
+  return `${String(dd).padStart(2,'0')}-${String(mm).padStart(2,'0')}-${yyyy}`;
+}
+
 /* =========================
    Estado
 ========================= */
@@ -1335,7 +1354,7 @@ function _atualizarListaAlunos(_tScope){
     aScope.forEach(a=>{
       const el=document.createElement("div");
       el.className="item selecionavel";
-      const nasc = a.dataNascimento || "—";
+      const nasc = formatarDataBR(a.dataNascimento) || "—";
       const idade = a.idade || calcIdade(a.dataNascimento) || "—";
       const turnoDesc  = a._turno  ? `${_turnoEmoji(a._turno)} ${a._turno}` : "—";
       const modeloDesc = a._modelo === 'INTEGRAL' ? '📚 Integral' : (a._modelo === 'REGULAR' ? 'Regular' : '—');
@@ -1503,7 +1522,15 @@ async function abrirFichaAluno(alunoId){
       </div>
     </div>`;
 
+  // Turma e professor(a) desta matrícula — vêm do cadastro de turmas, não do
+  // objeto do aluno em si.
+  const turmaDaFicha = turmas.find(t => t.turmaId === a.turmaId) || null;
+  a._turmaNome     = turmaDaFicha?.nome      || '—';
+  a._professorNome = turmaDaFicha?.professor || '—';
+
   const camposExtras = [
+    {key:'_turmaNome',     label:'TURMA'},
+    {key:'_professorNome', label:'PROFESSOR(A)'},
     {key:'rgOrgao', label:'RG - ÓRGÃO EMISSOR'},
     {key:'pais',    label:'PAÍS'},
     {key:'obs',     label:'OBSERVAÇÕES'},
@@ -1511,7 +1538,8 @@ async function abrirFichaAluno(alunoId){
 
   const campos = [...COLS.filter(c => c.key !== '_neeResumo'), ...camposExtras].map(c => {
     let v = a[c.key] ?? '';
-    if(c.key === 'idade')   v = v || calcIdade(a.dataNascimento) || '';
+    if(c.key === 'idade')          v = v || calcIdade(a.dataNascimento) || '';
+    if(c.key === 'dataNascimento') v = formatarDataBR(v);
     if(c.key === 'corRaca' && !v) v = 'Não declarada';
     if(c.key === 'pais'    && !v) v = 'BR';
     return `<div style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
@@ -1692,6 +1720,7 @@ function buildTableHtml(alunosList, metaTurma){
     const row = COLS.map(c=>{
       let v = a[c.key] ?? "";
       if(c.key==="idade") v = v || calcIdade(a.dataNascimento) || "";
+      if(c.key==="dataNascimento") v = formatarDataBR(v);
       if(c.key==="corRaca" && !v) v = "Não declarada";
       return `<td>${escapeHtml(String(v||""))}</td>`;
     }).join("");
@@ -1791,7 +1820,8 @@ function _bodyAlunos(lista, cols){
   cols = cols || COLS;
   return lista.map(a => cols.map(c => {
     let v = a[c.key] ?? "";
-    if(c.key==="idade")   v = v || calcIdade(a.dataNascimento) || "";
+    if(c.key==="idade")          v = v || calcIdade(a.dataNascimento) || "";
+    if(c.key==="dataNascimento") v = formatarDataBR(v);
     if(c.key==="corRaca" && !v) v = "Não declarada";
     return String(v||"");
   }));
@@ -2090,6 +2120,7 @@ function exportFichasIndividuais(titulo, alunosList){
       ]},
       { titulo: 'Filiação', campos: [ ['Mãe', 'mae'], ['Pai', 'pai'] ] },
       { titulo: 'Matrícula', campos: [
+        ['Turma', '_turmaNome'], ['Professor(a)', '_professorNome'],
         ['Turno', '_turno'], ['Modelo', '_modelo'],
         ['Status', '_status'], ['Situação', '_situacao'],
       ]},
@@ -2102,6 +2133,9 @@ function exportFichasIndividuais(titulo, alunosList){
     alunosList.forEach((a, i) => {
       if(i > 0) doc.addPage();
       a._idadeCalc = a.idade || calcIdade(a.dataNascimento) || '';
+      const turmaDaFicha = turmas.find(t => t.turmaId === a.turmaId) || null;
+      a._turmaNome     = turmaDaFicha?.nome      || '—';
+      a._professorNome = turmaDaFicha?.professor || '—';
       let y = _desenharCabecalhoEscola(doc, escola, titulo, pw);
 
       const bX = 20, bW = pw - 40, colW = bW / 2;
@@ -2142,7 +2176,8 @@ function exportFichasIndividuais(titulo, alunosList){
             const campo = sec.campos[idx+c];
             if(!campo) continue;
             const [label, key] = campo;
-            const valor = String(a[key] ?? '').trim() || '—';
+            const valorBruto = key === 'dataNascimento' ? formatarDataBR(a[key]) : a[key];
+            const valor = String(valorBruto ?? '').trim() || '—';
             const colX = bX + c * colW;
             doc.setFont(undefined,'bold');
             doc.text(`${label}:`, colX, y);
