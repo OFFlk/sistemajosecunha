@@ -960,6 +960,18 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   </div>
 </div>
 
+<!-- Profissional de apoio — aparece apenas quando alguma NEE (deficiência/TEA/altas
+     habilidades OU transtorno) foi marcada. Campo OPCIONAL: não é obrigatório
+     vincular um profissional mesmo com NEE marcada. Lista vem do módulo de
+     Funcionários (função "Profissional de Apoio"). -->
+<div class="field" id="blocoProfissionalApoio" style="display:none;margin-top:12px;">
+  <label for="neeProfissionalApoio">🧑‍🏫 Profissional de apoio (opcional)</label>
+  <select id="neeProfissionalApoio">
+    <option value="">— nenhum selecionado —</option>
+  </select>
+  <small class="help">Lista carregada do módulo de Funcionários (função "Profissional de Apoio"). Este campo é opcional.</small>
+</div>
+
 <div class="actions-wizard">
   <div class="left">
     <button class="btn secondary" id="btnLimparCampos" type="button">Limpar campos</button>
@@ -2438,6 +2450,15 @@ function normSerie(s){
         });
       }
 
+      // Profissional de apoio — espera o <select> ser populado (busca
+      // assíncrona no módulo de Funcionários) antes de marcar o valor salvo.
+      if(aluno.profissionalApoioId){
+        if(window._profissionaisApoioPromise) await window._profissionaisApoioPromise;
+        const selApoio = document.getElementById('neeProfissionalApoio');
+        if(selApoio) selApoio.value = aluno.profissionalApoioId;
+      }
+      if(window._neeAtualizarVisibilidadeApoio) window._neeAtualizarVisibilidadeApoio();
+
       // ── Preenche etapa 2 ──
       _pre('compRG',         aluno.rg         || '');
       _pre('compRGOrgao',    aluno.rgOrgao    || '');
@@ -2591,6 +2612,48 @@ function normSerie(s){
 
     function _cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
+    // Mostra/oculta o campo de profissional de apoio: só aparece quando
+    // alguma NEE (deficiência/TEA/altas habilidades OU transtorno) está
+    // marcada como "Sim". Ao ocultar, limpa a seleção (campo é opcional,
+    // então não faz sentido manter um profissional vinculado sem NEE).
+    function _neeAtualizarVisibilidadeApoio(){
+      const bloco = document.getElementById('blocoProfissionalApoio');
+      if(!bloco) return;
+      const mostrar = _neeE.def === true || _neeE.trans === true;
+      bloco.style.display = mostrar ? '' : 'none';
+      if(!mostrar){
+        const sel = document.getElementById('neeProfissionalApoio');
+        if(sel) sel.value = '';
+      }
+    }
+    window._neeAtualizarVisibilidadeApoio = _neeAtualizarVisibilidadeApoio;
+
+    // Carrega os profissionais de apoio cadastrados no módulo de Funcionários
+    // (função "PROFISSIONAL DE APOIO"), incluindo a especialidade de cada um.
+    // Exposto como Promise em window para que o modo de edição possa esperar
+    // o <select> estar populado antes de tentar marcar o valor salvo.
+    window._profissionaisApoioPromise = (async function _carregarProfissionaisApoio(){
+      const sel = document.getElementById('neeProfissionalApoio');
+      if(!sel) return;
+      try{
+        await new Promise(res => {
+          if(window.DB) return res();
+          document.addEventListener('auth:ready', res, { once: true });
+        });
+        if(!window.DB || !window.DB.funcionarios || !window.DB.funcionarios.list) return;
+        const todos = await window.DB.funcionarios.list();
+        const profissionaisApoio = (todos || [])
+          .filter(f => (f.funcao || '').toUpperCase() === 'PROFISSIONAL DE APOIO')
+          .sort((a,b) => (a.nome||'').localeCompare(b.nome||''));
+        profissionaisApoio.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.funcId || f._id || '';
+          opt.textContent = f.especialidadeApoio ? `${f.nome} — ${f.especialidadeApoio}` : (f.nome || 'Sem nome');
+          sel.appendChild(opt);
+        });
+      }catch(e){ console.warn('Erro ao carregar profissionais de apoio:', e); }
+    })();
+
     window._neeSet = function(bloco, sim){
       _neeE[bloco] = sim;
       const bSim  = document.getElementById('btn'+_cap(bloco)+'Sim');
@@ -2605,6 +2668,7 @@ function normSerie(s){
         panel?.classList.remove('open'); block?.classList.remove('ativo');
         bloco==='def' ? _neeLimparDef() : _neeLimparTrans();
       }
+      _neeAtualizarVisibilidadeApoio();
     };
 
     window._neeSyncSimple = function(key, itemId){
@@ -2676,6 +2740,11 @@ function normSerie(s){
 
     // Expõe estado para inserirAluno e clearFields
     window._neeGetDados = function(){
+      const selApoio = document.getElementById('neeProfissionalApoio');
+      const idApoio  = selApoio ? selApoio.value : '';
+      const nomeApoio = (selApoio && idApoio)
+        ? selApoio.options[selApoio.selectedIndex].textContent
+        : null;
       return {
         deficiencia:        _neeE.def,
         tea:                _neeE.tea,
@@ -2693,6 +2762,9 @@ function normSerie(s){
         dislexia:           _neeE.dislexia,
         tdah:               _neeE.tdah,
         tpac:               _neeE.tpac,
+        // Profissional de apoio — opcional, mesmo com NEE marcada
+        profissionalApoioId:   idApoio || null,
+        profissionalApoioNome: nomeApoio,
       };
     };
 
@@ -2734,6 +2806,7 @@ function normSerie(s){
         document.getElementById(id)?.classList.remove('open');
       });
       _neeLimparDef(); _neeLimparTrans();
+      _neeAtualizarVisibilidadeApoio();
     };
   })();
 
