@@ -416,13 +416,19 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
             <option value="INSPETOR DE ALUNOS">Inspetor(a) de Alunos</option>
             <option value="PSICÓLOGO">Psicólogo(a)</option>
             <option value="ASSISTENTE SOCIAL">Assistente Social</option>
-            <option value="PROFISSIONAL DE APOIO">Profissional de Apoio</option>
             <option value="OUTRO">Outro...</option>
           </select>
           <div id="wrapFuncaoOutro" style="display:none;margin-top:8px;">
             <input id="funcaoOutro" placeholder="Digite a função manualmente" autocomplete="off" style="width:100%;padding:11px 12px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--text);font-size:14px;font-family:'Nunito',sans-serif;outline:none;"/>
             <small class="help">Preencha a função não listada.</small>
           </div>
+        </div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="profissionalApoio" style="width:17px;height:17px;cursor:pointer;"/>
+            <span>🤝 É profissional de apoio?</span>
+          </label>
+          <small class="help">Marque se este(a) funcionário(a) atua dando apoio a algum(a) aluno(a) com NEE — independente da função (professor, mediador, cuidador, auxiliar etc.).</small>
           <div id="wrapEspecialidadeApoio" style="display:none;margin-top:8px;">
             <input id="especialidadeApoio" placeholder="Ex.: Cuidador(a), Intérprete de Libras, Acompanhante terapêutico..." autocomplete="off" style="width:100%;padding:11px 12px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--text);font-size:14px;font-family:'Nunito',sans-serif;outline:none;"/>
             <small class="help">Especifique a área de atuação deste profissional de apoio.</small>
@@ -1146,7 +1152,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       <option value="INSPETOR DE ALUNOS">Inspetor(a) de Alunos</option>
       <option value="PSICÓLOGO">Psicólogo(a)</option>
       <option value="ASSISTENTE SOCIAL">Assistente Social</option>
-      <option value="PROFISSIONAL DE APOIO">Profissional de Apoio</option>
     `;
     _funcoesExtras.forEach(f => {
       const opt = document.createElement('option');
@@ -1163,10 +1168,14 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     const show = this.value === 'OUTRO';
     document.getElementById('wrapFuncaoOutro').style.display = show ? 'block' : 'none';
     if(!show) document.getElementById('funcaoOutro').value = '';
+  });
 
-    const showApoio = this.value === 'PROFISSIONAL DE APOIO';
-    document.getElementById('wrapEspecialidadeApoio').style.display = showApoio ? 'block' : 'none';
-    if(!showApoio) document.getElementById('especialidadeApoio').value = '';
+  // Profissional de apoio é uma característica independente da função —
+  // qualquer função (professor, mediador, cuidador, auxiliar etc.) pode ser
+  // marcada como profissional de apoio.
+  document.getElementById('profissionalApoio').addEventListener('change', function(){
+    document.getElementById('wrapEspecialidadeApoio').style.display = this.checked ? 'block' : 'none';
+    if(!this.checked) document.getElementById('especialidadeApoio').value = '';
   });
 
   /* ════════════════════════════════════════
@@ -1912,7 +1921,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     if(document.getElementById('funcao').value === 'OUTRO' && !document.getElementById('funcaoOutro').value.trim()){
       _toastErro('⚠️ Digite a função.'); voltarEtapa1(); return;
     }
-    if(document.getElementById('funcao').value === 'PROFISSIONAL DE APOIO' && !document.getElementById('especialidadeApoio').value.trim()){
+    if(document.getElementById('profissionalApoio').checked && !document.getElementById('especialidadeApoio').value.trim()){
       _toastErro('⚠️ Informe a especialidade do profissional de apoio.'); voltarEtapa1(); return;
     }
     if(!document.getElementById('status').value){
@@ -1987,7 +1996,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         : document.getElementById('natUFText').value.trim(),
       naturalidadeCidade: normUpper(document.getElementById('natCidade').value),
       funcao,
-      especialidadeApoio: funcao === 'PROFISSIONAL DE APOIO'
+      profissionalApoio: document.getElementById('profissionalApoio').checked,
+      especialidadeApoio: document.getElementById('profissionalApoio').checked
         ? document.getElementById('especialidadeApoio').value.trim()
         : '',
       cargaHoraria: document.getElementById('cargaHoraria').value ? parseInt(document.getElementById('cargaHoraria').value, 10) : null,
@@ -2131,7 +2141,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       document.getElementById('wrapFuncaoOutro').style.display='block';
       document.getElementById('funcaoOutro').value = f.funcao||'';
     }
-    if(f.funcao === 'PROFISSIONAL DE APOIO'){
+    document.getElementById('profissionalApoio').checked = !!f.profissionalApoio;
+    if(f.profissionalApoio){
       document.getElementById('wrapEspecialidadeApoio').style.display = 'block';
       document.getElementById('especialidadeApoio').value = f.especialidadeApoio || '';
     }
