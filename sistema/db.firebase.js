@@ -297,6 +297,7 @@
     // ── Módulo de Notas Trimestrais (bridge p/ colar no Access) ──
     // Isolado dos demais módulos, sem interação com turmas/alunos/atas.
     notasTrimestrais: makeCollection('notasTrimestrais'),
+    notasSchemas: makeCollection('notasSchemas'),
 
     // ── Compartilhados ──
     escola:    escolaStore,
