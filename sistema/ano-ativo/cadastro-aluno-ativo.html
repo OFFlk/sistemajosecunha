@@ -2629,7 +2629,9 @@ function normSerie(s){
     window._neeAtualizarVisibilidadeApoio = _neeAtualizarVisibilidadeApoio;
 
     // Carrega os profissionais de apoio cadastrados no módulo de Funcionários
-    // (função "PROFISSIONAL DE APOIO"), incluindo a especialidade de cada um.
+    // (característica "profissionalApoio", independente da função — professor,
+    // mediador, cuidador, auxiliar etc. podem ser marcados como tal),
+    // incluindo a especialidade de cada um.
     // Exposto como Promise em window para que o modo de edição possa esperar
     // o <select> estar populado antes de tentar marcar o valor salvo.
     window._profissionaisApoioPromise = (async function _carregarProfissionaisApoio(){
@@ -2643,12 +2645,17 @@ function normSerie(s){
         if(!window.DB || !window.DB.funcionarios || !window.DB.funcionarios.list) return;
         const todos = await window.DB.funcionarios.list();
         const profissionaisApoio = (todos || [])
-          .filter(f => (f.funcao || '').toUpperCase() === 'PROFISSIONAL DE APOIO')
+          .filter(f => f.profissionalApoio === true)
           .sort((a,b) => (a.nome||'').localeCompare(b.nome||''));
         profissionaisApoio.forEach(f => {
           const opt = document.createElement('option');
           opt.value = f.funcId || f._id || '';
-          opt.textContent = f.especialidadeApoio ? `${f.nome} — ${f.especialidadeApoio}` : (f.nome || 'Sem nome');
+          const funcaoLabel = f.funcao ? _cap(f.funcao.toLowerCase()) : '';
+          const partes = [f.nome || 'Sem nome'];
+          if(funcaoLabel) partes.push(`(${funcaoLabel})`);
+          let texto = partes.join(' ');
+          if(f.especialidadeApoio) texto += ` — ${f.especialidadeApoio}`;
+          opt.textContent = texto;
           sel.appendChild(opt);
         });
       }catch(e){ console.warn('Erro ao carregar profissionais de apoio:', e); }
