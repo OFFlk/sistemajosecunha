@@ -972,6 +972,14 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   <small class="help">Lista carregada do módulo de Funcionários (função "Profissional de Apoio"). Este campo é opcional.</small>
 </div>
 
+<!-- AEE — Sala de Atendimento Educacional Especializado -->
+<div class="field" style="margin-top:12px;">
+  <label class="inline-check">
+    <input type="checkbox" id="aeeFrequenta" style="transform:scale(1.05)"/>
+    <span>🏫 Frequenta a sala do AEE (Atendimento Educacional Especializado)?</span>
+  </label>
+</div>
+
 <div class="actions-wizard">
   <div class="left">
     <button class="btn secondary" id="btnLimparCampos" type="button">Limpar campos</button>
@@ -1665,6 +1673,10 @@ function normSerie(s){
     // Limpa NEE
     if(window._neeLimparTudo) window._neeLimparTudo();
 
+    // Limpa AEE
+    const aeeChkClear = document.getElementById('aeeFrequenta');
+    if(aeeChkClear) aeeChkClear.checked = false;
+
     // Volta para etapa 1 se estiver na etapa 2
     const e1=document.getElementById('wzEtapa1');
     const e2=document.getElementById('wzEtapa2');
@@ -1803,6 +1815,7 @@ function normSerie(s){
     naturalidadeUF:     natUF.toUpperCase(),
     sexo:               sexoVal,
     corRaca:            corVal,
+    aee:                !!document.getElementById('aeeFrequenta')?.checked,
     ...dadosNEE,
     ...dadosComp,
   };
@@ -1983,6 +1996,7 @@ function normSerie(s){
       naturalidadeUF:     (document.getElementById('naturalidadeUF')?.value || '').trim().toUpperCase(),
       turno:        (document.getElementById('turnoSelecionado')?.value || '').trim(),
       modeloEnsino: (document.getElementById('modeloEnsino')?.value || '').trim(),
+      aee:          !!document.getElementById('aeeFrequenta')?.checked,
       ...(window._neeGetDados ? window._neeGetDados() : {}),
       rg:           (document.getElementById('compRG')?.value || '').trim(),
       rgOrgao:      (document.getElementById('compRGOrgao')?.value || '').trim().toUpperCase(),
@@ -2458,6 +2472,10 @@ function normSerie(s){
         if(selApoio) selApoio.value = aluno.profissionalApoioId;
       }
       if(window._neeAtualizarVisibilidadeApoio) window._neeAtualizarVisibilidadeApoio();
+
+      // AEE
+      const aeeChkEdit = document.getElementById('aeeFrequenta');
+      if(aeeChkEdit) aeeChkEdit.checked = !!aluno.aee;
 
       // ── Preenche etapa 2 ──
       _pre('compRG',         aluno.rg         || '');
