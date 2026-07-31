@@ -2651,11 +2651,7 @@ function normSerie(s){
           const opt = document.createElement('option');
           opt.value = f.funcId || f._id || '';
           const funcaoLabel = f.funcao ? _cap(f.funcao.toLowerCase()) : '';
-          const partes = [f.nome || 'Sem nome'];
-          if(funcaoLabel) partes.push(`(${funcaoLabel})`);
-          let texto = partes.join(' ');
-          if(f.especialidadeApoio) texto += ` — ${f.especialidadeApoio}`;
-          opt.textContent = texto;
+          opt.textContent = funcaoLabel ? `${f.nome || 'Sem nome'} — ${funcaoLabel}` : (f.nome || 'Sem nome');
           sel.appendChild(opt);
         });
       }catch(e){ console.warn('Erro ao carregar profissionais de apoio:', e); }
