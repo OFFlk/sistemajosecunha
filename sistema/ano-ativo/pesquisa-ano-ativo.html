@@ -447,6 +447,15 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
               </div>
             </div>
 
+            <div style="height:1px;background:var(--card-border);margin:12px 0;"></div>
+
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13px;">
+                <input type="checkbox" id="chkFiltroAee">
+                🏫 Frequenta a sala do AEE
+              </label>
+            </div>
+
             <div style="display:flex;justify-content:flex-end;margin-top:14px;">
               <button type="button" class="btn ghost" id="btnFecharPesquisaAvancada" style="font-size:12px;padding:6px 14px;">Fechar</button>
             </div>
@@ -1087,6 +1096,10 @@ function _aplicarFiltrosComuns(list){
     list = subtipos.length
       ? list.filter(a => subtipos.some(k => a[k] === true))
       : list.filter(a => a.transtorno === true);
+  }
+  // AEE — filtro simples de Sim/Não, sem subtipos
+  if(document.getElementById("chkFiltroAee")?.checked){
+    list = list.filter(a => a.aee === true);
   }
 
   const q = normText(inpBusca.value.trim());
@@ -2339,6 +2352,7 @@ document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   document.getElementById("chkFiltroTrans").checked = false;
   document.getElementById("subFiltroTrans").style.display = "none";
   document.querySelectorAll(".filtroTransItem").forEach(c=>c.checked=false);
+  document.getElementById("chkFiltroAee").checked = false;
   if(window._atualizarBadgePesquisaAvancada) window._atualizarBadgePesquisaAvancada();
   _atualizarOpcoesSituacaoPassado();
   seriesSelecionadas = [];
@@ -2381,10 +2395,16 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
     if(document.getElementById("chkReadmissao").checked) n++;
     if(document.getElementById("chkFiltroDef").checked) n++;
     if(document.getElementById("chkFiltroTrans").checked) n++;
+    if(document.getElementById("chkFiltroAee").checked) n++;
     badge.style.display = n > 0 ? "block" : "none";
     badge.textContent = String(n);
   }
   window._atualizarBadgePesquisaAvancada = atualizarBadge;
+
+  document.getElementById("chkFiltroAee").addEventListener("change", ()=>{
+    atualizarBadge();
+    atualizarListaAlunos();
+  });
 
   document.getElementById("chkFiltroDef").addEventListener("change", function(){
     document.getElementById("subFiltroDef").style.display = this.checked ? "flex" : "none";
@@ -2653,6 +2673,7 @@ function salvarEstadoPagina(){
     defSubtipos: Array.from(document.querySelectorAll(".filtroDefItem:checked")).map(c=>c.value),
     transMarcado: document.getElementById("chkFiltroTrans")?.checked || false,
     transSubtipos: Array.from(document.querySelectorAll(".filtroTransItem:checked")).map(c=>c.value),
+    aeeMarcado: document.getElementById("chkFiltroAee")?.checked || false,
   };
   sessionStorage.setItem('pesquisaAnoAtivoEstado', JSON.stringify(estado));
 }
@@ -2699,6 +2720,10 @@ function restaurarEstadoPagina(){
         const el = document.querySelector(`.filtroTransItem[value="${v}"]`);
         if(el) el.checked = true;
       });
+    }
+    if(estado.aeeMarcado){
+      const chk = document.getElementById("chkFiltroAee");
+      if(chk) chk.checked = true;
     }
     if(window._atualizarBadgePesquisaAvancada) window._atualizarBadgePesquisaAvancada();
     if(estado.modoFiltro){
