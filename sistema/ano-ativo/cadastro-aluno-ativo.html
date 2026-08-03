@@ -972,12 +972,19 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   <small class="help">Lista carregada do módulo de Funcionários (função "Profissional de Apoio"). Este campo é opcional.</small>
 </div>
 
-<!-- AEE — Sala de Atendimento Educacional Especializado -->
-<div class="field" style="margin-top:12px;">
-  <label class="inline-check">
-    <input type="checkbox" id="aeeFrequenta" style="transform:scale(1.05)"/>
-    <span>🏫 Frequenta a sala do AEE (Atendimento Educacional Especializado)?</span>
-  </label>
+<!-- AEE — Sala de Atendimento Educacional Especializado. Segue o mesmo
+     padrão visual dos blocos de deficiência/transtorno acima, e só aparece
+     depois que alguma NEE (deficiência OU transtorno) for marcada como
+     "Sim" — mesma regra do bloco de Profissional de Apoio. -->
+<div class="nee-block" id="blocoAee" style="display:none;margin-top:12px;">
+  <div class="nee-header">
+    <div class="nee-header-label">🏫 Frequenta a sala do AEE (Atendimento Educacional Especializado)?</div>
+    <div class="nee-toggle">
+      <button type="button" class="nee-sim-nao" id="btnAeeSim" onclick="_aeeSet(true)">Sim</button>
+      <button type="button" class="nee-sim-nao" id="btnAeeNao" onclick="_aeeSet(false)">Não</button>
+    </div>
+  </div>
+  <input type="checkbox" id="aeeFrequenta" style="display:none;">
 </div>
 
 <div class="actions-wizard">
@@ -1674,8 +1681,7 @@ function normSerie(s){
     if(window._neeLimparTudo) window._neeLimparTudo();
 
     // Limpa AEE
-    const aeeChkClear = document.getElementById('aeeFrequenta');
-    if(aeeChkClear) aeeChkClear.checked = false;
+    if(window._aeeSet) window._aeeSet(false, true);
 
     // Volta para etapa 1 se estiver na etapa 2
     const e1=document.getElementById('wzEtapa1');
@@ -2474,8 +2480,7 @@ function normSerie(s){
       if(window._neeAtualizarVisibilidadeApoio) window._neeAtualizarVisibilidadeApoio();
 
       // AEE
-      const aeeChkEdit = document.getElementById('aeeFrequenta');
-      if(aeeChkEdit) aeeChkEdit.checked = !!aluno.aee;
+      if(window._aeeSet) window._aeeSet(!!aluno.aee);
 
       // ── Preenche etapa 2 ──
       _pre('compRG',         aluno.rg         || '');
@@ -2630,21 +2635,49 @@ function normSerie(s){
 
     function _cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
-    // Mostra/oculta o campo de profissional de apoio: só aparece quando
-    // alguma NEE (deficiência/TEA/altas habilidades OU transtorno) está
-    // marcada como "Sim". Ao ocultar, limpa a seleção (campo é opcional,
-    // então não faz sentido manter um profissional vinculado sem NEE).
+    // Mostra/oculta o campo de profissional de apoio E o bloco de AEE: só
+    // aparecem quando alguma NEE (deficiência/TEA/altas habilidades OU
+    // transtorno) está marcada como "Sim". Ao ocultar, limpa a seleção/estado
+    // de ambos (são opcionais, então não faz sentido manter algo vinculado
+    // sem NEE marcada).
     function _neeAtualizarVisibilidadeApoio(){
       const bloco = document.getElementById('blocoProfissionalApoio');
-      if(!bloco) return;
+      const blocoAee = document.getElementById('blocoAee');
       const mostrar = _neeE.def === true || _neeE.trans === true;
-      bloco.style.display = mostrar ? '' : 'none';
-      if(!mostrar){
-        const sel = document.getElementById('neeProfissionalApoio');
-        if(sel) sel.value = '';
+      if(bloco){
+        bloco.style.display = mostrar ? '' : 'none';
+        if(!mostrar){
+          const sel = document.getElementById('neeProfissionalApoio');
+          if(sel) sel.value = '';
+        }
+      }
+      if(blocoAee){
+        blocoAee.style.display = mostrar ? '' : 'none';
+        if(!mostrar && window._aeeSet) window._aeeSet(false, true);
       }
     }
     window._neeAtualizarVisibilidadeApoio = _neeAtualizarVisibilidadeApoio;
+
+    // Toggle Sim/Não do bloco AEE — segue o mesmo padrão visual/interativo
+    // dos blocos de deficiência e transtorno, mas sem painel de detalhes
+    // (é só um Sim/Não simples). O segundo parâmetro (silencioso) evita
+    // "desmarcar visualmente com força" quando é só a limpeza automática
+    // ao ocultar o bloco.
+    window._aeeSet = function(sim, silencioso){
+      const chk  = document.getElementById('aeeFrequenta');
+      const bSim = document.getElementById('btnAeeSim');
+      const bNao = document.getElementById('btnAeeNao');
+      if(chk) chk.checked = sim;
+      if(sim){
+        bSim?.classList.add('sim');  bNao?.classList.remove('nao');
+      } else {
+        if(silencioso){
+          bSim?.classList.remove('sim'); bNao?.classList.remove('nao');
+        } else {
+          bNao?.classList.add('nao'); bSim?.classList.remove('sim');
+        }
+      }
+    };
 
     // Carrega os profissionais de apoio cadastrados no módulo de Funcionários
     // (característica "profissionalApoio", independente da função — professor,
