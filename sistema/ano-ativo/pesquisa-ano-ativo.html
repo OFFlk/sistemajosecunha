@@ -1856,14 +1856,31 @@ function _tabInterativaRenderTabela(){
   </div>`;
 }
 
+// Recria só o conteúdo da tabela (ordenação/colunas), preservando a posição
+// de rolagem horizontal/vertical que o usuário já tinha — sem isso, cada
+// clique num cabeçalho jogava o scroll de volta pro início, obrigando a
+// rolar de novo pra ver a coluna que acabou de ordenar.
+function _tabInterativaAtualizarTabela(){
+  const wrap = document.getElementById("tabInterativaTabelaWrap");
+  const scrollDivAntigo = wrap.querySelector(":scope > div");
+  const scrollLeft = scrollDivAntigo ? scrollDivAntigo.scrollLeft : 0;
+  const scrollTop  = scrollDivAntigo ? scrollDivAntigo.scrollTop  : 0;
+
+  wrap.innerHTML = _tabInterativaRenderTabela();
+
+  const scrollDivNovo = wrap.querySelector(":scope > div");
+  if(scrollDivNovo){ scrollDivNovo.scrollLeft = scrollLeft; scrollDivNovo.scrollTop = scrollTop; }
+
+  _tabInterativaLigarEventosTabela();
+}
+
 function _tabInterativaLigarEventosTabela(){
   document.querySelectorAll("#tabInterativaTabelaWrap th[data-key]").forEach(th=>{
     th.addEventListener("click", ()=>{
       const key = th.dataset.key;
       if(_tabInterativa.sortKey === key) _tabInterativa.sortDir *= -1;
       else { _tabInterativa.sortKey = key; _tabInterativa.sortDir = 1; }
-      document.getElementById("tabInterativaTabelaWrap").innerHTML = _tabInterativaRenderTabela();
-      _tabInterativaLigarEventosTabela();
+      _tabInterativaAtualizarTabela();
     });
   });
 }
@@ -1883,8 +1900,7 @@ function _tabInterativaLigarEventos(headerExtraHtml){
     chk.addEventListener("change", ()=>{
       const key = chk.dataset.key;
       if(chk.checked) _tabInterativa.ocultas.delete(key); else _tabInterativa.ocultas.add(key);
-      document.getElementById("tabInterativaTabelaWrap").innerHTML = _tabInterativaRenderTabela();
-      _tabInterativaLigarEventosTabela();
+      _tabInterativaAtualizarTabela();
     });
   });
   document.getElementById("btnTabInterativaMostrarTudo").addEventListener("click", ()=>{
