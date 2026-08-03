@@ -371,7 +371,6 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
           </select>
         </div>
         <button class="btn primary" id="btnAddSerie" style="flex-shrink:0;white-space:nowrap;">+ Adicionar</button>
-        <button class="btn ghost" id="btnLimparSeries" style="flex-shrink:0;white-space:nowrap;">Limpar</button>
         <div class="field" style="min-width:160px;margin:0;">
           <label for="selTurno">Filtrar por turno</label>
           <select id="selTurno">
@@ -1763,6 +1762,150 @@ const COLS_ESSENCIAIS = [
   {key:"mae", label:"MÃE"}, {key:"pai", label:"PAI"},
   {key:"_turno", label:"TURNO"}, {key:"_modelo", label:"MODELO"},
 ];
+/* =========================
+   Tabela interativa (estilo planilha)
+   Substitui as antigas tabelas estáticas (alunos e turmas): mostra TODAS as
+   colunas, permite ordenar clicando no cabeçalho e ocultar/mostrar colunas
+   direto na tela — útil quando você precisa de um dado específico rápido,
+   sem precisar exportar CSV/PDF.
+========================= */
+let _tabInterativa = { linhas: [], colunas: [], ocultas: new Set(), sortKey: null, sortDir: 1 };
+
+if(!window._tabInterativaDocClickBound){
+  document.addEventListener("click", ()=>{
+    const p = document.getElementById("painelTabInterativaColunas");
+    if(p) p.style.display = "none";
+  });
+  window._tabInterativaDocClickBound = true;
+}
+
+// Valor de EXIBIÇÃO de uma célula (mesmas regras especiais que já existiam
+// nas tabelas estáticas: idade calculada, data em BR, cor/raça padrão, e
+// agora também série(s) de turma, que vem como array).
+function _tabInterativaValor(col, row){
+  let v = row[col.key] ?? "";
+  if(col.key === "idade") v = v || calcIdade(row.dataNascimento) || "";
+  if(col.key === "dataNascimento") v = formatarDataBR(v);
+  if(col.key === "corRaca" && !v) v = "Não declarada";
+  if(col.key === "series" && Array.isArray(row.series)) v = row.series.join(", ");
+  return v;
+}
+
+// Valor de ORDENAÇÃO — precisa ser diferente do valor de exibição em alguns
+// casos (data de nascimento ordena pelo ISO original, não pelo DD-MM-YYYY
+// exibido; campos numéricos ordenam como número, não como texto).
+function _tabInterativaSortVal(col, row){
+  if(col.key === "dataNascimento") return row.dataNascimento || "";
+  if(col.key === "idade") return Number(row.idade || calcIdade(row.dataNascimento) || 0);
+  if(["_qtdAlunos","_qtdIntegral","_qtdRegular","anoLetivo"].includes(col.key)) return Number(row[col.key] || 0);
+  return normText(String(_tabInterativaValor(col, row) ?? ""));
+}
+
+function _tabInterativaRenderToolbar(){
+  const chips = _tabInterativa.colunas.map(c => `
+    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 6px;border-radius:6px;cursor:pointer;white-space:nowrap;">
+      <input type="checkbox" class="tabInterativaColChk" data-key="${c.key}" ${_tabInterativa.ocultas.has(c.key) ? "" : "checked"}>
+      ${escapeHtml(c.label)}
+    </label>`).join("");
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+      <div class="muted" style="font-size:12px;">${_tabInterativa.linhas.length} registro(s) • clique no cabeçalho pra ordenar</div>
+      <div style="position:relative;">
+        <button type="button" class="btn ghost" id="btnTabInterativaColunas" style="font-size:12.5px;padding:6px 12px;">☰ Colunas</button>
+        <div id="painelTabInterativaColunas" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:60;
+            background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);
+            padding:10px;max-height:320px;overflow:auto;min-width:230px;">
+          <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:8px;">
+            <button type="button" class="btn ghost" id="btnTabInterativaMostrarTudo" style="font-size:11px;padding:3px 8px;flex:1;">Mostrar todas</button>
+            <button type="button" class="btn ghost" id="btnTabInterativaOcultarTudo" style="font-size:11px;padding:3px 8px;flex:1;">Ocultar todas</button>
+          </div>
+          ${chips}
+        </div>
+      </div>
+    </div>`;
+}
+
+function _tabInterativaRenderTabela(){
+  const cols = _tabInterativa.colunas.filter(c => !_tabInterativa.ocultas.has(c.key));
+  if(!cols.length) return `<div class="muted" style="padding:20px;text-align:center;">Nenhuma coluna visível — marque ao menos uma em "☰ Colunas".</div>`;
+
+  const headers = cols.map(c => {
+    const ativo = _tabInterativa.sortKey === c.key;
+    const seta = ativo ? (_tabInterativa.sortDir === 1 ? " ▲" : " ▼") : "";
+    return `<th data-key="${c.key}" style="cursor:pointer;white-space:nowrap;user-select:none;${ativo ? "color:var(--brand,#7c3aed);" : ""}">${escapeHtml(c.label)}${seta}</th>`;
+  }).join("");
+
+  let linhas = _tabInterativa.linhas;
+  if(_tabInterativa.sortKey){
+    const col = _tabInterativa.colunas.find(c => c.key === _tabInterativa.sortKey);
+    linhas = linhas.slice().sort((a,b) => {
+      const va = _tabInterativaSortVal(col, a), vb = _tabInterativaSortVal(col, b);
+      if(typeof va === "number" && typeof vb === "number") return (va - vb) * _tabInterativa.sortDir;
+      return String(va).localeCompare(String(vb), 'pt-BR') * _tabInterativa.sortDir;
+    });
+  }
+
+  const body = linhas.map(row => {
+    const tds = cols.map(c => `<td>${escapeHtml(String(_tabInterativaValor(c, row) ?? ""))}</td>`).join("");
+    return `<tr>${tds}</tr>`;
+  }).join("");
+
+  return `<div style="overflow:auto;max-height:60vh;border:1px solid var(--card-border);border-radius:8px;">
+    <table style="min-width:100%;"><thead style="position:sticky;top:0;background:var(--card-bg);z-index:2;"><tr>${headers}</tr></thead>
+    <tbody>${body}</tbody></table>
+  </div>`;
+}
+
+function _tabInterativaLigarEventosTabela(){
+  document.querySelectorAll("#tabInterativaTabelaWrap th[data-key]").forEach(th=>{
+    th.addEventListener("click", ()=>{
+      const key = th.dataset.key;
+      if(_tabInterativa.sortKey === key) _tabInterativa.sortDir *= -1;
+      else { _tabInterativa.sortKey = key; _tabInterativa.sortDir = 1; }
+      document.getElementById("tabInterativaTabelaWrap").innerHTML = _tabInterativaRenderTabela();
+      _tabInterativaLigarEventosTabela();
+    });
+  });
+}
+
+function _tabInterativaRenderCompleto(headerExtraHtml){
+  modalBody.innerHTML = (headerExtraHtml || "") + _tabInterativaRenderToolbar() + `<div id="tabInterativaTabelaWrap">${_tabInterativaRenderTabela()}</div>`;
+  _tabInterativaLigarEventos(headerExtraHtml);
+}
+
+function _tabInterativaLigarEventos(headerExtraHtml){
+  const btnCol = document.getElementById("btnTabInterativaColunas");
+  const painel = document.getElementById("painelTabInterativaColunas");
+  btnCol.addEventListener("click", (e)=>{ e.stopPropagation(); painel.style.display = painel.style.display === "none" ? "block" : "none"; });
+  painel.addEventListener("click", (e)=> e.stopPropagation());
+
+  document.querySelectorAll(".tabInterativaColChk").forEach(chk=>{
+    chk.addEventListener("change", ()=>{
+      const key = chk.dataset.key;
+      if(chk.checked) _tabInterativa.ocultas.delete(key); else _tabInterativa.ocultas.add(key);
+      document.getElementById("tabInterativaTabelaWrap").innerHTML = _tabInterativaRenderTabela();
+      _tabInterativaLigarEventosTabela();
+    });
+  });
+  document.getElementById("btnTabInterativaMostrarTudo").addEventListener("click", ()=>{
+    _tabInterativa.ocultas.clear();
+    _tabInterativaRenderCompleto(headerExtraHtml);
+  });
+  document.getElementById("btnTabInterativaOcultarTudo").addEventListener("click", ()=>{
+    _tabInterativa.colunas.forEach(c => _tabInterativa.ocultas.add(c.key));
+    _tabInterativaRenderCompleto(headerExtraHtml);
+  });
+
+  _tabInterativaLigarEventosTabela();
+}
+
+function abrirTabelaInterativa(titulo, colunas, linhas, headerExtraHtml){
+  _tabInterativa = { linhas, colunas, ocultas: new Set(), sortKey: null, sortDir: 1 };
+  modalTitle.textContent = titulo;
+  _tabInterativaRenderCompleto(headerExtraHtml);
+  modalBackdrop.style.display = "flex";
+}
+
 const COLS_TURMAS = [
   {key:"turmaId", label:"ID TURMA"}, {key:"nome", label:"NOME"}, {key:"series", label:"SÉRIE(S)"},
   {key:"turno", label:"TURNO"}, {key:"professor", label:"PROFESSOR(A)"}, {key:"anoLetivo", label:"ANO LETIVO"},
@@ -1770,49 +1913,6 @@ const COLS_TURMAS = [
 ];
 
 function escapeHtml(s){ return s.replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-
-function buildTurmasTableHtml(turmasList){
-  const ano = anoSelecionadoOuAtivo();
-  const headers = COLS_TURMAS.map(c=>`<th>${c.label}</th>`).join("");
-  const body = turmasList.map(t => {
-    const matsT = _matsAtuaisDaTurma(t.turmaId, ano);
-    const qtd = matsT.length, qtdI = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
-    const seriesTxt = Array.isArray(t.series) ? t.series.join(", ") : (t.serie || "—");
-    const row = COLS_TURMAS.map(col => {
-      let v = col.key === "_qtdAlunos" ? qtd : col.key === "_qtdIntegral" ? qtdI : col.key === "_qtdRegular" ? qtd-qtdI : col.key === "series" ? seriesTxt : (t[col.key] ?? "");
-      return `<td>${escapeHtml(String(v))}</td>`;
-    }).join("");
-    return `<tr>${row}</tr>`;
-  }).join("");
-  return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
-}
-
-function buildTableHtml(alunosList, metaTurma){
-  let header = "";
-  if(metaTurma){
-    const serTxt = Array.isArray(metaTurma.series) ? metaTurma.series.join(", ") : (metaTurma.serie || "");
-    const linhas = [
-      metaTurma.nome      ? `<b>Turma:</b> ${escapeHtml(metaTurma.nome)}`                      : "",
-      serTxt              ? `<b>Série(s):</b> ${escapeHtml(serTxt)}`                             : "",
-      metaTurma.anoLetivo ? `<b>Ano letivo:</b> ${escapeHtml(String(metaTurma.anoLetivo))}`      : "",
-      metaTurma.turno     ? `<b>Turno:</b> ${escapeHtml(metaTurma.turno)}`                       : "",
-      metaTurma.professor ? `<b>Professor(a):</b> ${escapeHtml(metaTurma.professor)}`            : "",
-    ].filter(Boolean);
-    header = `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--chip-bg);font-size:13px;line-height:1.8;">${linhas.join(" &nbsp;|&nbsp; ")}</div>`;
-  }
-  const headers = COLS.map(c=>`<th>${c.label}</th>`).join("");
-  const body = alunosList.map(a=>{
-    const row = COLS.map(c=>{
-      let v = a[c.key] ?? "";
-      if(c.key==="idade") v = v || calcIdade(a.dataNascimento) || "";
-      if(c.key==="dataNascimento") v = formatarDataBR(v);
-      if(c.key==="corRaca" && !v) v = "Não declarada";
-      return `<td>${escapeHtml(String(v||""))}</td>`;
-    }).join("");
-    return `<tr>${row}</tr>`;
-  }).join("");
-  return `${header}<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
-}
 
 /* =========================
    Export PDF — helpers
@@ -2336,7 +2436,6 @@ document.getElementById("btnAddSerie").addEventListener("click", ()=>{
   if(!seriesSelecionadas.includes(v)){ seriesSelecionadas.push(v); renderChips(); atualizarListas(); }
   selSerieAdd.value = "";
 });
-document.getElementById("btnLimparSeries").addEventListener("click", ()=>{ seriesSelecionadas = []; renderChips(); atualizarListas(); });
 document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   inpBusca.value = "";
   document.getElementById("selTurno").value = "";
@@ -2440,7 +2539,13 @@ document.getElementById("sortTurmaField").addEventListener("change", (e)=>{
 
 document.getElementById("btnTurmasTabela").addEventListener("click", ()=>{
   const tSel = turmasSelecionadas(); if(!tSel.length){ setMsg("Selecione pelo menos uma turma.", "warn"); return; }
-  abrirModal(`Tabela de Turmas • ${anoSelecionadoOuAtivo() || "todos os anos"}`, buildTurmasTableHtml(tSel));
+  const ano = anoSelecionadoOuAtivo();
+  const turmasComputadas = tSel.map(t => {
+    const matsT = _matsAtuaisDaTurma(t.turmaId, ano);
+    const qtd = matsT.length, qtdI = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
+    return { ...t, _qtdAlunos: qtd, _qtdIntegral: qtdI, _qtdRegular: qtd - qtdI };
+  });
+  abrirTabelaInterativa(`Tabela de Turmas • ${ano || "todos os anos"}`, COLS_TURMAS, turmasComputadas);
 });
 document.getElementById("btnTurmasPdf").addEventListener("click", ()=>{
   const tSel = turmasSelecionadas(); if(!tSel.length){ setMsg("Selecione pelo menos uma turma.", "warn"); return; }
@@ -2450,7 +2555,19 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
   const aSel = alunosSelecionados();
   const ids = new Set(aSel.map(a => a.turmaId).filter(Boolean));
   const meta = ids.size === 1 ? (turmas.find(x => x.turmaId === [...ids][0]) || null) : null;
-  abrirModal("Tabela • Alunos selecionados", buildTableHtml(aSel, meta));
+  let headerExtraHtml = "";
+  if(meta){
+    const serTxt = Array.isArray(meta.series) ? meta.series.join(", ") : (meta.serie || "");
+    const linhas = [
+      meta.nome      ? `<b>Turma:</b> ${escapeHtml(meta.nome)}`                 : "",
+      serTxt         ? `<b>Série(s):</b> ${escapeHtml(serTxt)}`                  : "",
+      meta.anoLetivo ? `<b>Ano letivo:</b> ${escapeHtml(String(meta.anoLetivo))}` : "",
+      meta.turno     ? `<b>Turno:</b> ${escapeHtml(meta.turno)}`                 : "",
+      meta.professor ? `<b>Professor(a):</b> ${escapeHtml(meta.professor)}`      : "",
+    ].filter(Boolean);
+    headerExtraHtml = `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--chip-bg);font-size:13px;line-height:1.8;">${linhas.join(" &nbsp;|&nbsp; ")}</div>`;
+  }
+  abrirTabelaInterativa("Tabela • Alunos selecionados", COLS, aSel, headerExtraHtml);
 });
 // Dropdown de export de alunos
 (function(){
