@@ -2040,6 +2040,25 @@ function normSerie(s){
       console.log('[DEBUG-FOTO] alunoOriginal (snapshot capturado ao abrir a página) tinha fotoUrl:', alunoOriginal.fotoUrl);
       await window.DB.anoAtivoAlunos.save(objParaSalvar);
 
+      // O campo "modelo" (Regular/Integral) que a pesquisa e os exports usam
+      // vive na MATRÍCULA (window.DB.anoAtivoMatriculas), não no cadastro do
+      // aluno — o cadastro guarda só um espelho em `modeloEnsino` pra
+      // reconstruir a tela quando você reabre a edição. Antes desta correção,
+      // trocar "Frequenta o Integral?" aqui só atualizava esse espelho, e a
+      // matrícula ficava com o valor antigo — por isso a pesquisa e o export
+      // continuavam mostrando o modelo anterior mesmo depois de salvar.
+      try{
+        const matsDoAluno = await window.DB.anoAtivoMatriculas.list();
+        const matAtual = matsDoAluno
+          .filter(m => m.alunoId === alunoId && (m.status || 'ATIVO').toUpperCase() === 'ATIVO')
+          .sort((a,b) => new Date(b.criadoEm||0) - new Date(a.criadoEm||0))[0];
+        if(matAtual && (matAtual.modelo||'REGULAR').toUpperCase() !== (dadosComp.modeloEnsino||'REGULAR').toUpperCase()){
+          let matriculaAtualizada = { ...matAtual, modelo: dadosComp.modeloEnsino || 'REGULAR' };
+          if(window.MatriculaUtils) matriculaAtualizada = window.MatriculaUtils.validarMatricula(matriculaAtualizada);
+          await window.DB.anoAtivoMatriculas.save(matriculaAtualizada);
+        }
+      }catch(e){ console.warn('Erro ao sincronizar modelo na matrícula:', e); }
+
       if(window.initDocs)        window.initDocs(alunoId);
       if(window.uploadDocsQueue) await window.uploadDocsQueue();
 
