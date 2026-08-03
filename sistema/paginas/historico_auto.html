@@ -493,6 +493,19 @@ function nrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\
 function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function getLS(k,fb){ try{ const r=localStorage.getItem(k); return r==null?fb:JSON.parse(r);}catch{return fb;} }
 function fmtBRDate(v){ const s=String(v||''); if(/^\d{4}-\d{2}-\d{2}$/.test(s)){ const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`;} return s; }
+
+// Converte um nome salvo em CAIXA ALTA no banco para "Nome Sobrenome" (padrão de tabela do guia de formatação).
+// Preposições comuns em nomes (de/da/do/das/dos/e) permanecem em minúsculo, exceto quando são a primeira palavra.
+function toTitleCasePT(str){
+  const s = String(str||'').trim();
+  if(!s) return '';
+  const lowerWords = new Set(['de','da','do','das','dos','e']);
+  return s.toLowerCase().split(/\s+/).map((w,i)=>{
+    if(!w) return w;
+    if(i>0 && lowerWords.has(w)) return w;
+    return w.charAt(0).toUpperCase()+w.slice(1);
+  }).join(' ');
+}
 function mesExtensoBR(s){ const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']; s=String(s||''); let i=0; if(/^\d{4}-\d{2}-\d{2}$/.test(s)) i=+s.slice(5,7)-1; else if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) i=+s.slice(3,5)-1; return meses[i]||''; }
 function serieNum(txt){ const m=String(txt||'').match(/(\d+)/); return m?+m[1]:null; }
 
@@ -914,7 +927,7 @@ function sanitizeCH(v){
 function buildPlaceholders(){
   if(!state.selected) return {};
   const p={}, e=getPessoalFinal(), escolaDb=state.db.dadosEscola||{}, cidade=document.getElementById('inCidade').value.trim()||'', dataEm=document.getElementById('inData').value||'';
-  p.ALUNO_NOME=e.nome||''; p.ALUNO_ID_INTERNO=e.id||''; p.ALUNO_CPF=e.cpf||''; p.ALUNO_RG_CN=e.rgCn||''; p.ALUNO_NIS=e.nis||''; p.ALUNO_DATA_NASC=e.dataNascimento||''; p.ALUNO_NATURALIDADE=e.naturalidade||''; p.ALUNO_UF_NASC=e.ufNascimento||''; p.ALUNO_MAE=e.mae||''; p.ALUNO_PAI=e.pai||''; p.ALUNO_SEXO_F=(e.sexo==='F'?'X':' '); p.ALUNO_SEXO_M=(e.sexo==='M'?'X':' ');
+  p.ALUNO_NOME=toTitleCasePT(e.nome||''); p.ALUNO_ID_INTERNO=e.id||''; p.ALUNO_CPF=e.cpf||''; p.ALUNO_RG_CN=e.rgCn||''; p.ALUNO_NIS=e.nis||''; p.ALUNO_DATA_NASC=e.dataNascimento||''; p.ALUNO_NATURALIDADE=e.naturalidade||''; p.ALUNO_UF_NASC=e.ufNascimento||''; p.ALUNO_MAE=toTitleCasePT(e.mae||''); p.ALUNO_PAI=toTitleCasePT(e.pai||''); p.ALUNO_SEXO_F=(e.sexo==='F'?'X':' '); p.ALUNO_SEXO_M=(e.sexo==='M'?'X':' ');
   p.ESCOLA_NOME=document.getElementById('inEscola').value.trim() || escolaDb.nome || ''; p.ESCOLA_MUNICIPIO=cidade; p.ESCOLA_UF=(String(escolaDb.uf||escolaDb.UF||escolaDb.estadoUf||escolaDb.estado||'').toUpperCase().match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/)||[''])[0]; p.ESCOLA_INEP=escolaDb.inep||escolaDb.codigoInep||'';
   p.EMISSAO_CIDADE=(cidade + (p.ESCOLA_UF?('/'+p.ESCOLA_UF):'')).replace(/^\//,''); p.EMISSAO_DATA=fmtBRDate(dataEm); p.EMISSAO_DIA=dataEm?dataEm.slice(8,10):''; p.EMISSAO_MES_EXTENSO=dataEm?mesExtensoBR(dataEm):''; p.EMISSAO_ANO=dataEm?dataEm.slice(0,4):'';
   for(let n=1;n<=9;n++){ p[`A${n}_ETAPA`]=''; p[`A${n}_ANO_LETIVO`]=''; p[`A${n}_ESCOLA`]=''; p[`A${n}_MUNICIPIO`]=''; p[`A${n}_UF`]=''; p[`A${n}_DIAS_LETIVOS`]=''; p[`A${n}_CH_TOTAL`]=''; p[`A${n}_RESULTADO`]=''; p[`A${n}_RESULTADO_TABELA`]=''; DISC.forEach(([code])=>{ p[`A${n}_${code}_NC`]=''; p[`A${n}_${code}_CH`]=''; p[`A${n}${code}N`]=''; p[`A${n}${code}C`]=''; }); }
@@ -954,7 +967,7 @@ function buildPlaceholders(){
   });
   let last=0; for(let n=9;n>=1;n--){ if(p[`A${n}_ANO_LETIVO`]||p[`A${n}_ETAPA`]){ last=n; break; } }
   p.ANO_LETIVO_GERAL = last?(p[`A${last}_ANO_LETIVO`]||''):''; // placeholder do cabeçalho (ano letivo de referência)
-  p.CERT_ALUNO_NOME=p.ALUNO_NOME;
+  p.CERT_ALUNO_NOME=(p.ALUNO_NOME||'').toUpperCase();
   p.CERT_SERIE_FINAL=last?((String(p[`A${last}_ETAPA`]||'').match(/\d+/)||[''])[0]):''; // template já adiciona "° ANO"
   p.CERT_ETAPA=(/F1|F2/.test(document.getElementById('formato').value)?'Ensino Fundamental':'');
   p.CERT_ANO_LETIVO_FINAL=last?(p[`A${last}_ANO_LETIVO`]||''):'';
