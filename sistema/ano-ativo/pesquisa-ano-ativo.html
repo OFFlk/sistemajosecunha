@@ -389,17 +389,68 @@ html[data-theme="dark"] #modalGerarAtaCancelar:hover {
             <option value="INTEGRAL">📚 Integral</option>
           </select>
         </div>
-        <div class="field" id="blocoStatusAtivo" style="min-width:230px;margin:0;">
-          <label for="chkReadmissao" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;">
-            <input type="checkbox" id="chkReadmissao" style="width:auto;margin:0;">
-            🔁 Somente readmissão (inativos)
-          </label>
-          <select id="selSituacao" style="display:none;margin-top:6px;width:100%;">
-            <option value="">Todas as situações</option>
-            <option value="TRANSFERIDO">Transferido</option>
-            <option value="DESISTENTE">Desistente</option>
-            <option value="FALECIDO">Faleceu</option>
-          </select>
+        <div class="field" id="blocoStatusAtivo" style="min-width:230px;margin:0;position:relative;">
+          <label style="visibility:hidden;">Pesquisa avançada</label>
+          <button type="button" class="btn ghost" id="btnPesquisaAvancada" style="width:100%;white-space:nowrap;position:relative;">
+            🔎 Pesquisa avançada
+            <span id="badgePesquisaAvancada" style="display:none;position:absolute;top:-7px;right:-7px;background:var(--brand,#6d28d9);color:#fff;border-radius:999px;font-size:11px;font-weight:800;line-height:1;padding:3px 6px;">0</span>
+          </button>
+
+          <div id="painelPesquisaAvancada" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:250;
+              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
+              box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px;min-width:300px;max-width:340px;">
+
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:700;font-size:13px;">
+                <input type="checkbox" id="chkReadmissao" style="width:auto;margin:0;">
+                🔁 Somente readmissão (inativos)
+              </label>
+              <select id="selSituacao" style="display:none;margin-top:6px;width:100%;">
+                <option value="">Todas as situações</option>
+                <option value="TRANSFERIDO">Transferido</option>
+                <option value="DESISTENTE">Desistente</option>
+                <option value="FALECIDO">Faleceu</option>
+              </select>
+            </div>
+
+            <div style="height:1px;background:var(--card-border);margin:12px 0;"></div>
+
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13px;">
+                <input type="checkbox" id="chkFiltroDef">
+                ♿ Deficiência
+              </label>
+              <div id="subFiltroDef" style="display:none;flex-direction:column;gap:6px;margin:8px 0 0 22px;">
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
+              </div>
+            </div>
+
+            <div style="height:1px;background:var(--card-border);margin:12px 0;"></div>
+
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13px;">
+                <input type="checkbox" id="chkFiltroTrans">
+                🧠 Transtornos
+              </label>
+              <div id="subFiltroTrans" style="display:none;flex-direction:column;gap:6px;margin:8px 0 0 22px;">
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="discalculia">🔢 Discalculia / raciocínio lógico-matemático</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="disgrafia">✏️ Disgrafia / disortografia / escrita</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="dislalia">🗣️ Dislalia / linguagem e comunicação</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="dislexia">📖 Dislexia</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="tdah">⚡ TDAH</label>
+                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="tpac">🔊 TPAC</label>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+              <button type="button" class="btn ghost" id="btnFecharPesquisaAvancada" style="font-size:12px;padding:6px 14px;">Fechar</button>
+            </div>
+          </div>
         </div>
         <div class="field" id="blocoStatusPassado" style="min-width:230px;margin:0;display:none;">
           <label for="chkNaoConcluintes" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;">
@@ -1019,6 +1070,25 @@ function _aplicarFiltrosComuns(list){
   if(statusFiltro) list = list.filter(a => (a._status||'ATIVO') === statusFiltro);
   if(situacaoFiltro) list = list.filter(a => (a._situacao||'') === situacaoFiltro);
   else if(situacaoIn) list = list.filter(a => situacaoIn.includes(a._situacao||''));
+
+  // Pesquisa avançada — Deficiência: com a checkbox principal marcada e
+  // nenhum subtipo específico selecionado, filtra QUALQUER aluno com
+  // deficiencia===true. Com subtipo(s) marcado(s), filtra quem tem qualquer
+  // um deles (OR entre os selecionados).
+  if(document.getElementById("chkFiltroDef")?.checked){
+    const subtipos = Array.from(document.querySelectorAll(".filtroDefItem:checked")).map(c=>c.value);
+    list = subtipos.length
+      ? list.filter(a => subtipos.some(k => a[k] === true))
+      : list.filter(a => a.deficiencia === true);
+  }
+  // Mesma lógica para Transtornos
+  if(document.getElementById("chkFiltroTrans")?.checked){
+    const subtipos = Array.from(document.querySelectorAll(".filtroTransItem:checked")).map(c=>c.value);
+    list = subtipos.length
+      ? list.filter(a => subtipos.some(k => a[k] === true))
+      : list.filter(a => a.transtorno === true);
+  }
+
   const q = normText(inpBusca.value.trim());
   if(q) list = list.filter(a=> normText(`${a.nome} ${a.alunoId} ${a.cpf} ${a.serie}`).includes(q));
   return list;
@@ -2263,6 +2333,13 @@ document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   selSit.value = "";
   selSit.style.display = "none";
   document.getElementById("chkNaoConcluintes").checked = false;
+  document.getElementById("chkFiltroDef").checked = false;
+  document.getElementById("subFiltroDef").style.display = "none";
+  document.querySelectorAll(".filtroDefItem").forEach(c=>c.checked=false);
+  document.getElementById("chkFiltroTrans").checked = false;
+  document.getElementById("subFiltroTrans").style.display = "none";
+  document.querySelectorAll(".filtroTransItem").forEach(c=>c.checked=false);
+  if(window._atualizarBadgePesquisaAvancada) window._atualizarBadgePesquisaAvancada();
   _atualizarOpcoesSituacaoPassado();
   seriesSelecionadas = [];
   renderChips();
@@ -2282,6 +2359,51 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
   _atualizarOpcoesSituacaoPassado();
   atualizarListaAlunos();
 });
+
+// Painel de Pesquisa Avançada — abre/fecha, mostra sub-grid de deficiência/
+// transtorno específicos e mantém um badge com a contagem de filtros ativos.
+(function(){
+  const btn   = document.getElementById("btnPesquisaAvancada");
+  const painel = document.getElementById("painelPesquisaAvancada");
+  const badge = document.getElementById("badgePesquisaAvancada");
+
+  btn.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    const aberto = painel.style.display !== "none";
+    painel.style.display = aberto ? "none" : "block";
+  });
+  document.addEventListener("click", ()=>{ painel.style.display = "none"; });
+  painel.addEventListener("click", (e)=>{ e.stopPropagation(); });
+  document.getElementById("btnFecharPesquisaAvancada").addEventListener("click", ()=>{ painel.style.display = "none"; });
+
+  function atualizarBadge(){
+    let n = 0;
+    if(document.getElementById("chkReadmissao").checked) n++;
+    if(document.getElementById("chkFiltroDef").checked) n++;
+    if(document.getElementById("chkFiltroTrans").checked) n++;
+    badge.style.display = n > 0 ? "block" : "none";
+    badge.textContent = String(n);
+  }
+  window._atualizarBadgePesquisaAvancada = atualizarBadge;
+
+  document.getElementById("chkFiltroDef").addEventListener("change", function(){
+    document.getElementById("subFiltroDef").style.display = this.checked ? "flex" : "none";
+    if(!this.checked) document.querySelectorAll(".filtroDefItem").forEach(c=>c.checked=false);
+    atualizarBadge();
+    atualizarListaAlunos();
+  });
+  document.getElementById("chkFiltroTrans").addEventListener("change", function(){
+    document.getElementById("subFiltroTrans").style.display = this.checked ? "flex" : "none";
+    if(!this.checked) document.querySelectorAll(".filtroTransItem").forEach(c=>c.checked=false);
+    atualizarBadge();
+    atualizarListaAlunos();
+  });
+  document.querySelectorAll(".filtroDefItem, .filtroTransItem").forEach(c=>{
+    c.addEventListener("change", ()=>{ atualizarListaAlunos(); });
+  });
+  // A readmissão também conta pro badge (o listener de filtro dela já existe acima)
+  document.getElementById("chkReadmissao").addEventListener("change", atualizarBadge);
+})();
 document.getElementById("selSituacaoPassado").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 
 sortField.addEventListener("change", ()=>{ currentSortField = sortField.value; atualizarListaAlunos(); });
@@ -2526,7 +2648,11 @@ function salvarEstadoPagina(){
     naoConcluintesMarcado: document.getElementById("chkNaoConcluintes")?.checked || false,
     situacaoPassadoFiltro: document.getElementById("selSituacaoPassado")?.value || '',
     modoFiltro: document.querySelector('input[name="modoFiltro"]:checked')?.value || 'turma',
-    turmaSort: currentTurmaSort
+    turmaSort: currentTurmaSort,
+    defMarcado: document.getElementById("chkFiltroDef")?.checked || false,
+    defSubtipos: Array.from(document.querySelectorAll(".filtroDefItem:checked")).map(c=>c.value),
+    transMarcado: document.getElementById("chkFiltroTrans")?.checked || false,
+    transSubtipos: Array.from(document.querySelectorAll(".filtroTransItem:checked")).map(c=>c.value),
   };
   sessionStorage.setItem('pesquisaAnoAtivoEstado', JSON.stringify(estado));
 }
@@ -2558,6 +2684,23 @@ function restaurarEstadoPagina(){
     _atualizarOpcoesSituacaoPassado();
     if(estado.situacaoPassadoFiltro) document.getElementById("selSituacaoPassado").value = estado.situacaoPassadoFiltro;
     _blocoStatusAtualizarVisibilidade();
+    if(estado.defMarcado){
+      const chk = document.getElementById("chkFiltroDef");
+      if(chk){ chk.checked = true; document.getElementById("subFiltroDef").style.display = "flex"; }
+      (estado.defSubtipos||[]).forEach(v=>{
+        const el = document.querySelector(`.filtroDefItem[value="${v}"]`);
+        if(el) el.checked = true;
+      });
+    }
+    if(estado.transMarcado){
+      const chk = document.getElementById("chkFiltroTrans");
+      if(chk){ chk.checked = true; document.getElementById("subFiltroTrans").style.display = "flex"; }
+      (estado.transSubtipos||[]).forEach(v=>{
+        const el = document.querySelector(`.filtroTransItem[value="${v}"]`);
+        if(el) el.checked = true;
+      });
+    }
+    if(window._atualizarBadgePesquisaAvancada) window._atualizarBadgePesquisaAvancada();
     if(estado.modoFiltro){
       const radio = document.querySelector(`input[name="modoFiltro"][value="${estado.modoFiltro}"]`);
       if(radio) radio.checked = true;
