@@ -15,6 +15,7 @@
 </script>
 
 <!-- Scripts globais -->
+<script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -212,6 +213,30 @@ html[data-theme="dark"] .badge.ok{ color:#4ade80; }
 html[data-theme="dark"] .badge.bad{ color:#fca5a5; }
 html[data-theme="dark"] .badge.star{ color:#fbbf24; }
 html[data-theme="dark"] .badge.info{ color:#93c5fd; }
+
+/* ===== Toast + modal de confirmação (ver guia-toasts.md) ===== */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; z-index: 50;
+}
+.btn.ghost, .btn.secondary { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn.ghost:hover, .btn.secondary:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+
+/* ===== Dropdown de exportação (PDF / CSV) ===== */
+.export-drop{
+  display:none; flex-direction:column; position:absolute; right:0; top:calc(100% + 6px); z-index:200;
+  background:var(--card); border:1.5px solid var(--border); border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.18); min-width:190px; padding:6px 0;
+}
+.export-drop .btn{
+  width:100%; border-radius:0; border:none; justify-content:flex-start; padding:10px 16px; background:transparent;
+}
+.export-drop .btn:hover{ background:var(--brand-faded, #f5f3ff); }
 </style>
 
 <title>Histórico por Aluno</title>
@@ -259,7 +284,13 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
     <div class="card">
       <div class="details-title">
         <h3>Detalhes do aluno</h3>
-        <button class="btn btn-primary" type="button" onclick="exportarHistoricoSelecionado()" id="btnExportarSel" disabled>Exportar</button>
+        <div style="position:relative;display:inline-block;" id="wrapExportHistorico">
+          <button class="btn btn-primary" type="button" id="btnExportarSel" disabled>Exportar ▾</button>
+          <div class="export-drop" id="dropExportHistorico">
+            <button class="btn" type="button" id="btnExportarPdfSel">📄 Exportar PDF</button>
+            <button class="btn" type="button" id="btnExportarCsvSel">📊 Exportar CSV</button>
+          </div>
+        </div>
       </div>
       <div id="detalhes" class="muted" style="margin-top:10px;">
         Selecione um aluno na lista para ver o histórico.
@@ -290,6 +321,57 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
    Helpers / DB
 ========================= */
 const $ = (id) => document.getElementById(id);
+
+/* =========================
+   Toasts padronizados (ver guia-toasts.md)
+========================= */
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
 /* =========================
    DB por escola (Namespacing)
 ========================= */
@@ -578,7 +660,7 @@ function buscar(){
   const parcial = $("parcial").checked;
 
   if (!termo){
-    alert("Digite o nome ou ID do aluno.");
+    setMsg("Digite o nome ou ID do aluno.", "warn");
     return;
   }
 
@@ -729,18 +811,29 @@ function abrirTurmaTabela(id){
 }
 
 /* =========================
-   Exportação PDF do histórico (CONSOLIDADO)
-   - Um único PDF com CABEÇALHO apenas na 1ª página
+   Exportação do histórico — PDF (estilo "lista de aluno" da pesquisa)
+   e CSV (puro, sem estilo) — ver pesquisa-ano-ativo.html
    - Uma única TABELA com várias linhas (um ano por linha)
-   - Adiciona coluna "ANO" dentro da tabela (antes do Nº / Nome)
-   - Tabela ponta-a-ponta com colunas ajustadas automaticamente
+   - Coluna "ANO" antes do Nº / Nome
    - Colunas são a UNIÃO dos schemas das turmas encontradas (faltantes viram "--")
 ========================= */
 function exportarHistoricoSelecionado(){
-  if (!SELECTED_KEY) { alert("Selecione um aluno antes de exportar."); return; }
+  // Alias mantido por compatibilidade (botões de exportação rápida na lista/timeline)
+  exportarHistoricoSelecionadoPDF();
+}
+
+function exportarHistoricoSelecionadoPDF(){
+  if (!SELECTED_KEY) { setMsg("Selecione um aluno antes de exportar.", "warn"); return; }
   const aluno = INDEX.find(a => a.key === SELECTED_KEY);
   if (!aluno) return;
   exportarHistoricoAlunoPDF(aluno);
+}
+
+function exportarHistoricoSelecionadoCSV(){
+  if (!SELECTED_KEY) { setMsg("Selecione um aluno antes de exportar.", "warn"); return; }
+  const aluno = INDEX.find(a => a.key === SELECTED_KEY);
+  if (!aluno) return;
+  exportarHistoricoCSV(aluno);
 }
 
 function exportarOcorrencia(turmaId, alunoKey){
@@ -748,63 +841,70 @@ function exportarOcorrencia(turmaId, alunoKey){
   if (!aluno) return;
 
   const occ = aluno.ocorrencias.filter(o => o.turmaId === turmaId);
-  if (!occ.length) { alert("Ocorrência não encontrada."); return; }
+  if (!occ.length) { setMsg("Ocorrência não encontrada.", "warn"); return; }
 
   exportarHistoricoAlunoPDF(aluno, [occ[0]]);
 }
 
-function exportarHistoricoAlunoPDF(aluno, somenteOcc=null){
-  if (!window.jspdf || !window.jspdf.jsPDF) { alert("jsPDF não carregou."); return; }
-  if (typeof window.jspdf?.jsPDF !== "function") { alert("jsPDF não carregou."); return; }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF("l","mm","a4");
-
-  const escola = carregarEscola();
-  const occ = (somenteOcc && somenteOcc.length) ? somenteOcc : aluno.ocorrencias.slice().sort((x,y)=>{
+function _ordenarOcorrenciasHistorico(aluno, somenteOcc){
+  return (somenteOcc && somenteOcc.length) ? somenteOcc : aluno.ocorrencias.slice().sort((x,y)=>{
     const ax = parseInt(String(x.ano||"0"),10) || 0;
     const ay = parseInt(String(y.ano||"0"),10) || 0;
     if (ax !== ay) return ax - ay;
     return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
   });
-
-  // Cabeçalho (só uma vez)
-  desenharCabecalhoHistorico(doc, escola, aluno.display);
-
-  // Tabela consolidada
-  gerarTabelaHistoricoConsolidado(doc, aluno, occ);
-
-  const safe = aluno.display.replace(/[^\w\d]+/g,"_").slice(0,40) || "aluno";
-  doc.save(`historico_${safe}.pdf`);
 }
 
-function desenharCabecalhoHistorico(doc, escola, nomeAluno){
-  const nomeEscola = (escola?.nome || "Nome da Escola").toString();
-  const endereco = (escola?.endereco || "").toString();
-  const escudo = escola?.escudo || "";
+// Monta nome de arquivo: [prefixo]_[aluno]_[DD-MM-AAAA].[ext] — mesmo padrão
+// usado no restante do sistema (ver _buildFilename em pesquisa-ano-ativo.html)
+function _nomeArquivoHistorico(prefixo, alunoDisplay, ext){
+  const hoje = new Date();
+  const d = String(hoje.getDate()).padStart(2,'0');
+  const m = String(hoje.getMonth()+1).padStart(2,'0');
+  const a = hoje.getFullYear();
+  const safe = String(alunoDisplay||'aluno')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^\w\d]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,40) || 'aluno';
+  return `${prefixo}_${safe}_${d}-${m}-${a}.${ext}`;
+}
 
-  let y = 18;
-  const centerX = doc.internal.pageSize.getWidth() / 2;
+// Cabeçalho institucional no estilo novo do sistema (logo + nome em azul +
+// linha separadora + título do relatório) — mesma linguagem visual usada
+// em pesquisa-ano-ativo.html (_desenharCabecalhoEscola), adaptada pra
+// unidades em mm (esta página gera o PDF em "mm", não em "pt").
+function desenharCabecalhoHistoricoNovo(doc, escola, tituloRelatorio, subtitulo){
+  const pageW = doc.internal.pageSize.getWidth();
+  const L = 12, R = pageW - 12;
+  let y = 14;
 
-  if (escudo) {
-    try { doc.addImage(escudo, "PNG", 12, 10, 26, 26); } catch {}
+  let logoW = 0;
+  if (escola?.escudo){
+    try { doc.addImage(escola.escudo, "PNG", L, y, 20, 20); logoW = 24; } catch {}
   }
 
-  doc.setFont("Times","Bold");
-  doc.setFontSize(16);
-  doc.text(nomeEscola, centerX, y, {align:"center"});
+  const tx = L + logoW;
+  const nomeEscola = (escola?.nome || "Nome da Escola").toString();
+  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(11,63,191);
+  doc.text(nomeEscola.toUpperCase(), tx, y+6);
 
-  doc.setFont("Times","Normal");
-  doc.setFontSize(11);
-  doc.text(endereco, centerX, y+7, {align:"center"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(60);
+  let subY = y+12;
+  if (escola?.endereco){ doc.text(String(escola.endereco), tx, subY); subY += 5; }
+  y = Math.max(y+22, subY+2);
 
-  doc.setFont("Times","Bold");
-  doc.setFontSize(14);
-  doc.text("ATA DE RESULTADOS FINAIS", centerX, y+18, {align:"center"});
+  doc.setDrawColor(11,63,191); doc.setLineWidth(0.6);
+  doc.line(L, y, R, y);
+  y += 6;
 
-  doc.setFont("Times","Normal");
-  doc.setFontSize(13);
-  doc.text(`Histórico do aluno - ${nomeAluno}`, centerX, y+28, {align:"center"});
+  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(20);
+  doc.text(tituloRelatorio, L, y);
+  if (subtitulo){
+    y += 5.5;
+    doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(80);
+    doc.text(subtitulo, L, y);
+  }
+  doc.setTextColor(0);
+  return y + 8;
 }
 
 function mergeSchemaColumns(occList){
@@ -840,7 +940,9 @@ function mergeSchemaColumns(occList){
   return out;
 }
 
-function gerarTabelaHistoricoConsolidado(doc, aluno, occList){
+// Dados (head/body) compartilhados entre a exportação em PDF e em CSV —
+// assim as duas sempre mostram exatamente as mesmas colunas/linhas.
+function _construirHeadBodyHistorico(aluno, occList){
   // Determina se alguma turma desativa série/resultado; aqui a gente inclui por utilidade no histórico:
   // - Série: sempre (ajuda a leitura)
   // - Resultado final: inclui se existir em qualquer ocorrência
@@ -891,7 +993,13 @@ function gerarTabelaHistoricoConsolidado(doc, aluno, occList){
     return row;
   });
 
-  // Layout: tabela ponta-a-ponta (margem pequena p/ impressão)
+  return { head, body };
+}
+
+// Desenho da tabela no PDF — estilo novo do sistema (cabeçalho azul,
+// linhas alternadas, fonte helvetica), mesma linguagem visual de
+// _TABLE_STYLES em pesquisa-ano-ativo.html.
+function _desenharTabelaHistoricoPDF(doc, head, body, startY){
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 10;
   const usableW = pageW - margin * 2;
@@ -913,8 +1021,6 @@ function gerarTabelaHistoricoConsolidado(doc, aluno, occList){
   colStyles[3] = { cellWidth: wSerie, halign: "center" };
   for (let c = 4; c < head.length; c++) colStyles[c] = { cellWidth: wRest, halign: "center" };
 
-  // startY abaixo do cabeçalho
-  const startY = 18 + 30 + 20; // alinhado com o header que desenhamos
   doc.autoTable({
     startY,
     theme: "grid",
@@ -922,10 +1028,59 @@ function gerarTabelaHistoricoConsolidado(doc, aluno, occList){
     margin: { left: margin, right: margin },
     head: [head],
     body,
-    styles: { font: "Times", fontSize: 10, halign: "center", valign: "middle" },
-    headStyles: { fillColor: [220, 220, 220], textColor: 0, fontStyle: "bold" },
+    styles: { font: "helvetica", fontSize: 8.5, halign: "center", valign: "middle", lineColor: [210,220,240], lineWidth: 0.3 },
+    headStyles: { fillColor: [11,63,191], textColor: 255, fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [243,246,255] },
+    bodyStyles: { textColor: [30,30,50] },
     columnStyles: colStyles
   });
+}
+
+// Exportação em PDF — cabeçalho institucional + tabela, no estilo novo
+// (equivalente ao "Exportar PDF" da lista de alunos em pesquisa-ano-ativo.html)
+function exportarHistoricoAlunoPDF(aluno, somenteOcc=null){
+  if (!window.jspdf || !window.jspdf.jsPDF || typeof window.jspdf.jsPDF !== "function"){
+    setMsg("Falha ao carregar jsPDF. Verifique sua conexão.", "err");
+    return;
+  }
+
+  const occ = _ordenarOcorrenciasHistorico(aluno, somenteOcc);
+  if (!occ.length){ setMsg("Nenhuma ocorrência para exportar.", "warn"); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF("l","mm","a4");
+  const escola = carregarEscola();
+
+  const startY = desenharCabecalhoHistoricoNovo(doc, escola, "ATA DE RESULTADOS FINAIS", `Histórico do aluno — ${aluno.display}`);
+  const { head, body } = _construirHeadBodyHistorico(aluno, occ);
+  _desenharTabelaHistoricoPDF(doc, head, body, startY);
+
+  doc.save(_nomeArquivoHistorico("Historico", aluno.display, "pdf"));
+  setMsg("PDF exportado com sucesso!", "ok");
+}
+
+// Exportação em CSV — puro, sem estilo (mesmo padrão de exportCsvCompleto
+// em pesquisa-ano-ativo.html: aspas + ; + BOM UTF-8 pra abrir certo no Excel)
+function exportarHistoricoCSV(aluno, somenteOcc=null){
+  const occ = _ordenarOcorrenciasHistorico(aluno, somenteOcc);
+  if (!occ.length){ setMsg("Nenhuma ocorrência para exportar.", "warn"); return; }
+
+  const { head, body } = _construirHeadBodyHistorico(aluno, occ);
+  const linhas = [head, ...body];
+  const csv = linhas
+    .map(cols => cols.map(v => `"${String(v||"").replace(/"/g,'""')}"`).join(";"))
+    .join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = _nomeArquivoHistorico("Historico", aluno.display, "csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  setMsg("CSV exportado com sucesso!", "ok");
 }
 
 
@@ -957,6 +1112,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("q").addEventListener("keydown", (ev)=>{
     if (ev.key === "Enter"){ ev.preventDefault(); buscar(); }
   });
+
+  // Dropdown "Exportar ▾" (PDF / CSV) do painel de detalhes do aluno
+  (function(){
+    const btn  = $("btnExportarSel");
+    const drop = $("dropExportHistorico");
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      drop.style.display = (drop.style.display === "flex") ? "none" : "flex";
+    });
+    document.addEventListener("click", ()=>{ drop.style.display = "none"; });
+    drop.addEventListener("click", (e)=> e.stopPropagation());
+    $("btnExportarPdfSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoPDF(); });
+    $("btnExportarCsvSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoCSV(); });
+  })();
+
+  Loading.esconder(); // ← linha adicionada
 });
 </script>
 
