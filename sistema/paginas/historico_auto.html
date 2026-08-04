@@ -603,6 +603,19 @@ async function carregarDB(){
         _atualizarDbInfo();
         _prePopulaEscolaFields();
       }
+      // Leitura read-only do módulo ano-ativo, só pra saber se o aluno já
+      // tem matrícula lá (nesse caso os dados pessoais são editados por lá,
+      // não aqui — nunca gravamos nada nessas coleções a partir desta página).
+      if(DB.anoAtivoMatriculas && DB.anoAtivoAlunos){
+        try{
+          const [anoAtivoMatriculasDB, anoAtivoAlunosDB] = await Promise.all([
+            DB.anoAtivoMatriculas.list(),
+            DB.anoAtivoAlunos.list()
+          ]);
+          state.db.anoAtivoMatriculasDB = anoAtivoMatriculasDB;
+          state.db.anoAtivoAlunosDB = anoAtivoAlunosDB;
+        }catch(e){ console.warn('carregarDB anoAtivo (read-only):', e); }
+      }
     }catch(e){ console.warn('carregarDB Firestore:', e); }
   }
 }
@@ -674,11 +687,29 @@ function enrichAluno(item){
   const sexoRaw=pick(a.sexo,m.sexo).toUpperCase();
   return { id:pick(a.id,alvoId), nome:pick(a.nomeOficial,a.nome,m.nomeRaw,item.nome), cpf:pick(a.cpf,a.CPF,m.cpf), rgCn:pick(a.rgCn,a.rg,m.rgCn,m.rg), nis:pick(a.nis,m.nis), dataNascimento:pick(a.dataNascimento,a.nascimento,a.dtNascimento,m.dataNascimento), naturalidade:pick(a.naturalidadeCidade,a.naturalidade,m.naturalidade), ufNascimento:pick(a.naturalidadeUF,a.ufNascimento,a.uf,m.ufNascimento), mae:pick(a.nomeMae,a.mae,m.mae), pai:pick(a.nomePai,a.pai,m.pai), sexo:sexoRaw.startsWith('F')?'F':(sexoRaw.startsWith('M')?'M':'') };
 }
+// Verifica (somente leitura) se o aluno já tem matrícula no módulo ano-ativo.
+// As duas coleções (atas x ano-ativo) nunca se misturam para escrita — isso serve
+// só pra decidir se o editor de dados pessoais desta página fica travado ou não,
+// já que pra alunos com matrícula ativa os dados pessoais são editados por lá.
+function temMatriculaAnoAtivo(item){
+  const matsAA = Array.isArray(state.db.anoAtivoMatriculasDB) ? state.db.anoAtivoMatriculasDB : [];
+  const alunosAA = Array.isArray(state.db.anoAtivoAlunosDB) ? state.db.anoAtivoAlunosDB : [];
+  const alvoId = item.alunoId || '';
+  const alvoNome = nrm(item.nome);
+  if(alvoId && matsAA.some(m => String(m?.alunoId||'')===alvoId)) return true;
+  if(alvoNome){
+    const alunoAA = alunosAA.find(a => nrm(a?.nomeOficial||a?.nome||'')===alvoNome);
+    const idAA = alunoAA ? String(alunoAA._id||alunoAA.id||alunoAA.alunoId||'') : '';
+    if(idAA && matsAA.some(m => String(m?.alunoId||'')===idAA)) return true;
+  }
+  return false;
+}
 /* =========================
    Salvar dados pessoais no Identidade (localStorage + Firestore)
 ========================= */
 function salvarDadosPessoais(){
   if(!state.selected){ alert("Nenhum aluno selecionado."); return; }
+  if(state.selected.temMatriculaAtiva){ alert("Este aluno já possui matrícula no módulo Ano Ativo — os dados pessoais devem ser editados por lá."); return; }
 
   const ed = state.edits.pessoais || {};
   const alunoId = state.selected.alunoId || '';
@@ -775,7 +806,8 @@ function salvarDadosPessoais(){
 function selecionarAluno(key){
   const item=state.index.find(x=>x.key===key); if(!item) return;
   state.selected = {...item, enrich: enrichAluno(item), registros: getTurmaAlunoRowsFor(item)};
-  const btnSP = document.getElementById('btnSalvarPessoais'); if(btnSP) btnSP.style.display='inline-flex';
+  state.selected.temMatriculaAtiva = temMatriculaAnoAtivo(item);
+  const btnSP = document.getElementById('btnSalvarPessoais'); if(btnSP) btnSP.style.display = state.selected.temMatriculaAtiva ? 'none' : 'inline-flex';
   const msgSP = document.getElementById('msgSalvoPessoais'); if(msgSP) msgSP.style.display='none';
   state.edits = { pessoais:{}, anos:{}, meta:{} };
   renderResumoSelecionado(); renderDadosPessoaisEditor(); renderTimeline(); renderResumoEditavel(); refreshSaida();
@@ -829,18 +861,22 @@ function renderDadosPessoaisEditor(){
   const ufNasc = String(v('ufNascimento', e.ufNascimento||'')).toUpperCase();
   const nascEstr = String(v('nascimentoEstrangeiro','0'))==='1';
   const dateISO = (()=>{ const m=String(nasc||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?`${m[3]}-${m[2]}-${m[1]}`:''; })();
-  box.innerHTML = `<div class="grid2">
-    <div><label>Nome do aluno</label><input class="mini-input" data-pf="nome" value="${esc(v('nome',e.nome||state.selected.nome||''))}"></div>
-    <div><label>ID interno</label><input class="mini-input" data-pf="id" value="${esc(v('id',e.id||state.selected.alunoId||''))}"></div>
-    <div><label>CPF</label><input class="mini-input" inputmode="numeric" maxlength="14" data-pf="cpf" value="${esc(maskCPF(v('cpf',e.cpf||'')))}"></div>
-    <div><label>RG/CN</label><div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><select class="mini-input" data-pf="rgCnTipo"><option value="RG" ${rgTipo==='RG'?'selected':''}>RG</option><option value="CN" ${rgTipo==='CN'?'selected':''}>CN</option></select><input class="mini-input" inputmode="numeric" data-pf="rgCn" value="${esc(v('rgCn',e.rgCn||''))}" placeholder="Digite apenas números"></div></div>
-    <div><label>NIS</label><input class="mini-input" data-pf="nis" value="${esc(v('nis',e.nis||''))}"></div>
-    <div><label>Sexo</label><select class="mini-input" data-pf="sexo"><option value=""></option><option value="M" ${String(v('sexo',e.sexo||'')).toUpperCase()==='M'?'selected':''}>M</option><option value="F" ${String(v('sexo',e.sexo||'')).toUpperCase()==='F'?'selected':''}>F</option></select></div>
-    <div><label>Data nascimento</label><input type="date" class="mini-input" data-pf="dataNascimento_iso" value="${esc(dateISO)}"></div>
-    <div><label>Naturalidade</label><div style="display:grid;grid-template-columns:1fr 82px auto;gap:8px;align-items:end"><input class="mini-input" data-pf="naturalidade" value="${esc(v('naturalidade',e.naturalidade||''))}"><div style="display:flex;flex-direction:column;gap:3px;"><label style="font-size:11px;font-weight:700;margin:0;color:var(--muted)">UF</label><select class="mini-input" data-pf="ufNascimento" ${nascEstr?'disabled':''}><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div><label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:400"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''}> Estrangeiro</label></div></div>
-    <div><label>Mãe</label><input class="mini-input" data-pf="mae" value="${esc(v('mae',e.mae||''))}"></div>
-    <div><label>Pai</label><input class="mini-input" data-pf="pai" value="${esc(v('pai',e.pai||''))}"></div>
+  const travado = !!state.selected.temMatriculaAtiva;
+  const dis = travado ? 'disabled' : '';
+  const aviso = travado ? `<div class="warn" style="margin-bottom:10px;padding:8px;border-radius:6px;background:color-mix(in srgb, orange 15%, transparent);">⚠️ Este aluno já possui matrícula no módulo Ano Ativo. Os dados pessoais são editados por lá — os campos abaixo ficam bloqueados aqui para não haver divergência entre os dois cadastros.</div>` : '';
+  box.innerHTML = `${aviso}<div class="grid2">
+    <div><label>Nome do aluno</label><input class="mini-input" data-pf="nome" value="${esc(v('nome',e.nome||state.selected.nome||''))}" ${dis}></div>
+    <div><label>ID interno</label><input class="mini-input" data-pf="id" value="${esc(v('id',e.id||state.selected.alunoId||''))}" ${dis}></div>
+    <div><label>CPF</label><input class="mini-input" inputmode="numeric" maxlength="14" data-pf="cpf" value="${esc(maskCPF(v('cpf',e.cpf||'')))}" ${dis}></div>
+    <div><label>RG/CN</label><div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><select class="mini-input" data-pf="rgCnTipo" ${dis}><option value="RG" ${rgTipo==='RG'?'selected':''}>RG</option><option value="CN" ${rgTipo==='CN'?'selected':''}>CN</option></select><input class="mini-input" inputmode="numeric" data-pf="rgCn" value="${esc(v('rgCn',e.rgCn||''))}" placeholder="Digite apenas números" ${dis}></div></div>
+    <div><label>NIS</label><input class="mini-input" data-pf="nis" value="${esc(v('nis',e.nis||''))}" ${dis}></div>
+    <div><label>Sexo</label><select class="mini-input" data-pf="sexo" ${dis}><option value=""></option><option value="M" ${String(v('sexo',e.sexo||'')).toUpperCase()==='M'?'selected':''}>M</option><option value="F" ${String(v('sexo',e.sexo||'')).toUpperCase()==='F'?'selected':''}>F</option></select></div>
+    <div><label>Data nascimento</label><input type="date" class="mini-input" data-pf="dataNascimento_iso" value="${esc(dateISO)}" ${dis}></div>
+    <div><label>Naturalidade</label><div style="display:grid;grid-template-columns:1fr 82px auto;gap:8px;align-items:end"><input class="mini-input" data-pf="naturalidade" value="${esc(v('naturalidade',e.naturalidade||''))}" ${dis}><div style="display:flex;flex-direction:column;gap:3px;"><label style="font-size:11px;font-weight:700;margin:0;color:var(--muted)">UF</label><select class="mini-input" data-pf="ufNascimento" ${nascEstr?'disabled':''} ${dis}><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div><label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:400"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div></div>
+    <div><label>Mãe</label><input class="mini-input" data-pf="mae" value="${esc(v('mae',e.mae||''))}" ${dis}></div>
+    <div><label>Pai</label><input class="mini-input" data-pf="pai" value="${esc(v('pai',e.pai||''))}" ${dis}></div>
   </div>`;
+  if(travado) return;
   const rer=()=>{ renderResumoSelecionado(); refreshSaida(); };
   const q=(sel)=>box.querySelector(sel);
   const cpfInp=q('[data-pf="cpf"]'), rgInp=q('[data-pf="rgCn"]'), rgTipoSel=q('[data-pf="rgCnTipo"]'), dtInp=q('[data-pf="dataNascimento_iso"]');
@@ -927,7 +963,7 @@ function sanitizeCH(v){
 function buildPlaceholders(){
   if(!state.selected) return {};
   const p={}, e=getPessoalFinal(), escolaDb=state.db.dadosEscola||{}, cidade=document.getElementById('inCidade').value.trim()||'', dataEm=document.getElementById('inData').value||'';
-  p.ALUNO_NOME=toTitleCasePT(e.nome||''); p.ALUNO_ID_INTERNO=e.id||''; p.ALUNO_CPF=e.cpf||''; p.ALUNO_RG_CN=e.rgCn||''; p.ALUNO_NIS=e.nis||''; p.ALUNO_DATA_NASC=e.dataNascimento||''; p.ALUNO_NATURALIDADE=toTitleCasePT(e.naturalidade||''); p.ALUNO_UF_NASC=e.ufNascimento||''; p.ALUNO_MAE=toTitleCasePT(e.mae||''); p.ALUNO_PAI=toTitleCasePT(e.pai||''); p.ALUNO_SEXO_F=(e.sexo==='F'?'X':' '); p.ALUNO_SEXO_M=(e.sexo==='M'?'X':' ');
+  p.ALUNO_NOME=toTitleCasePT(e.nome||''); p.ALUNO_ID_INTERNO=e.id||''; p.ALUNO_CPF=e.cpf||''; p.ALUNO_RG_CN=e.rgCn||''; p.ALUNO_NIS=e.nis||''; p.ALUNO_DATA_NASC=e.dataNascimento||''; p.ALUNO_NATURALIDADE=e.naturalidade||''; p.ALUNO_UF_NASC=e.ufNascimento||''; p.ALUNO_MAE=toTitleCasePT(e.mae||''); p.ALUNO_PAI=toTitleCasePT(e.pai||''); p.ALUNO_SEXO_F=(e.sexo==='F'?'X':' '); p.ALUNO_SEXO_M=(e.sexo==='M'?'X':' ');
   p.ESCOLA_NOME=document.getElementById('inEscola').value.trim() || escolaDb.nome || ''; p.ESCOLA_MUNICIPIO=cidade; p.ESCOLA_UF=(String(escolaDb.uf||escolaDb.UF||escolaDb.estadoUf||escolaDb.estado||'').toUpperCase().match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/)||[''])[0]; p.ESCOLA_INEP=escolaDb.inep||escolaDb.codigoInep||'';
   p.EMISSAO_CIDADE=(cidade + (p.ESCOLA_UF?('/'+p.ESCOLA_UF):'')).replace(/^\//,''); p.EMISSAO_DATA=fmtBRDate(dataEm); p.EMISSAO_DIA=dataEm?dataEm.slice(8,10):''; p.EMISSAO_MES_EXTENSO=dataEm?mesExtensoBR(dataEm):''; p.EMISSAO_ANO=dataEm?dataEm.slice(0,4):'';
   for(let n=1;n<=9;n++){ p[`A${n}_ETAPA`]=''; p[`A${n}_ANO_LETIVO`]=''; p[`A${n}_ESCOLA`]=''; p[`A${n}_MUNICIPIO`]=''; p[`A${n}_UF`]=''; p[`A${n}_DIAS_LETIVOS`]=''; p[`A${n}_CH_TOTAL`]=''; p[`A${n}_RESULTADO`]=''; p[`A${n}_RESULTADO_TABELA`]=''; DISC.forEach(([code])=>{ p[`A${n}_${code}_NC`]=''; p[`A${n}_${code}_CH`]=''; p[`A${n}${code}N`]=''; p[`A${n}${code}C`]=''; }); }
@@ -935,7 +971,7 @@ function buildPlaceholders(){
   const autoBySlot2={};
   autoRows.forEach(a=>{ autoBySlot2[a.slot]=a; });
   const rows=getResumoRowsForEditor();
-  rows.forEach((r,idx)=>{ const k=r.key||('A'+(idx+1)), auto=autoBySlot2[r.slot]||autoRows[idx]||{}; p[`${k}_ETAPA`]=String(r.etapa??''); p[`${k}_ANO_LETIVO`]=String(r.anoLetivo??''); p[`${k}_ESCOLA`]=toTitleCasePT(String(r.escola??'')); p[`${k}_MUNICIPIO`]=toTitleCasePT(String(r.municipio??'')); p[`${k}_UF`]=String(r.uf??''); p[`${k}_DIAS_LETIVOS`]=String((state.edits.anos[k]||{}).diasLetivos??auto.diasLetivosDefault??'200'); const _chTotalManual = (state.edits.anos[k]||{}).chTotal;
+  rows.forEach((r,idx)=>{ const k=r.key||('A'+(idx+1)), auto=autoBySlot2[r.slot]||autoRows[idx]||{}; p[`${k}_ETAPA`]=String(r.etapa??''); p[`${k}_ANO_LETIVO`]=String(r.anoLetivo??''); p[`${k}_ESCOLA`]=String(r.escola??''); p[`${k}_MUNICIPIO`]=String(r.municipio??''); p[`${k}_UF`]=String(r.uf??''); p[`${k}_DIAS_LETIVOS`]=String((state.edits.anos[k]||{}).diasLetivos??auto.diasLetivosDefault??'200'); const _chTotalManual = (state.edits.anos[k]||{}).chTotal;
     p[`${k}_CH_TOTAL`]=(_chTotalManual!=null && String(_chTotalManual).trim()!=='') ? String(_chTotalManual) : ''; p[`${k}_RESULTADO`]=String(r.resultado??''); p[`${k}_RESULTADO_TABELA`]=p[`${k}_RESULTADO`];
     DISC.forEach(([code,key])=>{ let v=auto?.notas?.[key]; if(v==null||v==='--') v=''; p[`${k}_${code}_NC`]=String(v); p[`${k}_${code}_CH`]=''; p[`${k}${code}N`]=p[`${k}_${code}_NC`]; p[`${k}${code}C`]=''; });
     try{
