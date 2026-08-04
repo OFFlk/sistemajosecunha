@@ -620,14 +620,19 @@ function construirIndex(){
   }
 
   // 5) materializa e calcula min/max anos (p/ timeline)
-  INDEX = Array.from(map.values()).map(it => {
-    const anosNum = (it.ocorrencias || [])
-      .map(o => parseInt(String(o.ano||"0"),10))
-      .filter(n => !isNaN(n) && n > 0);
-    const minAno = anosNum.length ? Math.min(...anosNum) : null;
-    const maxAno = anosNum.length ? Math.max(...anosNum) : null;
-    return { ...it, minAno, maxAno, qtd: (it.ocorrencias||[]).length };
-  });
+  INDEX = Array.from(map.values())
+    .map(it => {
+      const anosNum = (it.ocorrencias || [])
+        .map(o => parseInt(String(o.ano||"0"),10))
+        .filter(n => !isNaN(n) && n > 0);
+      const minAno = anosNum.length ? Math.min(...anosNum) : null;
+      const maxAno = anosNum.length ? Math.max(...anosNum) : null;
+      return { ...it, minAno, maxAno, qtd: (it.ocorrencias||[]).length };
+    })
+    // Esta página é do módulo de ATAS: só entram alunos com pelo menos
+    // uma ocorrência em turmasDB. Alunos que existem só no catálogo
+    // unificado (ex.: só no Ano Ativo, nunca lançados em ata) ficam de fora.
+    .filter(it => it.qtd > 0);
 
   INDEX.sort((a,b)=> String(a.display).localeCompare(String(b.display),'pt-BR'));
 
