@@ -706,34 +706,14 @@ function buscar(){
       <div class="item" onclick="selecionarAluno('${a.key}')">
         <div>
           <div class="title">${escapeHtml(a.display)} ${idBadge} <span class="pill">${faixa}</span> <span class="pill">${a.qtd} registro(s)</span></div>
-          <div class="sub">Clique para abrir o histórico • Você pode exportar em PDF ou CSV</div>
+          <div class="sub">Clique para abrir o histórico</div>
         </div>
         <div class="right">
           <button class="btn btn-gray" type="button" onclick="event.stopPropagation(); selecionarAluno('${a.key}')">Abrir</button>
-          <div style="position:relative;display:inline-block;" onclick="event.stopPropagation();">
-            <button class="btn btn-primary" type="button" onclick="toggleExportDropLista(event, '${a.key}')">Exportar ▾</button>
-            <div class="export-drop" data-export-drop-for="${a.key}">
-              <button class="btn" type="button" onclick="fecharExportDropsLista(); selecionarAluno('${a.key}'); exportarHistoricoSelecionadoPDF();">📄 Exportar PDF</button>
-              <button class="btn" type="button" onclick="fecharExportDropsLista(); selecionarAluno('${a.key}'); exportarHistoricoSelecionadoCSV();">📊 Exportar CSV</button>
-            </div>
-          </div>
         </div>
       </div>
     `;
   }).join("");
-}
-
-function toggleExportDropLista(ev, key){
-  ev.stopPropagation();
-  document.querySelectorAll('[data-export-drop-for]').forEach(el => {
-    if (el.getAttribute('data-export-drop-for') !== key) el.style.display = 'none';
-  });
-  const drop = document.querySelector(`[data-export-drop-for="${CSS.escape(key)}"]`);
-  if (drop) drop.style.display = (drop.style.display === 'flex') ? 'none' : 'flex';
-}
-
-function fecharExportDropsLista(){
-  document.querySelectorAll('[data-export-drop-for]').forEach(el => el.style.display = 'none');
 }
 
 
@@ -1145,7 +1125,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.stopPropagation();
       drop.style.display = (drop.style.display === "flex") ? "none" : "flex";
     });
-    document.addEventListener("click", ()=>{ drop.style.display = "none"; fecharExportDropsLista(); });
+    document.addEventListener("click", ()=>{ drop.style.display = "none"; });
     drop.addEventListener("click", (e)=> e.stopPropagation());
     $("btnExportarPdfSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoPDF(); });
     $("btnExportarCsvSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoCSV(); });
