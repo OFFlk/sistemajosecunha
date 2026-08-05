@@ -321,7 +321,6 @@ html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(even) td{ bac
 <div id="header-placeholder"></div>
 
 <div class="wrap">
-  <div class="card ch-only-banner"><div style="font-weight:700">Schema de Carga Horária (página separada)</div><div class="small muted" style="margin-top:6px">As regras salvas aqui ficam no localStorage e podem ser usadas pela página do histórico.</div></div>
   <div class="card">
     <div class="row">
       <div style="flex:2;min-width:280px">
@@ -415,6 +414,15 @@ html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(even) td{ bac
       <div style="font-weight:700;margin-bottom:8px">Carga horária por disciplina (todas na mesma regra)</div>
       <div id="chCargasGrid" class="grid2"></div>
       <div class="small muted" style="margin-top:6px">Preencha as disciplinas necessárias. Campos em branco ficam sem CH nesta regra.</div>
+    </div>
+
+    <div class="card" style="margin:10px 0 0 0">
+      <label class="inline-check"><input type="checkbox" id="chTemTurno2" onchange="chToggleTurno2Grid()"> <span>Este schema tem Turno 2 (Complementação Escolar / modelo integral)?</span></label>
+      <div id="chCargasGridT2Wrap" style="display:none;margin-top:10px">
+        <div style="font-weight:700;margin-bottom:8px">Carga horária das atividades complementares (Turno 2)</div>
+        <div id="chCargasGridT2" class="grid2"></div>
+        <div class="small muted" style="margin-top:6px">Só é usado nos anos letivos em que o histórico exige a seção "TURNO 02". Campos em branco ficam sem CH nesta regra.</div>
+      </div>
     </div>
 
     <div class="card" style="margin:10px 0 0 0">
@@ -872,6 +880,34 @@ function patchTemplateZip(zip){
 
 
 const CH_LS_KEY='historicoCHSchemas_v1';
+const ATIVIDADES_T2 = [
+  ['AP','Acompanhamento Pedagógico'], ['CA','Cultura e Arte'], ['EL','Esporte e Lazer'],
+  ['DH','Direitos Humanos'], ['PS','Promoção de Saúde'], ['IC','Iniciação Científica'],
+  ['EA','Educação Ambiental'], ['CD','Comunicação e Cultura digital'], ['MH','Matrizes Históricas e Culturais']
+];
+function chToggleTurno2Grid(){
+  const chk=document.getElementById('chTemTurno2');
+  const wrap=document.getElementById('chCargasGridT2Wrap');
+  if(wrap) wrap.style.display = chk?.checked ? 'block' : 'none';
+}
+function chGetEditorCargasT2(){
+  const out={};
+  document.querySelectorAll('[data-ch-carga-t2]').forEach(inp=>{
+    const code=String(inp.getAttribute('data-ch-carga-t2')||'').toUpperCase();
+    const n=String(inp.value||'').replace(/\D/g,'');
+    if(code && n!=='') out[code]=Number(n);
+    if(inp.value!=='' && inp.value!==n) inp.value=n;
+  });
+  return out;
+}
+function chSetEditorCargasT2(cargas){
+  const map=(cargas&&typeof cargas==='object')?cargas:{};
+  document.querySelectorAll('[data-ch-carga-t2]').forEach(inp=>{
+    const code=String(inp.getAttribute('data-ch-carga-t2')||'').toUpperCase();
+    const val = map[code];
+    inp.value = (val==null || val==='') ? '' : String(val);
+  });
+}
 function chNormalizeRuleShape(rule){
   const r = Object.assign({}, rule||{});
   const cargas = {};
@@ -886,6 +922,16 @@ function chNormalizeRuleShape(rule){
   const oldCh = String(r.ch??'').replace(/\D/g,'');
   if(oldDisc && oldCh && !(oldDisc in cargas)) cargas[oldDisc]=Number(oldCh);
   r.cargas = cargas;
+  const cargasT2 = {};
+  if(r && typeof r.cargasT2==='object' && r.cargasT2){
+    for(const [k,v] of Object.entries(r.cargasT2)){
+      const code=String(k||'').toUpperCase();
+      const n=String(v??'').replace(/\D/g,'');
+      if(code && n!=='') cargasT2[code]=Number(n);
+    }
+  }
+  r.cargasT2 = cargasT2;
+  r.temTurno2 = !!r.temTurno2;
   if(!r.nome || !String(r.nome).trim()){
     const anos=(r.anos||[]).filter(v=>/^\d{4}$/.test(String(v)));
     r.nome = `Regra ${anos.length?anos.join('+'):'sem anos'}`;
@@ -1099,14 +1145,34 @@ function chCarregarRegraNoEditor(r){
   setv('chFormatoEtapa', r.formato||'LIVRE');
   setv('chNumeros', (r.numeros||[]).join(','));
   chSetEditorCargas(r.cargas||{});
+  const chkT2=document.getElementById('chTemTurno2'); if(chkT2) chkT2.checked=!!r.temTurno2;
+  chSetEditorCargasT2(r.cargasT2||{});
+  chToggleTurno2Grid();
   chRenderAnosSelecionados(); chRenderAnoSelect();
 }
 function chLimparEditor(){
   chState.editingId=null; chState.editor.anos=[];
   ['chNomeRegra','chNumeros','chEtapaTexto','chRegex','chAnoManual'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   chSetEditorCargas({});
+  const chkT2=document.getElementById('chTemTurno2'); if(chkT2) chkT2.checked=false;
+  chSetEditorCargasT2({});
+  chToggleTurno2Grid();
   const f=document.getElementById('chFormatoEtapa'); if(f) f.value='X_ANO';
   chRenderAnosSelecionados(); chRenderAnoSelect();
+}
+// Toast provisório (placeholder simples até o usuário mandar o guia oficial de toasts do sistema)
+function chToastErro(msg){
+  let el = document.getElementById('chToastErro');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'chToastErro';
+    el.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:#991b1b;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,0.25);font-weight:700;font-size:14px;max-width:90vw;text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.style.display='none'; }, 6000);
 }
 function chSalvarRegra(){
   const nome=String(document.getElementById('chNomeRegra')?.value||'').trim();
@@ -1120,11 +1186,25 @@ function chSalvarRegra(){
   if(!anos.length) return alert('Adicione pelo menos 1 ano letivo à regra.');
   if(!Object.keys(cargas).length) return alert('Preencha pelo menos uma carga horária de disciplina.');
   if(!etapaTexto){ etapaTexto=''; }
+  // Não permite 2 regras para a mesma série/etapa no mesmo ano letivo
+  const etapaNorm = nrm(etapaTexto);
+  const conflito = (chState.rules||[]).find(r => {
+    if(chState.editingId && r.id === chState.editingId) return false;
+    if(nrm(r.etapaTexto||'') !== etapaNorm) return false;
+    return (r.anos||[]).some(a => anos.includes(String(a)));
+  });
+  if(conflito){
+    const anosConflitantes = (conflito.anos||[]).filter(a=>anos.includes(String(a)));
+    chToastErro(`Já existe a regra "${conflito.nome}" para a série "${etapaTexto||'(sem série definida)'}" no(s) ano(s) ${anosConflitantes.join(', ')}. Edite ou exclua a regra existente antes de salvar.`);
+    return;
+  }
   const rule=chNormalizeRuleShape({
     id: chState.editingId || `ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
     nome, cargas, anos, etapaTexto,
     etapaRegex: etapaRegex || chEtapaRegexFromText(etapaTexto),
     formato, numeros:[...new Set(numeros)].sort((a,b)=>a-b),
+    temTurno2: !!document.getElementById('chTemTurno2')?.checked,
+    cargasT2: chGetEditorCargasT2(),
     updatedAt:new Date().toISOString()
   });
   const idx=(chState.rules||[]).findIndex(r=>r.id===rule.id);
@@ -1222,11 +1302,14 @@ function chInitUI(){
   if(grid){
     grid.innerHTML = discs.map(d=>`<div><label>${esc(d.code)} — ${esc(d.label)}</label><input class="mini-input" data-ch-carga="${esc(d.code)}" inputmode="numeric" placeholder="Ex.: 200"></div>`).join('');
   }
+  const gridT2=document.getElementById('chCargasGridT2');
+  if(gridT2){
+    gridT2.innerHTML = ATIVIDADES_T2.map(([code,label])=>`<div><label>${esc(label)}</label><input class="mini-input" data-ch-carga-t2="${esc(code)}" inputmode="numeric" placeholder="Ex.: 40"></div>`).join('');
+  }
   const mkOpts=(arr)=>arr.map(d=>`<option value="${esc(d.code)}">${esc(d.code)} — ${esc(d.label)}</option>`).join('');
   const s2=document.getElementById('chDiagDisc'); if(s2) s2.innerHTML=mkOpts(discs);
   ['chFormatoEtapa','chNumeros'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', chGerarEtapaPreset); if(el) el.addEventListener('input', chGerarEtapaPreset); });
   chRenderAnoSelect(); chRenderAnosSelecionados(); chPopulateTurmaHelper(); chRenderTabela();
-  chEsconderCamposEtapaOpcionais();
 }
 
 
