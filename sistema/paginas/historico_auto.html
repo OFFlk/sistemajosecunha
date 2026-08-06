@@ -1969,10 +1969,14 @@ document.addEventListener('DOMContentLoaded', async ()=>{
           });
         }
         const anos=[...new Set((r?.anos||[]).map(a=>String(a).match(/\d{4}/)?.[0]).filter(Boolean))].sort();
+        let series = Array.isArray(r?.series) ? r.series.map(v=>String(v||'').trim().toUpperCase()).filter(Boolean) : [];
+        if(!series.length && r?.etapaTexto && String(r.etapaTexto).trim()) series=[String(r.etapaTexto).trim().toUpperCase()];
+        series=[...new Set(series)];
         return {
           id: String(r?.id || ('ch_'+i)),
           nome: String(r?.nome || '').trim(),
           anos,
+          series,
           etapaTexto: String(r?.etapaTexto || '').trim(),
           etapaRegex: String(r?.etapaRegex || '').trim(),
           cargas,
@@ -1992,25 +1996,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     return {mode:'GLOBAL'};
   }
   function chMatchEtapaOptional(rule, etapa){
-    const et = String(etapa||'').trim();
-    if(!rule) return false;
-
-    // Modo padrão (mais seguro para seu fluxo atual):
-    // regras de CH são centradas no ANO LETIVO; etapa/série é apenas opcional.
-    // Só aplica filtro por etapa quando a regra marcar explicitamente isso.
-    const usarEtapa = !!(rule && (rule.aplicarPorEtapa === true || rule.usarEtapa === true || rule?._raw?.aplicarPorEtapa === true || rule?._raw?.usarEtapa === true));
-    if(!usarEtapa) return true;
-
-    if(!String(rule.etapaTexto||'').trim() && !String(rule.etapaRegex||'').trim()) return true;
-    if(typeof window.chMatchEtapa==='function'){
-      try { return !!window.chMatchEtapa(rule, et); } catch(e){}
-    }
-    const txt = String(rule.etapaTexto||'').trim().toLowerCase();
-    if(txt && et.toLowerCase()===txt) return true;
-    if(rule.etapaRegex){
-      try{ return new RegExp(rule.etapaRegex,'i').test(et); }catch(e){}
-    }
-    return !txt;
+    const series = Array.isArray(rule?.series) ? rule.series : [];
+    if(!series.length) return true; // regra vale pra todas as séries do(s) ano(s) letivo(s)
+    const alvo = nrm(String(etapa||'').trim());
+    if(!alvo) return false;
+    return series.some(s => nrm(s) === alvo);
   }
   function resolveCHForSelected({anoLetivo, etapa, disciplina}){
     const ano = String(anoLetivo||'').match(/\d{4}/)?.[0] || '';

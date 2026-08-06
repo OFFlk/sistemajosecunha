@@ -315,6 +315,16 @@ html[data-theme="dark"] #notasPreviewDocx table th{ background:var(--chip-bg); c
 html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(odd) td{ background:rgba(124,58,237,0.05); color:var(--text); }
 html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(even) td{ background:var(--card); color:var(--text); }
 
+/* Toggle Sim/Não (mesmo padrão do cadastro de aluno) */
+.simnao-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.simnao-label{ font-weight:700; }
+.simnao-toggle{ display:flex; gap:6px; }
+.simnao-btn{ padding:5px 16px; border-radius:999px; font-size:12px; font-weight:800; border:1.5px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; transition:background .15s,border-color .15s,color .15s; }
+.simnao-btn:hover{ border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
+.simnao-btn.sim{ background:var(--brand,#7c3aed); border-color:var(--brand,#7c3aed); color:#fff; }
+.simnao-btn.nao{ background:transparent; border-color:var(--border); color:var(--muted); }
+.simnao-panel{ display:none; margin-top:10px; }
+.simnao-panel.open{ display:block; }
 </style>
 </head>
 <body class="ch-only">
@@ -417,8 +427,15 @@ html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(even) td{ bac
     </div>
 
     <div class="card" style="margin:10px 0 0 0">
-      <label class="inline-check"><input type="checkbox" id="chTemTurno2" onchange="chToggleTurno2Grid()"> <span>Este schema tem Turno 2 (Complementação Escolar / modelo integral)?</span></label>
-      <div id="chCargasGridT2Wrap" style="display:none;margin-top:10px">
+      <div class="simnao-header">
+        <div class="simnao-label">Este schema tem Turno 2 (Complementação Escolar / modelo integral)?</div>
+        <div class="simnao-toggle">
+          <button type="button" class="simnao-btn nao" id="btnTurno2Sim" onclick="chSetTurno2(true)">Sim</button>
+          <button type="button" class="simnao-btn nao" id="btnTurno2Nao" onclick="chSetTurno2(false)">Não</button>
+        </div>
+      </div>
+      <input type="hidden" id="chTemTurno2" value="0">
+      <div id="chCargasGridT2Wrap" class="simnao-panel">
         <div style="font-weight:700;margin-bottom:8px">Carga horária das atividades complementares (Turno 2)</div>
         <div id="chCargasGridT2" class="grid2"></div>
         <div class="small muted" style="margin-top:6px">Só é usado nos anos letivos em que o histórico exige a seção "TURNO 02". Campos em branco ficam sem CH nesta regra.</div>
@@ -451,44 +468,44 @@ html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(even) td{ bac
     <div class="card" style="margin:10px 0 0 0">
       <div class="row">
         <div style="min-width:230px;flex:1">
-          <label>Formato da etapa/série (presets)</label>
-          <select id="chFormatoEtapa">
-            <option value="X_ANO">Xº ano</option>
-            <option value="X_SERIE">Xº série</option>
-            <option value="X_E_X_ANO">Xº e Xº ano</option>
-            <option value="X_E_X_SERIE">Xº e Xº série</option>
-            <option value="X_ANO_E_X_SERIE">Xº ano e Xº série</option>
-            <option value="ALFABETIZACAO">ALFABETIZAÇÃO</option>
-            <option value="EIXO">EIXO</option>
-            <option value="MULTISERIADA">MULTISERIADA X e X</option>
-            <option value="LIVRE">Livre/manual</option>
+          <label>Série(s)</label>
+          <select id="chSerieSelect">
+            <option value="">Selecione...</option>
+            <option value="ALFABETIZAÇÃO">Alfabetização</option>
+            <option value="EIXO 1">Eixo 1</option>
+            <option value="EIXO 2">Eixo 2</option>
+            <option value="EIXO 3">Eixo 3</option>
+            <option value="1ª SÉRIE">1ª série</option>
+            <option value="2ª SÉRIE">2ª série</option>
+            <option value="3ª SÉRIE">3ª série</option>
+            <option value="4ª SÉRIE">4ª série</option>
+            <option value="5ª SÉRIE">5ª série</option>
+            <option value="6ª SÉRIE">6ª série</option>
+            <option value="7ª SÉRIE">7ª série</option>
+            <option value="8ª SÉRIE">8ª série</option>
+            <option value="1º ANO">1º ano</option>
+            <option value="2º ANO">2º ano</option>
+            <option value="3º ANO">3º ano</option>
+            <option value="4º ANO">4º ano</option>
+            <option value="5º ANO">5º ano</option>
+            <option value="6º ANO">6º ano</option>
+            <option value="7º ANO">7º ano</option>
+            <option value="8º ANO">8º ano</option>
+            <option value="9º ANO">9º ano</option>
+            <option value="1º EM">1º EM</option>
+            <option value="2º EM">2º EM</option>
+            <option value="3º EM">3º EM</option>
+            <option value="4º EM">4º EM</option>
           </select>
         </div>
-        <div style="min-width:260px;flex:1.2">
-          <label>Números envolvidos (para X...) — separados por vírgula</label>
-          <input id="chNumeros" placeholder="Ex.: 1,2,3 ou 4,5">
-        </div>
-      </div>
-      <div class="row">
-        <div style="min-width:260px;flex:1.4">
-          <label>Texto final da etapa/série (gerado/editável)</label>
-          <input id="chEtapaTexto" placeholder="Ex.: 1º ao 3º ano">
-        </div>
-        <div style="min-width:260px;flex:1.2">
-          <label>Regex de compatibilidade (opcional, avançado)</label>
-          <input id="chRegex" placeholder="Ex.: (1º\s*ano|1ª\s*série)">
-        </div>
-      </div>
-      <div class="small muted">Dica: você pode gerar pelo preset e depois ajustar manualmente o texto.</div>
-      <div class="row" style="margin-top:8px">
-        <div style="min-width:320px;flex:1.5">
-          <label>Adicionar etapa de turma já cadastrada (helper, opcional)</label>
-          <select id="chTurmaHelper"></select>
+        <div style="flex:0 0 auto;min-width:auto">
+          <button type="button" class="out" onclick="chAddSerieSelecionada()">Adicionar</button>
         </div>
         <div style="flex:0 0 auto;min-width:auto">
-          <button type="button" class="out" onclick="chUsarTurmaHelper()">Usar etapa da turma</button>
+          <button type="button" class="gray" onclick="chLimparSeries()">Limpar séries</button>
         </div>
       </div>
+      <div id="chSeriesSelecionadas" class="small muted" style="margin-top:8px">Nenhuma série adicionada (regra vale pra todas as séries do ano letivo).</div>
     </div>
 
     <div class="toolbar" style="margin-top:10px">
@@ -507,17 +524,6 @@ html[data-theme="dark"] #notasPreviewDocx table tbody tr:nth-child(even) td{ bac
         <div class="small" id="chResumoRegras">0 regra(s)</div>
       </div>
       <div id="chRegrasTabela" style="margin-top:8px" class="small muted">Nenhuma regra cadastrada.</div>
-    </div>
-
-    <div class="card" style="margin:10px 0 0 0">
-      <div style="font-weight:700;margin-bottom:8px">Diagnóstico rápido (resolver CH)</div>
-      <div class="row">
-        <div style="min-width:120px;flex:0 0 140px"><label>Ano letivo</label><input id="chDiagAno" inputmode="numeric" maxlength="4" placeholder="2021"></div>
-        <div style="min-width:220px;flex:1"><label>Etapa/Série</label><input id="chDiagEtapa" placeholder="Ex.: 1º ano"></div>
-        <div style="min-width:180px;flex:0 0 220px"><label>Disciplina</label><select id="chDiagDisc"></select></div>
-        <div style="flex:0 0 auto;min-width:auto"><button type="button" class="gray" onclick="chRodarDiagnostico()">Testar</button></div>
-      </div>
-      <div id="chDiagOut" class="small muted" style="margin-top:8px">Preencha e clique em Testar.</div>
     </div>
   </div>
 
@@ -885,10 +891,12 @@ const ATIVIDADES_T2 = [
   ['DH','Direitos Humanos'], ['PS','Promoção de Saúde'], ['IC','Iniciação Científica'],
   ['EA','Educação Ambiental'], ['CD','Comunicação e Cultura digital'], ['MH','Matrizes Históricas e Culturais']
 ];
-function chToggleTurno2Grid(){
-  const chk=document.getElementById('chTemTurno2');
+function chSetTurno2(sim){
+  const hid=document.getElementById('chTemTurno2'); if(hid) hid.value = sim?'1':'0';
+  const bSim=document.getElementById('btnTurno2Sim'), bNao=document.getElementById('btnTurno2Nao');
   const wrap=document.getElementById('chCargasGridT2Wrap');
-  if(wrap) wrap.style.display = chk?.checked ? 'block' : 'none';
+  if(sim){ bSim?.classList.add('sim'); bNao?.classList.remove('sim'); wrap?.classList.add('open'); }
+  else { bNao?.classList.add('sim'); bSim?.classList.remove('sim'); wrap?.classList.remove('open'); }
 }
 function chGetEditorCargasT2(){
   const out={};
@@ -932,6 +940,12 @@ function chNormalizeRuleShape(rule){
   }
   r.cargasT2 = cargasT2;
   r.temTurno2 = !!r.temTurno2;
+  // Séries: novo modelo é uma lista (series[]); migra regra antiga de campo único (etapaTexto)
+  let series = Array.isArray(r.series) ? r.series.map(v=>String(v||'').trim().toUpperCase()).filter(Boolean) : [];
+  if(!series.length && r.etapaTexto && String(r.etapaTexto).trim()){
+    series = [String(r.etapaTexto).trim().toUpperCase()];
+  }
+  r.series = [...new Set(series)];
   if(!r.nome || !String(r.nome).trim()){
     const anos=(r.anos||[]).filter(v=>/^\d{4}$/.test(String(v)));
     r.nome = `Regra ${anos.length?anos.join('+'):'sem anos'}`;
@@ -956,7 +970,7 @@ function chSetEditorCargas(cargas){
     inp.value = (val==null || val==='') ? '' : String(val);
   });
 }
-const chState = { rules:(getLS(CH_LS_KEY, [])||[]).map(chNormalizeRuleShape), editor:{anos:[]}, editingId:null };
+const chState = { rules:(getLS(CH_LS_KEY, [])||[]).map(chNormalizeRuleShape), editor:{anos:[], series:[]}, editingId:null };
 // Carrega regras frescas do Firestore ao iniciar
 (async function initCHRules(){
   try{
@@ -999,39 +1013,22 @@ function chColetaAnosDetectados(){
   for(let y=current+1;y>=1990;y--) s.add(String(y)); // fallback amplo
   return [...s].filter(v=>/^\d{4}$/.test(v)).sort(chAnoSort);
 }
-function chNormalizeEtapaTexto(s){
-  return String(s||'').replace(/\s+/g,' ').trim();
+function chRenderSeriesSelecionadas(){
+  const box=document.getElementById('chSeriesSelecionadas'); if(!box) return;
+  const series=chState.editor.series||[];
+  if(!series.length){ box.innerHTML='<span class="muted">Nenhuma série adicionada (regra vale pra todas as séries do ano letivo).</span>'; return; }
+  box.innerHTML = series.map(s=>`<span class="pill" style="margin:2px 4px 2px 0;display:inline-block">${esc(s)} <button type="button" class="mini-btn" data-del-serie="${esc(s)}" style="margin-left:6px;border:none;background:transparent;color:#1e3a8a;cursor:pointer;font-weight:700">×</button></span>`).join('');
+  box.querySelectorAll('[data-del-serie]').forEach(b=>b.addEventListener('click',()=>{ chState.editor.series=(chState.editor.series||[]).filter(x=>x!==b.getAttribute('data-del-serie')); chRenderSeriesSelecionadas(); }));
 }
-function chEtapaRegexFromText(s){
-  const t=nrm(s);
-  if(!t) return '';
-  // regex simples; usuário pode editar depois
-  return t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s*');
+function chAddSerieSelecionada(){
+  const sel=document.getElementById('chSerieSelect'); const v=String(sel?.value||'').trim().toUpperCase();
+  if(!v) return;
+  chState.editor.series=[...new Set([...(chState.editor.series||[]), v])];
+  chRenderSeriesSelecionadas();
 }
-function chGerarEtapaPreset(){
-  const fmt=document.getElementById('chFormatoEtapa')?.value||'X_ANO';
-  const nums=(document.getElementById('chNumeros')?.value||'').split(',').map(v=>parseInt(v.trim(),10)).filter(Number.isFinite);
-  const ord=[...new Set(nums)].sort((a,b)=>a-b);
-  const nstr=(n)=>`${n}º`;
-  let txt='';
-  if(fmt==='X_ANO') txt = ord.length? ord.map(n=>`${nstr(n)} ano`).join(', ') : '';
-  else if(fmt==='X_SERIE') txt = ord.length? ord.map(n=>`${nstr(n)} série`).join(', ') : '';
-  else if(fmt==='X_E_X_ANO') txt = ord.length? ord.map(n=>nstr(n)).join(' e ') + ' ano' : '';
-  else if(fmt==='X_E_X_SERIE') txt = ord.length? ord.map(n=>nstr(n)).join(' e ') + ' série' : '';
-  else if(fmt==='X_ANO_E_X_SERIE'){
-    if(ord.length>=2) txt=`${nstr(ord[0])} ano e ${nstr(ord[1])} série`;
-    else if(ord.length===1) txt=`${nstr(ord[0])} ano e ${nstr(ord[0])} série`;
-  } else if(fmt==='ALFABETIZACAO') txt='ALFABETIZAÇÃO';
-  else if(fmt==='EIXO') txt='EIXO';
-  else if(fmt==='MULTISERIADA'){
-    txt = ord.length ? `MULTISERIADA ${ord.map(n=>nstr(n)).join(' e ')}` : 'MULTISERIADA';
-  } else if(fmt==='LIVRE'){
-    return;
-  }
-  const etapa=document.getElementById('chEtapaTexto');
-  if(etapa && txt) etapa.value = txt;
-  const rx=document.getElementById('chRegex');
-  if(rx && !rx.value.trim() && txt) rx.value = chEtapaRegexFromText(txt);
+function chLimparSeries(){
+  chState.editor.series=[];
+  chRenderSeriesSelecionadas();
 }
 function chRenderAnosSelecionados(){
   const box=document.getElementById('chAnosSelecionados'); if(!box) return;
@@ -1059,31 +1056,13 @@ function chAddAnoManual(){
   if(inp) inp.value='';
   chRenderAnosSelecionados(); chRenderAnoSelect();
 }
-function chPopulateTurmaHelper(){
-  const sel=document.getElementById('chTurmaHelper'); if(!sel) return;
-  const opts=['<option value="">(selecionar turma/etapa detectada)</option>'];
-  const seen=new Set();
-  (Array.isArray(state.db.turmasDB)?state.db.turmasDB:[]).forEach(t=>{
-    const txt=String(t?.serieTexto||t?.serie||'').trim(); if(!txt) return;
-    const ano=String(t?.anoLetivo||'').trim();
-    const key=`${txt}|${ano}`;
-    if(seen.has(key)) return; seen.add(key);
-    opts.push(`<option value="${esc(txt)}">${esc(txt)}${ano?` • ano letivo ${esc(ano)}`:''}</option>`);
-  });
-  sel.innerHTML=opts.join('');
-}
-function chUsarTurmaHelper(){
-  const sel=document.getElementById('chTurmaHelper'); const txt=String(sel?.value||'').trim();
-  if(!txt) return;
-  const etapa=document.getElementById('chEtapaTexto'); if(etapa) etapa.value=txt;
-  const rx=document.getElementById('chRegex'); if(rx && !rx.value.trim()) rx.value = chEtapaRegexFromText(txt);
-}
 function chRuleResumo(r){
   const anos=(r.anos||[]).slice().sort(chAnoSort);
   const anosTxt = anos.length===1 ? anos[0] : (anos.length?`${anos[0]}..${anos[anos.length-1]} (${anos.length})`:'—');
   const cargas = r?.cargas||{};
   const resumoCargas = chDisciplinas().map(d=>`${d.code}:${cargas[d.code]??''}`).filter(s=>!s.endsWith(':')).join(' • ');
-  return `${r.nome||'Regra'} • ${anosTxt} • ${r.etapaTexto||'—'}${resumoCargas?(' • '+resumoCargas):''}`;
+  const seriesTxt = (r.series||[]).length ? r.series.join(', ') : '(todas as séries)';
+  return `${r.nome||'Regra'} • ${anosTxt} • ${seriesTxt}${resumoCargas?(' • '+resumoCargas):''}`;
 }
 function chRenderTabela(){
   const wrap=document.getElementById('chRegrasTabela'); const info=document.getElementById('chResumoRegras');
@@ -1138,27 +1117,24 @@ function chCarregarRegraNoEditor(r){
   r = chNormalizeRuleShape(r);
   chState.editingId = r.id;
   chState.editor.anos = [...new Set((r.anos||[]).map(String).filter(v=>/^\d{4}$/.test(v)))];
+  chState.editor.series = [...(r.series||[])];
   const setv=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v??''; };
   setv('chNomeRegra', r.nome||'');
-  setv('chEtapaTexto', r.etapaTexto||'');
-  setv('chRegex', r.etapaRegex||'');
-  setv('chFormatoEtapa', r.formato||'LIVRE');
-  setv('chNumeros', (r.numeros||[]).join(','));
   chSetEditorCargas(r.cargas||{});
-  const chkT2=document.getElementById('chTemTurno2'); if(chkT2) chkT2.checked=!!r.temTurno2;
+  chSetTurno2(!!r.temTurno2);
   chSetEditorCargasT2(r.cargasT2||{});
-  chToggleTurno2Grid();
   chRenderAnosSelecionados(); chRenderAnoSelect();
+  chRenderSeriesSelecionadas();
 }
 function chLimparEditor(){
-  chState.editingId=null; chState.editor.anos=[];
-  ['chNomeRegra','chNumeros','chEtapaTexto','chRegex','chAnoManual'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  chState.editingId=null; chState.editor.anos=[]; chState.editor.series=[];
+  ['chNomeRegra','chAnoManual'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   chSetEditorCargas({});
-  const chkT2=document.getElementById('chTemTurno2'); if(chkT2) chkT2.checked=false;
+  chSetTurno2(false);
   chSetEditorCargasT2({});
-  chToggleTurno2Grid();
-  const f=document.getElementById('chFormatoEtapa'); if(f) f.value='X_ANO';
+  const sel=document.getElementById('chSerieSelect'); if(sel) sel.value='';
   chRenderAnosSelecionados(); chRenderAnoSelect();
+  chRenderSeriesSelecionadas();
 }
 // Toast provisório (placeholder simples até o usuário mandar o guia oficial de toasts do sistema)
 function chToastErro(msg){
@@ -1177,33 +1153,29 @@ function chToastErro(msg){
 function chSalvarRegra(){
   const nome=String(document.getElementById('chNomeRegra')?.value||'').trim();
   const cargas=chGetEditorCargas();
-  const formato=String(document.getElementById('chFormatoEtapa')?.value||'LIVRE');
-  const numeros=(document.getElementById('chNumeros')?.value||'').split(',').map(v=>parseInt(v.trim(),10)).filter(Number.isFinite);
-  let etapaTexto=chNormalizeEtapaTexto(document.getElementById('chEtapaTexto')?.value||'');
-  const etapaRegex=String(document.getElementById('chRegex')?.value||'').trim();
+  const series=[...new Set((chState.editor.series||[]).map(String))];
   const anos=[...new Set((chState.editor.anos||[]).map(String).filter(v=>/^\d{4}$/.test(v)))].sort(chAnoSort);
   if(!nome) return alert('Informe o nome da regra.');
   if(!anos.length) return alert('Adicione pelo menos 1 ano letivo à regra.');
   if(!Object.keys(cargas).length) return alert('Preencha pelo menos uma carga horária de disciplina.');
-  if(!etapaTexto){ etapaTexto=''; }
-  // Não permite 2 regras para a mesma série/etapa no mesmo ano letivo
-  const etapaNorm = nrm(etapaTexto);
+  // Não permite 2 regras para a mesma série no mesmo ano letivo
   const conflito = (chState.rules||[]).find(r => {
     if(chState.editingId && r.id === chState.editingId) return false;
-    if(nrm(r.etapaTexto||'') !== etapaNorm) return false;
+    const rSeries = (r.series||[]).length ? r.series : [''];
+    const mySeries = series.length ? series : [''];
+    const mesmaSerie = rSeries.some(rs => mySeries.some(ms => nrm(rs)===nrm(ms)));
+    if(!mesmaSerie) return false;
     return (r.anos||[]).some(a => anos.includes(String(a)));
   });
   if(conflito){
     const anosConflitantes = (conflito.anos||[]).filter(a=>anos.includes(String(a)));
-    chToastErro(`Já existe a regra "${conflito.nome}" para a série "${etapaTexto||'(sem série definida)'}" no(s) ano(s) ${anosConflitantes.join(', ')}. Edite ou exclua a regra existente antes de salvar.`);
+    chToastErro(`Já existe a regra "${conflito.nome}" para a série "${series.join(', ')||'(sem série definida)'}" no(s) ano(s) ${anosConflitantes.join(', ')}. Edite ou exclua a regra existente antes de salvar.`);
     return;
   }
   const rule=chNormalizeRuleShape({
     id: chState.editingId || `ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
-    nome, cargas, anos, etapaTexto,
-    etapaRegex: etapaRegex || chEtapaRegexFromText(etapaTexto),
-    formato, numeros:[...new Set(numeros)].sort((a,b)=>a-b),
-    temTurno2: !!document.getElementById('chTemTurno2')?.checked,
+    nome, cargas, anos, series,
+    temTurno2: document.getElementById('chTemTurno2')?.value==='1',
     cargasT2: chGetEditorCargasT2(),
     updatedAt:new Date().toISOString()
   });
@@ -1213,21 +1185,11 @@ function chSalvarRegra(){
   alert('Regra de CH salva.');
 }
 function chMatchEtapa(rule, etapa){
+  const series = Array.isArray(rule?.series) ? rule.series : [];
+  if(!series.length) return true; // regra por ano letivo (sem depender da série)
   const alvo = nrm(etapa);
-  const temFiltroEtapa = !!(String(rule?.etapaTexto||'').trim() || String(rule?.etapaRegex||'').trim());
-  if(!temFiltroEtapa) return true; // regra por ano letivo (sem depender da série/etapa)
   if(!alvo) return false;
-  if(rule.etapaRegex){
-    try{ if(new RegExp(rule.etapaRegex,'i').test(String(etapa||''))) return true; }catch(e){}
-    try{ if(new RegExp(rule.etapaRegex,'i').test(alvo)) return true; }catch(e){}
-  }
-  const rtxt=nrm(rule.etapaTexto||'');
-  if(rtxt && (alvo.includes(rtxt) || rtxt.includes(alvo))) return true;
-  // fallback por números compartilhados
-  const numsRule=[...(String(rule.etapaTexto||'').matchAll(/(\d+)/g))].map(m=>+m[1]);
-  const numsEt=[...(String(etapa||'').matchAll(/(\d+)/g))].map(m=>+m[1]);
-  if(numsRule.length && numsEt.length && numsRule.some(n=>numsEt.includes(n))) return true;
-  return false;
+  return series.some(s => nrm(s) === alvo);
 }
 function resolverCargaHorariaCH({anoLetivo, etapa, disciplina}){
   const ano=String(anoLetivo||'').match(/\d{4}/)?.[0]||'';
@@ -1240,16 +1202,6 @@ function resolverCargaHorariaCH({anoLetivo, etapa, disciplina}){
   });
   if(!compat[0]) return null;
   return Object.assign({}, compat[0], { disciplina:disc, ch:(compat[0].cargas||{})[disc] });
-}
-function chRodarDiagnostico(){
-  const ano=document.getElementById('chDiagAno')?.value||'';
-  const etapa=document.getElementById('chDiagEtapa')?.value||'';
-  const disciplina=document.getElementById('chDiagDisc')?.value||'';
-  const out=document.getElementById('chDiagOut');
-  const r=resolverCargaHorariaCH({anoLetivo:ano, etapa, disciplina});
-  if(!out) return;
-  if(!r){ out.innerHTML=`<span class="warn">Nenhuma regra encontrada</span> para <b>${esc(String(ano))}</b> • <b>${esc(String(etapa))}</b> • <b>${esc(String(disciplina))}</b>.`; return; }
-  out.innerHTML=`Regra aplicada: <b>${esc(chRuleResumo(r))}</b>${r.nome?` <span class="small">( ${esc(r.nome)} )</span>`:''}`;
 }
 function chExportarJSON(){
   const blob=new Blob([JSON.stringify({historicoCHSchemas_v1: chState.rules||[]}, null, 2)],{type:'application/json'});
@@ -1277,25 +1229,6 @@ async function chImportarJSON(ev){
   } catch(err){ alert('Erro ao importar JSON de CH: '+(err?.message||err)); }
   finally { if(ev?.target) ev.target.value=''; }
 }
-function chEsconderCamposEtapaOpcionais(){
-  try{
-    ['chFormatoEtapa','chNumeros','chTurmaHelper','chEtapaTexto','chRegex'].forEach(id=>{
-      const el=document.getElementById(id); if(!el) return;
-      const box = el.closest('div'); if(box) box.style.display='none';
-    });
-    // esconder dicas e botões helper/preset relacionados, mantendo a página limpa
-    document.querySelectorAll('button').forEach(btn=>{
-      const txt=(btn.textContent||'').trim().toLowerCase();
-      if(txt.includes('usar etapa da turma') || txt.includes('gerar')) btn.style.display='none';
-    });
-    document.querySelectorAll('.small,.muted').forEach(el=>{
-      const txt=(el.textContent||'').toLowerCase();
-      if(txt.includes('etapa') || txt.includes('turma')) {
-        if(el.closest('#chSchemaCard') || true){}
-      }
-    });
-  }catch(e){ console.warn(e); }
-}
 function chInitUI(){
   const discs=chDisciplinas();
   const grid=document.getElementById('chCargasGrid');
@@ -1306,10 +1239,7 @@ function chInitUI(){
   if(gridT2){
     gridT2.innerHTML = ATIVIDADES_T2.map(([code,label])=>`<div><label>${esc(label)}</label><input class="mini-input" data-ch-carga-t2="${esc(code)}" inputmode="numeric" placeholder="Ex.: 40"></div>`).join('');
   }
-  const mkOpts=(arr)=>arr.map(d=>`<option value="${esc(d.code)}">${esc(d.code)} — ${esc(d.label)}</option>`).join('');
-  const s2=document.getElementById('chDiagDisc'); if(s2) s2.innerHTML=mkOpts(discs);
-  ['chFormatoEtapa','chNumeros'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('change', chGerarEtapaPreset); if(el) el.addEventListener('input', chGerarEtapaPreset); });
-  chRenderAnoSelect(); chRenderAnosSelecionados(); chPopulateTurmaHelper(); chRenderTabela();
+  chRenderAnoSelect(); chRenderAnosSelecionados(); chRenderSeriesSelecionadas(); chRenderTabela();
 }
 
 
@@ -1368,7 +1298,6 @@ async function exportarDOCX(){
 function limpar(){ document.getElementById('qAluno').value=''; document.getElementById('resultados').innerHTML='<div class="item muted">Digite parte do nome ou ID e clique em pesquisar.</div>'; }
 async function recarregarDB(){
   await carregarDB();
-  chPopulateTurmaHelper();
   chRenderAnoSelect();
   chRenderTabela();
   if(state.selected){
