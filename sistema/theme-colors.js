@@ -159,42 +159,20 @@
       '--brand-border-d': '#6b7280',
       '--brand-text-d':   '#d1d5db',
     },
-    contrast: {
-      label: 'Alto Contraste',
-      '--brand':        '#ffd60a',
-      '--brand-hover':  '#ffc300',
-      '--brand-faded':  '#000000',
-      '--brand-border': '#ffd60a',
-      '--brand-text':   '#ffd60a',
-      '--brand-d':        '#ffd60a',
-      '--brand-hover-d':  '#ffc300',
-      '--brand-faded-d':  '#000000',
-      '--brand-border-d': '#ffd60a',
-      '--brand-text-d':   '#ffd60a',
-      // Alto contraste também precisa trocar fundo/texto — as outras
-      // paletas não mexem nisso (só acento), por isso ficam num bloco à parte.
-      extra: {
-        '--bg':            '#000000',
-        '--ink':           '#ffffff',
-        '--muted':         '#e5e5e5',
-        '--line':          '#ffd60a',
-        '--card':          '#000000',
-        '--header-bg':     '#000000',
-        '--header-border': '#ffd60a',
-        '--field-bg':      '#000000',
-        '--field-border':  '#ffd60a',
-        '--danger':        '#ff453a',
-        '--glow':          'none',
-      },
+    white: {
+      label: 'Branco',
+      '--brand':        '#ffffff',
+      '--brand-hover':  '#f0f0f0',
+      '--brand-faded':  '#fafafa',
+      '--brand-border': '#d4d4d4',
+      '--brand-text':   '#525252',
+      '--brand-d':        '#ffffff',
+      '--brand-hover-d':  '#e5e5e5',
+      '--brand-faded-d':  'rgba(255,255,255,0.12)',
+      '--brand-border-d': '#a3a3a3',
+      '--brand-text-d':   '#ffffff',
     },
   };
-
-  // Variáveis que só o modo alto contraste (ou uma paleta futura assim) usa.
-  // Precisam ser limpas a cada troca de paleta, senão "vazam" pras cores normais.
-  const EXTRA_KEYS = [
-    '--bg', '--ink', '--muted', '--line', '--card',
-    '--header-bg', '--header-border', '--field-bg', '--field-border', '--danger', '--glow',
-  ];
 
   function apply(key) {
     const palette = palettes[key] || palettes['violet'];
@@ -210,15 +188,6 @@
     root.style.setProperty('--brand-faded-d',  palette['--brand-faded-d']);
     root.style.setProperty('--brand-border-d', palette['--brand-border-d']);
     root.style.setProperty('--brand-text-d',   palette['--brand-text-d']);
-
-    // Limpa sempre primeiro — se a paleta anterior era alto contraste e a
-    // nova não usa 'extra', as páginas voltam a herdar bg/ink normais.
-    EXTRA_KEYS.forEach(function (k) { root.style.removeProperty(k); });
-    if (palette.extra) {
-      Object.keys(palette.extra).forEach(function (k) {
-        root.style.setProperty(k, palette.extra[k]);
-      });
-    }
 
     try { localStorage.setItem(STORAGE_KEY, key); } catch {}
     document.dispatchEvent(new CustomEvent('colorchange', { detail: { key, palette } }));
