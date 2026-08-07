@@ -566,6 +566,21 @@ const state = { db:{turmasDB:[],atasDB:[],alunosDB:[],matriculasDB:[],dadosEscol
 const DISC = [['LP','LP'],['MAT','MAT'],['CIE','CIE'],['HIS','HIS'],['GEO','GEO'],['ART','ART'],['EDF','EDF'],['ER','ER'],['ING','ING']];
 
 function nrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+// Reduz um texto de série livre (ex: "1º Ano", "1ºano", "1o ano do EF") a uma forma
+// canônica (número+categoria, ex: "ANO1") pra tolerar variação de digitação real
+// contra o catálogo fixo do select. Cai pro texto normalizado se não reconhecer categoria.
+function chCanonSerie(txt){
+  const t = nrm(txt);
+  if(!t) return '';
+  const numMatch = t.match(/(\d+)/);
+  const num = numMatch ? String(parseInt(numMatch[1],10)) : '';
+  if(/alfabetiz/.test(t)) return 'ALFAB';
+  if(/eixo/.test(t)) return 'EIXO'+num;
+  if(/\bem\b|ensino medio/.test(t)) return 'EM'+num;
+  if(/serie/.test(t)) return 'SERIE'+num;
+  if(/\bano\b/.test(t)) return 'ANO'+num;
+  return t;
+}
 function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function getLS(k,fb){ try{ const r=localStorage.getItem(k); return r==null?fb:JSON.parse(r);}catch{return fb;} }
 function fmtBRDate(v){ const s=String(v||''); if(/^\d{4}-\d{2}-\d{2}$/.test(s)){ const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`;} return s; }
@@ -1163,7 +1178,7 @@ function chSalvarRegra(){
     if(chState.editingId && r.id === chState.editingId) return false;
     const rSeries = (r.series||[]).length ? r.series : [''];
     const mySeries = series.length ? series : [''];
-    const mesmaSerie = rSeries.some(rs => mySeries.some(ms => nrm(rs)===nrm(ms)));
+    const mesmaSerie = rSeries.some(rs => mySeries.some(ms => chCanonSerie(rs)===chCanonSerie(ms)));
     if(!mesmaSerie) return false;
     return (r.anos||[]).some(a => anos.includes(String(a)));
   });
@@ -1187,9 +1202,9 @@ function chSalvarRegra(){
 function chMatchEtapa(rule, etapa){
   const series = Array.isArray(rule?.series) ? rule.series : [];
   if(!series.length) return true; // regra por ano letivo (sem depender da série)
-  const alvo = nrm(etapa);
+  const alvo = chCanonSerie(etapa);
   if(!alvo) return false;
-  return series.some(s => nrm(s) === alvo);
+  return series.some(s => chCanonSerie(s) === alvo);
 }
 function resolverCargaHorariaCH({anoLetivo, etapa, disciplina}){
   const ano=String(anoLetivo||'').match(/\d{4}/)?.[0]||'';

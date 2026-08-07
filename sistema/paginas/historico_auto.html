@@ -491,6 +491,18 @@ const DISC = [['LP','LP'],['MAT','MAT'],['CIE','CIE'],['HIS','HIS'],['GEO','GEO'
 const ATIVIDADES_T2 = ['AP','CA','EL','DH','PS','IC','EA','CD','MH'];
 
 function nrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
+function chCanonSerie(txt){
+  const t = nrm(txt);
+  if(!t) return '';
+  const numMatch = t.match(/(\d+)/);
+  const num = numMatch ? String(parseInt(numMatch[1],10)) : '';
+  if(/alfabetiz/.test(t)) return 'ALFAB';
+  if(/eixo/.test(t)) return 'EIXO'+num;
+  if(/\bem\b|ensino medio/.test(t)) return 'EM'+num;
+  if(/serie/.test(t)) return 'SERIE'+num;
+  if(/\bano\b/.test(t)) return 'ANO'+num;
+  return t;
+}
 function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function getLS(k,fb){ try{ const r=localStorage.getItem(k); return r==null?fb:JSON.parse(r);}catch{return fb;} }
 function fmtBRDate(v){ const s=String(v||''); if(/^\d{4}-\d{2}-\d{2}$/.test(s)){ const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`;} return s; }
@@ -1998,9 +2010,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   function chMatchEtapaOptional(rule, etapa){
     const series = Array.isArray(rule?.series) ? rule.series : [];
     if(!series.length) return true; // regra vale pra todas as séries do(s) ano(s) letivo(s)
-    const alvo = nrm(String(etapa||'').trim());
+    const alvo = chCanonSerie(etapa);
     if(!alvo) return false;
-    return series.some(s => nrm(s) === alvo);
+    return series.some(s => chCanonSerie(s) === alvo);
   }
   function resolveCHForSelected({anoLetivo, etapa, disciplina}){
     const ano = String(anoLetivo||'').match(/\d{4}/)?.[0] || '';
