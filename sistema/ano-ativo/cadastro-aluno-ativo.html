@@ -2476,11 +2476,11 @@ function normSerie(s){
         });
         if(aluno.defVisual){
           window._neeToggleCat('visual', true);
-          if(aluno.defVisualTipo) window._neeSelectSub('visual', aluno.defVisualTipo, aluno.defVisualTipo);
+          if(aluno.defVisualTipo) window._neeSelectSub('visual', aluno.defVisualTipo, window._neeSubLabel('visual', aluno.defVisualTipo));
         }
         if(aluno.defAuditiva){
           window._neeToggleCat('auditiva', true);
-          if(aluno.defAuditivaTipo) window._neeSelectSub('auditiva', aluno.defAuditivaTipo, aluno.defAuditivaTipo);
+          if(aluno.defAuditivaTipo) window._neeSelectSub('auditiva', aluno.defAuditivaTipo, window._neeSubLabel('auditiva', aluno.defAuditivaTipo));
         }
       }
       if(aluno.transtorno === true && window._neeSet){
@@ -2657,6 +2657,15 @@ function normSerie(s){
       dislexia:false, tdah:false, tpac:false,
     };
 
+    // Acha o texto legível (ex.: "Baixa visão") do radio cujo value bate com
+    // o que foi salvo (ex.: "BAIXA_VISAO") — evita duplicar essa lista aqui.
+    // Exposta em window: usada no pré-preenchimento de edição, que roda em
+    // outro escopo (fora deste IIFE).
+    window._neeSubLabel = function(cat, value){
+      const r = document.querySelector('input[name="neeR'+_cap(cat)+'"][value="'+value+'"]');
+      return r ? r.closest('.nee-radio-item')?.textContent.trim() : value;
+    };
+
     function _cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
     // Mostra/oculta o campo de profissional de apoio E o bloco de AEE: só
@@ -2780,7 +2789,9 @@ function normSerie(s){
       _neeE[cat+'Sub'] = value;
       document.querySelectorAll('[id^="neeR'+_cap(cat)+'"]').forEach(el=>el.classList.remove('selected'));
       document.querySelectorAll('input[name="neeR'+_cap(cat)+'"]').forEach(r=>{
-        if(r.value===value) r.closest('.nee-radio-item')?.classList.add('selected');
+        const match = r.value===value;
+        r.checked = match;
+        if(match) r.closest('.nee-radio-item')?.classList.add('selected');
       });
       _neeUpdateBadge(cat,label);
     };
