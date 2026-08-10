@@ -2460,11 +2460,16 @@ function normSerie(s){
       // NEE
       if(aluno.deficiencia === true && window._neeSet){
         window._neeSet('def', true);
+        // Chave interna (usada por _neeSyncSimple/neeChk*) -> nome do campo
+        // salvo em _neeGetDados (nem sempre é o mesmo nome, ver ali).
         const neeSimples = [
-          ['tea','Tea'],['altas','Altas'],['fisica','Fisica'],['intelectual','Intelectual']
+          ['tea','Tea','tea'],
+          ['altas','Altas','altasHabilidades'],
+          ['fisica','Fisica','defFisica'],
+          ['intelectual','Intelectual','defIntelectual'],
         ];
-        neeSimples.forEach(([key, cap]) => {
-          if(aluno[key === 'altas' ? 'altasHabilidades' : key]){
+        neeSimples.forEach(([key, cap, campoSalvo]) => {
+          if(aluno[campoSalvo]){
             const c = document.getElementById('neeChk'+cap);
             if(c){ c.checked=true; window._neeSyncSimple(key,'neeItem'+cap); }
           }
@@ -3003,7 +3008,7 @@ function normSerie(s){
   })();
 
   // ── Fábrica de autocomplete de cidade (reutilizada em endereço + naturalidade) ──
-  function criarAutocompleteCidade({ inputId, selUFId, dropdownId, ghostId, incluirCidadeEndereco }){
+  function criarAutocompleteCidade({ inputId, selUFId, dropdownId, ghostId, incluirCidadeEndereco, uppercase }){
     const inpCidade = document.getElementById(inputId);
     const selUF     = document.getElementById(selUFId);
     const dropdown  = document.getElementById(dropdownId);
@@ -3037,11 +3042,12 @@ function normSerie(s){
     function updateGhost(val){
       const match = bestMatch(val);
       if(!match || !val){ ghost.innerHTML = ''; return; }
-      const tail = match.cidade.slice(val.length);
+      let tail = match.cidade.slice(val.length);
+      if(uppercase) tail = tail.toUpperCase();
       ghost.innerHTML = `<span class="ghost-match">${escHtml(val)}</span><span class="ghost-tail">${escHtml(tail)}</span>`;
     }
 
-    function applyCity(cidade, uf){ inpCidade.value = cidade; if(uf) selUF.value = uf; ghost.innerHTML = ''; closeDropdown(); }
+    function applyCity(cidade, uf){ inpCidade.value = uppercase ? (cidade||'').toUpperCase() : cidade; if(uf) selUF.value = uf; ghost.innerHTML = ''; closeDropdown(); }
 
     function openDropdown(val){
       const opts = filtrarSugestoes(val);
@@ -3059,6 +3065,11 @@ function normSerie(s){
     function highlightItem(idx){ dropdown.querySelectorAll('.nat-opt').forEach((el,i) => el.classList.toggle('active', i === idx)); }
 
     inpCidade.addEventListener('input', () => {
+      if(uppercase){
+        const pos = inpCidade.selectionStart;
+        inpCidade.value = inpCidade.value.toUpperCase();
+        if(pos !== null) inpCidade.setSelectionRange(pos, pos);
+      }
       buildCidadeDB();
       const val = inpCidade.value;
       updateGhost(val);
@@ -3488,7 +3499,8 @@ function normSerie(s){
   window._natRebuild = criarAutocompleteCidade({
     inputId: 'naturalidadeCidade', selUFId: 'naturalidadeUF',
     dropdownId: 'natDropdown', ghostId: 'natGhost',
-    incluirCidadeEndereco: true
+    incluirCidadeEndereco: true,
+    uppercase: true
   })?.rebuild;
 
   // Recarrega turmas ao mudar o ano letivo
