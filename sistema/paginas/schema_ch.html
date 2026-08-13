@@ -1009,13 +1009,22 @@ function chDisciplinas(){
   base.forEach(x=>map.set(x.code,x));
   return [...map.values()];
 }
-function chSaveLS(){
+async function chSaveLS(){
   chState.rules=(Array.isArray(chState.rules)?chState.rules:[]).map(chNormalizeRuleShape);
   // Cache local imediato
   localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules||[]));
   // Persiste no Firestore (não bloqueia a UI)
   if(window.DB && DB.schemas){
-    DB.schemas.saveAll(chState.rules||[]).catch(e=>console.warn('chSaveLS Firestore:', e));
+    try{
+      const saved = await DB.schemas.saveAll(chState.rules||[]);
+      // saveAll devolve os objetos com o _id real do Firestore preenchido —
+      // sincroniza aqui pra nunca mais precisar de reload pra saber o _id
+      // de uma regra recém-criada (evita doc novo aleatório no próximo save).
+      if(Array.isArray(saved) && saved.length){
+        chState.rules = saved.map(chNormalizeRuleShape);
+        localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules));
+      }
+    }catch(e){ console.warn('chSaveLS Firestore:', e); }
   }
 }
 function chAnoSort(a,b){ return (+a||0)-(+b||0); }
@@ -1125,7 +1134,15 @@ function chAcoesRegra(act,id){
   if(act==='down' && i<chState.rules.length-1){ [chState.rules[i+1], chState.rules[i]]=[chState.rules[i], chState.rules[i+1]]; chSaveLS(); chRenderTabela(); return; }
   if(act==='del'){
     if(!confirm('Excluir esta regra de carga horária?')) return;
-    chState.rules.splice(i,1); chSaveLS(); chRenderTabela(); if(chState.editingId===id) chLimparEditor();
+    chState.rules.splice(i,1);
+    localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules||[]));
+    // Apaga de verdade no Firestore (por chave de negócio `id`, pra pegar
+    // também eventuais cópias duplicadas que ainda restem dessa regra) —
+    // splice()+chSaveLS() sozinho nunca deletava, só deixava de reenviar.
+    if(window.DB && DB.schemas){
+      DB.schemas.removeWhere('id', id).catch(e=>console.warn('chAcoesRegra del Firestore:', e));
+    }
+    chRenderTabela(); if(chState.editingId===id) chLimparEditor();
   }
 }
 function chCarregarRegraNoEditor(r){
