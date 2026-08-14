@@ -1,11 +1,15 @@
-# Checklist de Testes — Sistema Escolar (pré-auditoria) — v5
+# Checklist de Testes — Sistema Escolar (pré-auditoria) — v6
 
 > v1 tinha o levantamento inicial. v2 corrigiu escopo/contagem/RBAC/localStorage.
 > v3 refletia a primeira rodada real de testes. v4 refletia a rodada de fixes
-> em `cadastro_usuario.html` e `perfil.html`. Esta v5 reflete a rodada de fixes
-> em `cadastro-aluno-ativo.html` (itens 4 e 5 da lista de bugs) — saíram da
-> lista de bugs e foram pra aba **✅ Fixes aplicados**, no final do arquivo,
-> com o que foi feito e as decisões tomadas em cada um.
+> em `cadastro_usuario.html` e `perfil.html`. v5 refletia a rodada de fixes em
+> `cadastro-aluno-ativo.html`. Esta v6 reflete a primeira rodada de testes do
+> **módulo Admin**: `admin.html` e `schema_ata.html` testados sem erros,
+> `admin_escolas.html` com 2 bugs achados e corrigidos (saíram da lista de
+> bugs e foram pra aba **✅ Fixes aplicados**), `cadastro_admin.html` com o
+> bug já conhecido confirmado (segue em aberto), e `idaluno.html` testado
+> visualmente sem erros mas ainda pendente de revisão de código por ser a
+> página mais complexa do módulo.
 
 ---
 
@@ -28,6 +32,8 @@
    usuário já conseguir logar com o novo. Suspeita: mesma raiz do problema
    de cache local (localStorage) da seção de achados — tela pode estar lendo
    de uma lista em cache não invalidada, em vez do Firestore ao vivo.
+   *(Reconfirmado na rodada de testes do módulo Admin — segue em aberto,
+   fica pro guia detalhado do módulo, já que a página é do próprio Admin.)*
 
 ---
 
@@ -54,11 +60,13 @@
 
 ## ⏳ Pendências (ainda não testado)
 
-- **Módulo Admin inteiro** (`admin.html`, `admin_escolas.html`,
-  `cadastro_admin.html`, `admin_backup.html`, `idaluno.html`,
-  `schema_ata.html`) — combinado: vai ganhar um **guia à parte, bem
-  detalhado**, pra testar tim-tim por tim-tim quando você tiver mais tempo.
-  Me avisa quando quiser montar esse guia.
+- **Restante do módulo Admin** (`admin_backup.html`, `idaluno.html`) —
+  `admin.html`, `admin_escolas.html` e `schema_ata.html` já testados nesta
+  rodada (ver detalhes abaixo). `admin_backup.html` aguarda o fix combinado
+  (reescrever export pra ler do Firestore ao vivo). `idaluno.html` passou no
+  teste visual, mas por ser a página mais complexa do módulo, ainda quer uma
+  revisão de código à parte antes de dar como concluída — sem previsão
+  definida ainda.
 - **`historico_auto.html`** e **`schema_ch.html`** — aguardando os fixes que
   você já está desenvolvendo (mencionado antes de começar os testes).
 - **Firestore Security Rules** — ainda não escritas/revisadas. Você vai me
@@ -82,7 +90,54 @@
 
 ## ✅ Fixes aplicados
 
-### Rodada de hoje — `cadastro-aluno-ativo.html`
+### Rodada de hoje — `admin_escolas.html`
+
+- **`ADMIN` aparecendo como escola nas listagens — corrigido.** O doc
+  `ADMIN` no Firestore (marcador de admin global, não é uma escola de
+  verdade) estava sendo listado normalmente por `fetchSchools()` — entrava
+  na tabela e contava no "X escola(s)". O filtro de `ADMIN` que já existia
+  no select do `cadastro_usuario.html` não é reaproveitado aqui, por ser
+  outra tela/função — corrigido filtrando na fonte (`fetchSchools()`), pra
+  cobrir tabela, contagem e qualquer outro uso da função.
+- **Solicitações de alteração não apareciam pro ADMIN global — corrigido
+  (causa raiz + índice + regra de segurança).** A gravação (`btnSendReq`)
+  sempre gravou certo no Firestore, em `schools/{sid}/changeRequests`. O
+  problema era a leitura: `refreshApprovals()` lia de uma chave de
+  localStorage (`auth_school_change_requests_v1`) que nunca era escrita por
+  nada no sistema — leitura e escrita apontando pra lugares diferentes.
+  Reescrito pra ler do Firestore via `collectionGroup('changeRequests')`,
+  que é o mesmo lugar onde já era gravado. Precisou de mais dois ajustes de
+  infra, fora do código: (1) regra do Firestore em escopo de **collection
+  group** — a regra aninhada em `schools/{schoolId}/changeRequests` só vale
+  pra leitura de uma escola por vez, então foi somada `match
+  /{path=**}/changeRequests/{docId}` fora do bloco de `schools`; (2) um
+  índice de campo único (`changeRequests`/`status`) com exceção de escopo
+  "grupo de coleção" habilitada no console do Firestore, exigido pela
+  própria query.
+- **Botões Aprovar/Reprovar sem funcionalidade — corrigido.** Existiam no
+  HTML mas não tinham nenhum listener no script — clicar não fazia nada.
+  Implementados: Aprovar aplica os campos de `changes` (`name`/
+  `displayName`) diretamente no doc da escola e marca a solicitação como
+  `approved`; Reprovar só marca como `rejected` (com confirmação antes).
+- **Solicitação mandando os dois campos mesmo editando só um —
+  corrigido.** O formulário de solicitação já vem pré-preenchido com os
+  valores atuais de `name`/`displayName`, então o envio sempre incluía os
+  dois no `changes`, mesmo quando só um foi alterado. Corrigido pra
+  comparar com o valor original e só incluir no `changes` (e por
+  consequência na tela do ADMIN global) o que de fato mudou. Bônus: se
+  nada for alterado, agora avisa "Nenhuma alteração para enviar" em vez de
+  mandar uma solicitação vazia.
+- **Legenda removida** do card de "Solicitações de alteração" a pedido.
+
+**Testado e confirmado funcionando** (fluxo completo: solicitar edição como
+admin restrito de escola → aparecer certo pro ADMIN global → aprovar →
+refletir na escola).
+
+**Arquivos entregues nessa rodada:** `admin_escolas.html`.
+
+---
+
+### Rodada anterior — `cadastro-aluno-ativo.html`
 
 - **Naturalidade sem maiúsculo — corrigido.** O campo usa o mesmo
   autocomplete de cidade do endereço; um `.toUpperCase()` solto quebraria a
@@ -120,7 +175,7 @@
 
 ---
 
-### Rodada anterior — `cadastro_usuario.html`, `perfil.html`, `theme-colors.js`
+### Duas rodadas atrás — `cadastro_usuario.html`, `perfil.html`, `theme-colors.js`
 
 #### `cadastro_usuario.html`
 - **Header reduzido implementado.** Ficou header inline na própria página
