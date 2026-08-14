@@ -100,7 +100,6 @@
         <h2 style="margin:0;">Solicitações de alteração</h2>
         <span class="pill" id="reqCount">0</span>
       </div>
-      <p>Apenas o <strong>ADMIN</strong> global pode aprovar ou reprovar alterações solicitadas por admins de escolas.</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -233,6 +232,19 @@
       const newDisplay = document.getElementById('reqNewDisplay').value.trim();
       const msgEl      = document.getElementById('reqFormMsg');
       if(!newName){ msgEl.textContent='Informe o novo nome.'; msgEl.className='msg err'; return; }
+
+      // Só entra em 'changes' o que de fato mudou em relação ao valor atual —
+      // antes os dois campos eram enviados sempre, porque o formulário já vem
+      // pré-preenchido com os valores atuais.
+      const changes = {};
+      if(newName !== (currentName||''))       changes.name = newName;
+      if(newDisplay !== (currentDisplay||'')) changes.displayName = newDisplay;
+      if(!Object.keys(changes).length){
+        msgEl.textContent = 'Nenhuma alteração para enviar.';
+        msgEl.className = 'msg err';
+        return;
+      }
+
       const btn = document.getElementById('btnSendReq');
       btn.disabled = true; btn.textContent = 'Enviando...';
       try{
@@ -240,7 +252,7 @@
         await Auth.db.collection('schools').doc(sid).collection('changeRequests').add({
           schoolId: sid, requestedBy: session?.email||session?.uid||'',
           requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          status: 'pending', changes: { name: newName, displayName: newDisplay }
+          status: 'pending', changes
         });
         msgEl.textContent = 'Solicitação enviada! Aguarde aprovação do ADMIN.';
         msgEl.className = 'msg ok';
