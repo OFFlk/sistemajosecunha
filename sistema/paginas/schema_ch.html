@@ -574,11 +574,18 @@ function chCanonSerie(txt){
   if(!t) return '';
   const numMatch = t.match(/(\d+)/);
   const num = numMatch ? String(parseInt(numMatch[1],10)) : '';
-  if(/alfabetiz/.test(t)) return 'ALFAB';
+  if(/alfabetiz|\balfa\b/.test(t)) return 'ALFAB';
   if(/eixo/.test(t)) return 'EIXO'+num;
   if(/\bem\b|ensino medio/.test(t)) return 'EM'+num;
-  if(/serie/.test(t)) return 'SERIE'+num;
+  // "série" é nomenclatura antiga do Ensino Fundamental, sinônimo de "ano"
+  // — nunca é, por si só, indicativo de Ensino Médio ("1ª série" = "1º ano").
+  if(/serie/.test(t)) return 'ANO'+num;
   if(/\bano\b/.test(t)) return 'ANO'+num;
+  // Sem palavra-chave (indicador solto, ex. "1", como vem da coluna do
+  // aluno no import de XLSX — só o cabeçalho da ata carrega "1º Ano"/
+  // "1ª Série" por extenso) — assume ANO, a interpretação correta pro
+  // Fundamental, que é onde esse indicador solto aparece na prática.
+  if(num) return 'ANO'+num;
   return t;
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
@@ -1108,7 +1115,7 @@ function chRenderTabela(){
             <td>${i+1}</td>
             <td><b>${esc(r.nome||'')}</b></td>
             <td>${esc((r.anos||[]).slice().sort(chAnoSort).join(', '))}</td>
-            <td>${esc(r.etapaTexto||'')}</td>
+            <td>${esc((r.series||[]).length ? r.series.join(', ') : '(todas)')}</td>
             ${tds}
             <td><div class="toolbar">
               <button type="button" class="out" data-ch-act="edit" data-id="${esc(r.id)}">Editar</button>
