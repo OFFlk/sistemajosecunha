@@ -1,15 +1,21 @@
-# Checklist de Testes — Sistema Escolar (pré-auditoria) — v6
+# Checklist de Testes — Sistema Escolar (pré-auditoria) — v7
 
 > v1 tinha o levantamento inicial. v2 corrigiu escopo/contagem/RBAC/localStorage.
 > v3 refletia a primeira rodada real de testes. v4 refletia a rodada de fixes
 > em `cadastro_usuario.html` e `perfil.html`. v5 refletia a rodada de fixes em
-> `cadastro-aluno-ativo.html`. Esta v6 reflete a primeira rodada de testes do
+> `cadastro-aluno-ativo.html`. v6 refletia a primeira rodada de testes do
 > **módulo Admin**: `admin.html` e `schema_ata.html` testados sem erros,
-> `admin_escolas.html` com 2 bugs achados e corrigidos (saíram da lista de
-> bugs e foram pra aba **✅ Fixes aplicados**), `cadastro_admin.html` com o
-> bug já conhecido confirmado (segue em aberto), e `idaluno.html` testado
-> visualmente sem erros mas ainda pendente de revisão de código por ser a
-> página mais complexa do módulo.
+> `admin_escolas.html` com 2 bugs achados e corrigidos, `cadastro_admin.html`
+> com o bug já conhecido confirmado (email não atualizava na tela), e
+> `idaluno.html` testado visualmente sem erros mas pendente de revisão de
+> código. Esta **v7** reflete a investigação do bug de email do
+> `cadastro_admin.html`: causa raiz achada em `auth.firebase.js` (corrigido —
+> bug #3 sai da lista e vai pra **✅ Fixes aplicados**) e, como efeito
+> colateral da investigação, uma **falha grave de segurança** achada nas
+> Firestore Security Rules (escalonamento de privilégio via `users.update`,
+> já corrigida) e uma **falha de exclusão** achada em `Auth.deleteUser()`
+> (contas "excluídas" pelo painel continuavam válidas no Firebase
+> Authentication — mitigada por ora, fix definitivo fica pendente).
 
 ---
 
@@ -26,14 +32,8 @@
    remetente (SPF/DKIM/domínio), não bug de página. Investigar depois, à
    parte, se decidir que vale a pena.
 
-### `cadastro_admin.html`
-3. **Email do usuário não atualiza na tela após troca.** Nome atualiza
-   normalmente, mas o email continua mostrando o valor antigo mesmo após o
-   usuário já conseguir logar com o novo. Suspeita: mesma raiz do problema
-   de cache local (localStorage) da seção de achados — tela pode estar lendo
-   de uma lista em cache não invalidada, em vez do Firestore ao vivo.
-   *(Reconfirmado na rodada de testes do módulo Admin — segue em aberto,
-   fica pro guia detalhado do módulo, já que a página é do próprio Admin.)*
+*(sem bugs abertos no momento — ver **✅ Fixes aplicados** pro que foi
+resolvido nesta rodada)*
 
 ---
 
@@ -60,6 +60,44 @@
 
 ## ⏳ Pendências (ainda não testado)
 
+- **🔴 Gestão real de contas no Firebase Authentication (prioridade alta).**
+  Achado ao investigar o bug de email: `Auth.deleteUser(uid)` (usado pelo
+  botão Excluir/Reprovar em `cadastro_admin.html`) só apaga o documento em
+  `users/{uid}` no Firestore — **nunca apagou a conta no Firebase
+  Authentication**. Resultado: uma conta "excluída" pelo painel continua
+  logando normalmente pra sempre (inclusive redefinindo senha via "esqueci
+  minha senha"), só que com sessão caindo pra `role: 'user'` por falta de
+  perfil no Firestore — a não ser que o doc seja recriado depois, aí ela
+  volta a ter o role antigo. Confirmado em produção: existiam contas de
+  teste antigas, já "excluídas" há muito tempo, ainda ativas no
+  Authentication, uma delas inclusive de admin.
+  **Mitigação atual:** o wipe do banco planejado pro fim da fase de testes
+  apaga os documentos do Firestore, mas **não apaga nada do Authentication**
+  — contas fantasmas de teste continuariam válidas pra login mesmo depois do
+  wipe, a não ser que sejam apagadas manualmente pelo Console
+  (Authentication → Users) antes ou depois do wipe.
+  **Fix definitivo (combinado, ainda não implementado):** trocar
+  `Auth.deleteUser()` por uma Cloud Function com Admin SDK
+  (`admin.auth().deleteUser(uid)` + apagar o doc do Firestore), chamada pelo
+  botão de excluir em vez do client SDK direto — só assim a exclusão apaga
+  dos dois lugares de uma vez. Fica pendente pra quando a fase de testes
+  acabar (hoje dá pra contornar apagando manualmente pelo Console quando
+  necessário).
+- **Observações menores nas Firestore Security Rules** (achadas na mesma
+  revisão que corrigiu o `users.update` — nenhuma é urgente, nenhuma foi
+  mexida ainda):
+  - `schools/{schoolId}` tem `allow read: if true` — leitura 100% pública,
+    sem login. Provavelmente intencional (dropdown de escola no
+    autocadastro precisa disso antes do login), mas vale confirmar que os
+    docs de `schools` nunca vão guardar campo sensível, já que hoje
+    qualquer um lê tudo deles.
+  - `changeRequests.create` não valida que o campo `requestedBy` bate com
+    `request.auth.uid` — um admin de escola logado consegue gravar uma
+    solicitação alegando ter sido pedida por outra pessoa. Baixo risco,
+    mas polui auditoria.
+  - Funções `isPendingSignup()` e `resource_uid()` no arquivo de Rules são
+    definidas mas nunca chamadas — a regra de `create` reimplementa a mesma
+    lógica inline. Código morto, sem risco, só limpeza futura.
 - **Restante do módulo Admin** (`admin_backup.html`, `idaluno.html`) —
   `admin.html`, `admin_escolas.html` e `schema_ata.html` já testados nesta
   rodada (ver detalhes abaixo). `admin_backup.html` aguarda o fix combinado
@@ -90,7 +128,51 @@
 
 ## ✅ Fixes aplicados
 
-### Rodada de hoje — `admin_escolas.html`
+### Rodada de hoje — `auth.firebase.js` + `firestore.rules`
+
+- **Bug #3 (`cadastro_admin.html`: email não atualiza na tela) — corrigido
+  na raiz.** Não era bug da página — `cadastro_admin.html` só exibe o que
+  `Auth.listUsers()` devolve, sem cache próprio. A causa real: o sistema
+  guarda o email em dois lugares (Firebase Auth, que é o que de fato loga a
+  pessoa, e o campo `email` do doc `users/{uid}` no Firestore, que é o que a
+  tela do admin lê) e nada sincronizava um com o outro depois da troca.
+  `perfil.html` troca o email só via `verifyBeforeUpdateEmail()`, que
+  atualiza o Firebase Auth de forma assíncrona (só depois que o usuário
+  clica no link de confirmação, fora da sessão do navegador) — e nunca
+  escreve no Firestore. Corrigido em `loadProfile()` (roda a cada login/
+  refresh de sessão): compara o email atual do Firebase Auth com o que está
+  salvo no Firestore e, se divergem, regrava o Firestore com o valor
+  correto. Só sincroniza se o doc já existir (`snap.exists`), pra não tentar
+  `update` num perfil que ainda está sendo criado (corrida possível durante
+  o cadastro novo em `cadastro_usuario.html` — inofensiva antes do fix,
+  gerava só um warning no console).
+  **Efeito colateral aceito, sem fix:** a sincronização só acontece no
+  próximo login depois da confirmação, não no instante em que o link é
+  clicado (não tem como — o navegador nem está aberto nesse momento).
+  Considerado suficiente; Cloud Function pra sync instantâneo foi avaliada e
+  descartada por ser desproporcional pro sistema.
+- **🔴 Falha de segurança corrigida nas Firestore Rules — escalonamento de
+  privilégio via `users.update`.** Achada só de revisar as Rules durante a
+  investigação acima, sem relação direta com o bug de email. A regra de
+  `update` em `users/{uid}` deixava o próprio usuário alterar **qualquer**
+  campo do próprio documento, incluindo `role` e `schoolId` — ou seja,
+  qualquer conta (mesmo uma `pending` recém-criada, nunca aprovada) podia se
+  promover a admin global sozinha, direto pelo Firestore, sem passar pelo
+  app nem precisar de nenhum bug de tela (bastava um `update()` chamado pelo
+  console do navegador). Corrigido: usuário comum agora só edita o próprio
+  doc se `role` e `schoolId` do documento novo forem idênticos aos já
+  salvos — só admin altera esses dois campos. Resto do doc (nome, foto etc.)
+  continua editável pelo próprio dono normalmente.
+- **Achado, mas não corrigido nesta rodada:** `Auth.deleteUser()` só apaga o
+  doc do Firestore, nunca a conta no Firebase Authentication — contas
+  "excluídas" continuam válidas pra login. Ver pendência **🔴 Gestão real de
+  contas no Firebase Authentication** acima.
+
+**Arquivos entregues nessa rodada:** `auth.firebase.js`, `firestore.rules`.
+
+---
+
+### Rodada anterior — `admin_escolas.html`
 
 - **`ADMIN` aparecendo como escola nas listagens — corrigido.** O doc
   `ADMIN` no Firestore (marcador de admin global, não é uma escola de
