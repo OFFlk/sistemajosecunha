@@ -94,6 +94,24 @@ html[data-theme="dark"] .badge.ok   { color:#86efac; }
 
 /* ── row-btns ── */
 .row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+
+/* ── Toasts padronizados (ver guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; z-index: 50;
+}
+
+/* ── Resultado da importação (log estruturado) ── */
+.import-aba { border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
+.import-aba.tem-divergencia { border-color:var(--warn-bd); background:var(--warn-bg); }
+.import-aba-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.import-aba-divs { margin-top:8px; font-size:12px; color:var(--muted); }
+.import-aba-divs.collapsed { display:none; }
 </style>
 </head>
 <body>
@@ -453,8 +471,119 @@ function toggleSec(id) {
   if (tog) tog.classList.toggle('collapsed', col);
 }
 
+// Monta o HTML do resultado da importação: uma linha por aba (com badge
+// de status), e a lista de divergências de série/etapa dessa aba
+// escondida atrás de um toggle — em vez de despejar tudo cru na tela.
+function renderResultadoImportacao(resultadosAbas, resumoTexto){
+  const linhas = resultadosAbas.map((r, i) => {
+    if (!r.ok) {
+      return `<div class="import-aba tem-divergencia"><div class="import-aba-head">`+
+        `<span>❌ <b>${esc(r.abaName)}</b></span><span class="badge warn">${esc(r.motivo)}</span>`+
+        `</div></div>`;
+    }
+    const divCount = r.divergencias.length;
+    const badgeClass = divCount ? 'warn' : 'ok';
+    const badgeTxt = esc(r.badge);
+    const toggleId = `_impDiv${i}`;
+    const divergHtml = divCount ? (
+      `<div class="import-aba-divs collapsed" id="${toggleId}">`+
+        r.divergencias.slice(0,8).map(d=>`<div>• ${esc(d)}</div>`).join('')+
+        (divCount>8 ? `<div>… e mais ${divCount-8} divergência(s).</div>` : '')+
+      `</div>`
+    ) : '';
+    const toggleBtn = divCount ? (
+      `<span class="badge warn" style="cursor:pointer;" onclick="`+
+      `document.getElementById('${toggleId}').classList.toggle('collapsed')">`+
+      `⚠️ ${divCount} divergência(s) — ver</span>`
+    ) : '';
+    return `<div class="import-aba${divCount?' tem-divergencia':''}">`+
+      `<div class="import-aba-head">`+
+        `<span>✅ <b>${esc(r.abaName)}</b> — ${r.qtdAlunos} aluno(s)</span>`+
+        `<span class="badge ${badgeClass}">${badgeTxt}</span>${toggleBtn}`+
+      `</div>${divergHtml}</div>`;
+  }).join('');
+  return linhas + `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;">${esc(resumoTexto).replace(/\n/g,'<br>')}</div>`;
+}
+
 function esc(s) {
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
+// ── Modal de confirmação (substitui confirm() nativo) ──────────────────
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${_escHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    function fechar(resultado){ backdrop.remove(); resolve(resultado); }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
 }
 
 function _baixar(conteudo, nome, tipo) {
@@ -888,15 +1017,14 @@ function qualificarIndicadorAluno(raw, vocab) {
     }
 
     // Cabeçalho define o tipo (ANO/SÉRIE/EM) — usa a palavra do cabeçalho,
-    // não o símbolo do aluno, mas confere se batem.
+    // não o símbolo do aluno. Não confere º/ª: na prática, quem preenchia
+    // atas antigas nem sempre respeitava a concordância de gênero
+    // ("1º" em turma de "série" é comum e não indica erro de dado).
     const simboloEsperado = ORDINAL_POR_TIPO[vocab.tipo];
     const palavra = PALAVRA_POR_TIPO[vocab.tipo];
-    const simboloBate = simbolos.every(sym => sym === simboloEsperado);
     const numsForaDaLista = vocab.nums.length && nums.some(n => !vocab.nums.includes(n));
-    const divergente = !simboloBate || numsForaDaLista;
-    let motivo = '';
-    if (!simboloBate) motivo = `símbolo "${simbolos.join('/')}" não bate com ${vocab.tipo} (esperado "${simboloEsperado}")`;
-    else if (numsForaDaLista) motivo = `número(s) ${nums.join(',')} fora do esperado pelo cabeçalho (${vocab.nums.join(',')})`;
+    const divergente = numsForaDaLista;
+    const motivo = numsForaDaLista ? `número(s) ${nums.join(',')} fora do esperado pelo cabeçalho (${vocab.nums.join(',')})` : '';
     return { serie: `${nums.map(n=>n+simboloEsperado).join(' e ')} ${palavra}`, divergente, motivo };
   }
 
@@ -1006,17 +1134,18 @@ async function importarSelecionadas() {
   if (btnImp) { btnImp.disabled=true; btnImp.textContent='Importando...'; }
   const saida=document.getElementById('saidaXLSX');
   saida.style.display='block';
-  saida.textContent='⏳ Aguardando catálogo de alunos...';
+  saida.textContent='';
+  setMsg(`Importando ${selecionadas.length} aba(s)…`, 'loading');
 
   try {
     const turmasDB=lerTurmasDB();
-    const todasLinhas=[], abasValidas=[], log=[];
+    const todasLinhas=[], abasValidas=[], resultadosAbas=[];
 
     for (const abaName of selecionadas) {
       const ws=_workbook.Sheets[abaName];
       const matriz=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       const rHead=acharLinhaCabecalho(matriz);
-      if (rHead===-1) { log.push(`❌ Aba "${abaName}": cabeçalho não encontrado. Ignorada.`); continue; }
+      if (rHead===-1) { resultadosAbas.push({abaName, ok:false, motivo:'cabeçalho não encontrado'}); continue; }
 
       const info=extrairInfoCabecalho(matriz,rHead,abaName);
       const colMap=mapearColunas(matriz[rHead]);
@@ -1078,11 +1207,7 @@ async function importarSelecionadas() {
 
       totalTurmas++; totalAlunos+=novos.length;
       const badge=(info.anoLetivo?'ANO OK':'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
-      log.push(`✅ "${abaName}": ${novos.length} aluno(s) (${badge})`);
-      if (divergencias.length) {
-        log.push(`   ⚠️ Divergência de série/etapa nesta aba (${divergencias.length}):`);
-        divergencias.forEach(d=>log.push(`      - ${d}`));
-      }
+      resultadosAbas.push({abaName, ok:true, qtdAlunos:novos.length, badge, divergencias});
     }
 
     salvarTurmasDB(turmasDB);
@@ -1090,17 +1215,18 @@ async function importarSelecionadas() {
     // reconstruirAuxiliares enviaria atas/mats também, mas aqui só precisamos do localStorage.
     const aux=_reconstruirAuxLocalmente(turmasDB);
 
-    log.push('');
-    log.push(`TOTAL: ${totalTurmas} turma(s) • ${totalAlunos} aluno(s)`);
-    log.push(`IDs novos criados: ${idsCriados} (${totalAlunos-idsCriados} já existiam)`);
-    log.push(`Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`);
-    saida.textContent=log.join('\n');
+    const resumoTexto=`TOTAL: ${totalTurmas} turma(s) • ${totalAlunos} aluno(s)\n`+
+      `IDs novos criados: ${idsCriados} (${totalAlunos-idsCriados} já existiam)\n`+
+      `Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`;
+    saida.innerHTML=renderResultadoImportacao(resultadosAbas, resumoTexto);
     renderTabelaTurmas();
     atualizarStats();
+    setMsg(`${totalTurmas} turma(s) e ${totalAlunos} aluno(s) importados.`, 'ok');
 
   } catch(err) {
     console.error('[gerir-dados] Erro XLSX:', err);
     saida.textContent='❌ Erro inesperado: '+(err.message||err);
+    setMsg('Erro ao importar: '+(err.message||err), 'err');
   } finally {
     if (btnImp) { btnImp.disabled=false; btnImp.textContent='Importar selecionadas'; }
   }
