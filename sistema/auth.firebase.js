@@ -80,6 +80,22 @@
     };
     try { localStorage.setItem('auth_session_v2', JSON.stringify(_session)); } catch {}
 
+    // Autocura: perfil.html troca o email só via verifyBeforeUpdateEmail(),
+    // que atualiza o Firebase Auth (assíncrono, após o usuário clicar no
+    // link de confirmação) mas nunca escreve no doc users/{uid} do Firestore.
+    // Isso deixava o Firestore com o email antigo para sempre — e é o que
+    // cadastro_admin.html lê via listUsers(). Aqui, toda vez que a sessão é
+    // carregada (login, refresh de página, refreshSession()), comparamos com
+    // o email atual do Auth — que essa altura já é o correto, pós-confirmação
+    // — e sincronizamos o Firestore se estiverem diferentes.
+    if (user.email && p.email !== user.email) {
+      try {
+        await _db.collection('users').doc(user.uid).update({ email: user.email });
+      } catch (e) {
+        console.warn('Auth: falha ao sincronizar email no Firestore', e);
+      }
+    }
+
     if (_session.role === 'admin' || _session.schoolId?.toUpperCase() === 'ADMIN') {
       try {
         const ss = await _db.collection('schools').get();
