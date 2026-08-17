@@ -816,6 +816,94 @@ function serieTextoParaLista(serieTexto) {
   return [...new Set(out)];
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Qualificação do indicador do aluno (ANO/SÉRIE)
+   ─────────────────────────────────────────────────────────────
+   Na planilha, a coluna "ANO"/"SÉRIE" de cada aluno traz só o
+   indicador cru: "1º", "3ª e 4ª", "ALFA", "E1"... — mesmo em
+   turmas multisseriadas ou de aceleração. O texto completo
+   ("1º Ano", "Alfabetização", "Eixo 1"...) só existe no
+   cabeçalho da ata. Essas funções combinam os dois. */
+
+// Lê o cabeçalho da ata e descobre o "vocabulário" esperado pra essa
+// turma: de que tipo são as séries (ANO/SÉRIE/EM/EIXO/ALFA/LIVRE) e,
+// quando aplicável, quais números são esperados (pra turmas com lista
+// explícita ou aceleração). "LIVRE" é o caso "MULTI-SERIADA": o
+// cabeçalho não define um vocabulário único, então cada aluno é
+// resolvido pelo próprio símbolo (º=Ano, ª=Série).
+function detectarVocabularioCabecalho(serieTextoCabecalho) {
+  const s = normalizarTxt(serieTextoCabecalho);
+  if (!s) return { tipo: 'LIVRE', nums: [] };
+  if (/MULTI[- ]?SERIAD/.test(s)) return { tipo: 'LIVRE', nums: [] };
+  if (/ALFABETIZ/.test(s)) return { tipo: 'ALFA', nums: [] };
+  if (/EIXO/.test(s)) return { tipo: 'EIXO', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
+  if (/\bEM\b|ENSINO M[EÉ]DIO/.test(s)) return { tipo: 'EM', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
+  if (/ANO/.test(s)) return { tipo: 'ANO', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
+  if (/S[EÉ]RIE/.test(s)) return { tipo: 'SERIE', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
+  return { tipo: 'LIVRE', nums: [] };
+}
+
+const PALAVRA_POR_TIPO = { ANO: 'Ano', SERIE: 'Série', EM: 'EM' };
+const ORDINAL_POR_TIPO = { ANO: 'º', SERIE: 'ª', EM: 'º' };
+
+// Combina o indicador cru do aluno com o vocabulário do cabeçalho.
+// Retorna { serie, divergente, motivo }. `divergente` sinaliza quando o
+// indicador do aluno não bate com o que o cabeçalho anunciava (número
+// fora da lista esperada, ou símbolo º/ª incompatível com o tipo do
+// cabeçalho) — não bloqueia o import, só registra no log pra revisão.
+function qualificarIndicadorAluno(raw, vocab) {
+  const s = normalizarTxt(raw);
+  if (!s) return { serie: '', divergente: false, motivo: '' };
+
+  if (/^ALFA/.test(s)) {
+    const divergente = vocab.tipo !== 'LIVRE' && vocab.tipo !== 'ALFA';
+    return { serie: 'Alfabetização', divergente, motivo: divergente ? `indicador "ALFA" mas cabeçalho é ${vocab.tipo}` : '' };
+  }
+
+  const mEixo = s.match(/^E\s*(\d+)$/);
+  if (mEixo) {
+    const num = mEixo[1];
+    const tipoDivergente = vocab.tipo !== 'LIVRE' && vocab.tipo !== 'EIXO';
+    const numDivergente = vocab.tipo === 'EIXO' && vocab.nums.length && !vocab.nums.includes(num);
+    const divergente = tipoDivergente || numDivergente;
+    let motivo = '';
+    if (tipoDivergente) motivo = `indicador "E${num}" mas cabeçalho é ${vocab.tipo}`;
+    else if (numDivergente) motivo = `eixo ${num} fora do esperado pelo cabeçalho (${vocab.nums.join(',')})`;
+    return { serie: `Eixo ${num}`, divergente, motivo };
+  }
+
+  // Ordinal(is): "1º", "3ª", ou par de aceleração "1º e 2º" / "3ª e 4ª"
+  const ords = [...s.matchAll(/(\d+)\s*([ºª])/g)];
+  if (ords.length) {
+    const nums = ords.map(m=>m[1]);
+    const simbolos = [...new Set(ords.map(m=>m[2]))];
+
+    if (vocab.tipo === 'LIVRE' || vocab.tipo === 'ALFA' || vocab.tipo === 'EIXO') {
+      // Sem vocabulário definido pelo cabeçalho — usa o próprio símbolo
+      // do indicador pra decidir Ano (º) ou Série (ª).
+      const simbolo = simbolos[0] || 'º';
+      const palavra = simbolo === 'ª' ? 'Série' : 'Ano';
+      const divergente = vocab.tipo === 'ALFA' || vocab.tipo === 'EIXO'; // cabeçalho dizia outra coisa
+      return { serie: `${nums.map(n=>n+simbolo).join(' e ')} ${palavra}`, divergente, motivo: divergente ? `indicador numérico mas cabeçalho é ${vocab.tipo}` : '' };
+    }
+
+    // Cabeçalho define o tipo (ANO/SÉRIE/EM) — usa a palavra do cabeçalho,
+    // não o símbolo do aluno, mas confere se batem.
+    const simboloEsperado = ORDINAL_POR_TIPO[vocab.tipo];
+    const palavra = PALAVRA_POR_TIPO[vocab.tipo];
+    const simboloBate = simbolos.every(sym => sym === simboloEsperado);
+    const numsForaDaLista = vocab.nums.length && nums.some(n => !vocab.nums.includes(n));
+    const divergente = !simboloBate || numsForaDaLista;
+    let motivo = '';
+    if (!simboloBate) motivo = `símbolo "${simbolos.join('/')}" não bate com ${vocab.tipo} (esperado "${simboloEsperado}")`;
+    else if (numsForaDaLista) motivo = `número(s) ${nums.join(',')} fora do esperado pelo cabeçalho (${vocab.nums.join(',')})`;
+    return { serie: `${nums.map(n=>n+simboloEsperado).join(' e ')} ${palavra}`, divergente, motivo };
+  }
+
+  // Não reconhecido — devolve como veio, sem qualificar, e sinaliza.
+  return { serie: s, divergente: true, motivo: `indicador "${s}" não reconhecido` };
+}
+
 function extrairAnoSerieTurnoDaAba(abaName) {
   const s=normalizarTxt(abaName);
   const mAno=s.match(/\b(19|20)\d{2}\b/);
@@ -957,6 +1045,8 @@ async function importarSelecionadas() {
     let batchIdx=0, idsCriados=0, totalAlunos=0, totalTurmas=0;
 
     for (const {abaName,info,colMap,modoAvaliacao,linhas} of abasValidas) {
+      const vocab=detectarVocabularioCabecalho(info.serieTexto);
+      const divergencias=[];
       const novos=[];
       for (const {row,nomeAluno} of linhas) {
         const res=resultadosBatch[batchIdx++]; if(!res) continue;
@@ -964,7 +1054,11 @@ async function importarSelecionadas() {
         const aluno={nome:nomeAluno,serie:'',alunoId,port:'--',mat:'--',hist:'--',geo:'--',cien:'--',fis:'--',arte:'--',relig:'--',ing:'--',resultado:'Não informado'};
         for (const [cStr,field] of Object.entries(colMap)) {
           const v=row[Number(cStr)];
-          if (field==='serieAluno') aluno.serie=String(v||'').trim();
+          if (field==='serieAluno') {
+            const q=qualificarIndicadorAluno(v,vocab);
+            aluno.serie=q.serie;
+            if (q.divergente) divergencias.push(`${nomeAluno}: "${String(v||'').trim()}" — ${q.motivo}`);
+          }
           else if (field==='resultado') aluno.resultado=toResultado(v);
           else if (['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(field)) aluno[field]=toNotaSistema(v);
         }
@@ -985,6 +1079,10 @@ async function importarSelecionadas() {
       totalTurmas++; totalAlunos+=novos.length;
       const badge=(info.anoLetivo?'ANO OK':'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
       log.push(`✅ "${abaName}": ${novos.length} aluno(s) (${badge})`);
+      if (divergencias.length) {
+        log.push(`   ⚠️ Divergência de série/etapa nesta aba (${divergencias.length}):`);
+        divergencias.forEach(d=>log.push(`      - ${d}`));
+      }
     }
 
     salvarTurmasDB(turmasDB);
