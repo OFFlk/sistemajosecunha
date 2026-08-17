@@ -34,6 +34,8 @@ body { visibility: hidden; }
   --ok-bd:   rgba(22,163,74,.30);
   --warn-bg: rgba(245,158,11,.10);
   --warn-bd: rgba(245,158,11,.30);
+  --err-bg:  rgba(220,38,38,.10);
+  --err-bd:  rgba(220,38,38,.30);
 }
 
 /* ── Container desta página ── */
@@ -85,8 +87,10 @@ input[type="checkbox"] {
 /* ── Badge colorido (extensão dos globais) ── */
 .badge.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
 .badge.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
+.badge.err  { background:var(--err-bg);  border-color:var(--err-bd);  color:#991b1b; }
 html[data-theme="dark"] .badge.warn { color:#fbbf24; }
 html[data-theme="dark"] .badge.ok   { color:#86efac; }
+html[data-theme="dark"] .badge.err  { color:#fca5a5; }
 
 /* ── Botão danger desta página ── */
 .btn-danger { background:var(--danger-500,#b91c1c); border-color:var(--danger-500,#b91c1c); color:#fff; }
@@ -109,6 +113,7 @@ html[data-theme="dark"] .badge.ok   { color:#86efac; }
 /* ── Resultado da importação (log estruturado) ── */
 .import-aba { border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
 .import-aba.tem-divergencia { border-color:var(--warn-bd); background:var(--warn-bg); }
+.import-aba.bloqueada { border-color:var(--err-bd); background:var(--err-bg); }
 .import-aba-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
 .import-aba-divs { margin-top:8px; font-size:12px; color:var(--muted); }
 .import-aba-divs.collapsed { display:none; }
@@ -475,15 +480,22 @@ function toggleSec(id) {
 // de status), e a lista de divergências de série/etapa dessa aba
 // escondida atrás de um toggle — em vez de despejar tudo cru na tela.
 function renderResultadoImportacao(resultadosAbas, resumoTexto){
-  const linhas = resultadosAbas.map((r, i) => {
+  const limpas = resultadosAbas.filter(r => r.ok && r.divergencias.length===0);
+  const comProblema = resultadosAbas.filter(r => !r.ok || r.divergencias.length>0);
+
+  const resumoLimpas = limpas.length ? (
+    `<div class="import-aba" style="display:flex;align-items:center;gap:8px;">`+
+      `<span class="badge ok">✅ ${limpas.length} ata(s) importada(s) sem avisos</span>`+
+    `</div>`
+  ) : '';
+
+  const linhas = comProblema.map((r, i) => {
     if (!r.ok) {
-      return `<div class="import-aba tem-divergencia"><div class="import-aba-head">`+
-        `<span>❌ <b>${esc(r.abaName)}</b></span><span class="badge warn">${esc(r.motivo)}</span>`+
+      return `<div class="import-aba bloqueada"><div class="import-aba-head">`+
+        `<span>🚫 <b>${esc(r.abaName)}</b> — não importada</span><span class="badge err">${esc(r.motivo)}</span>`+
         `</div></div>`;
     }
     const divCount = r.divergencias.length;
-    const badgeClass = divCount ? 'warn' : 'ok';
-    const badgeTxt = esc(r.badge);
     const toggleId = `_impDiv${i}`;
     const divergHtml = divCount ? (
       `<div class="import-aba-divs collapsed" id="${toggleId}">`+
@@ -499,10 +511,11 @@ function renderResultadoImportacao(resultadosAbas, resumoTexto){
     return `<div class="import-aba${divCount?' tem-divergencia':''}">`+
       `<div class="import-aba-head">`+
         `<span>✅ <b>${esc(r.abaName)}</b> — ${r.qtdAlunos} aluno(s)</span>`+
-        `<span class="badge ${badgeClass}">${badgeTxt}</span>${toggleBtn}`+
+        `<span class="badge warn">${esc(r.badge)}</span>${toggleBtn}`+
       `</div>${divergHtml}</div>`;
   }).join('');
-  return linhas + `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;">${esc(resumoTexto).replace(/\n/g,'<br>')}</div>`;
+
+  return resumoLimpas + linhas + `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;">${esc(resumoTexto).replace(/\n/g,'<br>')}</div>`;
 }
 
 function esc(s) {
@@ -1032,6 +1045,39 @@ function qualificarIndicadorAluno(raw, vocab) {
   return { serie: s, divergente: true, motivo: `indicador "${s}" não reconhecido` };
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Validação do Ano Letivo do cabeçalho
+   ─────────────────────────────────────────────────────────────
+   Diferente da série (que dá pra corrigir depois, dentro do sistema,
+   via select), o ano letivo é usado como parte do ID da turma e do
+   casamento de CH no histórico — se vier errado, quebra a exportação
+   de forma silenciosa, e o usuário não teria como perceber olhando
+   só a tela (o select do ano ativo mostraria o valor errado como se
+   fosse normal). Por isso tem dois níveis:
+   - "block": caractere não numérico ou 5+ dígitos — claramente não é
+     um ano. A turma NÃO é importada (evita entrar lixo no banco),
+     mas isso não afeta as outras abas selecionadas.
+   - "warn": só dígitos, até 4, mas fora da faixa plausível pra uma
+     ata escolar (ex.: 1898, 1695, 850) — provável erro de digitação.
+     Ainda assim é importado, só fica sinalizado pra revisão. */
+function validarAnoLetivo(anoRaw) {
+  const s = String(anoRaw||'').trim();
+  if (!s) return { nivel:'warn', motivo:'ano letivo não encontrado no cabeçalho' };
+  if (!/^\d+$/.test(s)) {
+    return { nivel:'block', motivo:`ano letivo "${s}" contém caractere não numérico` };
+  }
+  if (s.length >= 5) {
+    return { nivel:'block', motivo:`ano letivo "${s}" tem ${s.length} dígitos — não parece um ano válido` };
+  }
+  const num = parseInt(s,10);
+  const anoAtual = new Date().getFullYear();
+  const MIN_ANO = 1900; // piso de sanidade — ajuste se a escola tiver atas mais antigas
+  if (num < MIN_ANO || num > anoAtual+1) {
+    return { nivel:'warn', motivo:`ano letivo "${s}" fora da faixa esperada (${MIN_ANO}–${anoAtual+1}) — confira se não é erro de digitação` };
+  }
+  return { nivel:'ok', motivo:'' };
+}
+
 function extrairAnoSerieTurnoDaAba(abaName) {
   const s=normalizarTxt(abaName);
   const mAno=s.match(/\b(19|20)\d{2}\b/);
@@ -1148,6 +1194,13 @@ async function importarSelecionadas() {
       if (rHead===-1) { resultadosAbas.push({abaName, ok:false, motivo:'cabeçalho não encontrado'}); continue; }
 
       const info=extrairInfoCabecalho(matriz,rHead,abaName);
+
+      const anoCheck=validarAnoLetivo(info.anoLetivo);
+      if (anoCheck.nivel==='block') {
+        resultadosAbas.push({abaName, ok:false, motivo:`ano letivo inválido: ${anoCheck.motivo}`});
+        continue; // não afeta as outras abas selecionadas
+      }
+
       const colMap=mapearColunas(matriz[rHead]);
       const modoAvaliacao=detectarModoAvaliacao(matriz,rHead,colMap);
       const cNome=Object.keys(colMap).find(k=>colMap[k]==='nome');
@@ -1164,7 +1217,7 @@ async function importarSelecionadas() {
       }
 
       todasLinhas.push(...linhasDaAba);
-      abasValidas.push({abaName,info,colMap,modoAvaliacao,linhas:linhasDaAba});
+      abasValidas.push({abaName,info,colMap,modoAvaliacao,linhas:linhasDaAba,avisoAno:anoCheck.nivel==='warn'?anoCheck.motivo:null});
     }
 
     // ← await correto (esse era o bug original do importar.html)
@@ -1173,9 +1226,9 @@ async function importarSelecionadas() {
 
     let batchIdx=0, idsCriados=0, totalAlunos=0, totalTurmas=0;
 
-    for (const {abaName,info,colMap,modoAvaliacao,linhas} of abasValidas) {
+    for (const {abaName,info,colMap,modoAvaliacao,linhas,avisoAno} of abasValidas) {
       const vocab=detectarVocabularioCabecalho(info.serieTexto);
-      const divergencias=[];
+      const divergencias=avisoAno ? [`[Ano letivo] ${avisoAno}`] : [];
       const novos=[];
       for (const {row,nomeAluno} of linhas) {
         const res=resultadosBatch[batchIdx++]; if(!res) continue;
@@ -1206,7 +1259,7 @@ async function importarSelecionadas() {
       if (idx>=0) turmasDB[idx]=turma; else turmasDB.push(turma);
 
       totalTurmas++; totalAlunos+=novos.length;
-      const badge=(info.anoLetivo?'ANO OK':'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
+      const badge=(info.anoLetivo?(avisoAno?'ANO ⚠️':'ANO OK'):'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
       resultadosAbas.push({abaName, ok:true, qtdAlunos:novos.length, badge, divergencias});
     }
 
@@ -1221,7 +1274,12 @@ async function importarSelecionadas() {
     saida.innerHTML=renderResultadoImportacao(resultadosAbas, resumoTexto);
     renderTabelaTurmas();
     atualizarStats();
-    setMsg(`${totalTurmas} turma(s) e ${totalAlunos} aluno(s) importados.`, 'ok');
+    const bloqueadas=resultadosAbas.filter(r=>!r.ok).length;
+    if (bloqueadas>0) {
+      setMsg(`${totalTurmas} turma(s) importada(s) • ${bloqueadas} aba(s) BLOQUEADA(s) por ano letivo inválido — veja o log.`, 'warn');
+    } else {
+      setMsg(`${totalTurmas} turma(s) e ${totalAlunos} aluno(s) importados.`, 'ok');
+    }
 
   } catch(err) {
     console.error('[gerir-dados] Erro XLSX:', err);
