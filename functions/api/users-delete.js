@@ -6,13 +6,20 @@
  * Retorna: { success: true }
  *
  * Faz o que Auth.deleteUser(uid) deveria sempre ter feito:
- *  1. Confirma que quem está chamando é um usuário autenticado (verifica o
- *     ID token contra as chaves públicas do Google).
+ *  1. Confirma que quem está chamando é um usuário autenticado (delega a
+ *     validação do ID token pro Google via accounts:lookup).
  *  2. Confirma que quem está chamando tem role 'admin' no Firestore.
  *  3. Apaga a conta no Firebase Authentication (Identity Toolkit REST API).
  *  4. Apaga o doc users/{uid} no Firestore.
- * Tudo via REST + Web Crypto — sem firebase-admin (não roda no runtime do
- * Cloudflare Pages) e sem precisar de Cloud Functions/plano Blaze.
+ * Tudo via REST — sem firebase-admin (não roda no runtime do Cloudflare
+ * Pages) e sem precisar de Cloud Functions/plano Blaze.
+ *
+ * Variáveis de ambiente necessárias (Cloudflare Pages → Settings →
+ * Environment variables, tipo Secret):
+ *  - FIREBASE_CLIENT_EMAIL  (da service account)
+ *  - FIREBASE_PRIVATE_KEY   (da service account)
+ *  - FIREBASE_API_KEY       (a mesma apiKey pública do FIREBASE_CONFIG em
+ *    auth.firebase.js — não é segredo, mas fica mais organizado como env var)
  */
 
 const PROJECT_ID = 'sistema-jose-cunha';
@@ -25,20 +32,11 @@ function corsHeaders() {
   };
 }
 
-/* ─── Base64url helpers ─── */
+/* ─── Base64url encode (usado só pra montar o JWT da service account) ─── */
 function b64urlEncode(bytes) {
   let bin = '';
   bytes.forEach(b => { bin += String.fromCharCode(b); });
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function b64urlDecodeToBytes(str) {
-  str = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (str.length % 4) str += '=';
-  const bin = atob(str);
-  return Uint8Array.from(bin, c => c.charCodeAt(0));
-}
-function b64urlDecodeToJson(str) {
-  return JSON.parse(new TextDecoder().decode(b64urlDecodeToBytes(str)));
 }
 
 /* ─── Importa a chave privada da service account (PEM PKCS8) pra assinar ─── */
@@ -92,44 +90,25 @@ async function getServiceAccountAccessToken(env) {
   return data.access_token;
 }
 
-/* ─── Verifica o ID token do Firebase Auth de quem está chamando ─── */
-async function verifyIdToken(idToken) {
-  const [encHeader, encClaims, encSig] = idToken.split('.');
-  if (!encHeader || !encClaims || !encSig) throw new Error('Token inválido.');
-
-  const header = b64urlDecodeToJson(encHeader);
-  const claims = b64urlDecodeToJson(encClaims);
-
-  const now = Math.floor(Date.now() / 1000);
-  if (claims.exp < now) throw new Error('Token expirado.');
-  if (claims.aud !== PROJECT_ID) throw new Error('Token de projeto errado.');
-  if (claims.iss !== `https://securetoken.google.com/${PROJECT_ID}`) throw new Error('Issuer inválido.');
-
-  // Busca a chave pública correspondente ao kid do header
-  const jwksRes = await fetch(
-    'https://www.googleapis.com/service_accounts/v1/jwk/[email protected]'
+/* ─── Verifica o ID token do Firebase Auth de quem está chamando ───
+   Em vez de verificar a assinatura na mão (buscar JWKS, importar chave
+   RS256 etc — processo mais propenso a bug), delega a validação pro
+   próprio Google via accounts:lookup. Se o token for válido, ele devolve
+   os dados do usuário; se for inválido/expirado, retorna erro. */
+async function verifyIdToken(idToken, env) {
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    }
   );
-  const jwks = await jwksRes.json();
-  const jwk = (jwks.keys || []).find(k => k.kid === header.kid);
-  if (!jwk) throw new Error('Chave pública não encontrada para verificar o token.');
-
-  const pubKey = await crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['verify']
-  );
-
-  const valid = await crypto.subtle.verify(
-    'RSASSA-PKCS1-v1_5',
-    pubKey,
-    b64urlDecodeToBytes(encSig),
-    new TextEncoder().encode(`${encHeader}.${encClaims}`)
-  );
-  if (!valid) throw new Error('Assinatura do token inválida.');
-
-  return claims; // claims.sub = uid do chamador
+  const data = await res.json();
+  if (!res.ok || !data.users || !data.users.length) {
+    throw new Error('Token inválido ou expirado. Faça login novamente.');
+  }
+  return { sub: data.users[0].localId };
 }
 
 /* ─── Firestore REST: lê um doc ─── */
@@ -198,7 +177,7 @@ export async function onRequestPost({ request, env }) {
     }
 
     // 1. Confirma quem está chamando
-    const callerClaims = await verifyIdToken(idToken);
+    const callerClaims = await verifyIdToken(idToken, env);
     const callerUid = callerClaims.sub;
 
     // 2. Pega o access token da service account (usado tanto pra checar
