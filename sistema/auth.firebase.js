@@ -164,9 +164,24 @@
       await _db.collection('users').doc(uid).set({ role: 'user' }, { merge: true });
     },
 
-    /** Reprova/remove um usuário. */
+    /**
+     * Reprova/remove um usuário — apaga a conta no Firebase Authentication
+     * E o doc no Firestore, via /api/users-delete (Cloudflare Pages
+     * Function). Antes só apagava o doc do Firestore, deixando a conta
+     * "excluída" ainda válida pra login no Firebase Auth.
+     */
     async deleteUser(uid) {
-      await _db.collection('users').doc(uid).delete();
+      const idToken = await _auth.currentUser.getIdToken();
+      const res = await fetch('/api/users-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + idToken,
+        },
+        body: JSON.stringify({ uid }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Falha ao excluir usuário.');
     },
 
     /** Aguarda o Firebase Auth inicializar e chama o callback. */
