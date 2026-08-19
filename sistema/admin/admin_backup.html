@@ -129,6 +129,25 @@
   </div>
 
   <div class="l-section">
+    <div class="l-slabel">// escopo</div>
+    <div class="l-sline"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🎯 Escopo das ações abaixo</div>
+    <div class="card-desc">Escolha se backup, restauração e limpeza afetam só a escola ativa no cabeçalho, ou todas as escolas do sistema de uma vez.</div>
+    <div class="row" style="margin-top:0;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
+        <input type="radio" name="scope" id="scopeEscola" value="escola" checked> Esta escola
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
+        <input type="radio" name="scope" id="scopeTodas" value="todas"> Todas as escolas
+      </label>
+    </div>
+    <div class="meta-line" id="scopeInfo" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="l-section">
     <div class="l-slabel">// backup</div>
     <div class="l-sline"></div>
   </div>
@@ -136,7 +155,7 @@
   <div class="grid">
     <div class="card">
       <div class="card-title">⬇️ Exportar backup</div>
-      <div class="card-desc">Gera um arquivo <code>.json</code> com todos os dados do sistema no localStorage. Útil antes de importações ou limpezas.</div>
+      <div class="card-desc" id="exportDesc">Gera um arquivo <code>.json</code> com os dados do sistema.</div>
       <div class="row" style="margin-top:0;">
         <button class="btn-action" onclick="exportarBackup()" type="button">Baixar backup</button>
         <span style="font-size:12px;color:var(--muted);">Inclui turmas, alunos, schemas e auxiliares.</span>
@@ -145,7 +164,7 @@
 
     <div class="card">
       <div class="card-title">⬆️ Restaurar backup</div>
-      <div class="warn-box">⚠️ Restaurar substitui os dados existentes nas chaves do sistema. Faça backup antes se não tiver certeza.</div>
+      <div class="warn-box" id="restoreWarn">⚠️ Restaurar substitui os dados existentes. Faça backup antes se não tiver certeza.</div>
       <label class="btn-file">
         Escolher backup (.json)
         <input accept=".json,application/json" id="fileBackup" onchange="previewBackup(event)" style="display:none" type="file"/>
@@ -165,11 +184,11 @@
 
   <div class="card">
     <div class="card-title">🧹 Limpeza controlada</div>
-    <div class="danger-box">⛔ As ações abaixo apagam dados permanentemente. Não é possível desfazer sem um backup.</div>
+    <div class="danger-box" id="cleanupWarn">⛔ As ações abaixo apagam dados permanentemente. Não é possível desfazer sem um backup.</div>
     <div class="row" style="margin-top:0;">
-      <button class="btn-danger" onclick="limparTudo()" type="button">Apagar TODOS os dados</button>
-      <button class="btn-danger" onclick="apagarTurmas()" type="button">Apagar somente turmas</button>
-      <button class="btn-danger" onclick="limparAlunosIds()" type="button">Limpar alunos / IDs</button>
+      <button class="btn-danger" id="btnLimparTudo" onclick="limparTudo()" type="button">Apagar TODOS os dados</button>
+      <button class="btn-danger" id="btnApagarTurmas" onclick="apagarTurmas()" type="button">Apagar somente turmas</button>
+      <button class="btn-danger" id="btnLimparAlunos" onclick="limparAlunosIds()" type="button">Limpar alunos / IDs</button>
     </div>
     <div class="meta-line" style="margin-top:14px;">
       <b>Apagar somente turmas</b> remove <code>turmasDB</code> e auxiliares derivados (<code>atasDB</code>, <code>matriculasDB</code>, <code>turmasMetaDB</code>).<br/>
@@ -221,6 +240,70 @@
     try{ const raw = localStorage.getItem(key); if (!raw) return fallback; return JSON.parse(raw); } catch (e){ return fallback; }
   }
 
+  /* ── Escopo escolhido nos rádios da página ── */
+  function getScope(){
+    return document.getElementById('scopeTodas')?.checked ? 'todas' : 'escola';
+  }
+  // Escola realmente ativa (não o marcador fantasma 'ADMIN'), ou null se
+  // nenhuma escola de verdade estiver selecionada no cabeçalho.
+  function getRealActiveSchoolId(){
+    const sid = _activeSchoolId();
+    return (sid && sid.toUpperCase() !== 'ADMIN') ? sid : null;
+  }
+  async function listAllRealSchoolIds(){
+    const snap = await window.Auth.db.collection('schools').get();
+    return snap.docs.map(d => d.id);
+  }
+
+  /* ══════════════════════════════════════════════════════
+     Leitura/gravação direto no Firestore por schoolId
+     explícito — NUNCA passa pelo window.DB aqui, porque o
+     cache de db.firebase.js é por nome de coleção só (não
+     por escola): se este código trocasse a "escola ativa" pra
+     percorrer todas as escolas, o DB.*.list() poderia devolver
+     dado em cache da escola anterior por até 30s. Indo direto
+     no Firestore com o schoolId explícito, esse risco não existe.
+  ══════════════════════════════════════════════════════ */
+  async function _listFSCol(schoolId, colName){
+    const snap = await window.Auth.db.collection('schools').doc(schoolId).collection(colName).get();
+    return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+  }
+  async function _saveAllFS(schoolId, colName, arr){
+    if (!Array.isArray(arr) || !arr.length) return;
+    const db = window.Auth.db;
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    const colRef = db.collection('schools').doc(schoolId).collection(colName);
+    for (let i = 0; i < arr.length; i += 400){
+      const batch = db.batch();
+      arr.slice(i, i + 400).forEach(obj => {
+        const { _id, ...data } = obj;
+        data.updatedAt = ts;
+        const businessKey = _id || obj.id || obj.alunoId || obj.turmaId || obj.matriculaId || null;
+        const ref = businessKey ? colRef.doc(String(businessKey)) : colRef.doc();
+        batch.set(ref, data, { merge: true });
+      });
+      await batch.commit();
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════
+     HELPER: apaga TODOS os documentos de uma sub-coleção
+     do Firestore em lotes de 400 (limite seguro do batch).
+  ══════════════════════════════════════════════════════ */
+  async function _deleteColRecursive(colRef, batchSize = 400){
+    const snap = await colRef.limit(batchSize).get();
+    if (snap.empty) return;
+    const batch = window.Auth.db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    if (snap.size === batchSize) await _deleteColRecursive(colRef, batchSize); // há mais docs
+  }
+  async function _clearFSColFor(schoolId, colName){
+    if (!window.Auth?.db || !schoolId) return;
+    const ref = window.Auth.db.collection('schools').doc(schoolId).collection(colName);
+    await _deleteColRecursive(ref);
+  }
+
   let _backupParsed = null;
 
   function setOut(msg){
@@ -237,53 +320,67 @@
     URL.revokeObjectURL(url);
   }
 
-  /* ══════════════════════════════════════════════════════
-     HELPER: apaga TODOS os documentos de uma sub-coleção
-     do Firestore em lotes de 400 (limite seguro do batch).
-  ══════════════════════════════════════════════════════ */
-  async function _deleteColRecursive(colRef, batchSize = 400){
-    const snap = await colRef.limit(batchSize).get();
-    if (snap.empty) return;
-    const batch = window.Auth.db.batch();
-    snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-    if (snap.size === batchSize) await _deleteColRecursive(colRef, batchSize); // há mais docs
-  }
-
-  async function _clearFSCol(colName){
-    if (!window.Auth?.db) return;
-    const schoolId = window.Auth.getActiveSchoolId();
-    if (!schoolId) return;
-    const ref = window.Auth.db.collection('schools').doc(schoolId).collection(colName);
-    await _deleteColRecursive(ref);
-  }
-
   /* ══════════════════════════════════════════
      EXPORTAR — lê do Firestore (fonte real)
   ══════════════════════════════════════════ */
   async function exportarBackup(){
-    setOut("⏳ Lendo dados do Firestore…");
-    try{
-      const dados = await window.DB.loadAll();
-      const schemas = await window.DB.schemas.list();
-      const data = {
-        turmasDB:         dados.turmasDB      || [],
-        alunosDB:         dados.alunosDB      || [],
-        matriculasDB:     dados.matriculasDB  || [],
-        atasDB:           dados.atasDB        || [],
-        turmasSchemas_v1: schemas             || [],
-        dadosEscola:      dados.dadosEscola   || {},
-      };
-      const payload = {
-        meta: { exportedAt: new Date().toISOString(), origin: location.origin, source: 'firestore', keys: Object.keys(data) },
-        data
-      };
-      const stamp = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
-      downloadText(`backup_firebase_${stamp}.json`, JSON.stringify(payload, null, 2));
-      setOut("✅ Backup gerado a partir do Firestore e baixado.");
-    } catch(e){
-      console.error(e);
-      setOut("❌ Erro ao exportar: " + e.message);
+    const scope = getScope();
+    if (scope === 'escola'){
+      const schoolId = getRealActiveSchoolId();
+      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de exportar (nenhuma está ativa agora).'); return; }
+      setOut("⏳ Lendo dados da escola ativa no Firestore…");
+      try{
+        const [turmasDB, alunosDB, matriculasDB, atasDB, schemas, escolaDoc] = await Promise.all([
+          _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
+          _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
+          _listFSCol(schoolId, 'schemasCH'),
+          window.Auth.db.collection('schools').doc(schoolId).get(),
+        ]);
+        const data = {
+          turmasDB, alunosDB, matriculasDB, atasDB,
+          turmasSchemas_v1: schemas,
+          dadosEscola: escolaDoc.exists ? escolaDoc.data() : {},
+        };
+        const payload = {
+          meta: { exportedAt: new Date().toISOString(), origin: location.origin, source: 'firestore', scope: 'escola', schoolId, keys: Object.keys(data) },
+          data
+        };
+        const stamp = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+        downloadText(`backup_${schoolId}_${stamp}.json`, JSON.stringify(payload, null, 2));
+        setOut("✅ Backup da escola gerado e baixado.");
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao exportar: " + e.message);
+      }
+    } else {
+      setOut("⏳ Lendo dados de TODAS as escolas no Firestore…");
+      try{
+        const schoolIds = await listAllRealSchoolIds();
+        const bySchool = {};
+        for (const schoolId of schoolIds){
+          const [turmasDB, alunosDB, matriculasDB, atasDB, schemas, escolaDoc] = await Promise.all([
+            _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
+            _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
+            _listFSCol(schoolId, 'schemasCH'),
+            window.Auth.db.collection('schools').doc(schoolId).get(),
+          ]);
+          bySchool[schoolId] = {
+            turmasDB, alunosDB, matriculasDB, atasDB,
+            turmasSchemas_v1: schemas,
+            dadosEscola: escolaDoc.exists ? escolaDoc.data() : {},
+          };
+        }
+        const payload = {
+          meta: { exportedAt: new Date().toISOString(), origin: location.origin, source: 'firestore', scope: 'todas', schools: schoolIds },
+          bySchool
+        };
+        const stamp = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+        downloadText(`backup_todas_escolas_${stamp}.json`, JSON.stringify(payload, null, 2));
+        setOut(`✅ Backup de ${schoolIds.length} escola(s) gerado e baixado.`);
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao exportar: " + e.message);
+      }
     }
   }
 
@@ -297,15 +394,37 @@
     reader.onload = () => {
       try{
         const parsed = JSON.parse(String(reader.result || ""));
+        const isMultiSchool = !!parsed?.bySchool;
+        const isSingleSchool = !!parsed?.data;
+        if (!isMultiSchool && !isSingleSchool) throw new Error('formato desconhecido');
         _backupParsed = parsed;
-        const keys = parsed?.data ? Object.keys(parsed.data) : [];
-        document.getElementById("preview").textContent =
-          `Arquivo: ${file.name}\nOrigin: ${parsed?.meta?.origin || "?"}\nExportado em: ${parsed?.meta?.exportedAt || "?"}\nFonte: ${parsed?.meta?.source || "localStorage (legado)"}\nChaves: ${keys.length}\n${keys.join(", ")}`;
+        const scope = getScope();
+        if (isMultiSchool && scope !== 'todas'){
+          document.getElementById("preview").textContent = "⚠️ Este arquivo é um backup de TODAS as escolas — mude o escopo acima pra 'Todas as escolas' antes de restaurar.";
+          document.getElementById("btnRestore").disabled = true;
+          document.getElementById("btnCancel").disabled  = false;
+          return;
+        }
+        if (isSingleSchool && scope !== 'escola'){
+          document.getElementById("preview").textContent = "⚠️ Este arquivo é um backup de UMA escola só — mude o escopo acima pra 'Esta escola' antes de restaurar.";
+          document.getElementById("btnRestore").disabled = true;
+          document.getElementById("btnCancel").disabled  = false;
+          return;
+        }
+        let resumo;
+        if (isMultiSchool){
+          const schoolIds = Object.keys(parsed.bySchool || {});
+          resumo = `Arquivo: ${file.name}\nOrigin: ${parsed?.meta?.origin || "?"}\nExportado em: ${parsed?.meta?.exportedAt || "?"}\nEscopo: todas as escolas\nEscolas no arquivo: ${schoolIds.length}\n${schoolIds.join(", ")}`;
+        } else {
+          const keys = Object.keys(parsed.data || {});
+          resumo = `Arquivo: ${file.name}\nOrigin: ${parsed?.meta?.origin || "?"}\nExportado em: ${parsed?.meta?.exportedAt || "?"}\nEscopo: escola (${parsed?.meta?.schoolId || "?"})\nFonte: ${parsed?.meta?.source || "localStorage (legado)"}\nChaves: ${keys.length}\n${keys.join(", ")}`;
+        }
+        document.getElementById("preview").textContent = resumo;
         document.getElementById("btnRestore").disabled = false;
         document.getElementById("btnCancel").disabled  = false;
       } catch(e){
         _backupParsed = null;
-        document.getElementById("preview").textContent = "❌ Arquivo inválido (não é JSON de backup).";
+        document.getElementById("preview").textContent = "❌ Arquivo inválido (não é JSON de backup reconhecido).";
         document.getElementById("btnRestore").disabled = true;
         document.getElementById("btnCancel").disabled  = false;
       }
@@ -325,69 +444,127 @@
      RESTAURAR — grava no Firestore
   ══════════════════════════════════════════ */
   async function restaurarBackup(){
-    if (!_backupParsed || !_backupParsed.data){ alert("Selecione um backup válido."); return; }
+    if (!_backupParsed){ alert("Selecione um backup válido."); return; }
     const originBk = String(_backupParsed?.meta?.origin || "");
     if (originBk && originBk !== location.origin){
       const ok = confirm("Este backup foi gerado em outro domínio:\n" + originBk + "\n\nDeseja restaurar mesmo assim?");
       if (!ok) return;
     }
-    const keys = Object.keys(_backupParsed.data || {});
-    if (!keys.length){ alert("Backup vazio."); return; }
-    const ok = confirm("Restaurar substituirá os dados existentes no Firestore.\n\nChaves: " + keys.join(", ") + "\n\nContinuar?");
-    if (!ok) return;
-
-    setOut("⏳ Restaurando no Firestore…");
+    const scope = getScope();
     const FS_MAP = {
       turmasDB:         'turmas',
       alunosDB:         'alunos',
       matriculasDB:     'matriculas',
       atasDB:           'atas',
-      turmasSchemas_v1: 'schemas',
-      dadosEscola:      'escola',
+      turmasSchemas_v1: 'schemasCH',
     };
-    try{
-      for (const k of keys){
-        const col = FS_MAP[k]; if (!col) continue;
-        const val = _backupParsed.data[k];
-        if (col === 'escola'){
-          await window.DB.escola.save(val);
-        } else {
-          const fc = window.DB[col]; if (!fc) continue;
-          if (Array.isArray(val)) await fc.saveAll(val);
-          else if (val && typeof val === 'object') await fc.save(val);
+
+    if (scope === 'escola'){
+      if (!_backupParsed.data){ alert("Este arquivo não é um backup de escola única."); return; }
+      const schoolId = getRealActiveSchoolId();
+      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de restaurar.'); return; }
+      const keys = Object.keys(_backupParsed.data || {});
+      if (!keys.length){ alert("Backup vazio."); return; }
+      const ok = confirm(`Restaurar substituirá os dados existentes da escola "${schoolId}" no Firestore.\n\nChaves: ${keys.join(", ")}\n\nContinuar?`);
+      if (!ok) return;
+
+      setOut("⏳ Restaurando no Firestore…");
+      try{
+        for (const k of keys){
+          const col = FS_MAP[k]; if (!col) continue;
+          const val = _backupParsed.data[k];
+          if (k === 'dadosEscola'){
+            if (val && typeof val === 'object') await window.Auth.db.collection('schools').doc(schoolId).set(val, { merge: true });
+            continue;
+          }
+          if (Array.isArray(val)) await _saveAllFS(schoolId, col, val);
         }
+        setOut("✅ Backup restaurado com sucesso no Firestore.");
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao restaurar: " + e.message);
       }
-      setOut("✅ Backup restaurado com sucesso no Firestore.");
-    } catch(e){
-      console.error(e);
-      setOut("❌ Erro ao restaurar: " + e.message);
+      cancelarRestore();
+    } else {
+      if (!_backupParsed.bySchool){ alert("Este arquivo não é um backup de todas as escolas."); return; }
+      const schoolIds = Object.keys(_backupParsed.bySchool);
+      if (!schoolIds.length){ alert("Backup vazio."); return; }
+      const ok = confirm(`Restaurar substituirá os dados existentes de ${schoolIds.length} escola(s) no Firestore:\n\n${schoolIds.join(", ")}\n\nContinuar?`);
+      if (!ok) return;
+      const ok2 = prompt(`Ação de alto risco — digita RESTAURAR TUDO pra confirmar que quer sobrescrever ${schoolIds.length} escola(s):`);
+      if (ok2 !== 'RESTAURAR TUDO'){ setOut("Restauração cancelada (confirmação não bateu)."); return; }
+
+      setOut(`⏳ Restaurando ${schoolIds.length} escola(s) no Firestore…`);
+      try{
+        for (const schoolId of schoolIds){
+          const schoolData = _backupParsed.bySchool[schoolId] || {};
+          const keys = Object.keys(schoolData);
+          for (const k of keys){
+            const col = FS_MAP[k]; if (!col) continue;
+            const val = schoolData[k];
+            if (k === 'dadosEscola'){
+              if (val && typeof val === 'object') await window.Auth.db.collection('schools').doc(schoolId).set(val, { merge: true });
+              continue;
+            }
+            if (Array.isArray(val)) await _saveAllFS(schoolId, col, val);
+          }
+        }
+        setOut(`✅ ${schoolIds.length} escola(s) restaurada(s) com sucesso no Firestore.`);
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao restaurar: " + e.message);
+      }
+      cancelarRestore();
     }
-    cancelarRestore();
   }
 
   /* ══════════════════════════════════════════
      LIMPAR TUDO — apaga coleções no Firestore
   ══════════════════════════════════════════ */
   async function limparTudo(){
-    const ok = confirm("Tem certeza? Isso apagará TODOS os dados do sistema no Firestore (turmas, alunos, matrículas, atas, schemas).\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.");
-    if (!ok) return;
-    setOut("⏳ Apagando todos os dados do Firestore…");
-
-    // Limpa localStorage também (cache local)
-    for (const k of SYSTEM_KEYS) localStorage.removeItem(scopedKey(k));
-
-    try{
-      await Promise.all([
-        _clearFSCol('turmas'),
-        _clearFSCol('alunos'),
-        _clearFSCol('matriculas'),
-        _clearFSCol('atas'),
-        _clearFSCol('schemasCH'),
-      ]);
-      setOut("🧹 Reset total concluído. Todos os dados foram apagados do Firestore.");
-    } catch(e){
-      console.error(e);
-      setOut("❌ Erro ao apagar Firestore: " + e.message);
+    const scope = getScope();
+    if (scope === 'escola'){
+      const schoolId = getRealActiveSchoolId();
+      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de limpar.'); return; }
+      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore (turmas, alunos, matrículas, atas, schemas).\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`);
+      if (!ok) return;
+      setOut(`⏳ Apagando todos os dados da escola "${schoolId}"…`);
+      for (const k of SYSTEM_KEYS) localStorage.removeItem(scopedKey(k));
+      try{
+        await Promise.all([
+          _clearFSColFor(schoolId, 'turmas'),
+          _clearFSColFor(schoolId, 'alunos'),
+          _clearFSColFor(schoolId, 'matriculas'),
+          _clearFSColFor(schoolId, 'atas'),
+          _clearFSColFor(schoolId, 'schemasCH'),
+        ]);
+        setOut(`🧹 Reset da escola "${schoolId}" concluído.`);
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao apagar Firestore: " + e.message);
+      }
+    } else {
+      const schoolIds = await listAllRealSchoolIds();
+      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore (turmas, alunos, matrículas, atas, schemas).\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`);
+      if (!ok) return;
+      const ok2 = prompt('Ação de altíssimo risco — digita APAGAR TUDO pra confirmar:');
+      if (ok2 !== 'APAGAR TUDO'){ setOut("Limpeza cancelada (confirmação não bateu)."); return; }
+      setOut(`⏳ Apagando todos os dados de ${schoolIds.length} escola(s)…`);
+      try{
+        for (const schoolId of schoolIds){
+          await Promise.all([
+            _clearFSColFor(schoolId, 'turmas'),
+            _clearFSColFor(schoolId, 'alunos'),
+            _clearFSColFor(schoolId, 'matriculas'),
+            _clearFSColFor(schoolId, 'atas'),
+            _clearFSColFor(schoolId, 'schemasCH'),
+          ]);
+        }
+        setOut(`🧹 Reset total concluído. Todos os dados de ${schoolIds.length} escola(s) foram apagados do Firestore.`);
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao apagar Firestore: " + e.message);
+      }
     }
   }
 
@@ -395,22 +572,43 @@
      APAGAR SOMENTE TURMAS
   ══════════════════════════════════════════ */
   async function apagarTurmas(){
-    const ok = confirm("Apagar turmas? Remove turmas, atas e matrículas do Firestore.\nAlunos e catálogo permanecem intactos.");
-    if (!ok) return;
-    setOut("⏳ Apagando turmas do Firestore…");
-
-    ["turmasDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
-
-    try{
-      await Promise.all([
-        _clearFSCol('turmas'),
-        _clearFSCol('atas'),
-        _clearFSCol('matriculas'),
-      ]);
-      setOut("🧹 Turmas, atas e matrículas apagadas do Firestore.");
-    } catch(e){
-      console.error(e);
-      setOut("❌ Erro ao apagar turmas: " + e.message);
+    const scope = getScope();
+    if (scope === 'escola'){
+      const schoolId = getRealActiveSchoolId();
+      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de apagar.'); return; }
+      const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas do Firestore.\nAlunos e catálogo permanecem intactos.`);
+      if (!ok) return;
+      setOut("⏳ Apagando turmas do Firestore…");
+      ["turmasDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
+      try{
+        await Promise.all([
+          _clearFSColFor(schoolId, 'turmas'),
+          _clearFSColFor(schoolId, 'atas'),
+          _clearFSColFor(schoolId, 'matriculas'),
+        ]);
+        setOut("🧹 Turmas, atas e matrículas apagadas do Firestore.");
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao apagar turmas: " + e.message);
+      }
+    } else {
+      const schoolIds = await listAllRealSchoolIds();
+      const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas do Firestore.\nAlunos e catálogo permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
+      if (!ok) return;
+      setOut(`⏳ Apagando turmas de ${schoolIds.length} escola(s)…`);
+      try{
+        for (const schoolId of schoolIds){
+          await Promise.all([
+            _clearFSColFor(schoolId, 'turmas'),
+            _clearFSColFor(schoolId, 'atas'),
+            _clearFSColFor(schoolId, 'matriculas'),
+          ]);
+        }
+        setOut("🧹 Turmas, atas e matrículas apagadas de todas as escolas.");
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao apagar turmas: " + e.message);
+      }
     }
   }
 
@@ -418,22 +616,43 @@
      LIMPAR ALUNOS / IDs
   ══════════════════════════════════════════ */
   async function limparAlunosIds(){
-    const ok = confirm("Limpar alunos/IDs? Remove a coleção de alunos, matrículas e atas do Firestore.\nAs turmas permanecem.");
-    if (!ok) return;
-    setOut("⏳ Apagando alunos do Firestore…");
-
-    ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
-
-    try{
-      await Promise.all([
-        _clearFSCol('alunos'),
-        _clearFSCol('matriculas'),
-        _clearFSCol('atas'),
-      ]);
-      setOut("🧹 Alunos, matrículas e atas apagados do Firestore.");
-    } catch(e){
-      console.error(e);
-      setOut("❌ Erro ao apagar alunos: " + e.message);
+    const scope = getScope();
+    if (scope === 'escola'){
+      const schoolId = getRealActiveSchoolId();
+      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de limpar.'); return; }
+      const ok = confirm(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas e atas do Firestore.\nAs turmas permanecem.`);
+      if (!ok) return;
+      setOut("⏳ Apagando alunos do Firestore…");
+      ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
+      try{
+        await Promise.all([
+          _clearFSColFor(schoolId, 'alunos'),
+          _clearFSColFor(schoolId, 'matriculas'),
+          _clearFSColFor(schoolId, 'atas'),
+        ]);
+        setOut("🧹 Alunos, matrículas e atas apagados do Firestore.");
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao apagar alunos: " + e.message);
+      }
+    } else {
+      const schoolIds = await listAllRealSchoolIds();
+      const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas do Firestore.\nAs turmas permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
+      if (!ok) return;
+      setOut(`⏳ Apagando alunos de ${schoolIds.length} escola(s)…`);
+      try{
+        for (const schoolId of schoolIds){
+          await Promise.all([
+            _clearFSColFor(schoolId, 'alunos'),
+            _clearFSColFor(schoolId, 'matriculas'),
+            _clearFSColFor(schoolId, 'atas'),
+          ]);
+        }
+        setOut("🧹 Alunos, matrículas e atas apagados de todas as escolas.");
+      } catch(e){
+        console.error(e);
+        setOut("❌ Erro ao apagar alunos: " + e.message);
+      }
     }
   }
 
@@ -459,28 +678,97 @@
     document.getElementById("origin").textContent = location.origin;
     document.getElementById("dbMeta").innerHTML = '<span style="color:var(--muted)">Carregando do Firestore…</span>';
     try{
-      if (!window.DB || !window.Auth || !window.Auth.getSession()) throw new Error('sem auth');
-      const [dados, schemas] = await Promise.all([
-        window.DB.loadAll(),
-        window.DB.schemas.list(),
-      ]);
-      const turmas      = dados.turmasDB     || [];
-      const alunosDB    = dados.alunosDB     || [];
-      const matriculasDB = dados.matriculasDB || [];
-      const atasDB      = dados.atasDB       || [];
-      document.getElementById("dbMeta").innerHTML = `
-        <div><b>Turmas:</b> ${turmas.length} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${contarAlunosUnicosEmTurmas(turmas)} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${alunosDB.length}</div>
-        <div><b>Schemas CH:</b> ${schemas.length} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${matriculasDB.length} &nbsp;•&nbsp; <b>Atas (aux):</b> ${atasDB.length}</div>
-        <div style="margin-top:4px;font-size:12px;color:var(--muted)">✅ Dados lidos direto do Firestore</div>
-      `;
+      if (!window.Auth || !window.Auth.db || !window.Auth.getSession()) throw new Error('sem auth');
+      const scope = getScope();
+      if (scope === 'escola'){
+        const schoolId = getRealActiveSchoolId();
+        if (!schoolId){
+          document.getElementById("dbMeta").innerHTML = '<span style="color:var(--muted)">Nenhuma escola real selecionada no cabeçalho.</span>';
+        } else {
+          const [turmas, alunosDB, matriculasDB, atasDB, schemas] = await Promise.all([
+            _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
+            _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
+            _listFSCol(schoolId, 'schemasCH'),
+          ]);
+          document.getElementById("dbMeta").innerHTML = `
+            <div><b>Escola:</b> ${schoolId}</div>
+            <div><b>Turmas:</b> ${turmas.length} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${contarAlunosUnicosEmTurmas(turmas)} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${alunosDB.length}</div>
+            <div><b>Schemas CH:</b> ${schemas.length} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${matriculasDB.length} &nbsp;•&nbsp; <b>Atas (aux):</b> ${atasDB.length}</div>
+            <div style="margin-top:4px;font-size:12px;color:var(--muted)">✅ Dados lidos direto do Firestore</div>
+          `;
+        }
+      } else {
+        const schoolIds = await listAllRealSchoolIds();
+        let totTurmas=0, totAlunosCat=0, totAlunosTurmas=0, totSchemas=0, totMat=0, totAtas=0;
+        for (const schoolId of schoolIds){
+          const [turmas, alunosDB, matriculasDB, atasDB, schemas] = await Promise.all([
+            _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
+            _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
+            _listFSCol(schoolId, 'schemasCH'),
+          ]);
+          totTurmas += turmas.length;
+          totAlunosTurmas += contarAlunosUnicosEmTurmas(turmas);
+          totAlunosCat += alunosDB.length;
+          totSchemas += schemas.length;
+          totMat += matriculasDB.length;
+          totAtas += atasDB.length;
+        }
+        document.getElementById("dbMeta").innerHTML = `
+          <div><b>${schoolIds.length} escola(s):</b> ${schoolIds.join(", ") || "—"}</div>
+          <div><b>Turmas:</b> ${totTurmas} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${totAlunosTurmas} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${totAlunosCat}</div>
+          <div><b>Schemas CH:</b> ${totSchemas} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${totMat} &nbsp;•&nbsp; <b>Atas (aux):</b> ${totAtas}</div>
+          <div style="margin-top:4px;font-size:12px;color:var(--muted)">✅ Totais somados de todas as escolas, lidos direto do Firestore</div>
+        `;
+      }
     } catch(e){
       document.getElementById("dbMeta").innerHTML = '<span style="color:var(--danger-color)">⚠️ Não foi possível ler o Firestore. Verifique o login.</span>';
     }
 
+    updateScopeUI();
     Loading.esconder(); // ← linha adicionada
   }
 
-  document.addEventListener("DOMContentLoaded", renderMeta);
+  // Reflete o escopo escolhido nos textos e trava as ações quando o modo
+  // 'escola' está ativo mas nenhuma escola real está selecionada no
+  // cabeçalho (evita mexer no documento fantasma 'schools/ADMIN').
+  function updateScopeUI(){
+    const scope = getScope();
+    const schoolId = getRealActiveSchoolId();
+    const info = document.getElementById("scopeInfo");
+    const blocked = scope === 'escola' && !schoolId;
+
+    if (scope === 'escola'){
+      info.innerHTML = schoolId
+        ? `Escola ativa: <b>${schoolId}</b>`
+        : `<span style="color:var(--danger-color)">⚠️ Nenhuma escola real está selecionada no cabeçalho. Escolha uma antes de usar as ações abaixo.</span>`;
+    } else {
+      info.textContent = "Vai afetar TODAS as escolas cadastradas no sistema, uma por uma.";
+    }
+
+    document.getElementById("exportDesc").textContent = scope === 'escola'
+      ? `Gera um .json com os dados da escola${schoolId ? ' "' + schoolId + '"' : ' ativa'}.`
+      : "Gera um .json com os dados de TODAS as escolas do sistema.";
+    document.getElementById("restoreWarn").textContent = scope === 'escola'
+      ? "⚠️ Restaura substituindo os dados da escola ativa. Faça backup antes se não tiver certeza."
+      : "⚠️ Restaura substituindo os dados de TODAS as escolas do arquivo. Faça backup antes se não tiver certeza.";
+    document.getElementById("cleanupWarn").textContent = scope === 'escola'
+      ? "⛔ As ações abaixo apagam dados da escola ativa permanentemente. Não é possível desfazer sem um backup."
+      : "⛔ As ações abaixo apagam dados de TODAS as escolas permanentemente. Não é possível desfazer sem um backup.";
+    document.getElementById("btnLimparTudo").textContent   = scope === 'escola' ? "Apagar TODOS os dados da escola" : "Apagar TODOS os dados (todas as escolas)";
+    document.getElementById("btnApagarTurmas").textContent = scope === 'escola' ? "Apagar somente turmas" : "Apagar turmas (todas as escolas)";
+    document.getElementById("btnLimparAlunos").textContent = scope === 'escola' ? "Limpar alunos / IDs" : "Limpar alunos / IDs (todas as escolas)";
+
+    ["btnLimparTudo","btnApagarTurmas","btnLimparAlunos","btnRestore"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && id !== 'btnRestore') el.disabled = blocked;
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    renderMeta();
+    document.getElementById("scopeEscola").addEventListener("change", renderMeta);
+    document.getElementById("scopeTodas").addEventListener("change", renderMeta);
+  });
 </script>
 
 </body>
