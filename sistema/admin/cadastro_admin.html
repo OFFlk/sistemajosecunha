@@ -330,6 +330,20 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       .filter(function(r){ return r.type === 'delete_user'; });
   }
 
+  // Apaga a solicitação processada e qualquer outra pendente pro MESMO
+  // usuário-alvo (duplicatas — mais de um gestor pedindo a exclusão do
+  // mesmo uid, ou o mesmo gestor clicando duas vezes). A decisão tomada
+  // numa vale pra todas: elas somem da fila, não pedem decisão de novo.
+  async function clearDuplicateDeleteRequests(targetUid, primaryRef){
+    try{ await primaryRef.delete(); }catch(_){ /* já pode ter sido apagada */ }
+    if(!targetUid) return;
+    try{
+      var all = await fetchPendingDeleteRequests();
+      var dupes = all.filter(function(r){ return r.changes && r.changes.targetUid === targetUid; });
+      await Promise.all(dupes.map(function(r){ return r._ref.delete().catch(function(){}); }));
+    }catch(_){ /* melhor deixar a duplicata pra próxima carga do que travar o fluxo */ }
+  }
+
   async function renderDeleteRequests(knownUsers){
     var tbody = el('delReqTbody');
     if(!tbody) return;
@@ -374,11 +388,11 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
               if(!targetUid) throw new Error('Solicitação sem uid alvo.');
               if(!confirm('Aprovar e excluir "'+(req.changes.targetName||targetUid)+'"? Esta ação não pode ser desfeita.')) { btn.disabled=false; return; }
               await Auth.deleteUser(targetUid);
-              await req._ref.delete();
-              setMsg('Usuário excluído e solicitação encerrada.');
+              await clearDuplicateDeleteRequests(targetUid, req._ref);
+              setMsg('Usuário excluído e solicitação(ões) encerrada(s).');
             } else {
-              await req._ref.delete();
-              setMsg('Solicitação reprovada — usuário mantido.');
+              await clearDuplicateDeleteRequests(req.changes && req.changes.targetUid, req._ref);
+              setMsg('Solicitação(ões) reprovada(s) — usuário mantido.');
             }
             await refresh();
           }catch(err){ setMsg(String(err&&err.message||err||'Erro'),true); btn.disabled=false; }
