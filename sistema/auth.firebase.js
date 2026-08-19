@@ -138,9 +138,18 @@
       return safeParse(localStorage.getItem('auth_schools_v1'), []);
     },
 
-    /** Lista todos os usuários (só admin). */
-    async listUsers() {
-      const snap = await _db.collection('users').get();
+    /**
+     * Lista usuários (admin global ou gestor de escola).
+     * Passe schoolId para restringir a query a uma escola específica —
+     * OBRIGATÓRIO para gestor de escola: as Rules exigem que a query em si
+     * já venha filtrada por schoolId (não dá pra buscar tudo e filtrar
+     * depois no cliente, a regra nega a lista inteira nesse caso).
+     * Admin global pode chamar sem argumento para trazer todo mundo.
+     */
+    async listUsers(schoolId) {
+      let query = _db.collection('users');
+      if (schoolId) query = query.where('schoolId', '==', schoolId);
+      const snap = await query.get();
       return snap.docs.map(d => {
         const data = d.data();
         delete data.uid; // garante que o uid sempre vem do ID do documento
