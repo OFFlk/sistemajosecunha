@@ -111,6 +111,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         <button class="tab active" type="button" data-view="requests">Solicitações</button>
         <button class="tab" type="button" data-view="users">Usuários</button>
         <button class="tab" type="button" data-view="admins">Admins</button>
+        <button class="tab" type="button" data-view="delrequests" id="tabDelRequests" style="display:none;">Exclusões</button>
       </div>
     </div>
 
@@ -175,6 +176,23 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
             <table>
               <thead><tr><th>Nome</th><th>Email</th><th>schoolId</th><th class="mono">uid</th><th>Ações</th></tr></thead>
               <tbody id="adminsTbody"><tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Exclusões pendentes (só admin global) -->
+      <section id="view-delrequests" style="display:none;">
+        <div class="note-box">
+          <div class="note-box-head">
+            <b>Solicitações de exclusão de usuário</b>
+            <span class="pill" id="delReqCount">0 pendente(s)</span>
+          </div>
+          <div class="note">Exclusões pedidas por gestores de escola ficam aqui até você aprovar ou reprovar.</div>
+          <div style="overflow:auto;">
+            <table>
+              <thead><tr><th>Usuário</th><th>Escola</th><th>Solicitado por</th><th>Data</th><th style="text-align:right;">Ações</th></tr></thead>
+              <tbody id="delReqTbody"><tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Carregando...</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -267,17 +285,130 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
     return true;
   }
 
+  // Monta a célula de ação da aba "Usuários": admin global exclui direto;
+  // gestor de escola solicita a exclusão (fica pendente até o admin global
+  // aprovar — mesmo padrão do fluxo de changeRequests já usado pra editar
+  // dados da escola).
+  // LIMITAÇÃO CONHECIDA: o botão do gestor sempre aparece como "Solicitar
+  // exclusão", mesmo que já exista uma solicitação pendente pro mesmo uid —
+  // ainda não leio changeRequests aqui pra marcar "já solicitado". Dá pra
+  // adicionar depois, junto do ajuste da página de aprovação.
+  function userActionCellHtml(u, isGlobalAdminFlag){
+    if(isGlobalAdminFlag){
+      return '<button class="btn-danger-sm" data-del-uid="'+escapeAttr(u.uid)+'" data-del-name="'+escapeAttr(u.name||u.email||'?')+'">Excluir</button>';
+    }
+    return '<button class="btn-danger-sm" data-del-uid="'+escapeAttr(u.uid)+'" data-del-name="'+escapeAttr(u.name||u.email||'?')+'">Solicitar exclusão</button>';
+  }
+
+  // NOTA PRA IMPLEMENTAÇÃO: preciso ver a página onde o admin global revisa
+  // e aprova as changeRequests (provavelmente admin_escolas.html) pra saber
+  // o formato exato que ela espera e adicionar lá o tratamento do type
+  // 'delete_user' (hoje ela só deve lidar com edição de nome/displayName da
+  // escola). Sem isso, a solicitação fica registrada no Firestore mas
+  // ninguém aprova ela pela interface ainda.
+  async function requestUserDeletion(uid, name, schoolId){
+    if(!confirm('Solicitar exclusão do usuário "' + name + '"? Só será removido após aprovação do admin.')) return false;
+    var session = Auth.getSession();
+    await Auth.db.collection('schools').doc(schoolId).collection('changeRequests').add({
+      schoolId:    schoolId,
+      requestedBy: session && session.uid,
+      requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status:      'pending',
+      type:        'delete_user',
+      changes:     { targetUid: uid, targetName: name || '' }
+    });
+    return true;
+  }
+
+  // Busca, em todas as escolas, as changeRequests do tipo 'delete_user'
+  // ainda pendentes. collectionGroup — só o admin global tem essa permissão
+  // nas Rules (allow read: if isGlobalAdmin() no bloco {path=**}/changeRequests).
+  async function fetchPendingDeleteRequests(){
+    var snap = await Auth.db.collectionGroup('changeRequests').where('status', '==', 'pending').get();
+    return snap.docs
+      .map(function(d){ return Object.assign({ _ref: d.ref, _id: d.id }, d.data()); })
+      .filter(function(r){ return r.type === 'delete_user'; });
+  }
+
+  async function renderDeleteRequests(knownUsers){
+    var tbody = el('delReqTbody');
+    if(!tbody) return;
+    try{
+      var reqs = await fetchPendingDeleteRequests();
+      el('delReqCount').textContent = reqs.length + ' pendente(s)';
+      tbody.innerHTML = '';
+      if(!reqs.length){
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px 8px;">Nenhuma solicitação pendente.</td></tr>';
+        return;
+      }
+      // "Solicitado por" é só um uid no doc — tenta achar nome/email na
+      // lista de usuários já carregada; se a escola não estiver na visão
+      // atual (filtro do cabeçalho), mostra o uid puro mesmo.
+      var byUid = {};
+      (knownUsers||[]).forEach(function(u){ byUid[u.uid] = u; });
+      reqs.forEach(function(r){
+        var targetName = (r.changes && r.changes.targetName) || (r.changes && r.changes.targetUid) || '—';
+        var requester = byUid[r.requestedBy];
+        var requesterLabel = requester ? (requester.name || requester.email) : (r.requestedBy || '—');
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td><b>'+escapeHtml(targetName)+'</b></td>'
+          + '<td><span class="pill mono">'+escapeHtml(r.schoolId||'—')+'</span></td>'
+          + '<td>'+escapeHtml(requesterLabel)+'</td>'
+          + '<td>'+fmtDate(r.requestedAt)+'</td>'
+          + '<td style="text-align:right;"><div class="row-actions">'
+          + '<button class="btn-approve" data-req-act="approve" data-req-id="'+escapeAttr(r._id)+'">Aprovar</button>'
+          + '<button class="btn-danger-sm" data-req-act="reject" data-req-id="'+escapeAttr(r._id)+'">Reprovar</button>'
+          + '</div></td>';
+        tr._req = r;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('button[data-req-act]').forEach(function(btn){
+        btn.addEventListener('click', async function(){
+          var tr = btn.closest('tr'), req = tr && tr._req;
+          if(!req) return;
+          var act = btn.dataset.reqAct;
+          btn.disabled = true;
+          try{
+            if(act === 'approve'){
+              var targetUid = req.changes && req.changes.targetUid;
+              if(!targetUid) throw new Error('Solicitação sem uid alvo.');
+              if(!confirm('Aprovar e excluir "'+(req.changes.targetName||targetUid)+'"? Esta ação não pode ser desfeita.')) { btn.disabled=false; return; }
+              await Auth.deleteUser(targetUid);
+              await req._ref.delete();
+              setMsg('Usuário excluído e solicitação encerrada.');
+            } else {
+              await req._ref.delete();
+              setMsg('Solicitação reprovada — usuário mantido.');
+            }
+            await refresh();
+          }catch(err){ setMsg(String(err&&err.message||err||'Erro'),true); btn.disabled=false; }
+        });
+      });
+    }catch(err){
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--danger-color);font-size:13px;padding:16px 8px;">Erro ao carregar: '+escapeHtml(String(err&&err.message||err))+'</td></tr>';
+    }
+  }
+
   async function refresh(){
     setMsg('Carregando...');
     try{
-      var effSchool = getEffectiveSchoolId();
-      var isMaster  = !effSchool || effSchool.toUpperCase() === 'ADMIN';
       var session   = Auth.getSession();
-      // Master (admin global) busca tudo; gestor de escola PRECISA passar o
-      // schoolId direto na query — as Rules exigem que a própria query já
-      // venha filtrada, senão negam a lista inteira (era a causa do erro
-      // "Missing or insufficient permissions" aqui).
-      var allUsers  = isMaster ? await Auth.listUsers() : await Auth.listUsers(effSchool);
+      // Identidade REAL — nunca muda durante a sessão, independe de qual
+      // escola está sendo visualizada no seletor do cabeçalho.
+      var isGlobalAdmin = !!session && String(session.schoolId||'').trim().toUpperCase() === 'ADMIN';
+      // effSchool: pra gestor de escola é sempre o schoolId fixo dele; pra
+      // admin global é só um FILTRO DE VISUALIZAÇÃO opcional (seletor do
+      // cabeçalho) — não deve mexer em permissão nenhuma.
+      var effSchool = getEffectiveSchoolId();
+      var queryScope = isGlobalAdmin
+        ? (effSchool && effSchool.toUpperCase() !== 'ADMIN' ? effSchool : null)
+        : effSchool;
+      // Gestor de escola PRECISA passar o schoolId direto na query — as
+      // Rules exigem que a própria query já venha filtrada, senão negam a
+      // lista inteira (era a causa do erro "Missing or insufficient
+      // permissions" aqui). Admin global só filtra se tiver escolhido uma
+      // escola específica no cabeçalho; senão busca todo mundo.
+      var allUsers  = queryScope ? await Auth.listUsers(queryScope) : await Auth.listUsers();
       var filtered  = allUsers;
 
       var pending = filtered.filter(function(u){ return String(u.role||'').trim().toLowerCase() === 'pending'; });
@@ -317,10 +448,23 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       } else {
         users.forEach(function(u){
           var tr = document.createElement('tr');
-          tr.innerHTML = '<td><b>'+escapeHtml(u.name||'—')+'</b></td><td>'+escapeHtml(u.email||'—')+'</td><td><span class="pill">'+escapeHtml(String(u.role||'user'))+'</span></td><td><span class="pill mono">'+escapeHtml(u.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(u.uid||'—')+'</td><td>'+(isMaster?'<button class="btn-danger-sm" data-del-uid="'+escapeAttr(u.uid)+'" data-del-name="'+escapeAttr(u.name||u.email||'?')+'">Excluir</button>':'—')+'</td>';
+          tr.innerHTML = '<td><b>'+escapeHtml(u.name||'—')+'</b></td><td>'+escapeHtml(u.email||'—')+'</td><td><span class="pill">'+escapeHtml(String(u.role||'user'))+'</span></td><td><span class="pill mono">'+escapeHtml(u.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(u.uid||'—')+'</td><td>'+userActionCellHtml(u,isGlobalAdmin)+'</td>';
           ubody.appendChild(tr);
         });
-        if(isMaster){ ubody.querySelectorAll('[data-del-uid]').forEach(function(btn){ btn.addEventListener('click',async function(){ btn.disabled=true; try{ var ok=await deleteUserById(btn.dataset.delUid,btn.dataset.delName); if(ok){setMsg('Usuário excluído.');await refresh();}else btn.disabled=false; }catch(err){setMsg(String(err&&err.message||err||'Erro'),true);btn.disabled=false;} }); }); }
+        ubody.querySelectorAll('[data-del-uid]').forEach(function(btn){
+          btn.addEventListener('click', async function(){
+            btn.disabled = true;
+            try{
+              if(isGlobalAdmin){
+                var ok = await deleteUserById(btn.dataset.delUid, btn.dataset.delName);
+                if(ok){ setMsg('Usuário excluído.'); await refresh(); } else btn.disabled=false;
+              } else {
+                var ok2 = await requestUserDeletion(btn.dataset.delUid, btn.dataset.delName, effSchool);
+                if(ok2){ setMsg('Solicitação de exclusão enviada — aguardando aprovação do admin.'); await refresh(); } else btn.disabled=false;
+              }
+            }catch(err){ setMsg(String(err&&err.message||err||'Erro'),true); btn.disabled=false; }
+          });
+        });
       }
 
       // Admins
@@ -332,11 +476,18 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       } else {
         admins.forEach(function(a){
           var tr = document.createElement('tr');
-          var canDelete = isMaster && a.uid !== (session && session.uid);
+          var canDelete = isGlobalAdmin && a.uid !== (session && session.uid);
           tr.innerHTML = '<td><b>'+escapeHtml(a.name||'—')+'</b></td><td>'+escapeHtml(a.email||'—')+'</td><td><span class="pill mono">'+escapeHtml(a.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(a.uid||'—')+'</td><td>'+(canDelete?'<button class="btn-danger-sm" data-del-uid="'+escapeAttr(a.uid)+'" data-del-name="'+escapeAttr(a.name||a.email||'?')+'">Excluir</button>':'—')+'</td>';
           abody.appendChild(tr);
         });
-        if(isMaster){ abody.querySelectorAll('[data-del-uid]').forEach(function(btn){ btn.addEventListener('click',async function(){ btn.disabled=true; try{ var ok=await deleteUserById(btn.dataset.delUid,btn.dataset.delName); if(ok){setMsg('Admin excluído.');await refresh();}else btn.disabled=false; }catch(err){setMsg(String(err&&err.message||err||'Erro'),true);btn.disabled=false;} }); }); }
+        if(isGlobalAdmin){ abody.querySelectorAll('[data-del-uid]').forEach(function(btn){ btn.addEventListener('click',async function(){ btn.disabled=true; try{ var ok=await deleteUserById(btn.dataset.delUid,btn.dataset.delName); if(ok){setMsg('Admin excluído.');await refresh();}else btn.disabled=false; }catch(err){setMsg(String(err&&err.message||err||'Erro'),true);btn.disabled=false;} }); }); }
+      }
+
+      // Exclusões pendentes — aba só existe/carrega pro admin global
+      var delTab = el('tabDelRequests');
+      if(delTab) delTab.style.display = isGlobalAdmin ? '' : 'none';
+      if(isGlobalAdmin){
+        await renderDeleteRequests(allUsers);
       }
 
       setMsg('');
