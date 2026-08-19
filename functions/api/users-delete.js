@@ -184,13 +184,43 @@ export async function onRequestPost({ request, env }) {
     //    permissão quanto pra fazer as exclusões)
     const accessToken = await getServiceAccountAccessToken(env);
 
-    // 3. Confirma que quem está chamando é admin
+    // 3. Confirma permissão de quem está chamando.
+    //    - Admin global (schoolId === 'ADMIN'): pode excluir qualquer um.
+    //    - Gestor de escola (role 'admin', mas schoolId de uma escola
+    //      específica): só pode reprovar solicitações de cadastro AINDA
+    //      PENDENTES da própria escola — excluir usuário já aprovado exige
+    //      passar pelo fluxo de changeRequests/aprovação do admin global.
+    //      Isso espelha a regra que a UI já aplica (deleteUserById direto
+    //      só aparece pro admin global; gestor só vê "Solicitar exclusão").
     const callerDoc = await firestoreGetDoc(accessToken, `users/${callerUid}`);
     if (!callerDoc || callerDoc.role !== 'admin') {
       return new Response(JSON.stringify({ error: 'Apenas administradores podem excluir usuários.' }), {
         status: 403,
         headers,
       });
+    }
+
+    if (uid === callerUid) {
+      return new Response(JSON.stringify({ error: 'Você não pode excluir sua própria conta por aqui.' }), {
+        status: 403,
+        headers,
+      });
+    }
+
+    const callerIsGlobalAdmin = String(callerDoc.schoolId || '').trim().toUpperCase() === 'ADMIN';
+
+    if (!callerIsGlobalAdmin) {
+      const targetDoc = await firestoreGetDoc(accessToken, `users/${uid}`);
+      const targetIsPendingInCallerSchool =
+        !!targetDoc &&
+        String(targetDoc.role || '').trim().toLowerCase() === 'pending' &&
+        String(targetDoc.schoolId || '') === String(callerDoc.schoolId || '');
+
+      if (!targetIsPendingInCallerSchool) {
+        return new Response(JSON.stringify({
+          error: 'Gestores de escola só podem reprovar solicitações pendentes da própria escola. Para excluir um usuário já aprovado, use "Solicitar exclusão".',
+        }), { status: 403, headers });
+      }
     }
 
     // 4. Apaga dos dois lugares
