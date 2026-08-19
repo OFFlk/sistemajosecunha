@@ -135,7 +135,7 @@
 
   <div class="card">
     <div class="card-title">🎯 Escopo das ações abaixo</div>
-    <div class="card-desc">Escolha se backup, restauração e limpeza afetam só a escola ativa no cabeçalho, ou todas as escolas do sistema de uma vez.</div>
+    <div class="card-desc">Escolha se backup, restauração e limpeza afetam só uma escola, ou todas as escolas do sistema de uma vez.</div>
     <div class="row" style="margin-top:0;">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
         <input type="radio" name="scope" id="scopeEscola" value="escola" checked> Esta escola
@@ -143,6 +143,11 @@
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
         <input type="radio" name="scope" id="scopeTodas" value="todas"> Todas as escolas
       </label>
+    </div>
+    <div class="row" id="scopeSchoolRow" style="margin-top:10px;">
+      <select id="scopeSchoolSelect" style="min-width:280px;">
+        <option value="">Carregando escolas…</option>
+      </select>
     </div>
     <div class="meta-line" id="scopeInfo" style="margin-top:10px;"></div>
   </div>
@@ -244,15 +249,43 @@
   function getScope(){
     return document.getElementById('scopeTodas')?.checked ? 'todas' : 'escola';
   }
-  // Escola realmente ativa (não o marcador fantasma 'ADMIN'), ou null se
-  // nenhuma escola de verdade estiver selecionada no cabeçalho.
+  // Escola escolhida no <select> próprio da página (não depende mais do
+  // seletor do cabeçalho — evita o acoplamento com uma função de navegação
+  // que não tem nada a ver com esta tela). null se nada estiver selecionado.
   function getRealActiveSchoolId(){
-    const sid = _activeSchoolId();
-    return (sid && sid.toUpperCase() !== 'ADMIN') ? sid : null;
+    const sel = document.getElementById('scopeSchoolSelect');
+    const v = sel ? sel.value : '';
+    return v || null;
   }
   async function listAllRealSchoolIds(){
     const snap = await window.Auth.db.collection('schools').get();
     return snap.docs.map(d => d.id);
+  }
+
+  // Popula o <select> de escolas do card de Escopo. Preserva a escolha
+  // atual entre recargas (ex.: quando o usuário só troca de rádio); só
+  // recai pra primeira escola da lista se a seleção anterior não existir
+  // mais (ou na primeira carga).
+  let _schoolsPopulated = false;
+  async function populateSchoolSelect(){
+    const sel = document.getElementById('scopeSchoolSelect');
+    if (!sel) return;
+    const prev = sel.value;
+    try{
+      const snap = await window.Auth.db.collection('schools').get();
+      const schools = snap.docs.map(d => ({ id: d.id, label: (d.data()?.displayName || d.data()?.name || d.id) }));
+      schools.sort((a,b) => a.label.localeCompare(b.label, 'pt-BR'));
+      if (!schools.length){
+        sel.innerHTML = '<option value="">Nenhuma escola cadastrada</option>';
+        _schoolsPopulated = true;
+        return;
+      }
+      sel.innerHTML = schools.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+      sel.value = schools.some(s => s.id === prev) ? prev : schools[0].id;
+      _schoolsPopulated = true;
+    } catch(e){
+      sel.innerHTML = '<option value="">Erro ao carregar escolas</option>';
+    }
   }
 
   /* ══════════════════════════════════════════════════════
@@ -729,30 +762,32 @@
   }
 
   // Reflete o escopo escolhido nos textos e trava as ações quando o modo
-  // 'escola' está ativo mas nenhuma escola real está selecionada no
-  // cabeçalho (evita mexer no documento fantasma 'schools/ADMIN').
+  // 'escola' está ativo mas nenhuma escola foi escolhida no select (lista
+  // vazia ou ainda carregando).
   function updateScopeUI(){
     const scope = getScope();
     const schoolId = getRealActiveSchoolId();
     const info = document.getElementById("scopeInfo");
     const blocked = scope === 'escola' && !schoolId;
 
+    document.getElementById("scopeSchoolRow").style.display = scope === 'escola' ? '' : 'none';
+
     if (scope === 'escola'){
       info.innerHTML = schoolId
-        ? `Escola ativa: <b>${schoolId}</b>`
-        : `<span style="color:var(--danger-color)">⚠️ Nenhuma escola real está selecionada no cabeçalho. Escolha uma antes de usar as ações abaixo.</span>`;
+        ? `Escola selecionada: <b>${schoolId}</b>`
+        : `<span style="color:var(--danger-color)">⚠️ Escolha uma escola na lista acima antes de usar as ações abaixo.</span>`;
     } else {
       info.textContent = "Vai afetar TODAS as escolas cadastradas no sistema, uma por uma.";
     }
 
     document.getElementById("exportDesc").textContent = scope === 'escola'
-      ? `Gera um .json com os dados da escola${schoolId ? ' "' + schoolId + '"' : ' ativa'}.`
+      ? `Gera um .json com os dados da escola${schoolId ? ' "' + schoolId + '"' : ' selecionada'}.`
       : "Gera um .json com os dados de TODAS as escolas do sistema.";
     document.getElementById("restoreWarn").textContent = scope === 'escola'
-      ? "⚠️ Restaura substituindo os dados da escola ativa. Faça backup antes se não tiver certeza."
+      ? "⚠️ Restaura substituindo os dados da escola selecionada. Faça backup antes se não tiver certeza."
       : "⚠️ Restaura substituindo os dados de TODAS as escolas do arquivo. Faça backup antes se não tiver certeza.";
     document.getElementById("cleanupWarn").textContent = scope === 'escola'
-      ? "⛔ As ações abaixo apagam dados da escola ativa permanentemente. Não é possível desfazer sem um backup."
+      ? "⛔ As ações abaixo apagam dados da escola selecionada permanentemente. Não é possível desfazer sem um backup."
       : "⛔ As ações abaixo apagam dados de TODAS as escolas permanentemente. Não é possível desfazer sem um backup.";
     document.getElementById("btnLimparTudo").textContent   = scope === 'escola' ? "Apagar TODOS os dados da escola" : "Apagar TODOS os dados (todas as escolas)";
     document.getElementById("btnApagarTurmas").textContent = scope === 'escola' ? "Apagar somente turmas" : "Apagar turmas (todas as escolas)";
@@ -764,10 +799,26 @@
     });
   }
 
+  // Bootstrap: espera o Firebase Auth terminar de inicializar antes da
+  // primeira leitura (Auth.onReady já enfileira o callback se ainda não
+  // estiver pronto, e chama na hora se já estiver — nunca corre na frente
+  // do SDK carregando via CDN, que era a causa do erro intermitente
+  // "Não foi possível ler o Firestore").
   document.addEventListener("DOMContentLoaded", () => {
-    renderMeta();
     document.getElementById("scopeEscola").addEventListener("change", renderMeta);
     document.getElementById("scopeTodas").addEventListener("change", renderMeta);
+    document.getElementById("scopeSchoolSelect").addEventListener("change", renderMeta);
+
+    function boot(){
+      populateSchoolSelect().then(renderMeta);
+    }
+    if (window.Auth && typeof Auth.onReady === 'function'){
+      Auth.onReady(boot);
+    } else {
+      // Fallback pouco provável (auth.firebase.js sempre expõe Auth
+      // sincronamente) — tenta mesmo assim em vez de travar a tela.
+      boot();
+    }
   });
 </script>
 
