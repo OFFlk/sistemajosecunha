@@ -273,8 +273,12 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       var effSchool = getEffectiveSchoolId();
       var isMaster  = !effSchool || effSchool.toUpperCase() === 'ADMIN';
       var session   = Auth.getSession();
-      var allUsers  = await Auth.listUsers();
-      var filtered  = isMaster ? allUsers : allUsers.filter(function(u){ return String(u.schoolId||'').trim() === effSchool; });
+      // Master (admin global) busca tudo; gestor de escola PRECISA passar o
+      // schoolId direto na query — as Rules exigem que a própria query já
+      // venha filtrada, senão negam a lista inteira (era a causa do erro
+      // "Missing or insufficient permissions" aqui).
+      var allUsers  = isMaster ? await Auth.listUsers() : await Auth.listUsers(effSchool);
+      var filtered  = allUsers;
 
       var pending = filtered.filter(function(u){ return String(u.role||'').trim().toLowerCase() === 'pending'; });
       var users   = filtered.filter(function(u){ var r=String(u.role||'').trim().toLowerCase(); return r!=='pending'&&r!=='admin'; });
