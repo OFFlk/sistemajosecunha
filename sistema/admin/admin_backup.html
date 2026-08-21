@@ -138,10 +138,10 @@
     <div class="card-desc">Escolha se backup, restauração e limpeza afetam só uma escola, ou todas as escolas do sistema de uma vez.</div>
     <div class="row" style="margin-top:0;">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
-        <input type="radio" name="scope" id="scopeEscola" value="escola" checked> Esta escola
+        <input type="radio" name="scope" id="scopeTodas" value="todas" checked> Todas as escolas
       </label>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
-        <input type="radio" name="scope" id="scopeTodas" value="todas"> Todas as escolas
+        <input type="radio" name="scope" id="scopeEscola" value="escola"> Escola específica
       </label>
     </div>
     <div class="row" id="scopeSchoolRow" style="margin-top:10px;">
@@ -259,7 +259,7 @@
   }
   async function listAllRealSchoolIds(){
     const snap = await window.Auth.db.collection('schools').get();
-    return snap.docs.map(d => d.id);
+    return snap.docs.map(d => d.id).filter(id => id.toUpperCase() !== 'ADMIN');
   }
 
   // Popula o <select> de escolas do card de Escopo. Preserva a escolha
@@ -273,7 +273,9 @@
     const prev = sel.value;
     try{
       const snap = await window.Auth.db.collection('schools').get();
-      const schools = snap.docs.map(d => ({ id: d.id, label: (d.data()?.displayName || d.data()?.name || d.id) }));
+      const schools = snap.docs
+        .filter(d => d.id.toUpperCase() !== 'ADMIN')
+        .map(d => ({ id: d.id, label: (d.data()?.displayName || d.data()?.name || d.id) }));
       schools.sort((a,b) => a.label.localeCompare(b.label, 'pt-BR'));
       if (!schools.length){
         sel.innerHTML = '<option value="">Nenhuma escola cadastrada</option>';
@@ -339,6 +341,36 @@
 
   let _backupParsed = null;
 
+  // Mapa COMPLETO de coleções por escola → chave usada no arquivo de backup.
+  // Cobre os 3 módulos que existem hoje: atas (histórico), ano ativo, e os
+  // um auxiliar (funcionários). Se um novo módulo
+  // surgir depois, é só adicionar aqui — export, restore, status e limpeza
+  // usam este mapa, não listam coleção por coleção.
+  const ATAS_MODULE_COLS = { turmas:'turmasDB', alunos:'alunosDB', matriculas:'matriculasDB', atas:'atasDB', schemasCH:'turmasSchemas_v1' };
+  const ANO_ATIVO_COLS   = { anoAtivoTurmas:'anoAtivoTurmasDB', anoAtivoAlunos:'anoAtivoAlunosDB', anoAtivoMatriculas:'anoAtivoMatriculasDB' };
+  const FUNCIONARIOS_COLS = { funcionarios:'funcionariosDB' };
+  const ALL_COLS = Object.assign({}, ATAS_MODULE_COLS, ANO_ATIVO_COLS, FUNCIONARIOS_COLS);
+  // "Apagar somente turmas": turmas + o que só existe em função de uma turma
+  // (atas, matrículas), nos dois módulos. Alunos/catálogo/funcionários e
+  // schemas ficam de fora.
+  const TURMAS_RELATED_COLS  = ['turmas', 'atas', 'matriculas', 'anoAtivoTurmas', 'anoAtivoMatriculas'];
+  // "Limpar alunos/IDs": alunos/catálogo + o que só existe em função de um
+  // aluno (atas, matrículas), nos dois módulos. Turmas, funcionários e
+  // schemas/notas ficam de fora.
+  const ALUNOS_RELATED_COLS  = ['alunos', 'atas', 'matriculas', 'anoAtivoAlunos', 'anoAtivoMatriculas'];
+  // Inverso (chave do backup → nome da coleção), usado na restauração.
+  const FS_MAP = Object.fromEntries(Object.entries(ALL_COLS).map(([col, key]) => [key, col]));
+
+  // Lê todas as coleções de uma escola de uma vez, devolvendo um objeto já
+  // no formato do arquivo de backup ({ turmasDB:[...], anoAtivoTurmasDB:[...], ... }).
+  async function _readAllCollections(schoolId){
+    const entries = Object.entries(ALL_COLS); // [ [colName, backupKey], ... ]
+    const results = await Promise.all(entries.map(([col]) => _listFSCol(schoolId, col)));
+    const data = {};
+    entries.forEach(([, key], i) => { data[key] = results[i]; });
+    return data;
+  }
+
   function setOut(msg){
     document.getElementById("saida").textContent = msg;
     renderMeta();
@@ -360,20 +392,14 @@
     const scope = getScope();
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de exportar (nenhuma está ativa agora).'); return; }
-      setOut("⏳ Lendo dados da escola ativa no Firestore…");
+      if (!schoolId){ alert('Selecione uma escola antes de exportar.'); return; }
+      setOut("⏳ Lendo dados da escola no Firestore…");
       try{
-        const [turmasDB, alunosDB, matriculasDB, atasDB, schemas, escolaDoc] = await Promise.all([
-          _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
-          _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
-          _listFSCol(schoolId, 'schemasCH'),
+        const [dataCols, escolaDoc] = await Promise.all([
+          _readAllCollections(schoolId),
           window.Auth.db.collection('schools').doc(schoolId).get(),
         ]);
-        const data = {
-          turmasDB, alunosDB, matriculasDB, atasDB,
-          turmasSchemas_v1: schemas,
-          dadosEscola: escolaDoc.exists ? escolaDoc.data() : {},
-        };
+        const data = { ...dataCols, dadosEscola: escolaDoc.exists ? escolaDoc.data() : {} };
         const payload = {
           meta: { exportedAt: new Date().toISOString(), origin: location.origin, source: 'firestore', scope: 'escola', schoolId, keys: Object.keys(data) },
           data
@@ -391,17 +417,11 @@
         const schoolIds = await listAllRealSchoolIds();
         const bySchool = {};
         for (const schoolId of schoolIds){
-          const [turmasDB, alunosDB, matriculasDB, atasDB, schemas, escolaDoc] = await Promise.all([
-            _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
-            _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
-            _listFSCol(schoolId, 'schemasCH'),
+          const [dataCols, escolaDoc] = await Promise.all([
+            _readAllCollections(schoolId),
             window.Auth.db.collection('schools').doc(schoolId).get(),
           ]);
-          bySchool[schoolId] = {
-            turmasDB, alunosDB, matriculasDB, atasDB,
-            turmasSchemas_v1: schemas,
-            dadosEscola: escolaDoc.exists ? escolaDoc.data() : {},
-          };
+          bySchool[schoolId] = { ...dataCols, dadosEscola: escolaDoc.exists ? escolaDoc.data() : {} };
         }
         const payload = {
           meta: { exportedAt: new Date().toISOString(), origin: location.origin, source: 'firestore', scope: 'todas', schools: schoolIds },
@@ -484,13 +504,6 @@
       if (!ok) return;
     }
     const scope = getScope();
-    const FS_MAP = {
-      turmasDB:         'turmas',
-      alunosDB:         'alunos',
-      matriculasDB:     'matriculas',
-      atasDB:           'atas',
-      turmasSchemas_v1: 'schemasCH',
-    };
 
     if (scope === 'escola'){
       if (!_backupParsed.data){ alert("Este arquivo não é um backup de escola única."); return; }
@@ -556,21 +569,16 @@
   ══════════════════════════════════════════ */
   async function limparTudo(){
     const scope = getScope();
+    const allColNames = Object.keys(ALL_COLS);
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de limpar.'); return; }
-      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore (turmas, alunos, matrículas, atas, schemas).\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`);
+      if (!schoolId){ alert('Selecione uma escola antes de limpar.'); return; }
+      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de CH e funcionários.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`);
       if (!ok) return;
       setOut(`⏳ Apagando todos os dados da escola "${schoolId}"…`);
       for (const k of SYSTEM_KEYS) localStorage.removeItem(scopedKey(k));
       try{
-        await Promise.all([
-          _clearFSColFor(schoolId, 'turmas'),
-          _clearFSColFor(schoolId, 'alunos'),
-          _clearFSColFor(schoolId, 'matriculas'),
-          _clearFSColFor(schoolId, 'atas'),
-          _clearFSColFor(schoolId, 'schemasCH'),
-        ]);
+        await Promise.all(allColNames.map(col => _clearFSColFor(schoolId, col)));
         setOut(`🧹 Reset da escola "${schoolId}" concluído.`);
       } catch(e){
         console.error(e);
@@ -578,20 +586,14 @@
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore (turmas, alunos, matrículas, atas, schemas).\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de CH e funcionários.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
       const ok2 = prompt('Ação de altíssimo risco — digita APAGAR TUDO pra confirmar:');
       if (ok2 !== 'APAGAR TUDO'){ setOut("Limpeza cancelada (confirmação não bateu)."); return; }
       setOut(`⏳ Apagando todos os dados de ${schoolIds.length} escola(s)…`);
       try{
         for (const schoolId of schoolIds){
-          await Promise.all([
-            _clearFSColFor(schoolId, 'turmas'),
-            _clearFSColFor(schoolId, 'alunos'),
-            _clearFSColFor(schoolId, 'matriculas'),
-            _clearFSColFor(schoolId, 'atas'),
-            _clearFSColFor(schoolId, 'schemasCH'),
-          ]);
+          await Promise.all(allColNames.map(col => _clearFSColFor(schoolId, col)));
         }
         setOut(`🧹 Reset total concluído. Todos os dados de ${schoolIds.length} escola(s) foram apagados do Firestore.`);
       } catch(e){
@@ -608,36 +610,28 @@
     const scope = getScope();
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de apagar.'); return; }
-      const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas do Firestore.\nAlunos e catálogo permanecem intactos.`);
+      if (!schoolId){ alert('Selecione uma escola antes de apagar.'); return; }
+      const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, catálogo, funcionários, schemas e notas permanecem intactos.`);
       if (!ok) return;
       setOut("⏳ Apagando turmas do Firestore…");
       ["turmasDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
-        await Promise.all([
-          _clearFSColFor(schoolId, 'turmas'),
-          _clearFSColFor(schoolId, 'atas'),
-          _clearFSColFor(schoolId, 'matriculas'),
-        ]);
-        setOut("🧹 Turmas, atas e matrículas apagadas do Firestore.");
+        await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
+        setOut("🧹 Turmas, atas e matrículas apagadas do Firestore (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar turmas: " + e.message);
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas do Firestore.\nAlunos e catálogo permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, catálogo, funcionários, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
       setOut(`⏳ Apagando turmas de ${schoolIds.length} escola(s)…`);
       try{
         for (const schoolId of schoolIds){
-          await Promise.all([
-            _clearFSColFor(schoolId, 'turmas'),
-            _clearFSColFor(schoolId, 'atas'),
-            _clearFSColFor(schoolId, 'matriculas'),
-          ]);
+          await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut("🧹 Turmas, atas e matrículas apagadas de todas as escolas.");
+        setOut("🧹 Turmas, atas e matrículas apagadas de todas as escolas (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar turmas: " + e.message);
@@ -658,30 +652,22 @@
       setOut("⏳ Apagando alunos do Firestore…");
       ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
-        await Promise.all([
-          _clearFSColFor(schoolId, 'alunos'),
-          _clearFSColFor(schoolId, 'matriculas'),
-          _clearFSColFor(schoolId, 'atas'),
-        ]);
-        setOut("🧹 Alunos, matrículas e atas apagados do Firestore.");
+        await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
+        setOut("🧹 Alunos, matrículas e atas apagados do Firestore (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar alunos: " + e.message);
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas do Firestore.\nAs turmas permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAs turmas, funcionários, schemas e notas permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
       setOut(`⏳ Apagando alunos de ${schoolIds.length} escola(s)…`);
       try{
         for (const schoolId of schoolIds){
-          await Promise.all([
-            _clearFSColFor(schoolId, 'alunos'),
-            _clearFSColFor(schoolId, 'matriculas'),
-            _clearFSColFor(schoolId, 'atas'),
-          ]);
+          await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut("🧹 Alunos, matrículas e atas apagados de todas as escolas.");
+        setOut("🧹 Alunos, matrículas e atas apagados de todas as escolas (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar alunos: " + e.message);
@@ -707,6 +693,32 @@
     return set.size;
   }
 
+  function contarMatriculasAtivas(matriculas){
+    return (Array.isArray(matriculas) ? matriculas : []).filter(m => String(m?.status||"").toUpperCase() === "ATIVO").length;
+  }
+
+  function _emptyCounts(){
+    const c = {};
+    Object.values(ALL_COLS).forEach(k => { c[k] = 0; });
+    c.alunosUnicosTurmasHist = 0;
+    c.matriculasAtivasAnoAtivo = 0;
+    return c;
+  }
+  function _addCounts(acc, d){
+    Object.values(ALL_COLS).forEach(k => { acc[k] += Array.isArray(d[k]) ? d[k].length : 0; });
+    acc.alunosUnicosTurmasHist   += contarAlunosUnicosEmTurmas(d.turmasDB);
+    acc.matriculasAtivasAnoAtivo += contarMatriculasAtivas(d.anoAtivoMatriculasDB);
+  }
+  function _statsHtml(c, headerLine){
+    return `
+      ${headerLine}
+      <div><b>Ano ativo —</b> Turmas: ${c.anoAtivoTurmasDB} &nbsp;•&nbsp; Matrículas ativas: ${c.matriculasAtivasAnoAtivo} &nbsp;•&nbsp; Alunos no catálogo: ${c.anoAtivoAlunosDB} &nbsp;•&nbsp; Matrículas (total): ${c.anoAtivoMatriculasDB}</div>
+      <div><b>Atas (histórico) —</b> Turmas: ${c.turmasDB} &nbsp;•&nbsp; Alunos nas turmas: ${c.alunosUnicosTurmasHist} &nbsp;•&nbsp; Alunos no catálogo: ${c.alunosDB} &nbsp;•&nbsp; Matrículas: ${c.matriculasDB} &nbsp;•&nbsp; Atas: ${c.atasDB}</div>
+      <div><b>Outros —</b> Schemas CH: ${c.turmasSchemas_v1} &nbsp;•&nbsp; Funcionários: ${c.funcionariosDB}</div>
+      <div style="margin-top:4px;font-size:12px;color:var(--muted)">✅ Dados lidos direto do Firestore — ano ativo + atas (histórico) + auxiliares</div>
+    `;
+  }
+
   async function renderMeta(){
     document.getElementById("origin").textContent = location.origin;
     document.getElementById("dbMeta").innerHTML = '<span style="color:var(--muted)">Carregando do Firestore…</span>';
@@ -716,42 +728,21 @@
       if (scope === 'escola'){
         const schoolId = getRealActiveSchoolId();
         if (!schoolId){
-          document.getElementById("dbMeta").innerHTML = '<span style="color:var(--muted)">Nenhuma escola real selecionada no cabeçalho.</span>';
+          document.getElementById("dbMeta").innerHTML = '<span style="color:var(--muted)">Nenhuma escola selecionada.</span>';
         } else {
-          const [turmas, alunosDB, matriculasDB, atasDB, schemas] = await Promise.all([
-            _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
-            _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
-            _listFSCol(schoolId, 'schemasCH'),
-          ]);
-          document.getElementById("dbMeta").innerHTML = `
-            <div><b>Escola:</b> ${schoolId}</div>
-            <div><b>Turmas:</b> ${turmas.length} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${contarAlunosUnicosEmTurmas(turmas)} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${alunosDB.length}</div>
-            <div><b>Schemas CH:</b> ${schemas.length} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${matriculasDB.length} &nbsp;•&nbsp; <b>Atas (aux):</b> ${atasDB.length}</div>
-            <div style="margin-top:4px;font-size:12px;color:var(--muted)">✅ Dados lidos direto do Firestore</div>
-          `;
+          const d = await _readAllCollections(schoolId);
+          const c = _emptyCounts();
+          _addCounts(c, d);
+          document.getElementById("dbMeta").innerHTML = _statsHtml(c, `<div><b>Escola:</b> ${schoolId}</div>`);
         }
       } else {
         const schoolIds = await listAllRealSchoolIds();
-        let totTurmas=0, totAlunosCat=0, totAlunosTurmas=0, totSchemas=0, totMat=0, totAtas=0;
+        const c = _emptyCounts();
         for (const schoolId of schoolIds){
-          const [turmas, alunosDB, matriculasDB, atasDB, schemas] = await Promise.all([
-            _listFSCol(schoolId, 'turmas'), _listFSCol(schoolId, 'alunos'),
-            _listFSCol(schoolId, 'matriculas'), _listFSCol(schoolId, 'atas'),
-            _listFSCol(schoolId, 'schemasCH'),
-          ]);
-          totTurmas += turmas.length;
-          totAlunosTurmas += contarAlunosUnicosEmTurmas(turmas);
-          totAlunosCat += alunosDB.length;
-          totSchemas += schemas.length;
-          totMat += matriculasDB.length;
-          totAtas += atasDB.length;
+          const d = await _readAllCollections(schoolId);
+          _addCounts(c, d);
         }
-        document.getElementById("dbMeta").innerHTML = `
-          <div><b>${schoolIds.length} escola(s):</b> ${schoolIds.join(", ") || "—"}</div>
-          <div><b>Turmas:</b> ${totTurmas} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${totAlunosTurmas} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${totAlunosCat}</div>
-          <div><b>Schemas CH:</b> ${totSchemas} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${totMat} &nbsp;•&nbsp; <b>Atas (aux):</b> ${totAtas}</div>
-          <div style="margin-top:4px;font-size:12px;color:var(--muted)">✅ Totais somados de todas as escolas, lidos direto do Firestore</div>
-        `;
+        document.getElementById("dbMeta").innerHTML = _statsHtml(c, `<div><b>${schoolIds.length} escola(s):</b> ${schoolIds.join(", ") || "—"}</div>`);
       }
     } catch(e){
       document.getElementById("dbMeta").innerHTML = '<span style="color:var(--danger-color)">⚠️ Não foi possível ler o Firestore. Verifique o login.</span>';
