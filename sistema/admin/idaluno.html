@@ -341,7 +341,8 @@ function salvarJSON(k, v){
   localStorage.setItem(_sk, JSON.stringify(v));
   // Espelha no Firestore em paralelo
   const _MAP={turmasDB:'turmas',alunosDB:'alunos',alunosAliasesDB:'matriculas',
-               atasDB:'atas',matriculasDB:'matriculas',turmasMetaDB:null};
+               atasDB:'atas',matriculasDB:'matriculas',turmasMetaDB:null,
+               anoAtivoTurmasDB_v1:'anoAtivoTurmas', anoAtivoMatriculasDB_v1:'anoAtivoMatriculas'};
   try{
     if(window.DB && window.Auth && window.Auth.getSession()){
       const col=_MAP[k]; if(col===undefined) return;
@@ -614,11 +615,18 @@ function gerarSugestoes(){
         // Detecta se são do mesmo módulo ou de módulos diferentes
         const aIsAA = isAA(a.id), bIsAA = isAA(b.id);
         const modulosDiferentes = aIsAA !== bIsAA;
+        // CRÍTICO: em par cross-módulo, o ID do Ano Ativo tem que ser sempre
+        // o sobrevivente (slot A / idManter). O Cloudinary vincula mídia
+        // (avatar, documentos) pelo alunoId do Ano Ativo — se o ID de Atas
+        // vencer a fusão, a mídia fica órfã (aponta pra um ID que deixou de
+        // existir). Isso não depende de qual nome o usuário escolhe manter.
+        const swap = modulosDiferentes && bIsAA && !aIsAA;
+        const pA = swap ? b : a, pB = swap ? a : b;
         sugs.push({
-          ida:   a.id, idb:   b.id,
-          aNome: a.nomeOficial, bNome: b.nomeOficial,
-          aSeries: seriesCache[a.id],
-          bSeries: seriesCache[b.id],
+          ida:   pA.id, idb:   pB.id,
+          aNome: pA.nomeOficial, bNome: pB.nomeOficial,
+          aSeries: seriesCache[pA.id],
+          bSeries: seriesCache[pB.id],
           score: s,
           modulosDiferentes, // flag para UI
         });
@@ -1095,6 +1103,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       document.addEventListener('auth:ready', res, {once:true});
     });
     const dados = await window.DB.loadAll();
+    const dadosAA = await window.DB.loadAllAnoAtivo();
     const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
     if(sid){
       const pre=(k)=>`schools:${sid}:${k}`;
@@ -1102,6 +1111,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if(dados.alunosDB)   localStorage.setItem(pre('alunosDB'),   JSON.stringify(dados.alunosDB));
       if(dados.matriculas) localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
       if(dados.atasDB)     localStorage.setItem(pre('atasDB'),     JSON.stringify(dados.atasDB));
+      if(dadosAA.turmasDB)     localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dadosAA.turmasDB));
+      if(dadosAA.matriculasDB) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dadosAA.matriculasDB));
     }
   }catch(e){ console.warn('idaluno Firestore pré-carga:', e); }
 
