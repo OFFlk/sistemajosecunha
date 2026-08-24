@@ -342,7 +342,8 @@ function salvarJSON(k, v){
   // Espelha no Firestore em paralelo
   const _MAP={turmasDB:'turmas',alunosDB:'alunos',alunosAliasesDB:'matriculas',
                atasDB:'atas',matriculasDB:'matriculas',turmasMetaDB:null,
-               anoAtivoTurmasDB_v1:'anoAtivoTurmas', anoAtivoMatriculasDB_v1:'anoAtivoMatriculas'};
+               anoAtivoTurmasDB_v1:'anoAtivoTurmas', anoAtivoMatriculasDB_v1:'anoAtivoMatriculas',
+               anoAtivoAlunosDB_v1:'anoAtivoAlunos'};
   try{
     if(window.DB && window.Auth && window.Auth.getSession()){
       const col=_MAP[k]; if(col===undefined) return;
@@ -600,8 +601,18 @@ function gerarSugestoes(){
     seriesCache[a.id] = _seriesDoAluno(a.id);
   }
 
-  // Índice de origem por ID: verifica se veio do Ano Ativo (tem [AA] nas séries)
-  const isAA = id => (seriesCache[id]||'').includes('[AA]');
+  // Índice de origem por ID: um alunoId "é" do Ano Ativo se tem ficha
+  // cadastrada na coleção anoAtivoAlunos — é o catálogo que carrega dados
+  // pessoais e é a base pela qual documentos/avatar no Cloudinary são
+  // localizados (via alunoId). NÃO usar só "tem matrícula ativa" como sinal:
+  // um aluno pode ter ficha completa (e docs no Cloudinary) sem matrícula
+  // corrente, e nesse caso a checagem antiga (baseada em [AA] nas séries)
+  // deixava de detectar a origem, permitindo que o ID errado sobrevivesse
+  // a uma fusão e órfãos documentos/dados vinculados ao alunoId antigo.
+  const _aaAlunos = new Set(
+    lerJSON("anoAtivoAlunosDB_v1", []).map(a => String(a._id || a.alunoId || "").trim()).filter(Boolean)
+  );
+  const isAA = id => _aaAlunos.has(String(id||"").trim());
 
   const sugs = [];
   for (let i=0;i<ALUNOS.length;i++){
@@ -1113,6 +1124,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       if(dados.atasDB)     localStorage.setItem(pre('atasDB'),     JSON.stringify(dados.atasDB));
       if(dadosAA.turmasDB)     localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dadosAA.turmasDB));
       if(dadosAA.matriculasDB) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dadosAA.matriculasDB));
+      if(dadosAA.alunosDB)     localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dadosAA.alunosDB));
     }
   }catch(e){ console.warn('idaluno Firestore pré-carga:', e); }
 
