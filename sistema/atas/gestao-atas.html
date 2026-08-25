@@ -895,9 +895,10 @@ function toNotaSistema(v) {
 
 function toResultado(v) {
   const s = normalizarTxt(v);
-  if (['AP','REP','DEST','TRA','FAL','AND'].includes(s)) return s;
-  if (s==='S') return 'S'; if (s==='P') return 'P';
+  if (['AP','REP','DEST','TRA','FAL','AND','C'].includes(s)) return s;
+  if (s==='S') return 'S'; if (s==='P') return 'P'; if (s==='I') return 'I';
   if (s.includes('SATISF')) return 'S'; if (s.includes('PARCIAL')) return 'P';
+  if (s.includes('INSATISF')) return 'I'; if (s.includes('CONSERVAD')) return 'C';
   return 'Não informado';
 }
 
@@ -1043,6 +1044,120 @@ function qualificarIndicadorAluno(raw, vocab) {
 
   // Não reconhecido — devolve como veio, sem qualificar, e sinaliza.
   return { serie: s, divergente: true, motivo: `indicador "${s}" não reconhecido` };
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Plausibilidade de trajetória (verde/amarelo/vermelho)
+   ─────────────────────────────────────────────────────────────
+   Decide se um novo registro de Ata é uma continuação plausível do
+   último registro já vinculado àquele alunoId no catálogo. NÃO decide
+   fusões sozinha — só classifica, pra alimentar a revisão da importação
+   (verde = segue normal · amarelo = aviso, não bloqueia · vermelho =
+   bloqueia e vai pra fila de anomalia).
+
+   Regra combinada (ano letivo + série), com a categoria do ÚLTIMO
+   resultado decidindo o que se espera a seguir:
+     AVANÇA  (Aprovado/Satisfatório/Parcial) → série esperada = anterior+1
+     MANTÉM  (Reprovado/Desistente/Conservado/Insatisfatória/Em andamento)
+             → série esperada = igual à anterior
+     LIVRE   (Transferido/Não informado) → sem expectativa de série,
+             só valida o intervalo de anos (o que aconteceu na outra
+             escola, ou por trás do dado ausente, é desconhecido)
+     BLOQUEIA (Falecido) → qualquer reaparecimento é sempre vermelho
+
+   Ainda não é chamada por importarSelecionadas() — a integração exige
+   antes o refactor do fluxo de "salva direto" pra "monta buffer, revisa,
+   só salva depois de resolver avisos/erros". Ver plano em separado.
+── */
+
+function _categoriaResultado(resultado) {
+  const AVANCA  = ['AP','S','P'];
+  const MANTEM  = ['REP','DEST','C','I','AND'];
+  const BLOQUEIA= ['FAL'];
+  const r = String(resultado||'').trim().toUpperCase();
+  if (BLOQUEIA.includes(r)) return 'BLOQUEIA';
+  if (AVANCA.includes(r))   return 'AVANCA';
+  if (MANTEM.includes(r))   return 'MANTEM';
+  return 'LIVRE'; // TRA, "Não informado", ou qualquer resultado não mapeado
+}
+
+// Extrai { tipo, num } de um texto de série já qualificado (ex.: "5º Ano",
+// "3ª Série", "Eixo 2", "Alfabetização"). Em indicadores de aceleração
+// ("1º e 2º Ano"), usa o MAIOR número — é o que define onde o aluno estará
+// ao concluir aquele ano letivo.
+function _parseSerieCanonica(serieDisplay) {
+  const s = normalizarTxt(serieDisplay);
+  if (!s) return null;
+  if (/ALFABETIZ/.test(s)) return { tipo:'ALFA', num:0 };
+  const mEixo = s.match(/EIXO\s*(\d+)/);
+  if (mEixo) return { tipo:'EIXO', num:Number(mEixo[1]) };
+  const nums = [...s.matchAll(/(\d+)/g)].map(m=>Number(m[1]));
+  if (!nums.length) return null;
+  const num = Math.max(...nums);
+  const tipo = /\bEM\b/.test(s) ? 'EM' : (/S[EÉ]RIE/.test(s) ? 'SERIE' : 'ANO');
+  return { tipo, num };
+}
+
+/**
+ * @param {Object|null} ultimo { anoLetivo, serieDisplay, resultado } — última
+ *   ata já vinculada ao alunoId candidato (null = sem histórico, primeira vez).
+ * @param {Object} novo { anoLetivo, serieDisplay } — registro sendo importado.
+ * @returns {{status:'verde'|'amarelo'|'vermelho', motivo:string}}
+ */
+function avaliarTrajetoria(ultimo, novo) {
+  if (!ultimo) return { status:'verde', motivo:'' };
+
+  const categoria = _categoriaResultado(ultimo.resultado);
+
+  if (categoria === 'BLOQUEIA') {
+    return { status:'vermelho', motivo:`último registro conhecido está marcado como Falecido (${ultimo.anoLetivo})` };
+  }
+
+  const anoUltimo = Number(ultimo.anoLetivo);
+  const anoNovo   = Number(novo.anoLetivo);
+  const gap = anoNovo - anoUltimo;
+
+  if (!Number.isFinite(gap) || gap < 1 || gap > 3) {
+    return { status:'vermelho', motivo:`intervalo de ${Number.isFinite(gap)?gap:'?'} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} foge do esperado (1 a 3 anos)` };
+  }
+
+  if (categoria === 'LIVRE') {
+    return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) sem resultado conclusivo (${ultimo.resultado || 'Não informado'}) — série não conferida` };
+  }
+
+  const serieUltima = _parseSerieCanonica(ultimo.serieDisplay);
+  const serieNova   = _parseSerieCanonica(novo.serieDisplay);
+
+  if (!serieUltima || !serieNova) {
+    return { status:'amarelo', motivo:'não foi possível interpretar a série de um dos registros para comparação' };
+  }
+
+  if (serieUltima.tipo !== serieNova.tipo) {
+    return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})` };
+  }
+
+  const numEsperado = categoria === 'AVANCA' ? serieUltima.num + 1 : serieUltima.num;
+
+  if (serieNova.num !== numEsperado) {
+    return { status:'amarelo', motivo:`série esperada era ${numEsperado} (${serieUltima.tipo}), mas veio ${serieNova.num}` };
+  }
+
+  return { status:'verde', motivo:'' };
+}
+
+// Varre turmasDB e devolve a ata mais recente (maior anoLetivo) já
+// vinculada a um alunoId — usada como referência pra avaliarTrajetoria().
+function ultimoRegistroDoAluno(alunoId, turmasDB) {
+  let melhor = null;
+  for (const turma of (turmasDB||[])) {
+    for (const aluno of (turma.alunos||[])) {
+      if (aluno.alunoId !== alunoId) continue;
+      if (!melhor || Number(turma.anoLetivo) > Number(melhor.anoLetivo)) {
+        melhor = { anoLetivo: turma.anoLetivo, serieDisplay: aluno.serie, resultado: aluno.resultado };
+      }
+    }
+  }
+  return melhor;
 }
 
 /* ─────────────────────────────────────────────────────────────
