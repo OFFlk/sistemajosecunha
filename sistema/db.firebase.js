@@ -171,6 +171,38 @@
     };
   }
 
+  /* ─── Consulta entre TODAS as escolas (ADMIN global, modo "Todas as
+     escolas" — nenhuma escola específica selecionada no header) ───
+     col() é sempre escopado a uma única escola; para juntar dados de
+     todas, usamos collectionGroup() do Firestore, que varre a subcoleção
+     de mesmo nome em qualquer escola de uma vez. */
+  async function collectionGroupList(name) {
+    await waitAuth();
+    const snap = await window.Auth.db.collectionGroup(name).get();
+    return snap.docs.map(d => ({
+      _id: d.id,
+      ...d.data(),
+      // schoolId por último de propósito: precisa vencer qualquer campo de
+      // mesmo nome que porventura já exista salvo no documento — a escola
+      // de origem real é o caminho do doc (schools/{schoolId}/...), nunca
+      // um campo de dado que pode nem existir nos documentos antigos.
+      schoolId: d.ref.parent.parent.id,
+    }));
+  }
+
+  /** Mapa schoolId → nome de exibição, para montar chips de escola na UI. */
+  async function loadSchoolsMap() {
+    await waitAuth();
+    const snap = await window.Auth.db.collection('schools').get();
+    const map = {};
+    snap.docs.forEach(d => {
+      if (d.id.toUpperCase() === 'ADMIN') return; // sentinel, não é escola real
+      const data = d.data();
+      map[d.id] = (data.displayName || data.name || data.nome || d.id).toString().trim();
+    });
+    return map;
+  }
+
   /* ─── Coleção especial: dadosEscola (documento único por escola) ─── */
   const escolaStore = {
     async get() {
@@ -407,8 +439,17 @@
     /**
      * Atalho: carrega todas as coleções do módulo de ANO-ATIVO.
      * Use este em vez de loadAll() nas páginas do ano-ativo.
+     *
+     * Quando o ADMIN global está em modo "Todas as escolas" (nenhuma
+     * escola específica selecionada no header — getActiveSchoolId()
+     * retorna o sentinel "ADMIN"), col() apontaria pra um doc de escola
+     * que não existe (schools/ADMIN/...) e sempre voltaria vazio. Nesse
+     * caso, delega pra loadAllAnoAtivoTodasEscolas() em vez disso.
      */
     async loadAllAnoAtivo() {
+      if (window.Auth.getActiveSchoolId() === 'ADMIN') {
+        return this.loadAllAnoAtivoTodasEscolas();
+      }
       const [turmasDB, alunosDB, matriculasDB, dadosEscola] = await Promise.all([
         this.anoAtivoTurmas.list(),
         this.anoAtivoAlunos.list(),
@@ -416,6 +457,24 @@
         this.escola.get(),
       ]);
       return { turmasDB, alunosDB, matriculasDB, dadosEscola };
+    },
+
+    /**
+     * Variante de loadAllAnoAtivo() pra "Todas as escolas": junta turmas,
+     * alunos e matrículas de TODAS as escolas via collectionGroup, cada
+     * item marcado com o schoolId de origem, mais um mapa schoolId→nome
+     * (schoolsMap) pra UI montar chip de escola. `dadosEscola` volta
+     * vazio de propósito — não existe um "ano ativo" único quando são
+     * várias escolas ao mesmo tempo, cada uma pode ter o seu.
+     */
+    async loadAllAnoAtivoTodasEscolas() {
+      const [turmasDB, alunosDB, matriculasDB, schoolsMap] = await Promise.all([
+        collectionGroupList('anoAtivoTurmas'),
+        collectionGroupList('anoAtivoAlunos'),
+        collectionGroupList('anoAtivoMatriculas'),
+        loadSchoolsMap(),
+      ]);
+      return { turmasDB, alunosDB, matriculasDB, dadosEscola: {}, schoolsMap };
     },
   };
 
