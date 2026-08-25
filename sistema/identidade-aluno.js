@@ -162,14 +162,56 @@
   /* ── Leitura síncrona (apenas para uso interno após garantirCarregado) ── */
   function lerTodos() { return _catalogo.slice(); }
 
-  /* ── Geração de ID ── */
-  function _proximoId(todos) {
-    let max = 0;
-    for (const a of (todos || [])) {
-      const m = _str(a.alunoId).match(/^ALU-(\d+)$/);
-      if (m) max = Math.max(max, parseInt(m[1], 10));
-    }
-    return 'ALU-' + String(max + 1).padStart(6, '0');
+  /* ── Geração de ID ──────────────────────────────────────────────────────
+     ANTES: escaneava o catálogo carregado (por escola, já que window.DB
+     resolve pra schools/{escolaAtiva}/alunos) e devolvia max+1. Isso causava
+     dois problemas reais:
+       1) cada escola tinha sua própria contagem, então ALU-000002 podia
+          existir em várias escolas ao mesmo tempo — e a mídia no Cloudinary
+          (avatares/documentos) é guardada só por alunoId, sem escola, então
+          duas crianças diferentes acabavam usando a mesma pasta de mídia.
+       2) apagar o aluno de maior número liberava esse número pro próximo
+          cadastro reutilizar — se sobrou mídia órfã no Cloudinary daquele
+          ID antigo (a exclusão em massa do admin_backup.html só apaga
+          Firestore, nunca Cloudinary), o aluno novo herdava as fotos/
+          documentos do aluno apagado.
+     AGORA: um contador atômico único pro sistema inteiro, em
+     system/contadores, incrementado via transação do Firestore. Nunca
+     reutiliza um número (só sobe, mesmo depois de exclusões), e é o mesmo
+     contador pra qualquer escola — resolve os dois problemas de uma vez.
+     Trade-off aceito: isso agora é assíncrono e sempre CONSOME um número
+     ao ser chamado (não existe mais "só espiar o próximo sem gastar").
+  ── */
+  function _formatarAlunoId(n) {
+    return 'ALU-' + String(n).padStart(6, '0');
+  }
+
+  /**
+   * Reserva `quantidade` IDs de uma vez, numa única transação (usado pelo
+   * findOrCreateBatch, pra não fazer uma transação por aluno num import
+   * grande). Devolve um array de strings ALU-XXXXXX, em ordem.
+   */
+  async function _reservarBlocoIds(quantidade) {
+    if (!quantidade || quantidade <= 0) return [];
+    if (!window.Auth?.db) throw new Error('Identidade: Auth.db indisponível pra gerar alunoId.');
+    const ref = window.Auth.db.collection('system').doc('contadores');
+    const novoMax = await window.Auth.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const atual = (snap.exists && typeof snap.data()?.alunoId === 'number') ? snap.data().alunoId : 0;
+      const novo = atual + quantidade;
+      tx.set(ref, { alunoId: novo, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return novo;
+    });
+    const base = novoMax - quantidade;
+    const ids = [];
+    for (let i = 1; i <= quantidade; i++) ids.push(_formatarAlunoId(base + i));
+    return ids;
+  }
+
+  /** Reserva um único ID novo. ASYNC — sempre aguarde com await. */
+  async function _proximoId() {
+    const [id] = await _reservarBlocoIds(1);
+    return id;
   }
 
   /**
@@ -292,7 +334,7 @@
     }
 
     const agora = new Date().toISOString();
-    const novo = { ...candidato, alunoId: _proximoId(todos), criadoEm: agora, atualizadoEm: agora };
+    const novo = { ...candidato, alunoId: await _proximoId(), criadoEm: agora, atualizadoEm: agora };
     novo.nome = novo.nomeOficial;
     _salvarNoArr(novo);
     return { alunoId: novo.alunoId, aluno: novo, isNew: true };
@@ -390,8 +432,10 @@
     /** Normalização de nome para comparação. */
     normNome(s) { return _normNome(s); },
 
-    /** Próximo ID livre. Só use após await pronto. */
-    proximoId() { return _proximoId(lerTodos()); },
+    /** Reserva e devolve um alunoId novo. ASYNC — sempre aguarde com await.
+     *  Diferente da versão antiga: agora CONSOME o número ao ser chamado
+     *  (não existe mais "só espiar sem gastar"). */
+    async proximoId() { return _proximoId(); },
 
     /**
      * Versão em lote — processa em memória, salva tudo no Firestore.
@@ -419,12 +463,19 @@
         if (a.nomeOficial) porNome.set(_normNome(a.nomeOficial), a);
       }
 
-      const resultados = [];
-      const novosCriados = [];
+      // ── Passada 1: decide quem já existe x quem é novo. Pra "novos",
+      // cria um objeto placeholder (alunoId ainda null) e guarda ESSA MESMA
+      // referência nos índices — assim, se uma linha seguinte da mesma leva
+      // apontar pro mesmo CPF/nome, ela mescla dentro do mesmo objeto (via
+      // Object.assign, em vez de trocar de referência) e recebe o alunoId
+      // certo automaticamente quando ele for atribuído na passada 2.
+      const resultadosRef = []; // [{ ref, isNew }] | null, na ordem da lista
+      const novosCriados  = []; // placeholders, na ordem de criação
+      const agora = new Date().toISOString();
 
       for (const campos of lista) {
         const candidato = normalizar(campos);
-        if (!candidato) { resultados.push(null); continue; }
+        if (!candidato) { resultadosRef.push(null); continue; }
 
         let encontrado = null;
         const cpfD = _normCpf(candidato.cpf || '');
@@ -440,24 +491,26 @@
         }
 
         if (encontrado) {
-          const atualizado = _mesclar(encontrado, candidato);
-          porNome.set(_normNome(atualizado.nomeOficial), atualizado);
-          resultados.push({ alunoId: atualizado.alunoId, aluno: atualizado, isNew: false });
+          Object.assign(encontrado, _mesclar(encontrado, candidato));
+          porNome.set(_normNome(encontrado.nomeOficial), encontrado);
+          if (cpfD.length === 11) porCpf.set(cpfD, encontrado);
+          resultadosRef.push({ ref: encontrado, isNew: false });
         } else {
-          const agora = new Date().toISOString();
-          const novo = {
-            ...candidato,
-            alunoId:      _proximoId(catalogo.concat(novosCriados)),
-            criadoEm:     agora,
-            atualizadoEm: agora,
-          };
+          const novo = { ...candidato, alunoId: null, criadoEm: agora, atualizadoEm: agora };
           novo.nome = novo.nomeOficial;
           novosCriados.push(novo);
           porNome.set(_normNome(novo.nomeOficial), novo);
           if (cpfD.length === 11) porCpf.set(cpfD, novo);
-          resultados.push({ alunoId: novo.alunoId, aluno: novo, isNew: true });
+          resultadosRef.push({ ref: novo, isNew: true });
         }
       }
+
+      // ── Passada 2: só agora reserva, numa única transação, exatamente
+      // quantos IDs forem necessários — e atribui em ordem de criação.
+      const idsReservados = await _reservarBlocoIds(novosCriados.length);
+      novosCriados.forEach((novo, i) => { novo.alunoId = idsReservados[i]; });
+
+      const resultados = resultadosRef.map(r => r ? { alunoId: r.ref.alunoId, aluno: r.ref, isNew: r.isNew } : null);
 
       // Atualiza catálogo em memória e persiste tudo no Firestore
       for (const r of resultados) {
