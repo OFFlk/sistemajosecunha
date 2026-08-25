@@ -803,6 +803,8 @@ let turmas = [];
 let mats = [];
 let atasDB = [];
 let anoAtivo = "";
+let schoolsMap = {};        // schoolId → nome de exibição (só preenchido em modo "Todas as escolas")
+let modoTodasEscolas = false;
 let seriesSelecionadas = [];
 let __lastLoadAt = 0;
 const __MIN_REFRESH_MS = 5000;
@@ -846,6 +848,8 @@ async function carregarDB(){
     alunos = Array.isArray(dados.alunosDB)     ? dados.alunosDB     : [];
     mats   = Array.isArray(dados.matriculasDB) ? dados.matriculasDB : [];
     turmas = Array.isArray(dados.turmasDB)     ? dados.turmasDB     : [];
+    schoolsMap = dados.schoolsMap || {};
+    modoTodasEscolas = !!dados.schoolsMap;
     const atasData = await window.DB.atas.list();
     atasDB = Array.isArray(atasData) ? atasData : [];
     anoAtivo = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
@@ -1330,6 +1334,8 @@ function atualizarListas(){
       const profTxt   = turmaOriginal.professor || t.professor || "";
       const qtdIntegral = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
       const modeloBadge = qtdIntegral > 0 ? `<span class="badge badge-integral">📚 ${qtdIntegral} integral</span>` : '';
+      const escolaBadgeTurma = (modoTodasEscolas && t.schoolId)
+        ? `<span class="badge badge-neutral">🏫 ${escapeHtml(schoolsMap[t.schoolId] || t.schoolId)}</span>` : '';
 
       // Gerar ata só faz sentido pra turma de ano JÁ ENCERRADO (ata de notas
       // fechando o ano), e só enquanto ainda não existe uma ata gerada pra
@@ -1350,6 +1356,7 @@ function atualizarListas(){
               <span class="badge">👥 ${qtdAlunos} aluno(s)</span>
               <span class="badge">📚 ${seriesTxt}</span>
               ${modeloBadge}
+              ${escolaBadgeTurma}
             </div>
             ${profTxt ? `<div class="turma-chips-row"><span class="badge badge-neutral badge-prof">👩‍🏫 ${profTxt}</span></div>` : ""}
             <div class="turma-chips-row"><span class="badge badge-neutral">ID: ${t.turmaId||"—"}</span></div>
@@ -1469,6 +1476,8 @@ function _atualizarListaAlunos(_tScope){
       const neeBadge = neeList.length > 0
         ? `<span class="badge" style="background:rgba(124,58,237,0.10);border-color:rgba(124,58,237,0.30);color:#6d28d9;">♿ ${neeList.join(', ')}</span>`
         : '';
+      const escolaBadgeAluno = (modoTodasEscolas && a.schoolId)
+        ? `<span class="badge badge-neutral">🏫 ${escapeHtml(schoolsMap[a.schoolId] || a.schoolId)}</span>` : '';
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
         <div class="left">
@@ -1477,6 +1486,7 @@ function _atualizarListaAlunos(_tScope){
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
               <span class="badge">${a.alunoId || "—"}</span>
               <span class="badge">📚 ${a.serie || "—"}</span>
+              ${escolaBadgeAluno}
             </div>
           </div>
           <div class="meta" style="margin-top:6px;display:block;">
