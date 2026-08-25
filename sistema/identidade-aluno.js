@@ -219,13 +219,14 @@
    * usuário selecionou manualmente num dropdown de busca por nome).
    *
    * Diferente de findOrCreate(), esta função NÃO redescobre o match por
-   * heurística (CPF / nome+nascimento / nome único) — ela confia inteiramente
-   * na decisão explícita de quem chamou. Isso evita o cenário em que a UI
-   * mostra "aluno vinculado" mas o merge automático, ao rodar de novo com
-   * outros critérios, discorda e cria um ID novo (ex.: dois alunos com o
-   * mesmo nome e sem data de nascimento cadastrada nas atas — a busca por
-   * nome único do findOrCreate se recusa a escolher entre eles, mas o
-   * usuário já tinha escolhido um específico no dropdown).
+   * heurística (CPF / nome+nascimento exatos) — ela confia inteiramente
+   * na decisão explícita de quem chamou. É o único jeito seguro de casar
+   * por nome sozinho: findOrCreate() nunca faz isso por conta própria
+   * (removido — fundia alunos diferentes com o mesmo nome sem confirmação
+   * humana). Quando uma página precisa dessa sugestão por nome, ela
+   * mesma detecta o candidato e pergunta ao usuário antes de chamar esta
+   * função com a decisão já tomada (ver cadastro-aluno-ativo.html: dropdown
+   * de nome + barreira de nome duplicado em modo CPF).
    *
    * @param {string} alunoId  ID já existente no catálogo (ex.: vindo de um
    *                          candidato selecionado na busca por nome)
@@ -315,17 +316,21 @@
       encontrado = todos.find(a => _normNome(a.nomeOficial) === nNome && _str(a.dataNascimento) === nNasc) || null;
     }
 
-    // 3. Busca por nome único (quando apenas um resultado bate)
-    if (!encontrado && candidato.nomeOficial) {
-      const nNome = _normNome(candidato.nomeOficial);
-      const matches = todos.filter(a => {
-        if (_normNome(a.nomeOficial) !== nNome) return false;
-        if (candidato.dataNascimento && a.dataNascimento)
-          return candidato.dataNascimento.trim() === _str(a.dataNascimento);
-        return true;
-      });
-      if (matches.length === 1) encontrado = matches[0];
-    }
+    // REMOVIDO: casamento por "nome único" (quando só um resultado batia
+    // por nome, mesmo sem CPF/nascimento confirmando). Achado como bug de
+    // produção: fundia silenciosamente dois alunos reais e diferentes com
+    // o mesmo nome, sem revisão humana, sempre que um dos dois lados não
+    // tinha data de nascimento preenchida. Casar por nome sozinho SEM
+    // confirmação humana nunca deveria acontecer aqui — quando isso faz
+    // sentido (ex.: sugerir "é o mesmo aluno?"), é responsabilidade de
+    // quem chama perguntar antes e usar vincularExplicito() com a decisão
+    // do usuário. Ver cadastro-aluno-ativo.html (modo Nome + barreira de
+    // nome duplicado em modo CPF) como implementação de referência — já
+    // faz essa checagem e confirmação por conta própria, sem depender
+    // desta função pra decidir. Sem esse casamento, nomes iguais sem CPF/
+    // nascimento batendo agora sempre criam um alunoId novo — cabe à aba
+    // de "Prováveis duplicatas" (idaluno.html) sinalizar pra fusão manual
+    // depois, se for o caso.
 
     if (encontrado) {
       const atualizado = _mesclar(encontrado, candidato);
@@ -485,10 +490,9 @@
         if (!encontrado && candidato.nomeOficial && candidato.dataNascimento)
           encontrado = porNomeNasc.get(`${_normNome(candidato.nomeOficial)}|${_str(candidato.dataNascimento)}`) || null;
 
-        if (!encontrado && candidato.nomeOficial) {
-          const match = porNome.get(_normNome(candidato.nomeOficial));
-          if (match && !(candidato.dataNascimento && match.dataNascimento)) encontrado = match;
-        }
+        // REMOVIDO: casamento por nome sozinho (ver comentário equivalente
+        // em findOrCreate(), acima) — mesmo bug, mesma correção: sem CPF
+        // ou nome+nascimento exatos batendo, sempre cria um alunoId novo.
 
         if (encontrado) {
           Object.assign(encontrado, _mesclar(encontrado, candidato));
