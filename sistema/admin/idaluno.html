@@ -444,7 +444,7 @@ function atualizarResumo(msg){
 ========================= */
 // proximoAlunoId removido — use window.Identidade.findOrCreate()
 
-function gerarIds(){
+async function gerarIds(){
   if(!window.Identidade){
     atualizarResumo("⚠️ Módulo de identidade não carregado. Recarregue a página.");
     return;
@@ -475,7 +475,7 @@ function gerarIds(){
   }
 
   // Processa tudo em memória, grava localStorage uma única vez
-  const resultados = window.Identidade.findOrCreateBatch(
+  const resultados = await window.Identidade.findOrCreateBatch(
     candidatos.filter(Boolean)
   );
 
@@ -807,7 +807,7 @@ async function aplicarFilaUnioes(){
     // yield para o browser renderizar o progresso
     await new Promise(r => setTimeout(r, 0));
 
-    unirIds(ida, idb, nomeFinal);
+    await unirIds(ida, idb, nomeFinal);
     processados++;
   }
 
@@ -844,7 +844,7 @@ function marcarComoDiferentes(){
   atualizarResumo("✅ Marcado como pessoas diferentes. (Salvo em alunosDupeIgnorados)");
 }
 
-function unirIds(idManter, idMesclar, nomeOficialFinal){
+async function unirIds(idManter, idMesclar, nomeOficialFinal){
   const turmas = lerTurmasDB();
   const aliases = lerAliasesDB();
 
@@ -891,11 +891,11 @@ function unirIds(idManter, idMesclar, nomeOficialFinal){
     if(alvoManter){
       alvoManter.nomeOficial = nomeOficialFinal;
       alvoManter.nome        = nomeOficialFinal;
-      window.Identidade.salvar(alvoManter);
+      await window.Identidade.salvar(alvoManter);
     }
     // Remove APENAS do catálogo de identidades — NÃO das matrículas/turmas
     // (já migramos o alunoId acima, então o aluno continua em todas as turmas)
-    window.Identidade.remover(idMesclar);
+    await window.Identidade.remover(idMesclar);
   } else {
     // fallback legado
     let alunosDB = lerAlunosDB();
@@ -1082,9 +1082,9 @@ async function limparDuplicatasFirestore(){
   }
 }
 
-function gerarIdsSistema(){
+async function gerarIdsSistema(){
   // 1) garante alunoId em todas as turmas (usa a lógica existente)
-  gerarIds();
+  await gerarIds();
 
   // 2) recarrega turmas do storage (gerarIds salva turmasDB)
   const turmas = lerTurmasDB();
