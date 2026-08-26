@@ -196,8 +196,8 @@
       <button class="btn-danger" id="btnLimparAlunos" onclick="limparAlunosIds()" type="button">Limpar alunos / IDs</button>
     </div>
     <div class="meta-line" style="margin-top:14px;">
-      <b>Apagar somente turmas</b> remove <code>turmasDB</code> e auxiliares derivados (<code>atasDB</code>, <code>matriculasDB</code>, <code>turmasMetaDB</code>).<br/>
-      <b>Limpar alunos / IDs</b> remove <code>alunosDB</code> e <code>alunosAliasesDB</code>, mantendo <code>turmasDB</code>.
+      <b>Apagar somente turmas</b> remove <code>turmasDB</code> e auxiliares derivados (<code>atasDB</code>, <code>matriculasDB</code>, <code>turmasMetaDB</code>) nos módulos de ano ativo e de atas, além de <code>funcionariosDB</code>.<br/>
+      <b>Limpar alunos / IDs</b> remove <code>alunosDB</code>, <code>alunosAliasesDB</code> e auxiliares, além de <code>funcionariosDB</code>, mantendo <code>turmasDB</code>.
     </div>
     <div class="summary" id="saida">Aguardando ação…</div>
   </div>
@@ -353,13 +353,12 @@
   const FUNCIONARIOS_COLS = { funcionarios:'funcionariosDB' };
   const ALL_COLS = Object.assign({}, ATAS_MODULE_COLS, ANO_ATIVO_COLS, FUNCIONARIOS_COLS);
   // "Apagar somente turmas": turmas + o que só existe em função de uma turma
-  // (atas, matrículas), nos dois módulos. Alunos/catálogo/funcionários e
-  // schemas ficam de fora.
-  const TURMAS_RELATED_COLS  = ['turmas', 'atas', 'matriculas', 'anoAtivoTurmas', 'anoAtivoMatriculas'];
+  // (atas, matrículas), nos dois módulos, mais funcionários (a pedido do
+  // usuário: funcionários deve ser apagado junto, não preservado).
+  const TURMAS_RELATED_COLS  = ['turmas', 'atas', 'matriculas', 'anoAtivoTurmas', 'anoAtivoMatriculas', 'funcionarios'];
   // "Limpar alunos/IDs": alunos/catálogo + o que só existe em função de um
-  // aluno (atas, matrículas), nos dois módulos. Turmas, funcionários e
-  // schemas/notas ficam de fora.
-  const ALUNOS_RELATED_COLS  = ['alunos', 'atas', 'matriculas', 'anoAtivoAlunos', 'anoAtivoMatriculas'];
+  // aluno (atas, matrículas), nos dois módulos, mais funcionários (idem).
+  const ALUNOS_RELATED_COLS  = ['alunos', 'atas', 'matriculas', 'anoAtivoAlunos', 'anoAtivoMatriculas', 'funcionarios'];
   // Inverso (chave do backup → nome da coleção), usado na restauração.
   const FS_MAP = Object.fromEntries(Object.entries(ALL_COLS).map(([col, key]) => [key, col]));
 
@@ -613,27 +612,27 @@
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
       if (!schoolId){ alert('Selecione uma escola antes de apagar.'); return; }
-      const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, catálogo, funcionários, schemas e notas permanecem intactos.`);
+      const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas, matrículas e funcionários dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, catálogo, schemas e notas permanecem intactos.`);
       if (!ok) return;
       setOut("⏳ Apagando turmas do Firestore…");
-      ["turmasDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
+      ["turmasDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoTurmasDB","anoAtivoMatriculasDB","funcionariosDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
         await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
-        setOut("🧹 Turmas, atas e matrículas apagadas do Firestore (ano ativo + histórico).");
+        setOut("🧹 Turmas, atas, matrículas e funcionários apagados do Firestore (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar turmas: " + e.message);
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, catálogo, funcionários, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas, matrículas e funcionários dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, catálogo, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
       setOut(`⏳ Apagando turmas de ${schoolIds.length} escola(s)…`);
       try{
         for (const schoolId of schoolIds){
           await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut("🧹 Turmas, atas e matrículas apagadas de todas as escolas (ano ativo + histórico).");
+        setOut("🧹 Turmas, atas, matrículas e funcionários apagados de todas as escolas (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar turmas: " + e.message);
@@ -649,27 +648,27 @@
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
       if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de limpar.'); return; }
-      const ok = confirm(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas e atas do Firestore.\nAs turmas permanecem.`);
+      const ok = confirm(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas, atas e funcionários do Firestore.\nAs turmas permanecem.`);
       if (!ok) return;
       setOut("⏳ Apagando alunos do Firestore…");
-      ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
+      ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoAlunosDB","anoAtivoMatriculasDB","funcionariosDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
         await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
-        setOut("🧹 Alunos, matrículas e atas apagados do Firestore (ano ativo + histórico).");
+        setOut("🧹 Alunos, matrículas, atas e funcionários apagados do Firestore (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar alunos: " + e.message);
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAs turmas, funcionários, schemas e notas permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas, atas e funcionários dos módulos de ano ativo e de atas (histórico) no Firestore.\nAs turmas permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
       setOut(`⏳ Apagando alunos de ${schoolIds.length} escola(s)…`);
       try{
         for (const schoolId of schoolIds){
           await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut("🧹 Alunos, matrículas e atas apagados de todas as escolas (ano ativo + histórico).");
+        setOut("🧹 Alunos, matrículas, atas e funcionários apagados de todas as escolas (ano ativo + histórico).");
       } catch(e){
         console.error(e);
         setOut("❌ Erro ao apagar alunos: " + e.message);
