@@ -1,4 +1,4 @@
-# Checklist de Testes — Sistema Escolar (pré-auditoria) — v7
+# Checklist de Testes — Sistema Escolar (pré-auditoria) — v12
 
 > v1 tinha o levantamento inicial. v2 corrigiu escopo/contagem/RBAC/localStorage.
 > v3 refletia a primeira rodada real de testes. v4 refletia a rodada de fixes
@@ -8,32 +8,121 @@
 > `admin_escolas.html` com 2 bugs achados e corrigidos, `cadastro_admin.html`
 > com o bug já conhecido confirmado (email não atualizava na tela), e
 > `idaluno.html` testado visualmente sem erros mas pendente de revisão de
-> código. Esta **v7** reflete a investigação do bug de email do
-> `cadastro_admin.html`: causa raiz achada em `auth.firebase.js` (corrigido —
-> bug #3 sai da lista e vai pra **✅ Fixes aplicados**) e, como efeito
-> colateral da investigação, uma **falha grave de segurança** achada nas
-> Firestore Security Rules (escalonamento de privilégio via `users.update`,
-> já corrigida) e uma **falha de exclusão** achada em `Auth.deleteUser()`
-> (contas "excluídas" pelo painel continuavam válidas no Firebase
-> Authentication — mitigada por ora, fix definitivo fica pendente).
+> código. v7 refletiu a investigação do bug de email do `cadastro_admin.html`:
+> causa raiz achada em `auth.firebase.js` (corrigido — bug #3 saiu da lista e
+> foi pra **✅ Fixes aplicados**) e, como efeito colateral da investigação,
+> uma **falha grave de segurança** achada nas Firestore Security Rules
+> (escalonamento de privilégio via `users.update`, já corrigida) e uma
+> **falha de exclusão** achada em `Auth.deleteUser()` (contas "excluídas"
+> pelo painel continuavam válidas no Firebase Authentication — mitigada por
+> ora, fix definitivo fica pendente). Esta **v8** fecha duas pendências sem
+> nenhum código mexido: **`config.html`** confirmado órfão e já retirado do
+> sistema (sai de "achado novo" e vai pra **✅ Decisões já tomadas**); e o
+> possível bug de **`perfil.html`** (troca de email não chegando no primeiro
+> endereço testado) foi retestado e confirmado como caso isolado, não bug de
+> código — sai da lista de bugs. **v9** fecha de vez a pendência 🔴 mais
+> antiga da lista: a exclusão real de contas no Firebase Authentication.
+> Implementado como endpoint próprio (`functions/api/users-delete.js` no
+> Cloudflare Pages, não Cloud Function do Firebase — sem custo), com
+> autorização em duas camadas (admin global vs. gestor de escola) pra bater
+> com o RBAC que `cadastro_admin.html` ganhou nesse meio tempo. Testado e
+> confirmado em produção. **v10** fecha as 3 observações menores das Rules
+> que estavam pendentes e trava duas brechas novas achadas na revisão: o
+> `allow delete` de `users` foi fechado (`if false` — toda exclusão passa
+> pelo endpoint), e o `allow update` não deixa mais o gestor de escola
+> promover ninguém a admin direto pelo Firestore. Testado e confirmado.
+> **v11** cobre a revisão de código de `idaluno.html` (pendência da v6),
+> a página mais complexa do módulo Admin — responsável por unificar o ID de
+> um mesmo aluno entre os módulos Atas e Ano Ativo, pra alimentar o export
+> automático de histórico escolar. Três causas raiz achadas e corrigidas
+> (sync incompleto com o Firestore no módulo Ano Ativo, e o ID errado
+> podendo sobreviver numa fusão cross-módulo — o que arriscava órfãos de
+> mídia no Cloudinary). Fica **parcialmente resolvido**: testado ponta a
+> ponta com sucesso (dados pessoais + notas + avatar sobreviveram à fusão),
+> mas achado um sintoma na **página de pesquisa de Atas**, ainda sem causa
+> raiz confirmada (ver `🐛 Bugs encontrados`). Também revisados nesta rodada,
+> só como leitura de apoio (nada alterado neles): `cadastro-turma.html`,
+> `cadastro-aluno-ativo.html`, `identidade-aluno.js`/`db.firebase.js`, e o
+> guia de migração do contador atômico de `alunoId` — nenhuma das três
+> páginas checadas precisa de ajuste por causa dessa migração. **v12** abre
+> uma frente nova, maior que um fix pontual: a **modernização do módulo de
+> Atas** (o mais antigo do sistema, hoje muito atrás dos demais em
+> funcionalidade). Causa raiz do bug de "nome desatualizado" da v11
+> **confirmada**: nome do aluno é gravado como texto fixo dentro do
+> documento da turma (não como referência ao catálogo), então uma fusão em
+> `idaluno.html` nunca se reflete na Ata. Descoberta adicional: a versão
+> debugada do `identidade-aluno.js` **removeu** o casamento por nome sozinho
+> (fonte de fusões erradas) — o que é correto, mas sem CPF/nascimento (que
+> Atas nunca manda), todo import passa a criar `alunoId` novo sempre, sem
+> nenhum matching por nome. Nasceu daí um plano de fundo (relatório entregue,
+> ver arquivo em separado) e a primeira implementação real: em
+> `gestao-atas.html`, foram corrigidos dois bugs pontuais (leitura de
+> resultado "Conservado"/"Insatisfatória" ausente, log de exclusão de turmas
+> gigantesco) e construída uma **checagem de plausibilidade de trajetória
+> escolar** (série/ano/situação) pra decidir, na importação, se um nome
+> repetido é ou não a mesma pessoa — com um novo fluxo de **análise → revisão
+> (verde/amarelo/vermelho) → confirmação**, substituindo o antigo "salva
+> direto". **Ainda não testado de ponta a ponta** (testes em andamento — ver
+> `⏳ Pendências`). Durante os primeiros testes manuais já apareceram dois
+> achados novos (ver `🐛 Bugs encontrados`), e ficaram registradas três
+> decisões de arquitetura pra próxima rodada de código (ver `⏳ Pendências`):
+> um modelo de matrícula única por aluno (como o Ano Ativo já faz), um ID
+> determinístico de matrícula pra travar reimportação duplicada de turma, e
+> mover a detecção de nomes semelhantes (hoje em `idaluno.html`) pra dentro
+> da própria análise de importação, antes do `alunoId` ser criado de vez.
 
 ---
 
 ## 🐛 Bugs encontrados (a corrigir)
 
-### `perfil.html`
-1. **Troca de email não chega no email antigo.** Ao trocar o email, a
-   confirmação diz que o novo email será validado antes da troca no banco —
-   mas o código de confirmação não chegou no primeiro email testado.
-   Testando com um segundo email, chegou normalmente. Pode ser
-   caso isolado do primeiro endereço — testar de novo com mais 1-2 emails
-   diferentes antes de tratar como bug de código.
-2. **Código de confirmação sempre cai no spam** — provável configuração de
-   remetente (SPF/DKIM/domínio), não bug de página. Investigar depois, à
-   parte, se decidir que vale a pena.
+- **`gestao-atas.html` — linha de aluno com nome "--" é tratada como aluno de
+  verdade.** Achado testando a nova análise de importação (imagem 1 anexada
+  na v12): a ata original tem uma linha em branco no meio da numeração (erro
+  humano na transcrição manual da ata física), preenchida como "--" no lugar
+  do nome pra não quebrar a numeração impressa (Nº 10, no exemplo). Hoje o
+  import lê "--" como um nome válido e cria um "aluno" sem notas/situação.
+  Decisão já tomada: **como o sistema não depende de sumário numérico
+  (é um banco pesquisável), essas linhas devem ser ignoradas no import** —
+  não pular o número na tabela física (isso é problema burocrático, fora do
+  sistema), só não criar registro de aluno pra essas linhas. Sem fix
+  aplicado ainda.
+- **`gestao-atas.html` — indicador de série "--" não reconhecido.** Achado
+  no mesmo teste (imagem 2 anexada na v12, turma "EJA1 2021"): 2 alunos
+  gerando aviso `indicador "--" não reconhecido`. Conferido no `.xlsx` de
+  origem: "--" ali é só **"não informado"** genérico (mesmo caso de dado
+  ausente que aparece em outras colunas), sem lógica especial por trás —
+  não é algo exclusivo do EJA. (Separadamente, esses mesmos 2 alunos também
+  tinham resultado `AND`/Em andamento nessa aba — já reconhecido pelo
+  `toResultado()`, sem relação de causa com o aviso do indicador.) Sem fix
+  aplicado ainda — falta decidir se "--" no campo de série deve parar de
+  gerar aviso (tratado como série desconhecida, sem travar nem avisar) ou
+  se deve continuar avisando, já que "não informado" ali é, de fato, uma
+  lacuna de dado.
+- **Pesquisa de Atas mostra o nome antigo depois de uma fusão em
+  `idaluno.html`.** Testado: aluno "teste1" (Ano Ativo) fundido com
+  "teste2" (Atas), escolhendo manter o nome "teste1". No Firestore e na
+  página de Histórico, os dados batem certo com "teste1" (nome, nascimento,
+  filiação). Mas na **pesquisa de Atas**, o mesmo aluno ainda aparece na
+  tabela como **"teste2"**. **Causa raiz confirmada na v12** (ver resumo no
+  topo do arquivo): nome gravado como texto fixo dentro do documento da
+  turma, nunca lido de volta do catálogo — não é cache/front-end como se
+  suspeitava na v11. Fix estrutural (fazer a Ata guardar só `alunoId` e ler
+  nome ao vivo) faz parte do plano maior de modernização do módulo,
+  registrado em relatório separado — não é mais um fix pontual isolado.
+- **`gerarIds()` em `idaluno.html` (botão "Gerar / Atualizar IDs") chama
+  `findOrCreateBatch()` sem `await`, numa função que não é `async`.** Achado
+  ao rodar o teste do Passo 1 do guia de migração do contador atômico
+  (`identidade-aluno.js`) — não é causado pela migração, já estava assim
+  antes. Como `findOrCreateBatch()` é `async`, o retorno vira uma Promise em
+  vez do array esperado, e o código que distribui `alunoId` de volta pras
+  turmas (`resultados[rIdx++]`) provavelmente nunca funcionou. Suspeita:
+  quem realmente cria os IDs de Atas hoje é o `garantirIds()` de
+  `cadastro-turma.html` (que usa `await` corretamente, na hora de salvar a
+  turma), tornando esse botão redundante/quebrado sem que ninguém tenha
+  notado. **Sendo resolvido em paralelo, em outro chat** (v12).
 
-*(sem bugs abertos no momento — ver **✅ Fixes aplicados** pro que foi
-resolvido nesta rodada)*
+*(ver **✅ Fixes aplicados** pro que foi resolvido, e **⏳ Pendências** pro
+que falta investigar/corrigir)*
 
 ---
 
@@ -45,71 +134,82 @@ resolvido nesta rodada)*
   redundante — vou aguardar o fix pra reescrever a função de export.
 - **`oldcadastro-funcionario.html` confirmado sem uso** — órfã, pode ser
   removida quando fizer sentido (não é urgente).
-
----
-
-## 🆕 Achado novo nesta rodada
-
-- **`config.html` (hub de Configurações) parece órfã/sem uso** — você marcou
-  como tal ao preencher a lista. Antes de remover, vale confirmar: nenhuma
-  outra página linka pra ela? Ela deveria estar acessível a partir de algum
-  lugar (`index.html`?) e simplesmente não está, ou o módulo inteiro ficou
-  obsoleto?
+- **`config.html` (hub de Configurações) confirmado órfão** — já retirado do
+  sistema.
+- **`perfil.html` — troca de email não chegando no primeiro endereço
+  testado** — retestado com mais emails, chegou normalmente. Confirmado
+  caso isolado do endereço original, não bug de código. Encerrado.
 
 ---
 
 ## ⏳ Pendências (ainda não testado)
 
-- **🔴 Gestão real de contas no Firebase Authentication (prioridade alta).**
-  Achado ao investigar o bug de email: `Auth.deleteUser(uid)` (usado pelo
-  botão Excluir/Reprovar em `cadastro_admin.html`) só apaga o documento em
-  `users/{uid}` no Firestore — **nunca apagou a conta no Firebase
-  Authentication**. Resultado: uma conta "excluída" pelo painel continua
-  logando normalmente pra sempre (inclusive redefinindo senha via "esqueci
-  minha senha"), só que com sessão caindo pra `role: 'user'` por falta de
-  perfil no Firestore — a não ser que o doc seja recriado depois, aí ela
-  volta a ter o role antigo. Confirmado em produção: existiam contas de
-  teste antigas, já "excluídas" há muito tempo, ainda ativas no
-  Authentication, uma delas inclusive de admin.
-  **Mitigação atual:** o wipe do banco planejado pro fim da fase de testes
-  apaga os documentos do Firestore, mas **não apaga nada do Authentication**
-  — contas fantasmas de teste continuariam válidas pra login mesmo depois do
-  wipe, a não ser que sejam apagadas manualmente pelo Console
-  (Authentication → Users) antes ou depois do wipe.
-  **Fix definitivo (combinado, ainda não implementado):** trocar
-  `Auth.deleteUser()` por uma Cloud Function com Admin SDK
-  (`admin.auth().deleteUser(uid)` + apagar o doc do Firestore), chamada pelo
-  botão de excluir em vez do client SDK direto — só assim a exclusão apaga
-  dos dois lugares de uma vez. Fica pendente pra quando a fase de testes
-  acabar (hoje dá pra contornar apagando manualmente pelo Console quando
-  necessário).
-- **Observações menores nas Firestore Security Rules** (achadas na mesma
-  revisão que corrigiu o `users.update` — nenhuma é urgente, nenhuma foi
-  mexida ainda):
-  - `schools/{schoolId}` tem `allow read: if true` — leitura 100% pública,
-    sem login. Provavelmente intencional (dropdown de escola no
-    autocadastro precisa disso antes do login), mas vale confirmar que os
-    docs de `schools` nunca vão guardar campo sensível, já que hoje
-    qualquer um lê tudo deles.
-  - `changeRequests.create` não valida que o campo `requestedBy` bate com
-    `request.auth.uid` — um admin de escola logado consegue gravar uma
-    solicitação alegando ter sido pedida por outra pessoa. Baixo risco,
-    mas polui auditoria.
-  - Funções `isPendingSignup()` e `resource_uid()` no arquivo de Rules são
-    definidas mas nunca chamadas — a regra de `create` reimplementa a mesma
-    lógica inline. Código morto, sem risco, só limpeza futura.
-- **Restante do módulo Admin** (`admin_backup.html`, `idaluno.html`) —
-  `admin.html`, `admin_escolas.html` e `schema_ata.html` já testados nesta
-  rodada (ver detalhes abaixo). `admin_backup.html` aguarda o fix combinado
-  (reescrever export pra ler do Firestore ao vivo). `idaluno.html` passou no
-  teste visual, mas por ser a página mais complexa do módulo, ainda quer uma
-  revisão de código à parte antes de dar como concluída — sem previsão
-  definida ainda.
+> **Ordem de prioridade combinada:** `admin_backup.html` fica por último na
+> fila de fixes.
+
+- **Modernização do módulo de Atas — em andamento (v12).** Plano completo
+  em relatório separado. Nesta rodada, em `gestao-atas.html`: fluxo de
+  import trocado de "salva direto" pra **análise → revisão
+  (verde/amarelo/vermelho) → confirmação**, com checagem de plausibilidade
+  de trajetória (`avaliarTrajetoria`, baseada em série + ano letivo +
+  situação, com janela de 1 a 3 anos a partir do último vínculo conhecido do
+  aluno). **Implementado, ainda não testado de ponta a ponta** — testes em
+  andamento, já geraram os dois achados novos listados em
+  `🐛 Bugs encontrados`.
+- **Decisão de arquitetura: matrícula única por aluno (como o Ano Ativo já
+  faz), em vez de um `alunoId` novo por turma/ano.** Hoje cada import
+  potencialmente cria um `alunoId` por aparição do nome; a ideia é o aluno
+  ter só um ID pra sempre, e uma **matrícula** (documento próprio, no
+  padrão de `anoAtivoMatriculas`) vinculando esse ID a cada turma/ano
+  cursado. Decidido: a resolução de identidade continua 100% automática
+  tanto no import quanto no futuro cadastro manual — sem precisar de telas
+  separadas pra aluno/turma/matrícula. Sem migração de dados necessária
+  (sistema em fase de testes, sem turmas reais ainda). Ainda não
+  implementado.
+- **ID determinístico de matrícula/turma, pra travar reimportação
+  duplicada.** Decidido que precisa existir alguma verificação pra que a
+  mesma turma (ou matrícula, no novo modelo acima) não seja importada 2+
+  vezes sem querer. Ainda não implementado — depende de o modelo de
+  matrícula acima estar definido primeiro.
+- **Mover a detecção de nomes semelhantes de `idaluno.html` pra dentro da
+  análise de importação de `gestao-atas.html`, antes do `alunoId` nascer.**
+  Hoje o script de semelhança de nome (% configurável) só existe em
+  `idaluno.html`, criado originalmente pra achar erro humano de
+  cadastro/import (ex.: "João" vs. "Joao"). Problema identificado: como o
+  contador de `alunoId` é atômico, se dois nomes parecidos viram dois IDs
+  na importação e só depois alguém mescla no `idaluno.html`, um número de
+  ID é perdido pra sempre (inflaciona a sequência). Decidido mover essa
+  checagem pra **antes** do `findOrCreateBatch` rodar na análise — nome
+  parecido vira uma decisão pendente (é a mesma pessoa? sim/não) dentro da
+  própria revisão verde/amarelo/vermelho, em vez de já reservar um ID novo
+  e só corrigir depois. Escopo confirmado: comparar o nome candidato **tanto
+  contra o catálogo já existente quanto entre linhas da mesma planilha**
+  (ex.: aluno já no catálogo com nome acentuado, e a planilha nova tem esse
+  mesmo aluno em duas turmas — uma com acento, outra sem). Em ambos os
+  casos, a decisão "é a mesma pessoa" deve levar em conta a proximidade de
+  série→situação→ano letivo (o mesmo `avaliarTrajetoria` já construído),
+  não só a semelhança textual do nome. Isso também tira peso do
+  `idaluno.html`, que passaria a focar só no vínculo Ano Ativo↔Atas (seu
+  propósito original). Ainda não implementado — combinado que só entra
+  depois do fluxo de análise/revisão atual ser testado.
+- **Restante do módulo Admin** (`admin_backup.html`) — `admin.html`,
+  `admin_escolas.html`, `schema_ata.html` e `idaluno.html` já testados (ver
+  detalhes abaixo). `admin_backup.html` aguarda o fix combinado (reescrever
+  export pra ler do Firestore ao vivo) — **deixado por último na fila de
+  fixes**, de propósito; você está tratando esse item à parte.
+- **`idaluno.html` — 🟡 parcialmente resolvido.** Revisão de código completa
+  feita (pendência da v6). Três causas raiz achadas e corrigidas nesta
+  rodada (ver `✅ Fixes aplicados`), testadas ponta a ponta com sucesso pelo
+  fluxo Atas↔Ano Ativo → Histórico. O sintoma na página de pesquisa de Atas
+  teve a causa raiz confirmada na v12 (nome fixo no documento da turma) e
+  virou parte do plano de modernização do módulo de Atas, em vez de fix
+  pontual — ver pendência acima. O `gerarIds()` sem `await` está sendo
+  resolvido em paralelo, em outro chat.
 - **`historico_auto.html`** e **`schema_ch.html`** — aguardando os fixes que
   você já está desenvolvendo (mencionado antes de começar os testes).
-- **Firestore Security Rules** — ainda não escritas/revisadas. Você vai me
-  pedir pra fazer as regras adaptadas ao RBAC do sistema — combinado,
-  fica pra quando você tiver o próximo token do GitHub.
+- **Email de confirmação de troca (`perfil.html`) sempre cai no spam** —
+  provável configuração de remetente (SPF/DKIM/domínio), não bug de página.
+  Baixa prioridade — investigar depois, à parte, se decidir que vale a pena.
 - **Levantamento completo de localStorage por página** — vou refazer a
   varredura (mais a fundo dessa vez, já mirando os bugs de cache que
   apareceram no teste, como o do email em `cadastro_admin.html`) assim que
@@ -128,7 +228,124 @@ resolvido nesta rodada)*
 
 ## ✅ Fixes aplicados
 
-### Rodada de hoje — `auth.firebase.js` + `firestore.rules`
+### Rodada de hoje — `gestao-atas.html`
+
+Início da modernização do módulo de Atas (plano completo em relatório
+separado). Três mudanças, nesta ordem:
+
+- **`toResultado()` não reconhecia "Conservado" (`C`) nem "Insatisfatória"
+  (`I`)** — caíam em "Não informado" silenciosamente. Adicionados aos
+  códigos e palavras-chave reconhecidos.
+- **Log de exclusão de turmas gigantesco — condensado.** Apagar várias
+  turmas de uma vez gerava de 1 a 4 linhas de log *por turma* (uma por
+  tentativa de remoção no Firestore), mais uma segunda lista repetindo os
+  nomes no final — pra 59 turmas, ~180 linhas. Trocado por um resumo
+  (`X/Y turma(s) removida(s)`) mais uma lista de avisos que só aparece
+  quando alguma turma precisou de fallback (`_id`/`removeWhere`) ou falhou
+  de verdade — o caminho normal (tudo removido de primeira) agora gera 2
+  linhas de log em vez de ~180.
+- **Nova checagem de plausibilidade de trajetória, e fluxo de import
+  trocado de "salva direto" pra "análise → revisão → confirmação".**
+  Funções novas: `_categoriaResultado`, `_parseSerieCanonica`,
+  `avaliarTrajetoria`, `ultimoRegistroDoAluno` — decidem se um nome
+  repetido no catálogo, com uma nova série/ano/situação, é uma continuação
+  plausível da mesma pessoa (janela de 1 a 3 anos a partir do último
+  vínculo conhecido daquele `alunoId`, com série esperada calculada a
+  partir do resultado anterior: Aprovado/Satisfatório/Parcial avança,
+  Reprovado/Desistente/Conservado/Insatisfatória/Em andamento mantém,
+  Transferido/Não informado fica sem expectativa de série, Falecido
+  bloqueia sempre). O antigo `importarSelecionadas()` (salvava direto no
+  Firestore) foi separado em `analisarSelecionadas()` (monta um buffer em
+  memória, sem gravar nada) → tela de revisão com cada turma marcada
+  verde/amarelo/vermelho (`renderRevisaoImportacao`, com botão de remover
+  turma da lista, `removerTurmaDoBuffer`) → `confirmarImportacao()` (só aí
+  grava de fato) ou `cancelarImportacao()` (descarta tudo, limpando
+  identidades órfãs criadas durante a análise). **Trade-off assumido e
+  avisado na própria tela:** a resolução de identidade
+  (`findOrCreateBatch`) já roda na fase de análise, antes da confirmação,
+  porque ela já persiste sozinha no catálogo — não foi criada uma versão
+  "simulada" dela. **Ainda não testado de ponta a ponta** — ver achados em
+  `🐛 Bugs encontrados` e a decisão de mover a checagem de nomes
+  semelhantes pra dentro desse fluxo em `⏳ Pendências`.
+
+**Arquivos entregues nessa rodada:** `gestao-atas.html`.
+
+---
+
+### Rodada anterior — `idaluno.html`
+
+Revisão de código completa da página (pendência da v6). Contexto: essa
+página existe pra unificar sob um único `alunoId` o mesmo aluno cadastrado
+separadamente em dois módulos — **Atas** (histórico, só nome/nota/série/
+turno/ano letivo, sem dados pessoais) e **Ano Ativo** (aluno atual, ficha
+completa com CPF/filiação/mais de 20 campos, e mídia no Cloudinary — avatar
+e documentos, indexada só por `alunoId`). A unificação existe pra alimentar
+automaticamente a página de Histórico Escolar (export em `.docx`), que hoje
+precisa puxar notas de Atas **e** dados pessoais de Ano Ativo do mesmo
+aluno.
+
+- **🔴 Sync incompleto com o Firestore no módulo Ano Ativo — corrigido.**
+  `unirIds()` atualizava corretamente o catálogo central (`alunos`, via
+  `window.Identidade`) numa fusão, mas as duas coleções do Ano Ativo
+  (`anoAtivoTurmas`, `anoAtivoMatriculas`) ficavam de fora do mapa de sync
+  de `salvarJSON()` — a fusão gravava certo só no `localStorage` do
+  navegador que fez a ação, nunca subia pro servidor. Um aluno "unido" nesse
+  navegador continuava duplicado em qualquer outro dispositivo. Corrigido:
+  as duas chaves entraram no `_MAP` de sync, apontando pras coleções reais
+  (`anoAtivoTurmas`/`anoAtivoMatriculas`).
+- **🔴 Ano Ativo não era recarregado do Firestore ao abrir a página —
+  corrigido.** No boot (`DOMContentLoaded`), só `turmasDB`/`alunosDB`/
+  `matriculas`/`atasDB` eram pré-carregados do Firestore pro `localStorage`.
+  As duas coleções do Ano Ativo ficavam de fora, então a página podia
+  calcular sugestões de fusão em cima de cache local desatualizado.
+  Corrigido: `window.DB.loadAllAnoAtivo()` agora roda junto no boot,
+  populando as três chaves (`anoAtivoTurmasDB_v1`, `anoAtivoMatriculasDB_v1`
+  e `anoAtivoAlunosDB_v1` — essa última achada só depois, ver abaixo).
+- **🔴 ID errado podia sobreviver numa fusão cross-módulo, arriscando
+  órfãos de mídia no Cloudinary — corrigido.** Esse foi o achado mais sério,
+  confirmado com teste real (aluno "teste1" em Ano Ativo + "teste2" em
+  Atas). O ID que sobrevive a uma fusão (`idManter`) era decidido só pela
+  ordem alfabética dos nomes na lista — sem nenhuma garantia de que fosse o
+  ID do Ano Ativo. Como o Cloudinary indexa avatar/documentos só pelo
+  `alunoId` (sem escola/módulo), se o ID de Atas vencesse a fusão, a mídia
+  do aluno ficava órfã (o app passa a perguntar pelo `alunoId` novo, que
+  nunca teve nada enviado sob esse nome). Corrigido em duas partes:
+  (1) `gerarSugestoes()` agora força o ID do Ano Ativo a ser sempre o
+  sobrevivente em pares cross-módulo, invertendo os papéis internamente
+  quando necessário; (2) a checagem de "isso é Ano Ativo" (`isAA()`), que
+  antes dependia de existir **matrícula ativa** pro aluno (sinal frágil — um
+  aluno pode ter ficha completa e mídia sem matrícula corrente), passou a
+  checar direto a coleção-catálogo `anoAtivoAlunos` — daí a necessidade da
+  terceira chave de sync/preload citada no item acima.
+  **Testado e confirmado ponta a ponta:** fusão de teste (Ano Ativo +
+  Atas) manteve ID, nome, nascimento, filiação e **avatar** corretos depois
+  da fusão, e o Histórico exportou notas + dados pessoais do mesmo aluno
+  automaticamente.
+  **Sintoma remanescente, sem causa raiz confirmada ainda:** a página de
+  pesquisa de Atas continua mostrando o nome antigo do aluno fundido (ver
+  `🐛 Bugs encontrados`).
+- **Revisado e descartado como não-crítico (não mexido):** o bloco de
+  aliases legado dentro de `unirIds()` (`alunosAliasesDB`) é código morto
+  no caminho principal — computado e nunca salvo quando `window.Identidade`
+  existe (só é usado no fallback legado). Confirmado que o catálogo atual
+  (`identidade-aluno.js`) não depende dele pra nada. Baixo risco, baixa
+  prioridade — não corrigido de propósito, pra não mexer no fallback à toa.
+
+**Revisados nesta rodada só como leitura de apoio, nada alterado neles:**
+`cadastro-turma.html`, `cadastro-aluno-ativo.html`, `identidade-aluno.js`,
+`db.firebase.js`, e o guia de migração do contador atômico de `alunoId`.
+Rodado o teste do Passo 1 do guia (`grep ".proximoId("`) nas três páginas:
+nenhuma chama `proximoId()` direto, todas usam `findOrCreate`/
+`findOrCreateBatch`/`salvar`/`remover` — nenhum ajuste necessário por causa
+da migração do contador atômico. Achado nesse processo (não relacionado à
+migração): `gerarIds()` em `idaluno.html` chama `findOrCreateBatch()` sem
+`await` (ver `🐛 Bugs encontrados`).
+
+**Arquivos entregues nessa rodada:** `idaluno.html`.
+
+---
+
+### Rodada anterior — `auth.firebase.js` + `firestore.rules`
 
 - **Bug #3 (`cadastro_admin.html`: email não atualiza na tela) — corrigido
   na raiz.** Não era bug da página — `cadastro_admin.html` só exibe o que
@@ -163,12 +380,82 @@ resolvido nesta rodada)*
   doc se `role` e `schoolId` do documento novo forem idênticos aos já
   salvos — só admin altera esses dois campos. Resto do doc (nome, foto etc.)
   continua editável pelo próprio dono normalmente.
-- **Achado, mas não corrigido nesta rodada:** `Auth.deleteUser()` só apaga o
-  doc do Firestore, nunca a conta no Firebase Authentication — contas
-  "excluídas" continuam válidas pra login. Ver pendência **🔴 Gestão real de
-  contas no Firebase Authentication** acima.
+- **🔴 Bug de exclusão corrigido — `Auth.deleteUser()` agora apaga dos dois
+  lugares.** Era o item que tinha ficado como "achado, mas não corrigido"
+  na rodada anterior. Antes só apagava o doc do Firestore, deixando a conta
+  ativa no Firebase Authentication pra sempre (confirmado em produção com
+  contas de teste antigas ainda válidas pra login, uma delas de admin).
 
 **Arquivos entregues nessa rodada:** `auth.firebase.js`, `firestore.rules`.
+
+---
+
+### Rodada seguinte — exclusão de usuário via endpoint próprio (`users-delete.js`)
+
+- **🔴 Gestão real de contas no Firebase Authentication — resolvido e
+  testado.** Trocado `Auth.deleteUser()` por uma chamada a um endpoint
+  próprio (`functions/api/users-delete.js`, Cloudflare Pages Function —
+  **não** é Cloud Function do Firebase, então não precisou do plano Blaze).
+  O endpoint usa uma service account do Firebase (REST, sem `firebase-admin`
+  — esse SDK não roda no runtime do Cloudflare Pages) pra apagar a conta no
+  Firebase Authentication e o doc em `users/{uid}` no Firestore numa
+  chamada só. Autorização em duas camadas, batendo com o RBAC de
+  `cadastro_admin.html`:
+  - **Admin global** (`schoolId: 'ADMIN'`): pode excluir qualquer um.
+  - **Gestor de escola** (`role: 'admin'` com `schoolId` de uma escola
+    específica): só pode apagar via esse endpoint se o alvo for uma
+    solicitação **pendente da própria escola** (reprovação). Excluir
+    usuário já aprovado — de qualquer escola, inclusive a própria — exige
+    passar pelo fluxo de `changeRequests`/aprovação do admin global. Isso
+    fecha uma brecha real: sem essa checagem, um gestor de escola
+    conseguiria excluir qualquer usuário já aprovado chamando o endpoint
+    direto (fora da UI), pulando a aprovação.
+  - Bloqueado também excluir a própria conta pelo endpoint.
+  **Testado e confirmado em produção:** exclusão via painel some da lista,
+  do Authentication e do Firestore; gestor de escola tentando excluir
+  usuário já aprovado recebe 403 com a mensagem certa; gestor reprovando
+  pendente da própria escola funciona normalmente.
+
+**Arquivos entregues nessa rodada:** `functions/api/users-delete.js`,
+`auth.firebase.js` (método `deleteUser()` atualizado pra chamar o endpoint,
+e `listUsers()` passou a aceitar `schoolId` opcional pra suportar a query
+com escopo do gestor de escola — exigência das próprias Rules).
+
+---
+
+### Rodada seguinte — `firestore.rules` (ajustes finos de RBAC)
+
+- **As 3 observações menores das Rules, resolvidas:** `changeRequests.create`
+  agora valida `requestedBy == request.auth.uid`; as funções mortas
+  `isPendingSignup()`/`resource_uid()` foram limpas — `isPendingSignup()`
+  passou a ser usada de verdade no `allow create` de `users`. O
+  `schools/{schoolId}` com `allow read: if true` foi mantido (intencional,
+  documentado em comentário — dropdown de escola no autocadastro precisa
+  disso antes do login).
+- **🔴 `allow delete` em `users/{uid}` fechado — `if false`.** A regra
+  antiga (`isGlobalAdmin() || isSchoolAdmin(resource.data.schoolId)`)
+  deixava o gestor de escola apagar direto pelo Firestore **qualquer**
+  usuário da própria escola, inclusive já aprovado — ignorando por completo
+  a restrição de "só pendente" que tinha acabado de ser implementada no
+  endpoint `/api/users-delete`. Como toda exclusão do app já passa por esse
+  endpoint (que usa service account, não o client SDK, então nem depende
+  dessa regra pra funcionar), a solução foi travar o delete direto de vez —
+  ninguém apaga usuário pelo Firestore, nem o admin global. Fecha o atalho
+  que reintroduzia conta fantasma nesse caminho específico.
+- **🟡 `allow update` de `users/{uid}` — gestor de escola não promove mais a
+  admin.** Antes só travava troca de `schoolId`; nada impedia o gestor de
+  virar o `role` de um usuário da própria escola pra `admin` direto pelo
+  Firestore. Ajustado pra permitir só a transição `pending` → `user`
+  (aprovação) ou manter o `role` como está — qualquer outra mudança de role
+  exige admin global. Decisão de negócio confirmada com você antes de
+  aplicar (fluxo combinado: gestor aprova/reprova sozinho; qualquer alteração
+  em usuário já aprovado passa pelo admin global).
+  **Testado e confirmado:** aprovar pendente funciona normal; gestor
+  tentando promover a admin é bloqueado (`permission-denied`); delete direto
+  pelo Firestore bloqueado até pro admin global; exclusão de escola
+  (`deleteSchool()`, regra separada) continua funcionando normal.
+
+**Arquivos entregues nessa rodada:** `firestore.rules`.
 
 ---
 
