@@ -288,11 +288,24 @@ function __schoolId() {
   return 'SEM_ESCOLA';
 }
 function dbKey(base)  { return `schools:${__schoolId()}:${base}`; }
+// Escreve no localStorage sem propagar exceção. O localStorage é só um
+// cache de leitura rápida (o dado real vive no Firestore) — se a cota do
+// navegador (5-10MB, por origem, nada a ver com cota/faturamento do
+// Firestore) estourar, isso NÃO pode travar o salvamento real. Antes, um
+// `localStorage.setItem` sem try/catch aqui abortava a função inteira
+// antes de chegar no código que grava no Firestore.
+function _lsSetSafe(key, val) {
+  try { localStorage.setItem(key, val); return true; }
+  catch (e) {
+    console.warn('[gestao-atas] cache local (localStorage) não pôde ser salvo — não afeta o Firestore:', e);
+    return false;
+  }
+}
 function dbRead(base, fallback) {
   try { const r = localStorage.getItem(dbKey(base)); return r ? JSON.parse(r) : fallback; } catch { return fallback; }
 }
 function dbWrite(base, val) {
-  localStorage.setItem(dbKey(base), JSON.stringify(val));
+  _lsSetSafe(dbKey(base), JSON.stringify(val));
   try {
     if (!window.DB || !window.Auth?.getSession()) return;
     const map = { turmasDB:'turmas', alunosDB:'alunos', atasDB:'atas', matriculasDB:'matriculas' };
@@ -419,7 +432,7 @@ async function inicializar() {
       const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
       // Mantém TODAS as turmas no cache local (não esconde as suspeitas) —
       // elas são marcadas visualmente na tabela e continuam selecionáveis para apagar.
-      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(todasFirestore));
+      _lsSetSafe(dbKey('turmasDB'), JSON.stringify(todasFirestore));
       logEl(`Firestore: ${todasFirestore.length} turma(s) total (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado — marcada${suspeitas.length===1?'':'s'} na tabela, não escondida${suspeitas.length===1?'':'s'})`, 'logGeral');
     }
   } catch(e) {
@@ -454,7 +467,7 @@ async function recarregar() {
       // basta chamar list() que ele já verifica o timestamp.
       const todasFirestore = await window.DB.turmas.list();
       const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
-      localStorage.setItem(dbKey('turmasDB'), JSON.stringify(todasFirestore));
+      _lsSetSafe(dbKey('turmasDB'), JSON.stringify(todasFirestore));
       logEl(`Firestore: ${todasFirestore.length} turma(s) (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado)`, 'logGeral');
     }
   } catch(e) {
@@ -680,9 +693,9 @@ function _reconstruirAuxLocalmente(turmas) {
     }
   }
   // Salva apenas no localStorage (sem disparar sync com Firestore)
-  localStorage.setItem(dbKey('atasDB'),       JSON.stringify(atas));
-  localStorage.setItem(dbKey('matriculasDB'), JSON.stringify(mats));
-  localStorage.setItem(dbKey('turmasMetaDB'), JSON.stringify(metas));
+  _lsSetSafe(dbKey('atasDB'),       JSON.stringify(atas));
+  _lsSetSafe(dbKey('matriculasDB'), JSON.stringify(mats));
+  _lsSetSafe(dbKey('turmasMetaDB'), JSON.stringify(metas));
   return { atas, mats, metas };
 }
 
@@ -770,7 +783,7 @@ async function apagarSelecionadas() {
 
   // 2. Atualiza localStorage diretamente (sem reenviar ao Firestore)
   const novas = turmas.filter((_,i) => !indices.includes(i));
-  localStorage.setItem(dbKey('turmasDB'), JSON.stringify(novas));
+  _lsSetSafe(dbKey('turmasDB'), JSON.stringify(novas));
   // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
   const aux = _reconstruirAuxLocalmente(novas);
 
@@ -862,7 +875,7 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
 
   // Atualiza localStorage do alunosDB removendo os órfãos
   const alunosLocal = lerAlunosDB().filter(a => !idsOrfaos.includes(String(a.alunoId || a._id || '').trim()));
-  localStorage.setItem(dbKey('alunosDB'), JSON.stringify(alunosLocal));
+  _lsSetSafe(dbKey('alunosDB'), JSON.stringify(alunosLocal));
 
   return removidos;
 }
@@ -922,7 +935,8 @@ function toNotaSistema(v) {
 // critério usado em qualificarIndicadorAluno() pra série.
 function toResultado(v, notasVaziasNaLinha) {
   const s = normalizarTxt(v);
-  if (['AP','REP','DEST','TRA','FAL','AND','C'].includes(s)) return { resultado: s, divergente: false, motivo: '' };
+  if (['AP','REP','DEST','TRA','FAL','AND'].includes(s)) return { resultado: s, divergente: false, motivo: '' };
+  if (s==='C'||s==='CON') return { resultado: 'C', divergente: false, motivo: '' };
   if (s==='S') return { resultado: 'S', divergente: false, motivo: '' };
   if (s==='P') return { resultado: 'P', divergente: false, motivo: '' };
   if (s==='I') return { resultado: 'I', divergente: false, motivo: '' };
