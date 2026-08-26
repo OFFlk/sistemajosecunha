@@ -158,7 +158,7 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
         </label>
         <button class="btn btn-gray"    id="btnSelTodas" onclick="selecionarAbas(true)"  disabled>Selecionar todas</button>
         <button class="btn btn-gray"    id="btnDesTodas" onclick="selecionarAbas(false)" disabled>Desmarcar todas</button>
-        <button class="btn btn-primary" id="btnImportar" onclick="importarSelecionadas()" disabled>Importar selecionadas</button>
+        <button class="btn btn-primary" id="btnImportar" onclick="analisarSelecionadas()" disabled>Importar selecionadas</button>
       </div>
       <div class="aba-list" id="listaAbas" style="display:none;"></div>
       <div class="summary"  id="saidaXLSX" style="display:none;"></div>
@@ -704,22 +704,27 @@ async function apagarSelecionadas() {
   clearLogEl('logApagar');
 
   // 1. Deleta do Firestore — usa turmaId como ID do documento (igual ao saveAll)
-  //    e também tenta pelo _id caso exista, além de removeWhere como fallback
+  //    e também tenta pelo _id caso exista, além de removeWhere como fallback.
+  //    Log condensado: só entra no console um aviso por turma quando algo sair
+  //    do caminho esperado (precisou de fallback, ou falhou de fato). O caso
+  //    normal (tentativa 1 funcionou) não gera linha nenhuma — só conta.
+  let removidosOk = 0;
+  const avisos = [];
   if (window.DB && window.DB.turmas) {
     for (const t of aApagar) {
       // O saveAll usa turmaId (ou id) como ID do documento no Firestore
       const docIdPrimario = t.turmaId || t.id;
       const docIdSecundario = t._id && t._id !== docIdPrimario ? t._id : null;
+      const nomeTurma = t.aba || docIdPrimario || '?';
       let removido = false;
 
       // Tentativa 1: pelo turmaId (ID que o saveAll gravou como nome do documento)
       if (docIdPrimario) {
         try {
           await window.DB.turmas.remove(docIdPrimario);
-          logEl(`  🗑 Firestore: removido "${t.aba || docIdPrimario}"`, 'logApagar');
-          removido = true;
+          removido = true; removidosOk++;
         } catch(e) {
-          logEl(`  ⚠️ Firestore (turmaId): "${docIdPrimario}": ${e.message}`, 'logApagar');
+          avisos.push(`⚠️ "${nomeTurma}": Firestore (turmaId) falhou — ${e.message}`);
         }
       }
 
@@ -727,10 +732,10 @@ async function apagarSelecionadas() {
       if (!removido && docIdSecundario) {
         try {
           await window.DB.turmas.remove(docIdSecundario);
-          logEl(`  🗑 Firestore: removido por _id "${t.aba || docIdSecundario}"`, 'logApagar');
-          removido = true;
+          removido = true; removidosOk++;
+          avisos.push(`ℹ️ "${nomeTurma}": removido por _id, não pelo turmaId padrão`);
         } catch(e) {
-          logEl(`  ⚠️ Firestore (_id): "${docIdSecundario}": ${e.message}`, 'logApagar');
+          avisos.push(`⚠️ "${nomeTurma}": Firestore (_id) falhou — ${e.message}`);
         }
       }
 
@@ -738,11 +743,15 @@ async function apagarSelecionadas() {
       if (!removido && docIdPrimario) {
         try {
           await window.DB.turmas.removeWhere('turmaId', docIdPrimario);
-          logEl(`  🗑 Firestore: removeWhere turmaId="${docIdPrimario}"`, 'logApagar');
-          removido = true;
+          removido = true; removidosOk++;
+          avisos.push(`ℹ️ "${nomeTurma}": removido via removeWhere (fallback de documento duplicado)`);
         } catch(e) {
-          logEl(`  ⚠️ Firestore removeWhere falhou: ${e.message}`, 'logApagar');
+          avisos.push(`⚠️ "${nomeTurma}": removeWhere falhou — ${e.message}`);
         }
+      }
+
+      if (!removido) {
+        avisos.push(`❌ "${nomeTurma}": não foi possível remover do Firestore por nenhum método`);
       }
 
       // Também remove atas e matrículas associadas
@@ -753,7 +762,7 @@ async function apagarSelecionadas() {
           await window.DB.atas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
           await window.DB.matriculas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
         } catch(e) {
-          logEl(`  ⚠️ Firestore: erro ao limpar atas/matrículas: ${e.message}`, 'logApagar');
+          avisos.push(`⚠️ "${nomeTurma}": erro ao limpar atas/matrículas — ${e.message}`);
         }
       }
     }
@@ -765,9 +774,13 @@ async function apagarSelecionadas() {
   // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
   const aux = _reconstruirAuxLocalmente(novas);
 
-  logEl(`✅ ${aApagar.length} turma(s) removida(s).`, 'logApagar');
+  logEl(`✅ ${removidosOk}/${aApagar.length} turma(s) removida(s) do Firestore.`, 'logApagar');
   logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`, 'logApagar');
-  nomes.forEach(n => logEl(`  ✖ ${n}`, 'logApagar'));
+  if (avisos.length) {
+    logEl('', 'logApagar');
+    logEl(`⚠️ ${avisos.length} aviso(s) — turmas que não seguiram o caminho padrão:`, 'logApagar');
+    avisos.forEach(a => logEl(`  ${a}`, 'logApagar'));
+  }
 
   // 3. Garbage collection de identidades órfãs
   logEl('', 'logApagar');
@@ -880,6 +893,14 @@ function exportarCSV() {
 let _workbook    = null;
 let _nomeArquivo = '';
 let _abasInfo    = [];
+// Buffer da análise de importação (verde/amarelo/vermelho) — nada em
+// turmasDB/Firestore é alterado até confirmarImportacao() ser chamado.
+// Único efeito colateral já efetivado durante a análise: o vínculo de
+// identidade (findOrCreateBatch) já roda e persiste no catálogo — ver
+// nota em analisarSelecionadas(). Se o usuário cancelar, os alunoId
+// novos criados nessa análise que ficarem sem nenhuma turma/matrícula
+// referenciando são limpos via _limparIdentidadesOrfas().
+let _bufferImportacao = null;
 
 function normalizarTxt(v) { return String(v??'').trim().toUpperCase().replace(/\s+/g,' '); }
 function isVazio(v)        { return v===null||v===undefined||String(v).trim()===''; }
@@ -1065,9 +1086,9 @@ function qualificarIndicadorAluno(raw, vocab) {
              escola, ou por trás do dado ausente, é desconhecido)
      BLOQUEIA (Falecido) → qualquer reaparecimento é sempre vermelho
 
-   Ainda não é chamada por importarSelecionadas() — a integração exige
-   antes o refactor do fluxo de "salva direto" pra "monta buffer, revisa,
-   só salva depois de resolver avisos/erros". Ver plano em separado.
+   Chamada por analisarSelecionadas() (fase de análise) — ver função
+   avaliarTrajetoria() usada ali, junto com o buffer verde/amarelo/vermelho
+   revisado antes de confirmarImportacao() gravar de fato no Firestore.
 ── */
 
 function _categoriaResultado(resultado) {
@@ -1285,34 +1306,41 @@ function renderListaAbas() {
 function selecionarAbas(val) { _abasInfo=_abasInfo.map(a=>({...a,checked:!!val})); renderListaAbas(); }
 function toggleAba(idx,val)  { _abasInfo[idx].checked=val; }
 
-async function importarSelecionadas() {
+/**
+ * FASE 1 — Análise. Lê o xlsx, resolve identidade (window.Identidade — isso
+ * já persiste no catálogo, ver nota no _bufferImportacao) e avalia a
+ * plausibilidade de trajetória de cada aluno (avaliarTrajetoria). NÃO grava
+ * nenhuma turma em turmasDB/Firestore ainda — monta um buffer em memória e
+ * mostra uma revisão (verde/amarelo/vermelho) antes de confirmar.
+ */
+async function analisarSelecionadas() {
   if (!IS_ADMIN || !_workbook) return;
   const selecionadas=_abasInfo.filter(a=>a.checked).map(a=>a.name);
   if (!selecionadas.length) { alert('Selecione pelo menos uma aba.'); return; }
   if (!window.Identidade)   { alert('Módulo de identidade não carregado. Recarregue a página.'); return; }
 
   const btnImp=document.getElementById('btnImportar');
-  if (btnImp) { btnImp.disabled=true; btnImp.textContent='Importando...'; }
+  if (btnImp) { btnImp.disabled=true; btnImp.textContent='Analisando...'; }
   const saida=document.getElementById('saidaXLSX');
   saida.style.display='block';
   saida.textContent='';
-  setMsg(`Importando ${selecionadas.length} aba(s)…`, 'loading');
+  setMsg(`Analisando ${selecionadas.length} aba(s)…`, 'loading');
 
   try {
-    const turmasDB=lerTurmasDB();
-    const todasLinhas=[], abasValidas=[], resultadosAbas=[];
+    const turmasDB=lerTurmasDB(); // estado atual, real — só lido, não alterado aqui
+    const todasLinhas=[], abasValidas=[], resultadosAbasBloqueadas=[];
 
     for (const abaName of selecionadas) {
       const ws=_workbook.Sheets[abaName];
       const matriz=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       const rHead=acharLinhaCabecalho(matriz);
-      if (rHead===-1) { resultadosAbas.push({abaName, ok:false, motivo:'cabeçalho não encontrado'}); continue; }
+      if (rHead===-1) { resultadosAbasBloqueadas.push({abaName, motivo:'cabeçalho não encontrado'}); continue; }
 
       const info=extrairInfoCabecalho(matriz,rHead,abaName);
 
       const anoCheck=validarAnoLetivo(info.anoLetivo);
       if (anoCheck.nivel==='block') {
-        resultadosAbas.push({abaName, ok:false, motivo:`ano letivo inválido: ${anoCheck.motivo}`});
+        resultadosAbasBloqueadas.push({abaName, motivo:`ano letivo inválido: ${anoCheck.motivo}`});
         continue; // não afeta as outras abas selecionadas
       }
 
@@ -1336,10 +1364,15 @@ async function importarSelecionadas() {
     }
 
     // ← await correto (esse era o bug original do importar.html)
+    // NOTA: isso já persiste no catálogo de identidade (cria alunoId novo
+    // quando não acha CPF/nome+nascimento batendo). Se o usuário cancelar
+    // a importação depois de ver a revisão, cancelarImportacao() roda o GC
+    // de identidades órfãs pra limpar o que não sobrar referenciado.
     const candidatos=todasLinhas.map(l=>({nomeOficial:l.nomeAluno,nome:l.nomeAluno}));
     const resultadosBatch=await window.Identidade.findOrCreateBatch(candidatos);
 
-    let batchIdx=0, idsCriados=0, totalAlunos=0, totalTurmas=0;
+    let batchIdx=0, idsCriados=0;
+    const itensBuffer=[];
 
     for (const {abaName,info,colMap,modoAvaliacao,linhas,avisoAno} of abasValidas) {
       const vocab=detectarVocabularioCabecalho(info.serieTexto);
@@ -1359,6 +1392,14 @@ async function importarSelecionadas() {
           else if (field==='resultado') aluno.resultado=toResultado(v);
           else if (['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(field)) aluno[field]=toNotaSistema(v);
         }
+        // Plausibilidade de trajetória — comparado ao último registro já
+        // gravado em turmasDB (turmas dentro DESSA MESMA importação, se
+        // multi-ano, ainda não são encadeadas entre si nesta versão).
+        const ultimo=ultimoRegistroDoAluno(alunoId, turmasDB);
+        const traj=avaliarTrajetoria(ultimo, {anoLetivo:info.anoLetivo, serieDisplay:aluno.serie});
+        aluno._trajStatus=traj.status; aluno._trajMotivo=traj.motivo; aluno._isNew=isNew;
+        if (traj.status==='vermelho') divergencias.push(`🚫 [Trajetória] ${nomeAluno}: ${traj.motivo}`);
+        else if (traj.status==='amarelo') divergencias.push(`[Trajetória] ${nomeAluno}: ${traj.motivo}`);
         novos.push(aluno);
       }
 
@@ -1370,38 +1411,180 @@ async function importarSelecionadas() {
         alunos:novos, criadoEm:new Date().toISOString(),
       };
 
-      const idx=turmasDB.findIndex(t=>t.id===turma.id);
-      if (idx>=0) turmasDB[idx]=turma; else turmasDB.push(turma);
-
-      totalTurmas++; totalAlunos+=novos.length;
+      const temVermelho=novos.some(a=>a._trajStatus==='vermelho');
+      const temAmarelo =divergencias.length>0;
+      const statusTurma=temVermelho?'vermelho':(temAmarelo?'amarelo':'verde');
       const badge=(info.anoLetivo?(avisoAno?'ANO ⚠️':'ANO OK'):'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
-      resultadosAbas.push({abaName, ok:true, qtdAlunos:novos.length, badge, divergencias});
+
+      itensBuffer.push({abaName, turma, statusTurma, badge, divergencias, qtdAlunos:novos.length});
     }
 
-    salvarTurmasDB(turmasDB);
-    // Usa versão local: salvarTurmasDB já enviou turmas ao Firestore;
-    // reconstruirAuxiliares enviaria atas/mats também, mas aqui só precisamos do localStorage.
-    const aux=_reconstruirAuxLocalmente(turmasDB);
+    _bufferImportacao={itens:itensBuffer, resultadosAbasBloqueadas, idsCriados};
 
-    const resumoTexto=`TOTAL: ${totalTurmas} turma(s) • ${totalAlunos} aluno(s)\n`+
-      `IDs novos criados: ${idsCriados} (${totalAlunos-idsCriados} já existiam)\n`+
-      `Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`;
-    saida.innerHTML=renderResultadoImportacao(resultadosAbas, resumoTexto);
-    renderTabelaTurmas();
-    atualizarStats();
-    const bloqueadas=resultadosAbas.filter(r=>!r.ok).length;
-    if (bloqueadas>0) {
-      setMsg(`${totalTurmas} turma(s) importada(s) • ${bloqueadas} aba(s) BLOQUEADA(s) por ano letivo inválido — veja o log.`, 'warn');
-    } else {
-      setMsg(`${totalTurmas} turma(s) e ${totalAlunos} aluno(s) importados.`, 'ok');
-    }
+    const saidaEl=document.getElementById('saidaXLSX');
+    saidaEl.innerHTML=renderRevisaoImportacao(_bufferImportacao);
+    const temVermelho=itensBuffer.some(it=>it.statusTurma==='vermelho');
+    setMsg(temVermelho
+      ? 'Análise concluída — há turma(s) bloqueada(s). Remova-as da lista pra poder salvar.'
+      : 'Análise concluída. Revise e confirme para salvar.', temVermelho?'warn':'ok');
 
   } catch(err) {
     console.error('[gerir-dados] Erro XLSX:', err);
     saida.textContent='❌ Erro inesperado: '+(err.message||err);
-    setMsg('Erro ao importar: '+(err.message||err), 'err');
+    setMsg('Erro ao analisar: '+(err.message||err), 'err');
   } finally {
     if (btnImp) { btnImp.disabled=false; btnImp.textContent='Importar selecionadas'; }
+  }
+}
+
+/** Monta o HTML da tela de revisão (verde/amarelo/vermelho) do buffer. */
+function renderRevisaoImportacao(buffer){
+  const cores={verde:{bg:'#166534',label:'✅ OK'},amarelo:{bg:'#92400e',label:'⚠️ Aviso'},vermelho:{bg:'#991b1b',label:'🚫 Bloqueado'}};
+  const cards=buffer.itens.map((it,idx)=>{
+    const c=cores[it.statusTurma];
+    const divCount=it.divergencias.length;
+    const toggleId=`_revDiv${idx}`;
+    const divergHtml=divCount?(
+      `<div class="import-aba-divs collapsed" id="${toggleId}">`+
+        it.divergencias.slice(0,12).map(d=>`<div>• ${esc(d)}</div>`).join('')+
+        (divCount>12?`<div>… e mais ${divCount-12} item(ns).</div>`:'')+
+      `</div>`
+    ):'';
+    const toggleBtn=divCount?(
+      `<span class="badge warn" style="cursor:pointer;" onclick="`+
+      `document.getElementById('${toggleId}').classList.toggle('collapsed')">`+
+      `${divCount} aviso(s) — ver</span>`
+    ):'';
+    return `<div class="import-aba" style="border-left:4px solid ${c.bg};padding-left:10px;">`+
+      `<div class="import-aba-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">`+
+        `<span>${esc(it.abaName)} — ${it.qtdAlunos} aluno(s)</span>`+
+        `<span style="display:flex;gap:8px;align-items:center;">`+
+          `<span class="badge" style="background:${c.bg};color:#fff;">${c.label}</span>${toggleBtn}`+
+          `<button type="button" class="btn" onclick="removerTurmaDoBuffer(${idx})">Remover</button>`+
+        `</span>`+
+      `</div>${divergHtml}</div>`;
+  }).join('');
+
+  const bloqueadas=buffer.resultadosAbasBloqueadas||[];
+  const bloqueadasHtml=bloqueadas.length?bloqueadas.map(r=>
+    `<div class="import-aba bloqueada"><div class="import-aba-head">`+
+      `<span>🚫 <b>${esc(r.abaName)}</b> — não processada</span><span class="badge err">${esc(r.motivo)}</span>`+
+    `</div></div>`
+  ).join(''):'';
+
+  const temVermelho=buffer.itens.some(it=>it.statusTurma==='vermelho');
+  const totalTurmas=buffer.itens.length;
+  const totalAlunos=buffer.itens.reduce((s,it)=>s+it.qtdAlunos,0);
+
+  const aviso=`<div style="margin-bottom:10px;font-size:13px;color:var(--muted,#666);">`+
+    `Revise antes de confirmar — nenhuma turma foi salva ainda. `+
+    `(O vínculo de identidade dos alunos já foi resolvido nesta análise; `+
+    `se cancelar, IDs novos sem nenhuma turma vinculada são limpos automaticamente.)`+
+  `</div>`;
+
+  const rodape=`<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;">`+
+    `<div>${totalTurmas} turma(s) analisada(s) • ${totalAlunos} aluno(s)`+
+      (temVermelho?' • <b style="color:#991b1b;">remova as turmas bloqueadas pra poder salvar</b>':'')+
+    `</div>`+
+    `<div style="display:flex;gap:8px;">`+
+      `<button type="button" class="btn" onclick="cancelarImportacao()">Cancelar tudo</button>`+
+      `<button type="button" class="btn btn-primary" id="btnConfirmarImportacao" ${(temVermelho||!totalTurmas)?'disabled':''} onclick="confirmarImportacao()">✅ Confirmar e salvar</button>`+
+    `</div>`+
+  `</div>`;
+
+  return aviso + cards + bloqueadasHtml + rodape;
+}
+
+/** Remove uma turma da revisão (não afeta o que já está salvo — nada foi salvo ainda). */
+function removerTurmaDoBuffer(idx){
+  if (!_bufferImportacao) return;
+  _bufferImportacao.itens.splice(idx,1);
+  const saidaEl=document.getElementById('saidaXLSX');
+  saidaEl.innerHTML=renderRevisaoImportacao(_bufferImportacao);
+  const temVermelho=_bufferImportacao.itens.some(it=>it.statusTurma==='vermelho');
+  setMsg(temVermelho?'Ainda há turma(s) bloqueada(s) na lista.':'Pronto para confirmar.', temVermelho?'warn':'ok');
+}
+
+/** Cancela a análise inteira. Limpa identidades órfãs criadas nesta análise, se houver. */
+async function cancelarImportacao(){
+  if (!_bufferImportacao) return;
+  const buffer=_bufferImportacao;
+  _bufferImportacao=null;
+  const saidaEl=document.getElementById('saidaXLSX');
+  saidaEl.innerHTML='';
+  saidaEl.style.display='none';
+
+  try {
+    const turmasDB=lerTurmasDB(); // estado real, intacto — nada foi salvo
+    // "turma" sintética só pra reaproveitar _limparIdentidadesOrfas(): ela
+    // checa cada alunoId dos "apagados" contra o que existe de verdade em
+    // turmasDB + ano-ativo, e remove o que não sobrar referenciado.
+    const idsNovosDaAnalise=[];
+    for (const it of buffer.itens)
+      for (const a of it.turma.alunos)
+        if (a._isNew) idsNovosDaAnalise.push({alunoId:a.alunoId});
+    if (idsNovosDaAnalise.length) {
+      const apagados=await _limparIdentidadesOrfas([{alunos:idsNovosDaAnalise}], turmasDB);
+      setMsg(`Importação cancelada. ${apagados} identidade(s) criada(s) nesta análise foram limpas.`, 'warn');
+    } else {
+      setMsg('Importação cancelada. Nenhuma turma foi salva.', 'warn');
+    }
+  } catch(e) {
+    console.warn('[cancelarImportacao] erro ao limpar identidades órfãs:', e.message);
+    setMsg('Importação cancelada. Nenhuma turma foi salva.', 'warn');
+  }
+}
+
+/**
+ * FASE 2 — Confirma. Grava só as turmas que sobraram no buffer (as removidas
+ * na revisão ficam de fora) em turmasDB/Firestore.
+ */
+async function confirmarImportacao(){
+  if (!_bufferImportacao || !_bufferImportacao.itens.length) return;
+  if (_bufferImportacao.itens.some(it=>it.statusTurma==='vermelho')) {
+    alert('Ainda há turma(s) bloqueada(s) na revisão. Remova-as antes de confirmar.');
+    return;
+  }
+
+  const btn=document.getElementById('btnConfirmarImportacao');
+  if (btn) { btn.disabled=true; btn.textContent='Salvando...'; }
+  setMsg('Salvando turma(s)…', 'loading');
+
+  try {
+    const turmasDB=lerTurmasDB();
+    let totalAlunos=0;
+    const resultadosAbas=[];
+
+    for (const it of _bufferImportacao.itens) {
+      // Limpa os campos de uso interno da revisão antes de persistir
+      for (const a of it.turma.alunos) { delete a._trajStatus; delete a._trajMotivo; delete a._isNew; }
+
+      const idx=turmasDB.findIndex(t=>t.id===it.turma.id);
+      if (idx>=0) turmasDB[idx]=it.turma; else turmasDB.push(it.turma);
+      totalAlunos+=it.qtdAlunos;
+      resultadosAbas.push({abaName:it.abaName, ok:true, qtdAlunos:it.qtdAlunos, badge:it.badge, divergencias:it.divergencias});
+    }
+
+    salvarTurmasDB(turmasDB);
+    const aux=_reconstruirAuxLocalmente(turmasDB);
+
+    const resumoTexto=`TOTAL: ${_bufferImportacao.itens.length} turma(s) • ${totalAlunos} aluno(s)\n`+
+      `IDs novos criados: ${_bufferImportacao.idsCriados} (${totalAlunos-_bufferImportacao.idsCriados} já existiam)\n`+
+      `Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`;
+
+    const saidaEl=document.getElementById('saidaXLSX');
+    saidaEl.innerHTML=renderResultadoImportacao(resultadosAbas, resumoTexto);
+    _bufferImportacao=null;
+
+    renderTabelaTurmas();
+    atualizarStats();
+    setMsg(`${resultadosAbas.length} turma(s) e ${totalAlunos} aluno(s) importados.`, 'ok');
+
+  } catch(err) {
+    console.error('[gerir-dados] Erro ao confirmar importação:', err);
+    setMsg('Erro ao salvar: '+(err.message||err), 'err');
+  } finally {
+    if (btn) { btn.disabled=false; btn.textContent='✅ Confirmar e salvar'; }
   }
 }
 
