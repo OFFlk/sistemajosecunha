@@ -914,13 +914,24 @@ function toNotaSistema(v) {
   return !Number.isNaN(n) ? n.toFixed(1).replace('.',',') : '--';
 }
 
-function toResultado(v) {
+// Retorna { resultado, divergente, motivo }. `divergente` sinaliza quando a
+// situação (última coluna: AP/REP/TRA/DEST/...) veio vazia ou "--" numa
+// linha que tem nome e notas preenchidos — provável erro de digitação ou
+// lacuna real da ata original, vale conferir. Só passa em silêncio quando
+// a linha inteira é vazia/placeholder (`notasVaziasNaLinha`), mesmo
+// critério usado em qualificarIndicadorAluno() pra série.
+function toResultado(v, notasVaziasNaLinha) {
   const s = normalizarTxt(v);
-  if (['AP','REP','DEST','TRA','FAL','AND','C'].includes(s)) return s;
-  if (s==='S') return 'S'; if (s==='P') return 'P'; if (s==='I') return 'I';
-  if (s.includes('SATISF')) return 'S'; if (s.includes('PARCIAL')) return 'P';
-  if (s.includes('INSATISF')) return 'I'; if (s.includes('CONSERVAD')) return 'C';
-  return 'Não informado';
+  if (['AP','REP','DEST','TRA','FAL','AND','C'].includes(s)) return { resultado: s, divergente: false, motivo: '' };
+  if (s==='S') return { resultado: 'S', divergente: false, motivo: '' };
+  if (s==='P') return { resultado: 'P', divergente: false, motivo: '' };
+  if (s==='I') return { resultado: 'I', divergente: false, motivo: '' };
+  if (s.includes('SATISF'))   return { resultado: 'S', divergente: false, motivo: '' };
+  if (s.includes('PARCIAL'))  return { resultado: 'P', divergente: false, motivo: '' };
+  if (s.includes('INSATISF')) return { resultado: 'I', divergente: false, motivo: '' };
+  if (s.includes('CONSERVAD'))return { resultado: 'C', divergente: false, motivo: '' };
+  if (notasVaziasNaLinha) return { resultado: 'Não informado', divergente: false, motivo: '' };
+  return { resultado: 'Não informado', divergente: true, motivo: `situação "${s||'--'}" não informada, mas há notas preenchidas — conferir se é erro de digitação ou lacuna da ata original` };
 }
 
 function linhaTemLegenda(row)  { return (row||[]).map(v=>normalizarTxt(v)).join(' ').includes('LEGENDA'); }
@@ -989,6 +1000,23 @@ function serieTextoParaLista(serieTexto) {
    ("1º Ano", "Alfabetização", "Eixo 1"...) só existe no
    cabeçalho da ata. Essas funções combinam os dois. */
 
+// Checa, na linha crua da planilha (antes de qualquer normalização pro
+// objeto `aluno`), se todas as colunas de nota mapeadas estão vazias ou
+// são placeholder ("-"/"--"). Usado só pra decidir se um indicador de
+// série "--" é uma linha genuinamente vazia (não avisa) ou um aluno de
+// verdade com a série faltando (avisa). Sem colunas de nota mapeadas,
+// não dá pra avaliar — assume vazio, pra não gerar aviso indevido numa
+// ata que nem usa essas colunas.
+function todasNotasVaziasNaLinha(row, colMap) {
+  const camposNota=['port','mat','hist','geo','cien','fis','arte','relig','ing'];
+  const cols=Object.entries(colMap).filter(([_,f])=>camposNota.includes(f)).map(([c])=>Number(c));
+  if (!cols.length) return true;
+  return cols.every(c=>{
+    const v=String(row[c]??'').trim();
+    return v===''||v==='-'||v==='--';
+  });
+}
+
 // Lê o cabeçalho da ata e descobre o "vocabulário" esperado pra essa
 // turma: de que tipo são as séries (ANO/SÉRIE/EM/EIXO/ALFA/LIVRE) e,
 // quando aplicável, quais números são esperados (pra turmas com lista
@@ -1015,9 +1043,25 @@ const ORDINAL_POR_TIPO = { ANO: 'º', SERIE: 'ª', EM: 'º' };
 // indicador do aluno não bate com o que o cabeçalho anunciava (número
 // fora da lista esperada, ou símbolo º/ª incompatível com o tipo do
 // cabeçalho) — não bloqueia o import, só registra no log pra revisão.
-function qualificarIndicadorAluno(raw, vocab) {
+//
+// `notasVaziasNaLinha` (calculado por linha, ver todasNotasVaziasNaLinha)
+// diferencia dois casos de indicador "--": linha genuinamente placeholder
+// (nome/notas também vazios — não avisa) de uma linha com nome e notas
+// preenchidos mas só a série faltando (avisa — provável erro de
+// digitação ou lacuna real da ata original que vale conferir).
+function qualificarIndicadorAluno(raw, vocab, notasVaziasNaLinha) {
   const s = normalizarTxt(raw);
   if (!s) return { serie: '', divergente: false, motivo: '' };
+
+  // "--"/"-" é o mesmo marcador genérico de "não informado" usado em outras
+  // colunas da ata (não é específico de nenhum tipo de turma). Só é aceito
+  // sem aviso quando o resto da linha também está vazio/placeholder —
+  // caso contrário (aluno de verdade, com notas, só sem série) sinaliza
+  // divergência pra revisão manual.
+  if (s==='-'||s==='--') {
+    if (notasVaziasNaLinha) return { serie: '--', divergente: false, motivo: '' };
+    return { serie: '--', divergente: true, motivo: 'indicador "--" (não informado), mas há notas/resultado preenchidos — conferir se é erro de digitação ou lacuna da ata original' };
+  }
 
   if (/^ALFA/.test(s)) {
     const divergente = vocab.tipo !== 'LIVRE' && vocab.tipo !== 'ALFA';
@@ -1355,6 +1399,11 @@ async function analisarSelecionadas() {
         if (linhaTemLegenda(row)||linhaPareceRodape(row)) break;
         const nome=cNome!==undefined?String(row[Number(cNome)]).trim():'';
         if (!nome) continue;
+        // Linha de numeração em branco na ata original (erro humano de
+        // transcrição): "--" no lugar do nome só pra não quebrar a
+        // numeração impressa. Sistema não depende de sumário numérico
+        // (é banco pesquisável) — ignora a linha, não cria aluno.
+        if (nome==='--'||nome==='-') continue;
         if (cNum!==undefined&&!isNumeroValido(row[Number(cNum)])) continue;
         linhasDaAba.push({row,nomeAluno:nome,colMap,modoAvaliacao});
       }
@@ -1382,14 +1431,19 @@ async function analisarSelecionadas() {
         const res=resultadosBatch[batchIdx++]; if(!res) continue;
         const {alunoId,isNew}=res; if(isNew) idsCriados++;
         const aluno={nome:nomeAluno,serie:'',alunoId,port:'--',mat:'--',hist:'--',geo:'--',cien:'--',fis:'--',arte:'--',relig:'--',ing:'--',resultado:'Não informado'};
+        const notasVaziasNaLinha=todasNotasVaziasNaLinha(row,colMap);
         for (const [cStr,field] of Object.entries(colMap)) {
           const v=row[Number(cStr)];
           if (field==='serieAluno') {
-            const q=qualificarIndicadorAluno(v,vocab);
+            const q=qualificarIndicadorAluno(v,vocab,notasVaziasNaLinha);
             aluno.serie=q.serie;
             if (q.divergente) divergencias.push(`${nomeAluno}: "${String(v||'').trim()}" — ${q.motivo}`);
           }
-          else if (field==='resultado') aluno.resultado=toResultado(v);
+          else if (field==='resultado') {
+            const qr=toResultado(v,notasVaziasNaLinha);
+            aluno.resultado=qr.resultado;
+            if (qr.divergente) divergencias.push(`${nomeAluno}: "${String(v||'').trim()}" — ${qr.motivo}`);
+          }
           else if (['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(field)) aluno[field]=toNotaSistema(v);
         }
         // Plausibilidade de trajetória — comparado ao último registro já
