@@ -1,4 +1,4 @@
-# Checklist de Testes — Sistema Escolar (pré-auditoria) — v12
+# Checklist de Testes — Sistema Escolar (pré-auditoria) — v13
 
 > v1 tinha o levantamento inicial. v2 corrigiu escopo/contagem/RBAC/localStorage.
 > v3 refletia a primeira rodada real de testes. v4 refletia a rodada de fixes
@@ -70,6 +70,30 @@
 > determinístico de matrícula pra travar reimportação duplicada de turma, e
 > mover a detecção de nomes semelhantes (hoje em `idaluno.html`) pra dentro
 > da própria análise de importação, antes do `alunoId` ser criado de vez.
+>
+> **v13** fecha duas pendências, fora da frente de modernização do Atas
+> (que segue em andamento, tratada por você em paralelo): **`admin_backup.html`**
+> foi finalmente reescrito pra ler/gravar direto no Firestore (a decisão que
+> estava travando esse item desde a v2) e ganhou duas rodadas de fix — a
+> primeira corrigindo `SYSTEM_KEYS` (cache local de "Apagar TODOS os dados"
+> não cobria as coleções do Ano Ativo/Funcionários) e a segunda estendendo
+> `apagarTurmas()`/`limparAlunosIds()` pra também apagar (Firestore + cache
+> local) a coleção de funcionários, que antes era preservada por essas duas
+> ações — decisão sua, mudando o comportamento anterior. E foi achado e
+> corrigido um **bug novo, fora do escopo do checklist** (achado por você
+> "fuçando o sistema", não fazia parte da rodada de testes formal):
+> `pesquisa-ano-ativo.html` não mostrava nenhum aluno/turma quando o ADMIN
+> global selecionava "Todas as escolas" no cabeçalho — sempre devolvia zero.
+> Causa raiz: `db.firebase.js` sempre lê os dados de uma única escola por
+> vez; o valor especial que marca "nenhuma escola selecionada" (`"ADMIN"`)
+> acabava sendo usado como se fosse um `schoolId` de verdade, apontando pra
+> uma escola que não existe. Corrigido com uma consulta nova entre todas as
+> escolas de uma vez (`collectionGroup` do Firestore) só pra esse caso,
+> mostrando um chip 🏫 com o nome da escola em cada aluno/turma da lista.
+> Precisou também de uma regra nova no `firestore.rules` (consulta entre
+> escolas exige regra própria, a aninhada por escola não cobre) — só
+> leitura, só pro ADMIN global, sem abrir brecha pra gestor de escola ver
+> dado de outra escola. Testado e confirmado por você em produção.
 
 ---
 
@@ -128,10 +152,6 @@ que falta investigar/corrigir)*
 
 ## ✅ Decisões já tomadas (não são mais perguntas em aberto)
 
-- **`admin_backup.html` gerar backup a partir do cache local é inadmissível.**
-  Decidido: precisa reescrever para ler direto do Firestore no momento do
-  export. O teste de comparação backup-vs-Firestore-ao-vivo da v2 fica
-  redundante — vou aguardar o fix pra reescrever a função de export.
 - **`oldcadastro-funcionario.html` confirmado sem uso** — órfã, pode ser
   removida quando fizer sentido (não é urgente).
 - **`config.html` (hub de Configurações) confirmado órfão** — já retirado do
@@ -143,9 +163,6 @@ que falta investigar/corrigir)*
 ---
 
 ## ⏳ Pendências (ainda não testado)
-
-> **Ordem de prioridade combinada:** `admin_backup.html` fica por último na
-> fila de fixes.
 
 - **Modernização do módulo de Atas — em andamento (v12).** Plano completo
   em relatório separado. Nesta rodada, em `gestao-atas.html`: fluxo de
@@ -192,11 +209,11 @@ que falta investigar/corrigir)*
   `idaluno.html`, que passaria a focar só no vínculo Ano Ativo↔Atas (seu
   propósito original). Ainda não implementado — combinado que só entra
   depois do fluxo de análise/revisão atual ser testado.
-- **Restante do módulo Admin** (`admin_backup.html`) — `admin.html`,
-  `admin_escolas.html`, `schema_ata.html` e `idaluno.html` já testados (ver
-  detalhes abaixo). `admin_backup.html` aguarda o fix combinado (reescrever
-  export pra ler do Firestore ao vivo) — **deixado por último na fila de
-  fixes**, de propósito; você está tratando esse item à parte.
+- **Módulo Admin — todas as páginas testadas.** `admin.html`,
+  `admin_escolas.html`, `schema_ata.html`, `idaluno.html` e agora
+  `admin_backup.html` já passaram por teste/revisão (ver detalhes abaixo em
+  cada um). `idaluno.html` segue **parcialmente resolvido** — ver item logo
+  abaixo.
 - **`idaluno.html` — 🟡 parcialmente resolvido.** Revisão de código completa
   feita (pendência da v6). Três causas raiz achadas e corrigidas nesta
   rodada (ver `✅ Fixes aplicados`), testadas ponta a ponta com sucesso pelo
@@ -207,28 +224,125 @@ que falta investigar/corrigir)*
   resolvido em paralelo, em outro chat.
 - **`historico_auto.html`** e **`schema_ch.html`** — aguardando os fixes que
   você já está desenvolvendo (mencionado antes de começar os testes).
-- **Email de confirmação de troca (`perfil.html`) sempre cai no spam** —
-  provável configuração de remetente (SPF/DKIM/domínio), não bug de página.
-  Baixa prioridade — investigar depois, à parte, se decidir que vale a pena.
 - **Levantamento completo de localStorage por página** — vou refazer a
   varredura (mais a fundo dessa vez, já mirando os bugs de cache que
   apareceram no teste, como o do email em `cadastro_admin.html`) assim que
-  tiver acesso ao repo de novo.
-- **Checagem de erros no console** no fluxo crítico (login → cadastro →
-  pesquisa → exportação) — não testado ainda.
+  tiver acesso ao repo de novo. **Última coisa a fazer antes dos logs.**
+
+---
+
+## ✅ Resolvido (sem fix de código necessário / já testado)
+
+- **Email de confirmação de troca (`perfil.html`) sempre cai no spam — sem
+  solução viável no momento.** Investigado: o site roda em subdomínio
+  `.pages.dev` (Cloudflare Pages), então não há domínio próprio pra
+  registrar como "domínio autorizado" no Firebase Auth — sem isso, não dá
+  pra configurar SPF/DKIM/DMARC próprios, e o Firebase nem permite
+  customizar o template do email sem domínio próprio verificado. Trocar só
+  o texto do template não muda a reputação do remetente, que é o que
+  decide ir pro spam. Decisão consciente: aceitar o risco por ora — só
+  resolveria de verdade migrando pra um domínio próprio no futuro, se virar
+  prioridade.
+- **Checagem de erros no console no fluxo crítico — testado, sem bugs
+  reais.** Percorrido login → cadastro (Ano Ativo) → pesquisa → exportação
+  (os 5 formatos: 3 PDFs coletivos, 1 PDF individual, 1 CSV), sem nenhum
+  erro vermelho real em nenhuma etapa. Único achado: os 3 PDFs coletivos
+  disparam um `console.error` da própria lib `jspdf-autotable`
+  (`"Of the table content, 0.11 units width could not fit page"`) — é um
+  aviso interno dela por arredondamento de largura de coluna (tabela mais
+  larga = mais perto do limite da página), não afeta o conteúdo exportado
+  e não precisa de fix. Só aparece nos coletivos porque têm mais colunas;
+  o individual e o CSV têm folga e não disparam.
 
 ---
 
 ## Testes pulados intencionalmente (sem necessidade de repetir)
 
 - `pesquisa-ano-ativo.html` e `readmitir-aluno.html` — já testados logo após
-  os fixes anteriores; cobertura considerada suficiente por você.
+  os fixes anteriores; cobertura considerada suficiente por você. **Achado
+  na v13:** apesar disso, um bug real apareceu depois em
+  `pesquisa-ano-ativo.html` num cenário que os testes anteriores não
+  tinham coberto (ADMIN global em modo "Todas as escolas") — corrigido, ver
+  `✅ Fixes aplicados`.
 
 ---
 
 ## ✅ Fixes aplicados
 
-### Rodada de hoje — `gestao-atas.html`
+### Rodada de hoje — `admin_backup.html`, `pesquisa-ano-ativo.html`, `db.firebase.js`, `firestore.rules`
+
+**`admin_backup.html` — reescrito pra Firestore-first (decisão pendente
+desde a v2), em duas rodadas:**
+
+- **Export/restore/status/limpeza agora leem e gravam direto no Firestore**,
+  por `schoolId` explícito, nunca via `window.DB`/cache local — elimina o
+  problema original (backup gerado a partir do cache podia ficar
+  desatualizado em relação ao Firestore). Ganhou também escopo por **escola
+  específica** ou **todas as escolas de uma vez** (backup/restore/limpeza
+  cobrindo múltiplas escolas num arquivo só, com confirmação extra de texto
+  pra restaurar/apagar em massa).
+- **Bug: `SYSTEM_KEYS` incompleto — corrigido.** A lista de chaves de cache
+  local limpas por "Apagar TODOS os dados" só cobria o módulo Atas legado
+  (`turmasDB`, `alunosDB` etc.), sem as chaves do Ano Ativo
+  (`anoAtivoTurmasDB`, `anoAtivoAlunosDB`, `anoAtivoMatriculasDB`) nem de
+  Funcionários (`funcionariosDB`). Depois de apagar tudo no Firestore, o
+  cache local dessas coleções ficava com dado velho até um refresh completo.
+  Corrigido incluindo as quatro chaves que faltavam.
+- **Mesmo tipo de bug, achado de novo em `apagarTurmas()` e
+  `limparAlunosIds()` — corrigido.** As duas já apagavam as coleções certas
+  no Firestore (incluindo Ano Ativo), mas suas próprias listas de cache
+  local (independentes do `SYSTEM_KEYS` acima) não cobriam as mesmas chaves
+  do Ano Ativo. Corrigido.
+- **Decisão sua: funcionários deixa de ser preservado por "Apagar somente
+  turmas" e "Limpar alunos/IDs".** Antes essas duas ações preservavam a
+  coleção de funcionários de propósito; a pedido seu, passaram a apagar
+  (Firestore + cache local) junto com o resto. `TURMAS_RELATED_COLS` e
+  `ALUNOS_RELATED_COLS` atualizados, e todos os textos de confirmação/aviso
+  da tela corrigidos pra refletir o novo comportamento (não diziam mais
+  "funcionários... permanecem intactos"). Export e "Apagar TODOS os dados"
+  já cobriam funcionários desde antes, não precisaram de ajuste.
+
+**Testado e confirmado por você em produção** (as duas rodadas).
+
+**Bug novo achado por você fora da rodada de testes formal —
+`pesquisa-ano-ativo.html` não lista nada em "Todas as escolas":**
+
+- **Causa raiz:** `db.firebase.js` sempre escopa a leitura a uma única
+  escola (`Auth.getActiveSchoolId()`). Quando o ADMIN global está em modo
+  "Todas as escolas" no cabeçalho, esse getter cai no valor sentinel
+  literal `"ADMIN"` (não uma escola de verdade) — que a leitura normal usa
+  como se fosse um `schoolId` real, apontando pra uma escola que não
+  existe e devolvendo sempre zero, silenciosamente.
+- **Fix:** `DB.loadAllAnoAtivo()` detecta esse sentinel e delega pra uma
+  função nova, `DB.loadAllAnoAtivoTodasEscolas()`, que usa
+  `collectionGroup()` do Firestore pra ler `anoAtivoTurmas`/
+  `anoAtivoAlunos`/`anoAtivoMatriculas` de todas as escolas de uma vez,
+  marcando cada item com o `schoolId` real (tirado do caminho do
+  documento, nunca de um campo salvo) e devolvendo um mapa
+  `schoolId → nome` pra UI. `pesquisa-ano-ativo.html` atualizado pra
+  mostrar um chip 🏫 com o nome da escola em cada card de turma/aluno
+  nesse modo.
+- **`firestore.rules` — regra nova de collection group.** A consulta
+  `collectionGroup()` batia em "Missing or insufficient permissions": a
+  regra aninhada em `schools/{schoolId}/anoAtivoAlunos/{docId}` só cobre
+  leitura de uma escola por vez, não uma consulta entre escolas. Adicionadas
+  3 regras (`anoAtivoTurmas`/`anoAtivoAlunos`/`anoAtivoMatriculas`) no
+  formato `match /{path=**}/<coleção>/{docId}`, só leitura, só pra
+  `isGlobalAdmin()` — mesmo padrão já usado ali pra `changeRequests`. Não
+  mexe em nenhuma regra existente.
+- **Observação:** o mesmo tipo de bug provavelmente afeta outros
+  carregadores em modo "Todas as escolas" (ex.: `loadAll()` do módulo
+  Atas) — não corrigido lá ainda, só no caminho do Ano Ativo.
+
+**Testado e confirmado por você em produção** (listagem completa com o
+chip de escola aparecendo certo).
+
+**Arquivos entregues nessa rodada:** `admin_backup.html`, `db.firebase.js`,
+`pesquisa-ano-ativo.html`, `firestore.rules`.
+
+---
+
+### Rodada anterior — `gestao-atas.html`
 
 Início da modernização do módulo de Atas (plano completo em relatório
 separado). Três mudanças, nesta ordem:
