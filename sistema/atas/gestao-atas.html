@@ -288,24 +288,18 @@ function __schoolId() {
   return 'SEM_ESCOLA';
 }
 function dbKey(base)  { return `schools:${__schoolId()}:${base}`; }
-// Escreve no localStorage sem propagar exceção. O localStorage é só um
-// cache de leitura rápida (o dado real vive no Firestore) — se a cota do
-// navegador (5-10MB, por origem, nada a ver com cota/faturamento do
-// Firestore) estourar, isso NÃO pode travar o salvamento real. Antes, um
-// `localStorage.setItem` sem try/catch aqui abortava a função inteira
-// antes de chegar no código que grava no Firestore.
-function _lsSetSafe(key, val) {
-  try { localStorage.setItem(key, val); return true; }
-  catch (e) {
-    console.warn('[gestao-atas] cache local (localStorage) não pôde ser salvo — não afeta o Firestore:', e);
-    return false;
-  }
-}
+// Estado em memória (não localStorage): o dado real vive no Firestore;
+// isto é só um espelho de leitura rápida durante a sessão da página —
+// populado no inicializar()/recarregar() e atualizado a cada dbWrite().
+// Some ao fechar/recarregar a aba (não deveria ser usado pra "guardar
+// pra acessar depois" — pra isso, sempre relê do Firestore).
+const _mem = {};
 function dbRead(base, fallback) {
-  try { const r = localStorage.getItem(dbKey(base)); return r ? JSON.parse(r) : fallback; } catch { return fallback; }
+  const k = dbKey(base);
+  return (k in _mem) ? _mem[k] : fallback;
 }
 function dbWrite(base, val) {
-  _lsSetSafe(dbKey(base), JSON.stringify(val));
+  _mem[dbKey(base)] = val;
   try {
     if (!window.DB || !window.Auth?.getSession()) return;
     const map = { turmasDB:'turmas', alunosDB:'alunos', atasDB:'atas', matriculasDB:'matriculas' };
@@ -432,7 +426,7 @@ async function inicializar() {
       const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
       // Mantém TODAS as turmas no cache local (não esconde as suspeitas) —
       // elas são marcadas visualmente na tabela e continuam selecionáveis para apagar.
-      _lsSetSafe(dbKey('turmasDB'), JSON.stringify(todasFirestore));
+      _mem[dbKey('turmasDB')] = todasFirestore;
       logEl(`Firestore: ${todasFirestore.length} turma(s) total (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado — marcada${suspeitas.length===1?'':'s'} na tabela, não escondida${suspeitas.length===1?'':'s'})`, 'logGeral');
     }
   } catch(e) {
@@ -467,7 +461,7 @@ async function recarregar() {
       // basta chamar list() que ele já verifica o timestamp.
       const todasFirestore = await window.DB.turmas.list();
       const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
-      _lsSetSafe(dbKey('turmasDB'), JSON.stringify(todasFirestore));
+      _mem[dbKey('turmasDB')] = todasFirestore;
       logEl(`Firestore: ${todasFirestore.length} turma(s) (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado)`, 'logGeral');
     }
   } catch(e) {
@@ -692,10 +686,10 @@ function _reconstruirAuxLocalmente(turmas) {
         resultado:String(a.resultado||'').trim()||'Não informado' });
     }
   }
-  // Salva apenas no localStorage (sem disparar sync com Firestore)
-  _lsSetSafe(dbKey('atasDB'),       JSON.stringify(atas));
-  _lsSetSafe(dbKey('matriculasDB'), JSON.stringify(mats));
-  _lsSetSafe(dbKey('turmasMetaDB'), JSON.stringify(metas));
+  // Atualiza só o estado em memória (não dispara sync com Firestore)
+  _mem[dbKey('atasDB')] = atas;
+  _mem[dbKey('matriculasDB')] = mats;
+  _mem[dbKey('turmasMetaDB')] = metas;
   return { atas, mats, metas };
 }
 
@@ -781,9 +775,9 @@ async function apagarSelecionadas() {
     }
   }
 
-  // 2. Atualiza localStorage diretamente (sem reenviar ao Firestore)
+  // 2. Atualiza o estado em memória diretamente (sem reenviar ao Firestore)
   const novas = turmas.filter((_,i) => !indices.includes(i));
-  _lsSetSafe(dbKey('turmasDB'), JSON.stringify(novas));
+  _mem[dbKey('turmasDB')] = novas;
   // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
   const aux = _reconstruirAuxLocalmente(novas);
 
@@ -858,7 +852,7 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
 
   logEl(`  Candidatos a remoção: ${idsOrfaos.length} ID(s)`, 'logApagar');
 
-  // Remove do Firestore (coleção `alunos`) e do localStorage
+  // Remove do Firestore (coleção `alunos`) e do estado em memória
   let removidos = 0;
   for (const alunoId of idsOrfaos) {
     try {
@@ -873,9 +867,9 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
     }
   }
 
-  // Atualiza localStorage do alunosDB removendo os órfãos
+  // Atualiza o estado em memória (alunosDB) removendo os órfãos
   const alunosLocal = lerAlunosDB().filter(a => !idsOrfaos.includes(String(a.alunoId || a._id || '').trim()));
-  _lsSetSafe(dbKey('alunosDB'), JSON.stringify(alunosLocal));
+  _mem[dbKey('alunosDB')] = alunosLocal;
 
   return removidos;
 }
