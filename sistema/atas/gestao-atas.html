@@ -1190,29 +1190,49 @@ function avaliarTrajetoria(ultimo, novo) {
   const anoNovo   = Number(novo.anoLetivo);
   const gap = anoNovo - anoUltimo;
 
-  if (!Number.isFinite(gap) || gap < 1 || gap > 3) {
-    return { status:'vermelho', motivo:`intervalo de ${Number.isFinite(gap)?gap:'?'} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} foge do esperado (1 a 3 anos)` };
+  // Só bloqueia (vermelho) o que é cronologicamente impossível: ano novo
+  // igual ou anterior ao último já registrado. Um intervalo grande (>3
+  // anos) é improvável, mas não impossível — aluno pode ter saído e
+  // voltado anos depois. Em vez de travar aqui sem olhar o resto, segue
+  // avaliando série/situação normalmente e, se tudo mais for coerente,
+  // vira amarelo com um aviso específico do intervalo — decisão de
+  // "é o mesmo aluno ou não" fica com quem revisa, não travada de cara.
+  if (!Number.isFinite(gap) || gap < 1) {
+    return { status:'vermelho', motivo:`intervalo de ${Number.isFinite(gap)?gap:'?'} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} não é cronologicamente possível` };
   }
+  const gapIncomum = gap > 3;
+  const sufixoGap = gapIncomum ? ` (intervalo de ${gap} anos também é incomum — esperado 1 a 3)` : '';
 
   if (categoria === 'LIVRE') {
-    return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) sem resultado conclusivo (${ultimo.resultado || 'Não informado'}) — série não conferida` };
+    return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) sem resultado conclusivo (${ultimo.resultado || 'Não informado'}) — série não conferida${sufixoGap}` };
   }
 
   const serieUltima = _parseSerieCanonica(ultimo.serieDisplay);
   const serieNova   = _parseSerieCanonica(novo.serieDisplay);
 
   if (!serieUltima || !serieNova) {
-    return { status:'amarelo', motivo:'não foi possível interpretar a série de um dos registros para comparação' };
+    return { status:'amarelo', motivo:`não foi possível interpretar a série de um dos registros para comparação${sufixoGap}` };
   }
 
   if (serieUltima.tipo !== serieNova.tipo) {
-    return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})` };
+    return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})${sufixoGap}` };
   }
 
   const numEsperado = categoria === 'AVANCA' ? serieUltima.num + 1 : serieUltima.num;
 
   if (serieNova.num !== numEsperado) {
-    return { status:'amarelo', motivo:`série esperada era ${numEsperado} (${serieUltima.tipo}), mas veio ${serieNova.num}` };
+    // Caso conhecido: reprovado/mantido no último registro, mas a série
+    // avançou mesmo assim — prática comum em anos anteriores (a escola
+    // promovia o aluno reprovado). Não é necessariamente erro de
+    // digitação, então ganha um motivo específico em vez do genérico.
+    if (categoria === 'MANTEM' && serieNova.num === serieUltima.num + 1) {
+      return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) foi reprovado/mantido, mas a série avançou mesmo assim (prática comum em anos anteriores) — confira se é o mesmo aluno${sufixoGap}` };
+    }
+    return { status:'amarelo', motivo:`série esperada era ${numEsperado} (${serieUltima.tipo}), mas veio ${serieNova.num}${sufixoGap}` };
+  }
+
+  if (gapIncomum) {
+    return { status:'amarelo', motivo:`intervalo de ${gap} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} é incomum, mas série e situação são coerentes com progressão normal — confira se é o mesmo aluno` };
   }
 
   return { status:'verde', motivo:'' };
