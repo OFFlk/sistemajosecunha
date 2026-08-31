@@ -339,7 +339,7 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
               <tr>
                 <th>Nº</th><th>Nome</th><th>Série</th>
                 <th>Port</th><th>Mat</th><th>Hist</th><th>Geo</th>
-                <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th>
+                <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th><th>Ing</th>
                 <th>Resultado</th>
               </tr>
             </thead>
@@ -367,7 +367,7 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
                   <th class="nome-col">Nome</th>
                   <th>Série</th>
                   <th>Port</th><th>Mat</th><th>Hist</th><th>Geo</th>
-                  <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th>
+                  <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th><th>Ing</th>
                   <th>Resultado</th>
                 </tr>
               </thead>
@@ -405,82 +405,40 @@ const _session = (window.Auth && typeof Auth.getSession === 'function')
 const _podeEditar = !!_session && _session.role === 'admin';
 
 /* =========================
-   DB por escola (Namespacing)
+   Dados: Firestore é a única fonte
+   (sem localStorage como cache — mesmo padrão adotado em
+   gestao-atas.html: localStorage usado como "guarda pra acessar
+   depois" já causou bug real de quota estourada travando o
+   salvamento de verdade no Firestore. turmas/atas/matriculas
+   não são mais coleções separadas: o dado de atas mora só em
+   turmas.alunos[], gravado por gestao-atas.html.)
 ========================= */
-const DB = (() => {
-  function readJSON(key, fallback){
-    try{
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    }catch{ return fallback; }
-  }
-  function writeJSON(key, value){
-    localStorage.setItem(key, JSON.stringify(value));
-  }
-  function getSession(){
-    try{
-      if (window.Auth && typeof window.Auth.getSession === "function"){
-        return window.Auth.getSession();
-      }
-    }catch{}
-    return readJSON("auth_session_v2", null);
-  }
-  function getActiveSchoolId(){
-    const sess = getSession() || {};
-    const sid = String(sess.schoolId || "").trim() || "SEM_ESCOLA";
-    if (sid === "ADMIN"){
-      const active = String(localStorage.getItem("admin_active_school_v1") || "").trim();
-      return active || "ADMIN";
-    }
-    return sid;
-  }
-  function key(base){
-    return `schools:${getActiveSchoolId()}:${base}`;
-  }
-  function migrateIfNeeded(base, fallback){
-    const scopedKey = key(base);
-    if (localStorage.getItem(scopedKey) == null){
-      const legacy = localStorage.getItem(base);
-      if (legacy != null){
-        localStorage.setItem(scopedKey, legacy);
-      } else if (fallback !== undefined){
-        writeJSON(scopedKey, fallback);
-      }
-    }
-    return scopedKey;
-  }
-  function read(base, fallback){
-    const k = migrateIfNeeded(base, fallback);
-    return readJSON(k, fallback);
-  }
-  function write(base, value){
-    const k = key(base);
-    writeJSON(k, value);
-    try{
-      if(!window.DB || !window.Auth || !window.Auth.getSession()) return;
-      const _MAP={turmasDB:'turmas',alunosDB:'alunos',alunosAliasesDB:'matriculas',atasDB:'atas',matriculasDB:'matriculas',dadosEscola:null};
-      const col=_MAP[base];
-      if(col===undefined) return;
-      if(col===null){ if(window.DB.escola) window.DB.escola.save(value).catch(()=>{}); return; }
-      const c=window.DB[col]; if(!c) return;
-      Array.isArray(value)?c.saveAll(value).catch(()=>{}):c.save(value).catch(()=>{});
-    }catch(e){}
-  }
-  function remove(base){
-    localStorage.removeItem(key(base));
-  }
-  return { key, read, write, remove, getActiveSchoolId };
-})();
 
 /* =========================
-   DB local (scoped)
+   Catálogo de identidade (nome oficial por alunoId)
+   O nome gravado dentro de turma.alunos[].nome é o texto cru
+   do momento do import — se o aluno for fundido/corrigido depois
+   (idaluno.html), esse campo embutido fica desatualizado. O nome
+   correto pra exibir é sempre o do catálogo, por alunoId.
 ========================= */
-function lerTurmasDB() {
-  return DB.read("turmasDB", []);
+let _mapaNomes = new Map(); // alunoId -> nome oficial
+
+async function carregarCatalogoNomes(){
+  try{
+    if (window.Identidade && window.Identidade.pronto) await window.Identidade.pronto;
+    const lista = (window.Identidade && typeof window.Identidade.lerTodos === "function")
+      ? window.Identidade.lerTodos() : [];
+    _mapaNomes = new Map(lista.map(a => [a.alunoId, a.nome || a.nomeOficial || ""]));
+  }catch(e){
+    console.warn("[pesquisa-ata] Falha ao carregar catálogo de identidade:", e);
+    _mapaNomes = new Map();
+  }
 }
 
-function salvarTurmasDB(turmas) {
-  DB.write("turmasDB", turmas);
+function nomeAtual(aluno){
+  if (!aluno) return "";
+  const oficial = aluno.alunoId ? _mapaNomes.get(aluno.alunoId) : null;
+  return oficial || aluno.nome || "";
 }
 
 /* =========================
@@ -490,6 +448,12 @@ let turmas = [];
 let turmasTodas = []; // todas as turmas carregadas, antes do filtro ativa/inativa
 let turmaSelecionada = null;
 let alunosView = [];
+
+// Exposto pra script isolado de "Pesquisa por aluno" (abaixo, no fim do arquivo)
+// Busca sempre em TODAS as turmas (ativas + inativas), igual ao comportamento
+// original — o filtro de "Inativas" só afeta a lista principal, não essa busca.
+window.obterTurmas = () => turmasTodas;
+window.nomeAtual = nomeAtual;
 
 /* =========================
    Utilitários
@@ -602,9 +566,6 @@ function renderListaTurmas(lista) {
   });
 }
 
-function editarTurma(id) {
-  window.location.href = `cadastro-turma.html?edit=${encodeURIComponent(id)}`;
-}
 /* =========================
    Selecionar turma
 ========================= */
@@ -647,7 +608,7 @@ function selecionarTurma(id) {
   document.getElementById("fAluno").value = "";
   document.getElementById("fAluno").oninput = () => {
     const q = norm(document.getElementById("fAluno").value);
-    const filtrados = alunosView.filter(a => norm(a.nome).includes(q));
+    const filtrados = alunosView.filter(a => norm(nomeAtual(a)).includes(q));
     renderAlunos(filtrados);
   };
 
@@ -709,14 +670,6 @@ function editarTurmaSelecionada() {
 }
 
 /* =========================
-   Abrir no cadastro (função antiga - mantida para compatibilidade)
-========================= */
-function abrirNoCadastro() {
-  editarTurmaSelecionada();
-}
-
-
-/* =========================
    Render alunos
 ========================= */
 function renderAlunos(lista) {
@@ -727,7 +680,7 @@ function renderAlunos(lista) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="num-col">${idx+1}</td>
-      <td class="nome-aluno">${a.nome || ""}</td>
+      <td class="nome-aluno">${nomeAtual(a)}</td>
       <td>${a.serie || ""}</td>
       <td>${a.port ?? "--"}</td>
       <td>${a.mat ?? "--"}</td>
@@ -737,6 +690,7 @@ function renderAlunos(lista) {
       <td>${a.fis ?? "--"}</td>
       <td>${a.arte ?? "--"}</td>
       <td>${a.relig ?? "--"}</td>
+      <td>${a.ing ?? "--"}</td>
       <td>${a.resultado ?? "Não informado"}</td>
     `;
     tbody.appendChild(tr);
@@ -794,7 +748,7 @@ function aplicarFiltros() {
         norm(t.turno || "") + " " +
         norm(t.anoLetivo || "");
       if (base.includes(fBusca)) return true;
-      return (t.alunos || []).some(a => norm(a.nome).includes(fBusca));
+      return (t.alunos || []).some(a => norm(nomeAtual(a)).includes(fBusca));
     });
   }
 
@@ -804,28 +758,30 @@ function aplicarFiltros() {
 /* =========================
    Exportar PDF
 ========================= */
-function carregarDadosEscolaDoStorage() {
+async function carregarDadosEscola() {
+  const padrao = { nome: "Nome da Escola", endereco: "Endereço da Escola", escudo: "" };
   try {
-    const raw = localStorage.getItem(DB.key("dadosEscola"));
-    if (!raw) return { nome: "Nome da Escola", endereco: "Endereço da Escola", escudo: "" };
-    const d = JSON.parse(raw);
-    return {
-      nome: d.nome || "Nome da Escola",
-      endereco: d.endereco || "Endereço da Escola",
-      escudo: d.escudo || ""
-    };
-  } catch {
-    return { nome: "Nome da Escola", endereco: "Endereço da Escola", escudo: "" };
+    // Lê direto do Firestore (coleção "escola") em vez de confiar em localStorage
+    // como cache — mesmo motivo do resto da página: pode estar desatualizado ou
+    // nunca ter sido escrito aqui.
+    if (window.DB && window.DB.escola && typeof window.DB.escola.list === "function") {
+      const lista = await window.DB.escola.list();
+      const d = Array.isArray(lista) ? lista[0] : lista;
+      if (d) return { nome: d.nome || padrao.nome, endereco: d.endereco || padrao.endereco, escudo: d.escudo || "" };
+    }
+  } catch (e) {
+    console.warn("[pesquisa-ata] Falha ao carregar dados da escola:", e);
   }
+  return padrao;
 }
 
-function exportarPDFDaTurma() {
+async function exportarPDFDaTurma() {
   if (!turmaSelecionada) return;
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF("p","mm","a4");
 
-  const escola = carregarDadosEscolaDoStorage();
+  const escola = await carregarDadosEscola();
 
   let y = 20;
 
@@ -863,24 +819,15 @@ function exportarPDFDaTurma() {
     startY: y,
     theme: "grid",
     styles: { font: "Times", fontSize: 9, halign: "center" },
-    head: [["Nº","Nome","Série","Port","Mat","Hist","Geo","Ciên","Ed.Fís","Arte","Rel","Resultado"]],
+    head: [["Nº","Nome","Série","Port","Mat","Hist","Geo","Ciên","Ed.Fís","Arte","Rel","Ing","Resultado"]],
     body: alunos.map((a,i)=>[
-      i+1, a.nome, a.serie, a.port, a.mat, a.hist, a.geo,
-      a.cien, a.fis, a.arte, a.relig, a.resultado
+      i+1, nomeAtual(a), a.serie, a.port, a.mat, a.hist, a.geo,
+      a.cien, a.fis, a.arte, a.relig, a.ing, a.resultado
     ])
   });
 
   const safe = String(turmaSelecionada.aba || "turma").replace(/[\\/:*?"<>|]/g, "_");
   doc.save(`ata_${safe}.pdf`);
-}
-
-/* =========================
-   Abrir no cadastro
-========================= */
-function abrirNoCadastro() {
-  if (!turmaSelecionada) return;
-  localStorage.setItem("turmaSelecionadaId", turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId);
-  window.location.href = "cadastro-turma.html";
 }
 
 /* =========================
@@ -892,20 +839,17 @@ async function carregar() {
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
       document.addEventListener('auth:ready', res, {once:true});
     });
-    const dados = await window.DB.loadAll();
-    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
-    if(sid){
-      const pre = (k)=>`schools:${sid}:${k}`;
-      if(dados.turmasDB)    localStorage.setItem(pre('turmasDB'),    JSON.stringify(dados.turmasDB));
-      if(dados.alunosDB)    localStorage.setItem(pre('alunosDB'),    JSON.stringify(dados.alunosDB));
-      if(dados.matriculas)  localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
-      if(dados.atasDB)      localStorage.setItem(pre('atasDB'),      JSON.stringify(dados.atasDB));
-      if(dados.dadosEscola && Object.keys(dados.dadosEscola).length)
-        localStorage.setItem(pre('dadosEscola'), JSON.stringify(dados.dadosEscola));
-    }
-  }catch(e){ console.warn('Firestore pré-carga:', e); }
 
-  turmasTodas = lerTurmasDB();
+    await carregarCatalogoNomes();
+
+    turmasTodas = (window.DB && window.DB.turmas && typeof window.DB.turmas.list === "function")
+      ? await window.DB.turmas.list()
+      : [];
+  }catch(e){
+    console.warn('[pesquisa-ata] Falha ao carregar turmas do Firestore:', e);
+    turmasTodas = [];
+  }
+
   recomputarTurmasBase();
 
   document.getElementById("dbInfo").textContent =
@@ -956,6 +900,7 @@ const DISC_NOTAS_PADRAO = [
   { key:'fis',   label:'Ed.Fís' },
   { key:'arte',  label:'Arte'   },
   { key:'relig', label:'Rel'    },
+  { key:'ing',   label:'Ing'    },
 ];
 
 function _getDiscNotas(turma){
@@ -1003,7 +948,7 @@ function renderTabelaEdit(alunos){
 
   alunos.forEach((a, i) => {
     const tr = document.createElement('tr');
-    const nomeCompleto = a.nome || '';
+    const nomeCompleto = nomeAtual(a);
     const primeiroNome = nomeCompleto.split(' ')[0];
     
     const notaCells = discCols.map(d => {
@@ -1047,10 +992,26 @@ function renderTabelaEdit(alunos){
   });
 }
 
-function salvarNotas(){
+/**
+ * Grava só o documento desta turma no Firestore (schools/{id}/turmas/{turmaId}),
+ * sem merge — mesmo padrão de _saveAllFull em gestao-atas.html. Evita reescrever
+ * a coleção inteira de turmas a cada edição de notas (o que a versão antiga fazia).
+ */
+async function _salvarTurmaNoFirestore(turma){
+  const schoolId = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : null;
+  const turmaId = turma.id || turma._id || turma.turmaId;
+  if (!schoolId || !turmaId) throw new Error('schoolId ou turmaId ausente ao salvar turma.');
+  const { ...dados } = turma;
+  dados.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+  await window.Auth.db
+    .collection('schools').doc(schoolId)
+    .collection('turmas').doc(turmaId)
+    .set(dados);
+}
+
+async function salvarNotas(){
   if(!turmaSelecionada) return;
   const alunos = (turmaSelecionada.alunos || []).map((a) => ({ ...a }));
-  const discCols = _getDiscNotas(turmaSelecionada);
   const campos = [...document.querySelectorAll('#tNotasEdit input, #tNotasEdit select')];
   campos.forEach(el => {
     const idx = parseInt(el.dataset.idx, 10);
@@ -1062,14 +1023,26 @@ function salvarNotas(){
   const selId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
   const idx = turmas.findIndex(t => (t.id || t._id || t.turmaId) === selId);
   if(idx >= 0) turmas[idx] = turmaSelecionada;
+  const idxTodas = turmasTodas.findIndex(t => (t.id || t._id || t.turmaId) === selId);
+  if(idxTodas >= 0) turmasTodas[idxTodas] = turmaSelecionada;
 
-  salvarTurmasDB(turmas);
+  const msg = document.getElementById('msgSalvarNotas');
+
+  try{
+    await _salvarTurmaNoFirestore(turmaSelecionada);
+  }catch(e){
+    console.warn('[pesquisa-ata] Falha ao salvar notas no Firestore:', e);
+    if(msg){
+      msg.textContent = `❌ Falha ao salvar — tente novamente.`;
+      msg.style.display = 'block';
+    }
+    return;
+  }
 
   alunosView = alunos.slice();
   renderAlunos(alunosView);
   renderResumoTurma(turmaSelecionada);
 
-  const msg = document.getElementById('msgSalvarNotas');
   if(msg){
     msg.textContent = `✅ Notas salvas — ${alunos.length} aluno(s) atualizados.`;
     msg.style.display = 'block';
@@ -1121,23 +1094,23 @@ function salvarNotas(){
 
     if (!termo) { alert("Digite o nome do aluno."); return; }
 
-    if (typeof window.lerTurmasDB !== "function") {
-      alert("Erro: lerTurmasDB() não encontrada.");
+    if (typeof window.obterTurmas !== "function") {
+      alert("Erro: turmas ainda não carregadas.");
       return;
     }
 
-    const db = window.lerTurmasDB();
+    const db = window.obterTurmas();
     const achados = [];
 
     for (const t of (db || [])){
       const alunos = Array.isArray(t?.alunos) ? t.alunos : [];
       for (const a of alunos){
-        const nomeA = normNome(a?.nome);
+        const nomeA = normNome(window.nomeAtual ? window.nomeAtual(a) : a?.nome);
         if (!nomeA) continue;
         const ok = parcial ? nomeA.includes(termo) : (nomeA === termo);
         if (!ok) continue;
         achados.push({
-          aluno: a?.nome || "",
+          aluno: window.nomeAtual ? window.nomeAtual(a) : (a?.nome || ""),
           ano: t?.anoLetivo || "",
           serie: a?.serie || t?.serieTexto || "",
           turno: t?.turno || "",
