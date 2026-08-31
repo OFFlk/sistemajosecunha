@@ -301,25 +301,39 @@ function dbRead(base, fallback) {
 function dbWrite(base, val) {
   _mem[dbKey(base)] = val;
   try {
-    if (!window.DB || !window.Auth?.getSession()) return;
+    if (!window.DB || !window.Auth?.getSession()) return Promise.resolve();
     const map = { turmasDB:'turmas', alunosDB:'alunos', atasDB:'atas', matriculasDB:'matriculas' };
     const col = map[base];
     if (col && window.DB[col]) {
       // Para turmasDB: cada turma tem seu array de alunos/notas — usa saveAllFull para
       // garantir que o documento inteiro é sobrescrito (sem merge), preservando o campo alunos.
+      // Retorna a Promise (não engole erro) pra quem chama poder esperar e mostrar
+      // falha real ao usuário — antes, confirmarImportacao() nunca via esse erro.
       if (base === 'turmasDB') {
-        _saveAllFull('turmas', val).catch(e => console.warn('Firestore turmasDB:', e));
+        return _saveAllFull('turmas', val).catch(e => { console.warn('Firestore turmasDB:', e); throw e; });
       } else {
-        window.DB[col].saveAll(val).catch(e => console.warn('Firestore ' + base + ':', e));
+        return window.DB[col].saveAll(val).catch(e => console.warn('Firestore ' + base + ':', e));
       }
     }
   } catch(_) {}
+  return Promise.resolve();
 }
 
 /**
  * Salva array de turmas no Firestore fazendo SET completo (sem merge),
  * garantindo que o campo `alunos` seja sempre sobrescrito por inteiro.
  * Usa turmaId (ou _id) como ID do documento — igual ao saveAll do db.firebase.js.
+ *
+ * LOTE_TAMANHO=10 (não 400): o limite de 400 vinha do limite de OPERAÇÕES do
+ * Firestore por batch (500), mas o que estourava a cota do navegador era o
+ * TAMANHO do payload — cada turma carrega o array `alunos` inteiro, então um
+ * lote de 400 turmas em uma importação grande (ex.: 100 abas) ainda cabia
+ * inteiro num commit só, sem throttle nenhum. Reduzido pra 10 e cada lote
+ * espera o anterior confirmar (await) antes de seguir — isso mantém pequeno
+ * o volume de mutação pendente que o Firestore tenta persistir no
+ * localStorage (enablePersistence+synchronizeTabs em auth.firebase.js), e
+ * libera espaço automaticamente a cada confirmação, sem precisar recarregar
+ * a página entre lotes.
  */
 async function _saveAllFull(colName, arr) {
   if (!window.DB || !window.Auth) return;
@@ -331,10 +345,12 @@ async function _saveAllFull(colName, arr) {
   if (!schoolId) return;
   const db = window.Auth.db;
   const ts = firebase.firestore.FieldValue.serverTimestamp();
-  // Lotes de 400 (limite Firestore é 500 por batch)
-  for (let i = 0; i < arr.length; i += 400) {
+  const LOTE_TAMANHO = 10;
+  const falhas = [];
+  for (let i = 0; i < arr.length; i += LOTE_TAMANHO) {
+    const fatia = arr.slice(i, i + LOTE_TAMANHO);
     const batch = db.batch();
-    arr.slice(i, i + 400).forEach(obj => {
+    fatia.forEach(obj => {
       const { _id, ...data } = obj;
       data.updatedAt = ts;
       // ID do documento: prioriza _id explícito, depois turmaId, depois id
@@ -344,12 +360,25 @@ async function _saveAllFull(colName, arr) {
       // SET sem merge: sobrescreve o documento inteiro, incluindo o array `alunos`
       batch.set(ref, data);
     });
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.warn(`[_saveAllFull] Lote ${i}-${i + fatia.length} falhou:`, e);
+      falhas.push({ inicio: i, fim: i + fatia.length, erro: e });
+      // Não interrompe os lotes seguintes — mas registra quais turmas
+      // ficaram sem salvar, pra não passar a impressão de importação
+      // completa quando só uma parte foi de fato gravada.
+    }
+  }
+  if (falhas.length) {
+    const totalFalhas = falhas.reduce((s, f) => s + (f.fim - f.inicio), 0);
+    console.error(`[_saveAllFull] ${totalFalhas} de ${arr.length} turma(s) NÃO foram salvas. Lotes com falha:`, falhas);
+    throw new Error(`${totalFalhas} de ${arr.length} turma(s) não foram salvas no Firestore. Veja o console para detalhes.`);
   }
 }
 
 function lerTurmasDB()     { return dbRead('turmasDB', []); }
-function salvarTurmasDB(v) { dbWrite('turmasDB', v || []); }
+function salvarTurmasDB(v) { return dbWrite('turmasDB', v || []); }
 function lerAlunosDB()     { return dbRead('alunosDB', []); }
 
 function idAtaFrom(tid)      { return 'ATA|' + tid; }
@@ -1647,7 +1676,7 @@ async function confirmarImportacao(){
       resultadosAbas.push({abaName:it.abaName, ok:true, qtdAlunos:it.qtdAlunos, badge:it.badge, divergencias:it.divergencias});
     }
 
-    salvarTurmasDB(turmasDB);
+    await salvarTurmasDB(turmasDB);
     const aux=_reconstruirAuxLocalmente(turmasDB);
 
     const resumoTexto=`TOTAL: ${_bufferImportacao.itens.length} turma(s) • ${totalAlunos} aluno(s)\n`+
