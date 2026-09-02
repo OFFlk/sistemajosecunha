@@ -1,4 +1,4 @@
-# Checklist de Testes — Sistema Escolar (pré-auditoria) — v13
+# Checklist de Testes — Sistema Escolar (pré-auditoria) — v14
 
 > v1 tinha o levantamento inicial. v2 corrigiu escopo/contagem/RBAC/localStorage.
 > v3 refletia a primeira rodada real de testes. v4 refletia a rodada de fixes
@@ -94,6 +94,30 @@
 > escolas exige regra própria, a aninhada por escola não cobre) — só
 > leitura, só pro ADMIN global, sem abrir brecha pra gestor de escola ver
 > dado de outra escola. Testado e confirmado por você em produção.
+>
+> **v14** fecha a investigação de leituras excessivas no Firestore (achada
+> fora do checklist formal, "fuçando o sistema"): a causa raiz tinha duas
+> partes — o contador atômico de `alunoId` está correto (não deve reaproveitar
+> número), mas nada limpava os IDs órfãos que ele deixava pra trás, e o
+> vazamento contínuo era o botão **"Apagar somente turmas"** de
+> `admin_backup.html`, que preserva `alunos` de propósito mas apaga
+> `anoAtivoMatriculas` na mesma ação — sem essa referência, a GC que já existe
+> em `gestao-atas.html` (`_limparIdentidadesOrfas()`) nunca tinha como saber
+> que aqueles IDs viraram órfãos durante ciclos de teste (reimportar → apagar
+> turmas → repetir). **Nenhum código mudou**: decisão tomada foi manter os
+> botões de `admin_backup.html` como estão — resets completos de teste devem
+> usar "Reset Total" em vez de "Apagar turmas". Limpeza executada via
+> diagnóstico por console + remoção manual: dos 18 mil+ IDs órfãos do
+> relatório original, restaram só 4 (ruído aceitável). Da investigação nasceu
+> um desenho de reformulação do módulo de Atas — `alunos` vira só um elo de
+> confirmação entre Atas e Ano Ativo, nova coleção `alunos-atas` com dados
+> legíveis simples (id/nome/último ano de registro), `idaluno.html` como única
+> página que escreve em `alunos` — registrado em relatório separado
+> (`relatorio-leituras-excessivas-e-redesenho-atas.md`), **nada implementado
+> ainda**. Dois pontos levantados na investigação ficam pendentes pra quando
+> esse redesenho for efetivado: auto-boot indiscriminado de
+> `identidade-aluno.js` e a arquitetura de carregar o catálogo inteiro pra
+> buscar (`findOrCreate`/`findOrCreateBatch`) — ver `⏳ Pendências`.
 
 ---
 
@@ -228,6 +252,29 @@ que falta investigar/corrigir)*
   varredura (mais a fundo dessa vez, já mirando os bugs de cache que
   apareceram no teste, como o do email em `cadastro_admin.html`) assim que
   tiver acesso ao repo de novo. **Última coisa a fazer antes dos logs.**
+- **Redesenho do módulo de Atas (leituras excessivas) — desenho pronto, nada
+  implementado.** Schema de `alunos`/`alunos-atas`/`anoAtivoAlunos`, novo
+  papel de `idaluno.html` (única página que escreve em `alunos`) — ver
+  relatório separado (`relatorio-leituras-excessivas-e-redesenho-atas.md`).
+  **Decisões finais tomadas:** `ultimoAnoRegistro` será **denormalizado**
+  (gravado no doc de `alunos-atas`, recalculado ao confirmar import, ao
+  apagar turma e ao fundir em `idaluno.html` — calcular na hora reintroduziria
+  o mesmo problema de leitura excessiva que motivou essa investigação); **sem
+  migração de dados** — hoje só existem dados de teste no `alunos` atual, que
+  serão apagados (via "Apagar TODOS os dados") antes de o novo modelo entrar
+  em uso.
+  **Ordem de implementação combinada, pra quando for efetivar:**
+  1. Reescrever `identidade-aluno.js` pro novo modelo (peça central — tudo
+     mais depende dela).
+  2. Atualizar `idaluno.html` pro novo papel (só linkar Atas↔Ano-Ativo).
+  3. Atualizar `gestao-atas.html`/`pesquisa-ata.html` pra ler de
+     `alunos-atas` em vez do `alunos` antigo.
+  4. Só depois, retomar auto-boot indiscriminado de `identidade-aluno.js` e a
+     arquitetura de carregar o catálogo inteiro pra buscar
+     (`findOrCreate`/`findOrCreateBatch`) — fazem mais sentido resolvidos
+     junto da reescrita do item 1 do que isolados.
+  **Sugestão:** abrir chat novo pra começar a implementação, levando o
+  relatório + este checklist (v14) como contexto.
 
 ---
 
@@ -269,7 +316,31 @@ que falta investigar/corrigir)*
 
 ## ✅ Fixes aplicados
 
-### Rodada de hoje — `admin_backup.html`, `pesquisa-ano-ativo.html`, `db.firebase.js`, `firestore.rules`
+### Rodada de hoje — investigação de leituras excessivas + limpeza da coleção `alunos`
+
+- **Causa raiz confirmada:** contador atômico está correto (não deve
+  reaproveitar `alunoId`); o vazamento real era o botão "Apagar somente
+  turmas" de `admin_backup.html`, que preserva `alunos` mas apaga
+  `anoAtivoMatriculas` junto — impedindo a GC já existente
+  (`_limparIdentidadesOrfas()`, em `gestao-atas.html`) de perceber os órfãos
+  criados em ciclos de teste (reimportar → apagar turmas → repetir).
+- **Nenhum código alterado.** Decisão: manter `admin_backup.html` como está —
+  o comportamento de "Apagar turmas" é intencional; resets completos de
+  teste devem usar "Reset Total" em vez disso.
+- **Limpeza executada** (diagnóstico via console + remoção manual): dos
+  18 mil+ IDs órfãos do relatório original, restaram 4 — ruído, sem
+  necessidade de tratar.
+- **Redesenho do módulo de Atas desenhado** (schema de `alunos`/
+  `alunos-atas`/`anoAtivoAlunos`, novo papel de `idaluno.html`, cálculo de
+  "último ano de registro") — nada implementado ainda, ver
+  `⏳ Pendências`.
+
+**Arquivos entregues nessa rodada:** nenhum (investigação + desenho). Relatório
+separado: `relatorio-leituras-excessivas-e-redesenho-atas.md`.
+
+---
+
+### Rodada anterior — `admin_backup.html`, `pesquisa-ano-ativo.html`, `db.firebase.js`, `firestore.rules`
 
 **`admin_backup.html` — reescrito pra Firestore-first (decisão pendente
 desde a v2), em duas rodadas:**
