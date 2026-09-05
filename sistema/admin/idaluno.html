@@ -771,6 +771,17 @@ async function aplicarFilaUnioes(){
   const fila = [...FILA_UNIOES]; // cópia para iterar com segurança
   FILA_UNIOES = [];
 
+  // Ano ativo do sistema (dadosEscola.configAnoAtivo — ver admin.html),
+  // buscado uma vez só, fora do loop, pra não reler o doc da escola a cada
+  // união processada.
+  let anoAtivoAtual = null;
+  try {
+    const escola = await window.DB.escola.get();
+    anoAtivoAtual = escola?.configAnoAtivo || null;
+  } catch(e) {
+    console.warn('[aplicarFilaUnioes] configAnoAtivo:', e);
+  }
+
   let processados = 0;
   for(const { ida, idb, nomeFinal } of fila){
     step.textContent = `Unindo: ${nomeFinal} (${processados + 1}/${total})`;
@@ -779,7 +790,7 @@ async function aplicarFilaUnioes(){
     // yield para o browser renderizar o progresso
     await new Promise(r => setTimeout(r, 0));
 
-    await fundir(ida, idb, nomeFinal);
+    await fundir(ida, idb, nomeFinal, anoAtivoAtual);
     processados++;
   }
 
@@ -845,7 +856,7 @@ function marcarComoDiferentes(){
  * mídia no Cloudinary é vinculada por esse alunoId (ver v11). Se o chamador
  * passar na direção errada, corrige sozinho.
  */
-async function fundir(idManter, idEngolido, nomeOficialFinal){
+async function fundir(idManter, idEngolido, nomeOficialFinal, anoAtivoAtual){
   idManter = String(idManter).trim();
   idEngolido = String(idEngolido).trim();
   if (!idManter || !idEngolido || idManter === idEngolido) return;
@@ -862,7 +873,7 @@ async function fundir(idManter, idEngolido, nomeOficialFinal){
                        && (!!manterAtas !== !!engolidoAtas);
   if (crossGenuino && !manterAA && engolidoAA){
     console.warn('[fundir] Direção invertida: Ano-Ativo sempre sobrevive em fusão cross-módulo. Corrigindo automaticamente.');
-    return fundir(idEngolido, idManter, nomeOficialFinal);
+    return fundir(idEngolido, idManter, nomeOficialFinal, anoAtivoAtual);
   }
 
   let tocouAtas = false, tocouAA = false;
@@ -907,8 +918,19 @@ async function fundir(idManter, idEngolido, nomeOficialFinal){
     for (const m of matsAtas){
       await window.DB.matriculas.save({ ...m, alunoId: idManter });
     }
-    // TODO (pendência aberta): recalcular Identidade.recalcularUltimoAnoRegistro(idManter, ...)
-    // aqui — falta decidir de onde vem o "ano letivo ativo do sistema" nesta página.
+    // Recalcula ultimoAnoRegistro considerando as matrículas recém-migradas
+    // pra idManter (a lacuna do "de onde vem o ano ativo" foi fechada:
+    // dadosEscola.configAnoAtivo, buscado uma vez em aplicarFilaUnioes() e
+    // repassado aqui). Depende de `anoLetivo` denormalizado em cada doc de
+    // matrículas — matrículas de import legado ainda sem esse campo não
+    // entram na conta (ver comentário na função, em identidade-aluno.js).
+    if (window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+      try {
+        await window.Identidade.recalcularUltimoAnoRegistroBatch([idManter], anoAtivoAtual);
+      } catch(e) {
+        console.warn('[fundir] recalcularUltimoAnoRegistroBatch erro:', e);
+      }
+    }
   }
 
   if (tocouAA){
