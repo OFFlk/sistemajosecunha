@@ -178,6 +178,35 @@
       },
 
       /**
+       * Busca pontual por uma LISTA de valores num campo (ex.: vários
+       * alunoId de uma vez), sem carregar a coleção inteira e sem fazer
+       * uma leitura por item. Divide em lotes de 10 (limite do operador
+       * `in` do Firestore) e junta os resultados.
+       * Usado por identidade-aluno.js (recalcularUltimoAnoRegistroBatch)
+       * pra buscar as matrículas de vários alunos numa única leva de
+       * queries, em vez de uma leitura por aluno.
+       *
+       * @param {string} field    campo a comparar (ex.: 'alunoId')
+       * @param {Array} values    valores aceitos (duplicados/nulos são ignorados)
+       * @param {Object} [opts]   { limit } — aplicado a CADA lote, não ao total
+       */
+      async whereIn(field, values, opts = {}) {
+        await waitAuth();
+        const vals = Array.from(new Set((values || []).filter(v => v != null && v !== '')));
+        if (!vals.length) return [];
+        const CHUNK = 10;
+        const resultados = [];
+        for (let i = 0; i < vals.length; i += CHUNK) {
+          const chunk = vals.slice(i, i + CHUNK);
+          let q = col(colName).where(field, 'in', chunk);
+          if (opts.limit) q = q.limit(opts.limit);
+          const snap = await q.get();
+          resultados.push(...snap2arr(snap));
+        }
+        return resultados;
+      },
+
+      /**
        * Remove TODOS os documentos onde field == value.
        * Útil para limpar duplicatas e alunos mesclados no Firestore.
        */
@@ -473,6 +502,10 @@
     /**
      * Atalho: carrega todas as coleções do módulo de ATAS.
      * Retorna objeto no mesmo formato que state.db já espera.
+     *
+     * alunosDB vem de `alunos-atas` (catálogo legível do módulo) — NÃO de
+     * `alunos`, que virou só o elo de confirmação cross-módulo (ver
+     * redesenho: relatório de leituras excessivas + identidade-aluno.js v2).
      */
     async loadAll() {
       const [turmasDB, alunosDB, matriculasDB, atasDB, dadosEscola] = await Promise.all([

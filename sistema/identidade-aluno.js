@@ -265,6 +265,53 @@
     return ano;
   }
 
+  /**
+   * Versão em lote de recalcularUltimoAnoRegistro() — busca as matrículas
+   * de VÁRIOS alunos numa leva de queries (whereIn(), chunks de 10 — ver
+   * db.firebase.js) em vez de uma leitura por aluno, e grava tudo com um
+   * único saveAll() em alunos-atas. Depende de `anoLetivo` estar
+   * denormalizado em cada doc de `matriculas` (decisão do redesenho: evita
+   * o join matrícula→ata/turma só pra descobrir o ano) — matrículas criadas
+   * antes dessa denormalização (ex.: import legado em gestão-atas.html que
+   * ainda não foi atualizado) não entram na conta.
+   *
+   * Chamar depois que as matrículas da leva já estiverem salvas — o
+   * recálculo lê o estado atual de `matriculas`, então uma matrícula ainda
+   * não persistida não entra na conta.
+   *
+   * @param {string[]} alunoIds
+   * @param {number|string} anoAtivoAtual  ano letivo ativo do sistema (ex.: dadosEscola.configAnoAtivo)
+   * @returns {Promise<Array<{alunoId, ultimoAnoRegistro}>>}
+   */
+  async function recalcularUltimoAnoRegistroBatch(alunoIds, anoAtivoAtual) {
+    const ids = Array.from(new Set((alunoIds || []).map(_str).filter(Boolean)));
+    if (!ids.length) return [];
+    if (!window.DB?.matriculas?.whereIn) {
+      throw new Error('Identidade.recalcularUltimoAnoRegistroBatch: DB.matriculas.whereIn indisponível (db.firebase.js desatualizado?).');
+    }
+    await _waitAuth();
+
+    const matriculas = await window.DB.matriculas.whereIn('alunoId', ids);
+
+    const anosPorAluno = new Map(ids.map(id => [id, []]));
+    for (const m of matriculas) {
+      const id = _str(m?.alunoId);
+      const ano = Number(m?.anoLetivo);
+      if (anosPorAluno.has(id) && Number.isFinite(ano)) anosPorAluno.get(id).push(ano);
+    }
+
+    const agora = new Date().toISOString();
+    const patches = ids.map(id => ({
+      _id: id,
+      alunoId: id,
+      ultimoAnoRegistro: _anoMaisProximo(anosPorAluno.get(id), anoAtivoAtual),
+      atualizadoEm: agora,
+    }));
+
+    await window.DB[CHAVE_ATAS].saveAll(patches);
+    return patches.map(p => ({ alunoId: p.alunoId, ultimoAnoRegistro: p.ultimoAnoRegistro }));
+  }
+
   /* ────────────────────────────────────────────
      Elo cross-módulo (`alunos`) — confirmação de que um alunoId de Atas
      e um de Ano-Ativo são a mesma pessoa.
@@ -363,6 +410,7 @@
     salvarAtas,
     removerAtas,
     recalcularUltimoAnoRegistro,
+    recalcularUltimoAnoRegistroBatch,
 
     // Elo cross-módulo — CRUD puro, sem decisão (fundir() é de idaluno.html)
     buscarElo,
