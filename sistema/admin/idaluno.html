@@ -234,15 +234,14 @@
 
 <div class="container">
 <div class="card">
-<h2>IDs de alunos (automático)</h2>
+<h2>Verificação e fusão de alunos (Atas ↔ Ano-Ativo)</h2>
 <p class="small">
-O sistema varre o <b>turmasDB</b>, cria IDs automaticamente e detecta possíveis alunos duplicados.
-Não existe cadastro manual de aluno.
+Detecta possíveis duplicatas/vínculos entre os catálogos de Atas e Ano-Ativo por
+semelhança de nome. A criação de IDs de Atas acontece em <b>cadastro-turma.html</b>
+ao salvar a turma — esta página não cria IDs, só une/vincula os que já existem.
 </p>
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-<button class="btn btn-primary" onclick="gerarIds()">Gerar / Atualizar IDs</button>
-<button class="btn btn-gray" onclick="gerarIdsSistema()" title="Cria IDs e também gera bancos auxiliares (atasDB, matriculasDB, turmasMetaDB)">Gerar IDs do sistema</button>
-<button class="btn btn-danger" onclick="limparDuplicatasFirestore()" title="Remove do Firestore documentos duplicados de alunos (mesmo alunoId)">🧹 Limpar duplicatas no Firestore</button>
+<button class="btn btn-danger" onclick="limparDuplicatasFirestore()" title="Verifica alunos-atas e anoAtivoAlunos por documentos com alunoId repetido (não deveria ocorrer em uso normal — segurança contra dado legado)">🧹 Verificar duplicatas no Firestore</button>
 <div style="flex:1;min-width:260px">
 <label class="small">Similaridade mínima</label>
 <input id="cut" max="95" min="70" style="width:100%" type="range" value="85"/>
@@ -340,10 +339,9 @@ function salvarJSON(k, v){
   const _sk = _sid ? `schools:${_sid}:${k}` : k;
   localStorage.setItem(_sk, JSON.stringify(v));
   // Espelha no Firestore em paralelo
-  const _MAP={turmasDB:'turmas',alunosDB:'alunos',alunosAliasesDB:'matriculas',
+  const _MAP={turmasDB:'turmas',
                atasDB:'atas',matriculasDB:'matriculas',turmasMetaDB:null,
-               anoAtivoTurmasDB_v1:'anoAtivoTurmas', anoAtivoMatriculasDB_v1:'anoAtivoMatriculas',
-               anoAtivoAlunosDB_v1:'anoAtivoAlunos'};
+               anoAtivoTurmasDB_v1:'anoAtivoTurmas', anoAtivoMatriculasDB_v1:'anoAtivoMatriculas'};
   try{
     if(window.DB && window.Auth && window.Auth.getSession()){
       const col=_MAP[k]; if(col===undefined) return;
@@ -357,18 +355,9 @@ function salvarJSON(k, v){
 function lerTurmasDB(){ return lerJSON("turmasDB", []); }
 function salvarTurmasDB(v){ salvarJSON("turmasDB", v||[]); }
 
-// alunosDB: [{id, nomeOficial, criadoEm, atualizadoEm}]
-// Normaliza campos: cadastro-aluno-ativo usa {alunoId, nome}, idaluno usa {id, nomeOficial}
-function normAlunoDB(a){
-  if (!a) return null;
-  return { ...a, id: a.id || a.alunoId || '', nomeOficial: a.nomeOficial || a.nome || '' };
-}
-function lerAlunosDB(){ return lerJSON("alunosDB", []).map(normAlunoDB).filter(Boolean); }
-function salvarAlunosDB(v){ salvarJSON("alunosDB", v||[]); }
-
-// alunosAliasesDB: { aliasKey: alunoId }
-function lerAliasesDB(){ return lerJSON("alunosAliasesDB", {}); }
-function salvarAliasesDB(v){ salvarJSON("alunosAliasesDB", v||{}); }
+// Uma linha de ALUNOS (tabela em memória, montada no boot a partir de
+// alunos-atas + anoAtivoAlunos): { id, nomeOficial, origem: 'atas'|'anoAtivo'|'ambos' }
+// `origem: 'ambos'` = já fundido (mesmo alunoId presente nas duas coleções).
 
 // pares ignorados (decisão "são pessoas diferentes")
 function lerIgnorados(){ return lerJSON("alunosDupeIgnorados", []); }
@@ -442,72 +431,59 @@ function atualizarResumo(msg){
 /* =========================
    IDs automáticos
 ========================= */
-// proximoAlunoId removido — use window.Identidade.findOrCreate()
+// Criação de alunoId de Atas acontece em cadastro-turma.html (garantirIds()).
+// gerarIds()/gerarIdsSistema() removidos desta página por serem redundantes
+// e, no caso de gerarIds(), estarem quebrados (chamavam findOrCreateBatch()
+// sem await) — decisão tomada na rodada de redesenho do módulo de Atas.
 
-async function gerarIds(){
-  if(!window.Identidade){
-    atualizarResumo("⚠️ Módulo de identidade não carregado. Recarregue a página.");
-    return;
+/* =========================
+   Catálogo ALUNOS (alunos-atas + anoAtivoAlunos + elo)
+========================= */
+
+// Extrai a parte numérica de "ALU-000123" pra comparação de "menor ID".
+function _numAlunoId(id){
+  const m = String(id||"").match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : Infinity;
+}
+// true se a vence (é a mesma ou menor que b)
+function _idMenorOuIgual(a, b){ return _numAlunoId(a) <= _numAlunoId(b); }
+
+/**
+ * Recarrega ALUNOS a partir do Firestore (bulk — necessário pra comparação
+ * par-a-par de nomes; ver nota sobre isso na conversa). Cada linha:
+ * { id, nomeOficial, origem: 'atas'|'anoAtivo'|'ambos' }.
+ * origem:'ambos' = mesmo alunoId já existe nas duas coleções (já fundido).
+ */
+async function recarregarAlunos(){
+  const [atasDocs, aaDocs] = await Promise.all([
+    window.DB['alunos-atas'].list(),
+    window.DB.anoAtivoAlunos.list(),
+  ]);
+
+  const porId = new Map();
+  for (const d of atasDocs){
+    const id = String(d.alunoId || d._id || "").trim();
+    if (!id) continue;
+    porId.set(id, { id, nomeOficial: d.nome || d.nomeOficial || "", origem: "atas" });
   }
-
-  const turmas = lerTurmasDB();
-  if (!Array.isArray(turmas) || turmas.length === 0){
-    atualizarResumo("⚠️ <b>turmasDB</b> está vazio neste domínio. Abra este Admin pelo <b>mesmo localhost</b> do sistema.");
-    alert("turmasDB vazio neste domínio/localStorage.");
-    return;
-  }
-
-  let processados = 0, idsCriados = 0, turmasAlteradas = 0;
-
-  // Coleta todos os candidatos de todas as turmas de uma vez
-  // para usar findOrCreateBatch — UMA leitura/escrita no localStorage
-  const candidatos = [];
-  for (const t of turmas){
-    if (!Array.isArray(t.alunos)) continue;
-    for (const al of t.alunos){
-      const nomeRaw = String(al?.nome||"").trim();
-      candidatos.push(nomeRaw ? {
-        nomeOficial: nomeRaw,
-        nome: nomeRaw,
-        alunoId: String(al.alunoId||"").trim() || undefined,
-      } : null);
+  for (const d of aaDocs){
+    const id = String(d.alunoId || d._id || "").trim();
+    if (!id) continue;
+    const nome = d.nome || d.nomeCompleto || d.nomeOficial || "";
+    const existente = porId.get(id);
+    if (existente){
+      existente.origem = "ambos";
+      // Nome do Ano-Ativo tende a ser mais completo (tem cadastro formal) —
+      // prevalece na exibição quando já está fundido.
+      if (nome) existente.nomeOficial = nome;
+    } else {
+      porId.set(id, { id, nomeOficial: nome, origem: "anoAtivo" });
     }
   }
 
-  // Processa tudo em memória, grava localStorage uma única vez
-  const resultados = await window.Identidade.findOrCreateBatch(
-    candidatos.filter(Boolean)
-  );
-
-  // Distribui resultados de volta para as turmas
-  let rIdx = 0;
-  for (const t of turmas){
-    if (!Array.isArray(t.alunos)) continue;
-    let alterou = false;
-    for (const al of t.alunos){
-      const nomeRaw = String(al?.nome||"").trim();
-      if (!nomeRaw){ continue; }
-      const res = resultados[rIdx++];
-      if (!res) continue;
-      const { alunoId: id, isNew } = res;
-      if (isNew) idsCriados++;
-      if (al.alunoId !== id){ al.alunoId = id; alterou = true; }
-      processados++;
-    }
-    if (alterou) turmasAlteradas++;
-  }
-
-  salvarTurmasDB(turmas);
-  // findOrCreateBatch já persistiu alunosDB em uma única operação
-
-  // Recarrega do catálogo unificado (inclui alunos do Ano Ativo também)
-  const alunosDB = window.Identidade.lerTodos().map(normAlunoDB).filter(Boolean);
-  ALUNOS = alunosDB.slice().sort((a,b)=>String(a.nomeOficial||"").localeCompare(String(b.nomeOficial||""),'pt-BR'));
-  renderAlunos();
-  gerarSugestoes();
-
-  atualizarResumo(`✅ Processados: <b>${processados}</b> • IDs criados: <b>${idsCriados}</b> • Turmas atualizadas: <b>${turmasAlteradas}</b> • Alunos únicos no catálogo: <b>${ALUNOS.length}</b> • Sugestões: <b>${SUGS.length}</b>`);
-  atualizarMetaSistema();
+  ALUNOS = Array.from(porId.values())
+    .sort((a,b)=>String(a.nomeOficial||"").localeCompare(String(b.nomeOficial||""),'pt-BR'));
+  return ALUNOS;
 }
 
 /* =========================
@@ -534,7 +510,7 @@ function marcarDuplicadoManual(){
   if (!id){ alert("Selecione um aluno na lista."); return; }
 
   if (!SUGS.length){
-    alert("Ainda não há sugestões. Clique em 'Gerar / Atualizar IDs' e/ou reduza a similaridade.");
+    alert("Ainda não há sugestões. Reduza a similaridade mínima e tente de novo.");
     return;
   }
 
@@ -601,19 +577,6 @@ function gerarSugestoes(){
     seriesCache[a.id] = _seriesDoAluno(a.id);
   }
 
-  // Índice de origem por ID: um alunoId "é" do Ano Ativo se tem ficha
-  // cadastrada na coleção anoAtivoAlunos — é o catálogo que carrega dados
-  // pessoais e é a base pela qual documentos/avatar no Cloudinary são
-  // localizados (via alunoId). NÃO usar só "tem matrícula ativa" como sinal:
-  // um aluno pode ter ficha completa (e docs no Cloudinary) sem matrícula
-  // corrente, e nesse caso a checagem antiga (baseada em [AA] nas séries)
-  // deixava de detectar a origem, permitindo que o ID errado sobrevivesse
-  // a uma fusão e órfãos documentos/dados vinculados ao alunoId antigo.
-  const _aaAlunos = new Set(
-    lerJSON("anoAtivoAlunosDB_v1", []).map(a => String(a._id || a.alunoId || "").trim()).filter(Boolean)
-  );
-  const isAA = id => _aaAlunos.has(String(id||"").trim());
-
   const sugs = [];
   for (let i=0;i<ALUNOS.length;i++){
     for (let j=i+1;j<ALUNOS.length;j++){
@@ -623,16 +586,25 @@ function gerarSugestoes(){
 
       const s = similaridade(a.nomeOficial, b.nomeOficial);
       if (s >= cut){
-        // Detecta se são do mesmo módulo ou de módulos diferentes
-        const aIsAA = isAA(a.id), bIsAA = isAA(b.id);
-        const modulosDiferentes = aIsAA !== bIsAA;
-        // CRÍTICO: em par cross-módulo, o ID do Ano Ativo tem que ser sempre
-        // o sobrevivente (slot A / idManter). O Cloudinary vincula mídia
-        // (avatar, documentos) pelo alunoId do Ano Ativo — se o ID de Atas
-        // vencer a fusão, a mídia fica órfã (aponta pra um ID que deixou de
-        // existir). Isso não depende de qual nome o usuário escolhe manter.
-        const swap = modulosDiferentes && bIsAA && !aIsAA;
-        const pA = swap ? b : a, pB = swap ? a : b;
+        const distintos = a.origem !== b.origem;
+        const modulosDiferentes = distintos && a.origem !== "ambos" && b.origem !== "ambos";
+
+        let pA, pB;
+        if (modulosDiferentes){
+          // Cross-módulo: o lado Ano-Ativo SEMPRE sobrevive, independente
+          // do valor numérico do ID. Mídia no Cloudinary (avatar/documentos)
+          // é vinculada pelo alunoId do Ano-Ativo — se o ID de Atas vencesse,
+          // a mídia ficaria órfã (bug já visto e corrigido antes, na v11).
+          const swap = a.origem !== "anoAtivo";
+          pA = swap ? b : a; pB = swap ? a : b;
+        } else {
+          // Mesmo módulo (ou envolve um lado já fundido, 'ambos'): sem
+          // vínculo de mídia em jogo aqui — regra é sempre o menor ID,
+          // independente do nome que o usuário escolher manter.
+          const swap = !_idMenorOuIgual(a.id, b.id);
+          pA = swap ? b : a; pB = swap ? a : b;
+        }
+
         sugs.push({
           ida:   pA.id, idb:   pB.id,
           aNome: pA.nomeOficial, bNome: pB.nomeOficial,
@@ -807,9 +779,13 @@ async function aplicarFilaUnioes(){
     // yield para o browser renderizar o progresso
     await new Promise(r => setTimeout(r, 0));
 
-    await unirIds(ida, idb, nomeFinal);
+    await fundir(ida, idb, nomeFinal);
     processados++;
   }
+
+  await recarregarAlunos();
+  renderAlunos();
+  gerarSugestoes();
 
   bar.style.width = "100%";
   step.textContent = `✅ ${total} união(ões) aplicada(s)!`;
@@ -844,270 +820,217 @@ function marcarComoDiferentes(){
   atualizarResumo("✅ Marcado como pessoas diferentes. (Salvo em alunosDupeIgnorados)");
 }
 
-async function unirIds(idManter, idMesclar, nomeOficialFinal){
-  const turmas = lerTurmasDB();
-  const aliases = lerAliasesDB();
+/**
+ * Funde idEngolido em idManter. Algoritmo genérico por coleção — não
+ * precisa saber de antemão se é duplicata do mesmo módulo ou fusão
+ * cross-módulo; isso é decidido implicitamente por onde cada ID já existe.
+ *
+ * Pra cada coleção (alunos-atas, anoAtivoAlunos):
+ *  - Se só idEngolido tem doc lá → cria o mesmo doc em idManter (cópia),
+ *    apaga o de idEngolido, reescreve turmas/matriculas dessa coleção.
+ *  - Se os dois têm doc lá → é duplicata dentro da própria coleção: mescla
+ *    (nome final) no doc de idManter, apaga o de idEngolido, reescreve
+ *    turmas/matriculas.
+ *  - Se só idManter tem doc lá → nada a fazer nessa coleção (já estava
+ *    correto), só atualiza o nome se for o caso.
+ *
+ * Ao final, se idManter passou a existir NAS DUAS coleções, é uma fusão
+ * cross-módulo de verdade → grava/atualiza o elo em `alunos`. Se idEngolido
+ * já tinha um elo próprio (era um 'ambos' sendo fundido em outro ID), esse
+ * elo antigo é removido (ficaria órfão apontando pra um ID que não existe
+ * mais em lugar nenhum).
+ *
+ * Segurança: numa fusão cross-módulo genuína (um lado só existe em Atas, o
+ * outro só em Ano-Ativo), o lado Ano-Ativo tem que sobreviver sempre —
+ * mídia no Cloudinary é vinculada por esse alunoId (ver v11). Se o chamador
+ * passar na direção errada, corrige sozinho.
+ */
+async function fundir(idManter, idEngolido, nomeOficialFinal){
+  idManter = String(idManter).trim();
+  idEngolido = String(idEngolido).trim();
+  if (!idManter || !idEngolido || idManter === idEngolido) return;
 
-  // move aliases do ID mesclado para o ID mantido
-  for (const k of Object.keys(aliases)){
-    if (aliases[k] === idMesclar) aliases[k] = idManter;
+  const [manterAtas, engolidoAtas, manterAA, engolidoAA, eloEngolido] = await Promise.all([
+    window.Identidade.buscarAtasPorId(idManter),
+    window.Identidade.buscarAtasPorId(idEngolido),
+    window.DB.anoAtivoAlunos.get(idManter),
+    window.DB.anoAtivoAlunos.get(idEngolido),
+    window.Identidade.buscarElo(idEngolido),
+  ]);
+
+  const crossGenuino = (!!manterAtas !== !!manterAA) && (!!engolidoAtas !== !!engolidoAA)
+                       && (!!manterAtas !== !!engolidoAtas);
+  if (crossGenuino && !manterAA && engolidoAA){
+    console.warn('[fundir] Direção invertida: Ano-Ativo sempre sobrevive em fusão cross-módulo. Corrigindo automaticamente.');
+    return fundir(idEngolido, idManter, nomeOficialFinal);
   }
-  // garante alias do nome final
-  const kFinal = normNome(nomeOficialFinal);
-  if (kFinal) aliases[kFinal] = idManter;
 
-  // atualiza turmas de atas
-  for (const t of turmas){
-    if (!Array.isArray(t.alunos)) continue;
-    for (const al of t.alunos){
-      if (al.alunoId === idMesclar) al.alunoId = idManter;
+  let tocouAtas = false, tocouAA = false;
+
+  // ── alunos-atas ──
+  if (engolidoAtas){
+    if (manterAtas){
+      await window.Identidade.vincularAtasExplicito(idManter, { nome: nomeOficialFinal });
+    } else {
+      await window.Identidade.salvarAtas({ ...engolidoAtas, alunoId: idManter, nome: nomeOficialFinal });
     }
+    await window.Identidade.removerAtas(idEngolido);
+    tocouAtas = true;
+  } else if (manterAtas && nomeOficialFinal){
+    await window.Identidade.vincularAtasExplicito(idManter, { nome: nomeOficialFinal });
   }
 
-  // ── Atualiza matrículas e turmas do módulo Ano Ativo ──────────────────
-  // (sem isso, o aluno some da turma no ano-ativo após a união)
-  const matsAA = lerJSON("anoAtivoMatriculasDB_v1", []);
-  let matsAAtouched = false;
-  for(const m of matsAA){
-    if(String(m.alunoId||"") === idMesclar){ m.alunoId = idManter; matsAAtouched = true; }
+  // ── anoAtivoAlunos ──
+  if (engolidoAA){
+    const base = manterAA ? {} : { ...engolidoAA };
+    delete base._id;
+    await window.DB.anoAtivoAlunos.save({ ...base, _id: idManter, alunoId: idManter, nome: nomeOficialFinal });
+    await window.DB.anoAtivoAlunos.remove(idEngolido);
+    tocouAA = true;
+  } else if (manterAA && nomeOficialFinal){
+    await window.DB.anoAtivoAlunos.save({ _id: idManter, nome: nomeOficialFinal });
   }
-  if(matsAAtouched) salvarJSON("anoAtivoMatriculasDB_v1", matsAA);
 
-  const turmasAA = lerJSON("anoAtivoTurmasDB_v1", []);
-  let turmasAAtouched = false;
-  for(const t of turmasAA){
-    if(Array.isArray(t.alunos)){
-      for(const al of t.alunos){
-        if(String(al.alunoId||"") === idMesclar){ al.alunoId = idManter; turmasAAtouched = true; }
+  // ── Reescreve referências (só no(s) lado(s) onde idEngolido existia) ──
+  if (tocouAtas){
+    const turmas = lerTurmasDB();
+    let turmasTouched = false;
+    for (const t of turmas){
+      if (!Array.isArray(t.alunos)) continue;
+      for (const al of t.alunos){
+        if (al.alunoId === idEngolido){ al.alunoId = idManter; turmasTouched = true; }
       }
     }
-  }
-  if(turmasAAtouched) salvarJSON("anoAtivoTurmasDB_v1", turmasAA);
+    if (turmasTouched) salvarTurmasDB(turmas);
 
-  // atualiza nome oficial do ID mantido via Identidade.salvar
-  if(window.Identidade){
-    const todos = window.Identidade.lerTodos();
-    const alvoManter = todos.find(a => (a.alunoId||a.id) === idManter);
-    if(alvoManter){
-      alvoManter.nomeOficial = nomeOficialFinal;
-      alvoManter.nome        = nomeOficialFinal;
-      await window.Identidade.salvar(alvoManter);
+    const matsAtas = await window.DB.matriculas.whereEquals('alunoId', idEngolido);
+    for (const m of matsAtas){
+      await window.DB.matriculas.save({ ...m, alunoId: idManter });
     }
-    // Remove APENAS do catálogo de identidades — NÃO das matrículas/turmas
-    // (já migramos o alunoId acima, então o aluno continua em todas as turmas)
-    await window.Identidade.remover(idMesclar);
-  } else {
-    // fallback legado
-    let alunosDB = lerAlunosDB();
-    for (const a of alunosDB){
-      if (a.id === idManter){ a.nomeOficial = nomeOficialFinal; a.atualizadoEm = new Date().toISOString(); }
+    // TODO (pendência aberta): recalcular Identidade.recalcularUltimoAnoRegistro(idManter, ...)
+    // aqui — falta decidir de onde vem o "ano letivo ativo do sistema" nesta página.
+  }
+
+  if (tocouAA){
+    const turmasAA = lerJSON("anoAtivoTurmasDB_v1", []);
+    let touched = false;
+    for (const t of turmasAA){
+      if (!Array.isArray(t.alunos)) continue;
+      for (const al of t.alunos){
+        if (String(al.alunoId||"") === idEngolido){ al.alunoId = idManter; touched = true; }
+      }
     }
-    alunosDB = alunosDB.filter(a => a.id !== idMesclar);
-    salvarAlunosDB(alunosDB);
-    salvarAliasesDB(aliases);
-    if(window.DB?.alunos?.removeWhere){
-      window.DB.alunos.removeWhere('alunoId', idMesclar).catch(e=>console.warn(e));
+    if (touched) salvarJSON("anoAtivoTurmasDB_v1", turmasAA);
+
+    const matsAA = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', idEngolido);
+    for (const m of matsAA){
+      await window.DB.anoAtivoMatriculas.save({ ...m, alunoId: idManter });
     }
   }
 
-  salvarTurmasDB(turmas);
-
-  // re-render a partir do catálogo unificado
-  const alunosDB = (window.Identidade ? window.Identidade.lerTodos() : lerAlunosDB()).map(normAlunoDB).filter(Boolean);
-  ALUNOS = alunosDB.slice().sort((a,b)=>String(a.nomeOficial||"").localeCompare(String(b.nomeOficial||""),'pt-BR'));
-  renderAlunos();
-  gerarSugestoes();
-
-  // Não filtra automaticamente — quem chama decide o fluxo da UI
-  atualizarResumo(`✅ Unificado: <b>${escapeHtml(idMesclar)}</b> &rarr; <b>${escapeHtml(idManter)}</b> • Nome oficial: <b>${escapeHtml(nomeOficialFinal)}</b>`);
-}
-
-
-/* =========================
-   IDs do sistema (turmas/atas/matrículas)
-   - Não muda a UI do sistema, só cria metadados úteis no localStorage
-========================= */
-function salvarAtasDB(v){ salvarJSON("atasDB", v||[]); }
-function salvarMatriculasDB(v){ salvarJSON("matriculasDB", v||[]); }
-function salvarTurmasMetaDB(v){ salvarJSON("turmasMetaDB", v||[]); }
-
-function lerAtasDB(){ return lerJSON("atasDB", []); }
-function lerMatriculasDB(){ return lerJSON("matriculasDB", []); }
-function lerTurmasMetaDB(){ return lerJSON("turmasMetaDB", []); }
-
-function idAtaFromTurmaId(turmaId){
-  // ID determinístico (não depende de contador)
-  return "ATA|" + String(turmaId||"").trim();
-}
-
-function idMatriculaFrom(turmaId, alunoId){
-  return "MAT|" + String(turmaId||"").trim() + "|" + String(alunoId||"").trim();
-}
-
-function construirBancosSistema(turmas){
-  const atas = [];
-  const mats = [];
-  const metas = [];
-
-  for (const t of (turmas||[])){
-    const turmaId = String(t?.id || t?.turmaId || "").trim();
-    if (!turmaId) continue;
-
-    // copia "turmaId" de forma explícita (pra ficar padronizado)
-    if (!t.turmaId) t.turmaId = turmaId;
-
-    const ataId = idAtaFromTurmaId(turmaId);
-
-    atas.push({
-      id: ataId,
-      turmaId,
-      anoLetivo: String(t?.anoLetivo||"").trim(),
-      turno: String(t?.turno||"").trim(),
-      seriesTurma: Array.isArray(t?.seriesTurma) ? t.seriesTurma : [],
-      serieTexto: String(t?.serieTexto||"").trim(),
-      origemArquivo: String(t?.origemArquivo||"").trim(),
-      aba: String(t?.aba||"").trim(),
-      schemaId: String(t?.schemaId||"").trim(),
-      schemaSnapshot: t?.schemaSnapshot || null,
-      criadoEm: t?.criadoEm || ""
+  // ── Elo cross-módulo ──
+  const finalTemAtas = !!(manterAtas || engolidoAtas);
+  const finalTemAA = !!(manterAA || engolidoAA);
+  if (finalTemAtas && finalTemAA){
+    const aaFinal = manterAA || engolidoAA;
+    await window.Identidade.salvarElo({
+      alunoId: idManter,
+      atasId: eloEngolido?.atasId || (manterAtas ? idManter : idEngolido),
+      anoAtivoId: eloEngolido?.anoAtivoId || (manterAA ? idManter : idEngolido),
+      idEngolido,
+      nome: nomeOficialFinal,
+      cpf: aaFinal?.cpf || eloEngolido?.cpf || '',
     });
-
-    metas.push({
-      turmaId,
-      ataId,
-      anoLetivo: String(t?.anoLetivo||"").trim(),
-      turno: String(t?.turno||"").trim(),
-      seriesTurma: Array.isArray(t?.seriesTurma) ? t.seriesTurma : [],
-      serieTexto: String(t?.serieTexto||"").trim(),
-      origemArquivo: String(t?.origemArquivo||"").trim(),
-      aba: String(t?.aba||"").trim(),
-      alunos: Array.isArray(t?.alunos) ? t.alunos.length : 0
-    });
-
-    const alunos = Array.isArray(t?.alunos) ? t.alunos : [];
-    for (const a of alunos){
-      const alunoId = String(a?.alunoId||"").trim();
-      if (!alunoId) continue; // se não tem alunoId, não cria matrícula (clique em "Gerar / Atualizar IDs" antes)
-
-      const mid = idMatriculaFrom(turmaId, alunoId);
-
-      mats.push({
-        id: mid,
-        turmaId,
-        ataId,
-        alunoId,
-        nomeRaw: String(a?.nome||"").trim(),
-        serie: String(a?.serie||"").trim(),
-        resultado: String(a?.resultado||"").trim() || "Não informado"
-      });
-    }
+  }
+  // idEngolido está sempre totalmente retirado do sistema aqui — se ele
+  // tinha elo próprio, remove (ficaria órfão apontando pra um ID inexistente).
+  if (eloEngolido){
+    await window.DB.alunos.remove(idEngolido);
   }
 
-  salvarAtasDB(atas);
-  salvarMatriculasDB(mats);
-  salvarTurmasMetaDB(metas);
-
-  return { atas, mats, metas };
+  atualizarResumo(`✅ Unificado: <b>${escapeHtml(idEngolido)}</b> &rarr; <b>${escapeHtml(idManter)}</b> • Nome oficial: <b>${escapeHtml(nomeOficialFinal)}</b>`);
 }
+
 
 function atualizarMetaSistema(){
   const turmas = lerTurmasDB();
-  const alunosDB = lerAlunosDB();
-  const aliases = lerAliasesDB();
-
-  const atas = lerAtasDB();
-  const mats = lerMatriculasDB();
-  const metas = lerTurmasMetaDB();
-
-  const aliasCount = (aliases && typeof aliases === "object") ? Object.keys(aliases).length : 0;
+  const nAtas = ALUNOS.filter(a => a.origem === "atas" || a.origem === "ambos").length;
+  const nAA   = ALUNOS.filter(a => a.origem === "anoAtivo" || a.origem === "ambos").length;
+  const nAmbos = ALUNOS.filter(a => a.origem === "ambos").length;
 
   $("metaSistema").innerHTML =
-    `Sistema: turmasDB=<b>${turmas.length}</b> • alunosDB=<b>${alunosDB.length}</b> • aliases=<b>${aliasCount}</b> • atasDB=<b>${atas.length}</b> • matriculasDB=<b>${mats.length}</b> • turmasMetaDB=<b>${metas.length}</b>`;
+    `Sistema: turmasDB=<b>${turmas.length}</b> • alunos-atas=<b>${nAtas}</b> • anoAtivoAlunos=<b>${nAA}</b> • já fundidos=<b>${nAmbos}</b>`;
 }
 
 /* =========================
    Limpeza de duplicatas no Firestore
+   Legado do modelo antigo, onde `alunos` era um catálogo grande e podia
+   acumular doc._id != alunoId por bug de escrita. No modelo novo, save()
+   sempre usa alunoId como _id do documento (ver db.firebase.js), então
+   duplicata no sentido antigo não deveria mais ser possível — mas mantido
+   como rede de segurança contra dado legado ainda não migrado, agora
+   varrendo alunos-atas e anoAtivoAlunos (não mais `alunos`, que é só o
+   elo, com poucos docs e sem esse risco).
 ========================= */
 async function limparDuplicatasFirestore(){
-  if(!window.DB || !window.DB.alunos){
+  if(!window.DB || !window.DB['alunos-atas'] || !window.DB.anoAtivoAlunos){
     alert("DB não disponível. Faça login primeiro.");
     return;
   }
-  if(!confirm("Isso vai buscar TODOS os alunos no Firestore e remover documentos com alunoId duplicado, mantendo apenas o mais recente. Continuar?")){
+  if(!confirm("Isso vai buscar TODOS os documentos em alunos-atas e anoAtivoAlunos e remover os com alunoId duplicado, mantendo apenas o mais recente. Continuar?")){
     return;
   }
 
   atualizarResumo("🔄 Buscando documentos no Firestore...");
   try{
-    const docs = await window.DB.alunos.list();
+    let totalRemovidos = 0;
+    for (const colecao of [window.DB['alunos-atas'], window.DB.anoAtivoAlunos]){
+      const docs = await colecao.list();
 
-    // Agrupa por alunoId, mantém o doc com updatedAt mais recente
-    const byAlunoId = new Map();
-    for(const d of docs){
-      const aid = (d.alunoId || d.id || d._id || "").toString().trim();
-      if(!aid) continue;
-      const prev = byAlunoId.get(aid);
-      // compara data de atualização para manter o mais recente
-      const dTs = (d.updatedAt?.seconds || 0);
-      const pTs = (prev?.updatedAt?.seconds || 0);
-      if(!prev || dTs >= pTs){
-        byAlunoId.set(aid, d);
+      const byAlunoId = new Map();
+      for(const d of docs){
+        const aid = (d.alunoId || d._id || "").toString().trim();
+        if(!aid) continue;
+        const prev = byAlunoId.get(aid);
+        const dTs = (d.updatedAt?.seconds || 0);
+        const pTs = (prev?.updatedAt?.seconds || 0);
+        if(!prev || dTs >= pTs) byAlunoId.set(aid, d);
       }
+
+      const toRemove = docs.filter(d => {
+        const aid = (d.alunoId || d._id || "").toString().trim();
+        if(!aid) return false;
+        const winner = byAlunoId.get(aid);
+        return winner && d._id !== winner._id;
+      });
+
+      for(const d of toRemove) await colecao.remove(d._id);
+      totalRemovidos += toRemove.length;
     }
 
-    // Documentos a remover: todos que NÃO são o "vencedor" do seu alunoId
-    const toRemove = docs.filter(d => {
-      const aid = (d.alunoId || d.id || d._id || "").toString().trim();
-      if(!aid) return false;
-      const winner = byAlunoId.get(aid);
-      return winner && d._id !== winner._id;
-    });
-
-    if(!toRemove.length){
+    if(!totalRemovidos){
       atualizarResumo("✅ Nenhuma duplicata encontrada no Firestore.");
-      return;
+    } else {
+      await recarregarAlunos();
+      renderAlunos();
+      gerarSugestoes();
+      atualizarMetaSistema();
+      atualizarResumo(`✅ ${totalRemovidos} duplicata(s) removida(s) do Firestore.`);
     }
-
-    atualizarResumo(`🗑️ Removendo ${toRemove.length} documento(s) duplicado(s)...`);
-    for(const d of toRemove){
-      await window.DB.alunos.remove(d._id);
-    }
-    // Invalida cache
-    await window.DB.alunos.list();
-
-    atualizarResumo(`✅ ${toRemove.length} duplicata(s) removida(s) do Firestore. Recarregue a página de pesquisa.`);
   }catch(e){
     console.error(e);
     atualizarResumo(`❌ Erro ao limpar duplicatas: ${e.message || e}`);
   }
 }
 
-async function gerarIdsSistema(){
-  // 1) garante alunoId em todas as turmas (usa a lógica existente)
-  await gerarIds();
-
-  // 2) recarrega turmas do storage (gerarIds salva turmasDB)
-  const turmas = lerTurmasDB();
-
-  // 3) cria bancos auxiliares
-  const out = construirBancosSistema(turmas);
-
-  // 4) salva turmas com turmaId padronizado (opcional)
-  salvarTurmasDB(turmas);
-
-  atualizarMetaSistema();
-
-  // não atrapalha o resumo, só complementa
-  atualizarResumo(($("resumo").innerHTML || "") +
-    `<br/>🧩 Sistema: atas=<b>${out.atas.length}</b> • matrículas=<b>${out.mats.length}</b> • turmasMeta=<b>${out.metas.length}</b>`);
-}
-
-
 /* =========================
    Boot
 ========================= */
 document.addEventListener("DOMContentLoaded", async ()=>{
-  // Pré-carrega dados do Firestore no localStorage
+  // Pré-carrega turmas/matrículas no localStorage (ainda usado por
+  // lerTurmasDB()/_seriesDoAluno() e pela reescrita de referências em
+  // fundir()). O catálogo de alunos (alunos-atas/anoAtivoAlunos) NÃO passa
+  // mais por aqui — é lido direto do Firestore em recarregarAlunos().
   try{
     await new Promise(res=>{
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
@@ -1118,13 +1041,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
     if(sid){
       const pre=(k)=>`schools:${sid}:${k}`;
-      if(dados.turmasDB)   localStorage.setItem(pre('turmasDB'),   JSON.stringify(dados.turmasDB));
-      if(dados.alunosDB)   localStorage.setItem(pre('alunosDB'),   JSON.stringify(dados.alunosDB));
-      if(dados.matriculas) localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
-      if(dados.atasDB)     localStorage.setItem(pre('atasDB'),     JSON.stringify(dados.atasDB));
+      if(dados.turmasDB)       localStorage.setItem(pre('turmasDB'),               JSON.stringify(dados.turmasDB));
       if(dadosAA.turmasDB)     localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dadosAA.turmasDB));
       if(dadosAA.matriculasDB) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dadosAA.matriculasDB));
-      if(dadosAA.alunosDB)     localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dadosAA.alunosDB));
     }
   }catch(e){ console.warn('idaluno Firestore pré-carga:', e); }
 
@@ -1146,15 +1065,16 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   if (!db.length){
     atualizarResumo("⚠️ <b>turmasDB</b> está vazio neste domínio. Abra este Admin pelo <b>mesmo localhost</b> do sistema.");
   } else {
-    // Identidade.lerTodos() enxerga alunos de AMBOS os módulos (atas + ano-ativo)
-    const alunosDB = (window.Identidade ? window.Identidade.lerTodos() : lerAlunosDB()).map(normAlunoDB).filter(Boolean);
-    if (alunosDB.length){
-      ALUNOS = alunosDB.slice().sort((a,b)=>String(a.nomeOficial||"").localeCompare(String(b.nomeOficial||""),'pt-BR'));
+    // recarregarAlunos() enxerga alunos dos DOIS módulos (alunos-atas +
+    // anoAtivoAlunos), lendo direto do Firestore (sem catálogo em memória
+    // persistente entre visitas — ver redesenho de leituras excessivas).
+    await recarregarAlunos();
+    if (ALUNOS.length){
       renderAlunos();
       gerarSugestoes();
-      atualizarResumo(`DB detectado. Alunos (ambos módulos): <b>${ALUNOS.length}</b> • Sugestões: <b>${SUGS.length}</b> (Clique em "Gerar / Atualizar IDs" se você importou turmas novas.)`);
+      atualizarResumo(`DB detectado. Alunos (ambos módulos): <b>${ALUNOS.length}</b> • Sugestões: <b>${SUGS.length}</b>`);
     } else {
-      atualizarResumo("DB detectado. Clique em <b>Gerar / Atualizar IDs</b> para criar os IDs automaticamente.");
+      atualizarResumo("DB detectado, mas nenhum aluno encontrado em alunos-atas/anoAtivoAlunos.");
     }
   }
 
