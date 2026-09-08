@@ -131,7 +131,7 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
     <div class="stats-row">
       <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas</div></div>
       <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos no banco</div></div>
-      <div class="stat-box"><div class="stat-num" id="statAlunosDB">—</div><div class="stat-lbl">Identidades (alunosDB)</div></div>
+      <div class="stat-box"><div class="stat-num" id="statAlunosDB">—</div><div class="stat-lbl">Identidades (alunos-atas)</div></div>
       <div class="stat-box"><div class="stat-num" id="statSemId">—</div><div class="stat-lbl">Alunos sem ID</div></div>
     </div>
     <div class="row-btns" style="margin-top:14px;">
@@ -201,7 +201,7 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
       <span class="sec-toggle" id="togSecExport">▼</span>
     </div>
     <div class="sec-body" id="secExport">
-      <p class="muted">Exporta turmasDB + alunosDB do módulo de atas. Faça backup antes de qualquer limpeza.</p>
+      <p class="muted">Exporta turmasDB + alunos-atas do módulo de atas. Faça backup antes de qualquer limpeza.</p>
       <div class="row-btns">
         <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
         <button class="btn btn-outline" id="btnExportCSV"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
@@ -302,7 +302,7 @@ function dbWrite(base, val) {
   _mem[dbKey(base)] = val;
   try {
     if (!window.DB || !window.Auth?.getSession()) return Promise.resolve();
-    const map = { turmasDB:'turmas', alunosDB:'alunos', atasDB:'atas', matriculasDB:'matriculas' };
+    const map = { turmasDB:'turmas', atasDB:'atas', matriculasDB:'matriculas' };
     const col = map[base];
     if (col && window.DB[col]) {
       // Para turmasDB: cada turma tem seu array de alunos/notas — usa saveAllFull para
@@ -379,7 +379,6 @@ async function _saveAllFull(colName, arr) {
 
 function lerTurmasDB()     { return dbRead('turmasDB', []); }
 function salvarTurmasDB(v) { return dbWrite('turmasDB', v || []); }
-function lerAlunosDB()     { return dbRead('alunosDB', []); }
 
 function idAtaFrom(tid)      { return 'ATA|' + tid; }
 function idMatFrom(tid, aid) { return 'MAT|' + tid + '|' + aid; }
@@ -405,7 +404,8 @@ function reconstruirAuxiliares(turmas) {
       const matId = idMatFrom(turmaId, alunoId);
       mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
         nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
-        resultado:String(a.resultado||'').trim()||'Não informado' });
+        resultado:String(a.resultado||'').trim()||'Não informado',
+        anoLetivo:t.anoLetivo||'' });
     }
   }
   dbWrite('atasDB',       atas);
@@ -442,7 +442,9 @@ async function inicializar() {
   clearLogEl('logGeral');
   logEl('Carregando dados do Firestore...', 'logGeral');
 
-  try { await window.Identidade.pronto; } catch(_) {}
+  // identidade-aluno.js v2 não tem catálogo em memória nem promise de
+  // "pronto" — cada chamada (buscarAtasPorNome, criarAtasBatch, etc.) já é
+  // pontual e aguarda Auth sozinha.
 
   // Sincroniza com Firestore e filtra apenas turmas de atas
   try {
@@ -468,20 +470,29 @@ async function inicializar() {
 }
 
 function atualizarStats() {
-  const turmas = lerTurmasDB(), alunosDB = lerAlunosDB();
+  const turmas = lerTurmasDB();
   let totalAlunos = 0, semId = 0;
   for (const t of turmas) for (const a of (t.alunos||[])) { totalAlunos++; if (!String(a.alunoId||'').trim()) semId++; }
   document.getElementById('statTurmas').textContent   = turmas.length;
   document.getElementById('statAlunos').textContent   = totalAlunos;
-  document.getElementById('statAlunosDB').textContent = alunosDB.length;
   document.getElementById('statSemId').textContent    = semId;
   if (semId > 0) logEl(`⚠️ ${semId} aluno(s) sem alunoId — use a página de IDs (config) para corrigir.`, 'logGeral');
+  _atualizarStatAlunosAtas();
+}
+
+// statAlunosDB agora reflete o total de `alunos-atas` (catálogo real do
+// módulo), buscado à parte por ser uma leitura assíncrona — nada mais
+// mantém um mirror síncrono dessa coleção em memória (ver redesenho).
+function _atualizarStatAlunosAtas(){
+  if (!window.DB || !window.DB['alunos-atas']) return;
+  window.DB['alunos-atas'].list()
+    .then(arr => { const el = document.getElementById('statAlunosDB'); if (el) el.textContent = arr.length; })
+    .catch(()=>{});
 }
 
 async function recarregar() {
   clearLogEl('logGeral');
   logEl('Recarregando...', 'logGeral');
-  try { await window.Identidade.recarregarDoFirebase(); } catch(_) {}
   try {
     if (window.DB && window.DB.turmas) {
       // Limpa o cache interno do db.firebase.js (a chave é o nome da coleção)
@@ -712,7 +723,8 @@ function _reconstruirAuxLocalmente(turmas) {
       const matId = idMatFrom(turmaId, alunoId);
       mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
         nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
-        resultado:String(a.resultado||'').trim()||'Não informado' });
+        resultado:String(a.resultado||'').trim()||'Não informado',
+        anoLetivo:t.anoLetivo||'' });
     }
   }
   // Atualiza só o estado em memória (não dispara sync com Firestore)
@@ -836,16 +848,19 @@ async function apagarSelecionadas() {
 }
 
 /**
- * Garbage collection de identidades (coleção `alunos` / alunosDB).
- * Remove apenas IDs que NÃO aparecem em nenhuma turma de atas restante
- * E NÃO aparecem em anoAtivoMatriculas (módulo de ano-ativo).
+ * Garbage collection de identidades (coleção `alunos-atas`).
+ * Remove apenas alunoId que NÃO aparecem em nenhuma turma de atas restante
+ * E NÃO aparecem em anoAtivoMatriculas (módulo de ano-ativo) — essa segunda
+ * checagem também protege um alunoId já fundido (existe em alunos-atas E
+ * anoAtivoAlunos com o mesmo ID) que ainda tenha matrícula ativa no
+ * Ano-Ativo, mesmo sem turma de Atas restante.
  *
  * @param {Array} turmasApagadas  — turmas que acabaram de ser removidas
  * @param {Array} turmasRestantes — turmas de atas que ainda existem no banco
  * @returns {number} quantidade de identidades removidas
  */
 async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
-  if (!window.DB || !window.DB.alunos) return 0;
+  if (!window.DB || !window.DB['alunos-atas']) return 0;
 
   // Coleta IDs dos alunos das turmas apagadas
   const idsApagados = new Set();
@@ -881,24 +896,17 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
 
   logEl(`  Candidatos a remoção: ${idsOrfaos.length} ID(s)`, 'logApagar');
 
-  // Remove do Firestore (coleção `alunos`) e do estado em memória
+  // Remove do Firestore (coleção `alunos-atas`)
   let removidos = 0;
   for (const alunoId of idsOrfaos) {
     try {
-      // Tenta pelo _id direto (alunoId geralmente É o ID do documento)
-      await window.DB.alunos.remove(alunoId).catch(async () => {
-        // Fallback: busca pelo campo alunoId
-        await window.DB.alunos.removeWhere('alunoId', alunoId).catch(() => {});
-      });
+      if (window.Identidade?.removerAtas) await window.Identidade.removerAtas(alunoId);
+      else await window.DB['alunos-atas'].remove(alunoId);
       removidos++;
     } catch(e) {
       console.warn('[GC] Erro ao remover identidade', alunoId, e.message);
     }
   }
-
-  // Atualiza o estado em memória (alunosDB) removendo os órfãos
-  const alunosLocal = lerAlunosDB().filter(a => !idsOrfaos.includes(String(a.alunoId || a._id || '').trim()));
-  _mem[dbKey('alunosDB')] = alunosLocal;
 
   return removidos;
 }
@@ -906,9 +914,12 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
 /* =============================================
    EXPORTAR
 ============================================= */
-function exportarJSON() {
+async function exportarJSON() {
   if (!IS_ADMIN) return;
-  _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:1, turmasDB:lerTurmasDB(), alunosDB:lerAlunosDB() }, null, 2),
+  let alunosAtas = [];
+  try { alunosAtas = (window.DB?.['alunos-atas']) ? await window.DB['alunos-atas'].list() : []; }
+  catch(_) { alunosAtas = []; }
+  _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:2, turmasDB:lerTurmasDB(), alunosAtasDB:alunosAtas }, null, 2),
     `backup-atas-${_hoje()}.json`, 'application/json');
   logEl('✅ JSON exportado.', 'logGeral');
 }
@@ -930,12 +941,10 @@ let _workbook    = null;
 let _nomeArquivo = '';
 let _abasInfo    = [];
 // Buffer da análise de importação (verde/amarelo/vermelho) — nada em
-// turmasDB/Firestore é alterado até confirmarImportacao() ser chamado.
-// Único efeito colateral já efetivado durante a análise: o vínculo de
-// identidade (findOrCreateBatch) já roda e persiste no catálogo — ver
-// nota em analisarSelecionadas(). Se o usuário cancelar, os alunoId
-// novos criados nessa análise que ficarem sem nenhuma turma/matrícula
-// referenciando são limpos via _limparIdentidadesOrfas().
+// turmasDB/Firestore é alterado até confirmarImportacao() ser chamado, e
+// nenhum alunoId é criado ou vinculado durante a análise (só decidido —
+// ver analisarSelecionadas()/pendenciasIdentidade). Por isso cancelar a
+// importação não precisa de nenhuma limpeza: nada foi persistido ainda.
 let _bufferImportacao = null;
 
 function normalizarTxt(v) { return String(v??'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -1414,6 +1423,94 @@ function toggleAba(idx,val)  { _abasInfo[idx].checked=val; }
  * nenhuma turma em turmasDB/Firestore ainda — monta um buffer em memória e
  * mostra uma revisão (verde/amarelo/vermelho) antes de confirmar.
  */
+/* =========================
+   Similaridade de nome (Jaro-Winkler) — portada de idaluno.html.
+   Usada aqui pra resolver identidade DURANTE o import (antes do alunoId
+   nascer), em vez de só depois em idaluno.html — decisão da pendência v12:
+   evita gastar número de ID (contador atômico, nunca reaproveita) num nome
+   repetido que já ia precisar ser fundido manualmente de qualquer jeito.
+========================= */
+function similaridade(a,b){
+  const nA = window.Identidade.normNome(a), nB = window.Identidade.normNome(b);
+  if (!nA || !nB) return 0;
+  if (nA === nB) return 1;
+
+  const mDist = Math.floor(Math.max(nA.length, nB.length)/2)-1;
+  const aMatch = new Array(nA.length).fill(false);
+  const bMatch = new Array(nB.length).fill(false);
+
+  let matches = 0;
+  for (let i=0;i<nA.length;i++){
+    const start = Math.max(0, i-mDist);
+    const end = Math.min(i+mDist+1, nB.length);
+    for (let j=start;j<end;j++){
+      if (bMatch[j]) continue;
+      if (nA[i] !== nB[j]) continue;
+      aMatch[i]=true; bMatch[j]=true; matches++; break;
+    }
+  }
+  if (!matches) return 0;
+
+  let t = 0, k = 0;
+  for (let i=0;i<nA.length;i++){
+    if (!aMatch[i]) continue;
+    while(!bMatch[k]) k++;
+    if (nA[i] !== nB[k]) t++;
+    k++;
+  }
+  t = t/2;
+
+  const jaro = (matches/nA.length + matches/nB.length + (matches-t)/matches)/3;
+  let l = 0;
+  for (; l<4 && l<nA.length && l<nB.length && nA[l]===nB[l]; l++);
+  const p = 0.1;
+  return jaro + l*p*(1-jaro);
+}
+
+const SIMILARIDADE_CUT = 0.85;  // mesmo padrão default de idaluno.html
+const SIMILARIDADE_AUTO = 0.94; // acima disso + trajetória verde + catálogo = vincula sem perguntar
+
+// Prefixo curto (até 4 chars) do 1º e do último token do nome — usado só
+// pra estreitar a busca no Firestore (nunca carrega a coleção inteira). A
+// decisão final de "é a mesma pessoa" sempre passa por similaridade() no
+// nome completo, não pelo prefixo — o prefixo é só pra achar candidatos.
+function _prefixosBusca(nome){
+  const norm = window.Identidade.normNome(nome);
+  const tokens = norm.split(' ').filter(Boolean);
+  if (!tokens.length) return [];
+  const pfx = s => s.slice(0, Math.min(4, s.length));
+  const prefixos = new Set([pfx(tokens[0])]);
+  if (tokens.length > 1) prefixos.add(pfx(tokens[tokens.length-1]));
+  return [...prefixos].filter(Boolean);
+}
+
+/**
+ * Busca candidatos no catálogo já existente (alunos-atas) por nome
+ * parecido. Duas queries de prefixo curto (nome + sobrenome) pra pegar uma
+ * rede razoável de candidatos sem carregar a coleção inteira, depois
+ * pontua todos por similaridade() de nome completo e descarta quem não
+ * bate o corte — o prefixo curto é só pra achar quem vale a pena comparar.
+ */
+async function _candidatosCatalogo(nome){
+  const prefixos = _prefixosBusca(nome);
+  if (!prefixos.length) return [];
+  const listas = await Promise.all(prefixos.map(p => window.Identidade.buscarAtasPorNome(p, 25)));
+  const porId = new Map();
+  for (const lista of listas) for (const a of lista) porId.set(a.alunoId, a);
+  return [...porId.values()]
+    .map(a => ({ origem:'catalogo', alunoId:a.alunoId, nome:a.nome, score:similaridade(nome, a.nome) }))
+    .filter(c => c.score >= SIMILARIDADE_CUT);
+}
+
+// Candidatos dentro da MESMA análise (linhas já processadas antes desta,
+// de qualquer aba selecionada) — cobre o caso de um aluno aparecer em 2
+// abas/anos do mesmo arquivo com pequena variação de grafia.
+function _candidatosNoLote(nome, jaProcessados){
+  return jaProcessados
+    .map(p => ({ origem:'lote', ref:p, nome:p.nomeAluno, anoLetivo:p.anoLetivo, score:similaridade(nome, p.nomeAluno) }))
+    .filter(c => c.score >= SIMILARIDADE_CUT);
+}
+
 async function analisarSelecionadas() {
   if (!IS_ADMIN || !_workbook) return;
   const selecionadas=_abasInfo.filter(a=>a.checked).map(a=>a.name);
@@ -1429,7 +1526,7 @@ async function analisarSelecionadas() {
 
   try {
     const turmasDB=lerTurmasDB(); // estado atual, real — só lido, não alterado aqui
-    const todasLinhas=[], abasValidas=[], resultadosAbasBloqueadas=[];
+    const abasValidas=[], resultadosAbasBloqueadas=[];
 
     for (const abaName of selecionadas) {
       const ws=_workbook.Sheets[abaName];
@@ -1465,19 +1562,20 @@ async function analisarSelecionadas() {
         linhasDaAba.push({row,nomeAluno:nome,colMap,modoAvaliacao});
       }
 
-      todasLinhas.push(...linhasDaAba);
       abasValidas.push({abaName,info,colMap,modoAvaliacao,linhas:linhasDaAba,avisoAno:anoCheck.nivel==='warn'?anoCheck.motivo:null});
     }
 
-    // ← await correto (esse era o bug original do importar.html)
-    // NOTA: isso já persiste no catálogo de identidade (cria alunoId novo
-    // quando não acha CPF/nome+nascimento batendo). Se o usuário cancelar
-    // a importação depois de ver a revisão, cancelarImportacao() roda o GC
-    // de identidades órfãs pra limpar o que não sobrar referenciado.
-    const candidatos=todasLinhas.map(l=>({nomeOficial:l.nomeAluno,nome:l.nomeAluno}));
-    const resultadosBatch=await window.Identidade.findOrCreateBatch(candidatos);
+    // Resolução de identidade: NENHUM alunoId é criado ou vinculado aqui —
+    // só decidido. Isso resolve a pendência v12 (contador atômico não
+    // reaproveita número; criar um ID "provisório" numa pendência ambígua
+    // significava perder esse número pra sempre se a resposta fosse "é a
+    // mesma pessoa"). A criação/vínculo de verdade só acontece em
+    // confirmarImportacao(), depois da revisão humana.
+    const pendenciasIdentidade=[];
+    const jaProcessados=[]; // {nomeAluno, anoLetivo, serieDisplay, resultado, aluno} em ordem de processamento
+    let pendCount=0;
 
-    let batchIdx=0, idsCriados=0;
+    let batchIdx=0, idsNovosEstimados=0, idsVinculadosAuto=0;
     const itensBuffer=[];
 
     for (const {abaName,info,colMap,modoAvaliacao,linhas,avisoAno} of abasValidas) {
@@ -1485,9 +1583,7 @@ async function analisarSelecionadas() {
       const divergencias=avisoAno ? [`[Ano letivo] ${avisoAno}`] : [];
       const novos=[];
       for (const {row,nomeAluno} of linhas) {
-        const res=resultadosBatch[batchIdx++]; if(!res) continue;
-        const {alunoId,isNew}=res; if(isNew) idsCriados++;
-        const aluno={nome:nomeAluno,serie:'',alunoId,port:'--',mat:'--',hist:'--',geo:'--',cien:'--',fis:'--',arte:'--',relig:'--',ing:'--',resultado:'Não informado'};
+        const aluno={nome:nomeAluno,serie:'',alunoId:null,port:'--',mat:'--',hist:'--',geo:'--',cien:'--',fis:'--',arte:'--',relig:'--',ing:'--',resultado:'Não informado'};
         const notasVaziasNaLinha=todasNotasVaziasNaLinha(row,colMap);
         for (const [cStr,field] of Object.entries(colMap)) {
           const v=row[Number(cStr)];
@@ -1503,14 +1599,60 @@ async function analisarSelecionadas() {
           }
           else if (['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(field)) aluno[field]=toNotaSistema(v);
         }
-        // Plausibilidade de trajetória — comparado ao último registro já
-        // gravado em turmasDB (turmas dentro DESSA MESMA importação, se
-        // multi-ano, ainda não são encadeadas entre si nesta versão).
-        const ultimo=ultimoRegistroDoAluno(alunoId, turmasDB);
-        const traj=avaliarTrajetoria(ultimo, {anoLetivo:info.anoLetivo, serieDisplay:aluno.serie});
-        aluno._trajStatus=traj.status; aluno._trajMotivo=traj.motivo; aluno._isNew=isNew;
-        if (traj.status==='vermelho') divergencias.push(`🚫 [Trajetória] ${nomeAluno}: ${traj.motivo}`);
-        else if (traj.status==='amarelo') divergencias.push(`[Trajetória] ${nomeAluno}: ${traj.motivo}`);
+
+        // ── Candidatos: catálogo (alunos-atas) + mesma análise (outras abas) ──
+        const candCatalogo = await _candidatosCatalogo(nomeAluno);
+        const candLote = _candidatosNoLote(nomeAluno, jaProcessados);
+        const candidatos = [...candCatalogo, ...candLote].map(c => {
+          const ultimo = c.origem==='catalogo'
+            ? ultimoRegistroDoAluno(c.alunoId, turmasDB)
+            : { anoLetivo:c.ref.anoLetivo, serieDisplay:c.ref.serieDisplay, resultado:c.ref.resultado };
+          const traj = avaliarTrajetoria(ultimo, {anoLetivo:info.anoLetivo, serieDisplay:aluno.serie});
+          return { ...c, traj };
+        });
+
+        const viaveis = candidatos.filter(c => c.traj.status !== 'vermelho');
+        let trajStatusLinha='verde', trajMotivoLinha='';
+
+        if (!viaveis.length) {
+          // Nenhum candidato plausível (nem parecido, nem cronologicamente
+          // coerente) — aluno novo de verdade, sem ambiguidade.
+          aluno._decisao = { tipo:'novo' };
+        } else {
+          viaveis.sort((a,b)=> (b.score-a.score) || ((a.traj.status==='verde'?0:1)-(b.traj.status==='verde'?0:1)));
+          const melhor = viaveis[0];
+          trajStatusLinha = melhor.traj.status;
+          trajMotivoLinha = melhor.traj.motivo;
+          if (melhor.origem==='catalogo' && melhor.score>=SIMILARIDADE_AUTO && melhor.traj.status==='verde') {
+            // Alta confiança: nome quase idêntico + candidato já no
+            // catálogo + trajetória perfeitamente coerente. Vincula sem
+            // perguntar (mesmo padrão de confiança que idaluno.html usava
+            // pra decisão automática antes da checagem manual).
+            aluno._decisao = { tipo:'vincularCatalogo', alunoId:melhor.alunoId };
+            idsVinculadosAuto++;
+          } else {
+            // Ambíguo — nome parecido (score ${melhor.score}), mas não o
+            // suficiente pra decidir sozinho (candidato de outra planilha
+            // desta mesma análise, ou trajetória só "amarela"). Vira
+            // pendência: fica como "novo" por padrão até confirmação.
+            pendCount++;
+            const chave=`pendId_${pendCount}`;
+            aluno._pendenciaChave=chave;
+            aluno._decisao={ tipo:'novo' }; // default seguro até o usuário marcar
+            pendenciasIdentidade.push({
+              chave, aluno, nomeAluno,
+              candidato: melhor,
+              scorePct: Math.round(melhor.score*100),
+            });
+          }
+        }
+
+        aluno._trajStatus=trajStatusLinha; aluno._trajMotivo=trajMotivoLinha;
+        if (trajStatusLinha==='vermelho') divergencias.push(`🚫 [Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
+        else if (trajStatusLinha==='amarelo' && !aluno._pendenciaChave) divergencias.push(`[Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
+
+        jaProcessados.push({ nomeAluno, anoLetivo:info.anoLetivo, serieDisplay:aluno.serie, resultado:aluno.resultado, aluno });
+        if (aluno._decisao.tipo==='novo') idsNovosEstimados++;
         novos.push(aluno);
       }
 
@@ -1530,7 +1672,7 @@ async function analisarSelecionadas() {
       itensBuffer.push({abaName, turma, statusTurma, badge, divergencias, qtdAlunos:novos.length});
     }
 
-    _bufferImportacao={itens:itensBuffer, resultadosAbasBloqueadas, idsCriados};
+    _bufferImportacao={itens:itensBuffer, resultadosAbasBloqueadas, idsNovosEstimados, idsVinculadosAuto, pendenciasIdentidade};
 
     const saidaEl=document.getElementById('saidaXLSX');
     saidaEl.innerHTML=renderRevisaoImportacao(_bufferImportacao);
@@ -1587,10 +1729,30 @@ function renderRevisaoImportacao(buffer){
   const totalTurmas=buffer.itens.length;
   const totalAlunos=buffer.itens.reduce((s,it)=>s+it.qtdAlunos,0);
 
+  const pendencias = buffer.pendenciasIdentidade || [];
+  const pendenciasHtml = pendencias.length ? (
+    `<div style="margin-bottom:14px;border:1px solid #92400e;border-radius:8px;padding:10px;background:rgba(146,64,14,0.08);">`+
+      `<div style="font-weight:600;margin-bottom:6px;">🔗 ${pendencias.length} possível vínculo de identidade — revise antes de confirmar</div>`+
+      `<div style="font-size:12px;color:var(--muted,#666);margin-bottom:8px;">`+
+        `Nome parecido com alguém já existente, mas não o suficiente pra decidir sozinho. `+
+        `Desmarcado (padrão): entra como aluno novo. Marcado: usa o mesmo alunoId do candidato — nenhum ID novo é gasto.`+
+      `</div>`+
+      pendencias.map(p => {
+        const origemTxt = p.candidato.origem==='catalogo'
+          ? `já no catálogo (${esc(p.candidato.alunoId)})`
+          : `outra aba desta mesma importação (${esc(p.candidato.ref.anoLetivo||'?')})`;
+        const trajTxt = p.candidato.traj.motivo ? ` — ${esc(p.candidato.traj.motivo)}` : '';
+        return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;">`+
+          `<input type="checkbox" id="chk_${p.chave}" style="margin-top:3px;">`+
+          `<span><b>${esc(p.nomeAluno)}</b> parece ser <b>${esc(p.candidato.nome)}</b> (${p.scorePct}% de nome, ${origemTxt})${trajTxt}</span>`+
+        `</label>`;
+      }).join('')+
+    `</div>`
+  ) : '';
+
   const aviso=`<div style="margin-bottom:10px;font-size:13px;color:var(--muted,#666);">`+
-    `Revise antes de confirmar — nenhuma turma foi salva ainda. `+
-    `(O vínculo de identidade dos alunos já foi resolvido nesta análise; `+
-    `se cancelar, IDs novos sem nenhuma turma vinculada são limpos automaticamente.)`+
+    `Revise antes de confirmar — nenhuma turma foi salva ainda e nenhum alunoId foi criado ou vinculado. `+
+    `Isso só acontece ao confirmar, já considerando as escolhas acima.`+
   `</div>`;
 
   const rodape=`<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;">`+
@@ -1603,7 +1765,7 @@ function renderRevisaoImportacao(buffer){
     `</div>`+
   `</div>`;
 
-  return aviso + cards + bloqueadasHtml + rodape;
+  return aviso + pendenciasHtml + cards + bloqueadasHtml + rodape;
 }
 
 /** Remove uma turma da revisão (não afeta o que já está salvo — nada foi salvo ainda). */
@@ -1616,39 +1778,24 @@ function removerTurmaDoBuffer(idx){
   setMsg(temVermelho?'Ainda há turma(s) bloqueada(s) na lista.':'Pronto para confirmar.', temVermelho?'warn':'ok');
 }
 
-/** Cancela a análise inteira. Limpa identidades órfãs criadas nesta análise, se houver. */
+/** Cancela a análise inteira. Nada foi criado/vinculado ainda (isso só acontece em confirmarImportacao), então não há limpeza a fazer. */
 async function cancelarImportacao(){
   if (!_bufferImportacao) return;
-  const buffer=_bufferImportacao;
   _bufferImportacao=null;
   const saidaEl=document.getElementById('saidaXLSX');
   saidaEl.innerHTML='';
   saidaEl.style.display='none';
-
-  try {
-    const turmasDB=lerTurmasDB(); // estado real, intacto — nada foi salvo
-    // "turma" sintética só pra reaproveitar _limparIdentidadesOrfas(): ela
-    // checa cada alunoId dos "apagados" contra o que existe de verdade em
-    // turmasDB + ano-ativo, e remove o que não sobrar referenciado.
-    const idsNovosDaAnalise=[];
-    for (const it of buffer.itens)
-      for (const a of it.turma.alunos)
-        if (a._isNew) idsNovosDaAnalise.push({alunoId:a.alunoId});
-    if (idsNovosDaAnalise.length) {
-      const apagados=await _limparIdentidadesOrfas([{alunos:idsNovosDaAnalise}], turmasDB);
-      setMsg(`Importação cancelada. ${apagados} identidade(s) criada(s) nesta análise foram limpas.`, 'warn');
-    } else {
-      setMsg('Importação cancelada. Nenhuma turma foi salva.', 'warn');
-    }
-  } catch(e) {
-    console.warn('[cancelarImportacao] erro ao limpar identidades órfãs:', e.message);
-    setMsg('Importação cancelada. Nenhuma turma foi salva.', 'warn');
-  }
+  setMsg('Importação cancelada. Nenhuma turma foi salva, nenhum alunoId foi criado.', 'warn');
 }
 
 /**
  * FASE 2 — Confirma. Grava só as turmas que sobraram no buffer (as removidas
  * na revisão ficam de fora) em turmasDB/Firestore.
+ */
+/**
+ * FASE 2 — Confirma. Resolve as pendências de identidade marcadas na
+ * revisão, cria/vincula os alunoId de verdade (só agora — nada foi
+ * criado durante a análise), e grava as turmas que sobraram no buffer.
  */
 async function confirmarImportacao(){
   if (!_bufferImportacao || !_bufferImportacao.itens.length) return;
@@ -1659,16 +1806,65 @@ async function confirmarImportacao(){
 
   const btn=document.getElementById('btnConfirmarImportacao');
   if (btn) { btn.disabled=true; btn.textContent='Salvando...'; }
-  setMsg('Salvando turma(s)…', 'loading');
+  setMsg('Resolvendo identidade dos alunos…', 'loading');
 
   try {
+    // ── 1. Aplica as escolhas marcadas nas pendências (checkboxes) ──
+    // Desmarcado (padrão) = já está como 'novo', nada a fazer. Marcado:
+    // 'catalogo' aponta pro alunoId já existente; 'lote' agrupa com o
+    // candidato de outra aba desta mesma análise (union-find simples —
+    // os dois vão compartilhar UM único alunoId, criado só uma vez).
+    const grupoDe = new Map(); // aluno (não-raiz) -> aluno de quem ele "puxa"
+    function raizDe(aluno){
+      let cur = aluno;
+      while (grupoDe.has(cur)) cur = grupoDe.get(cur);
+      return cur;
+    }
+
+    for (const p of (_bufferImportacao.pendenciasIdentidade||[])) {
+      const chk = document.getElementById(`chk_${p.chave}`);
+      if (!chk || !chk.checked) continue;
+      if (p.candidato.origem === 'catalogo') {
+        p.aluno._decisao = { tipo:'vincularCatalogo', alunoId:p.candidato.alunoId };
+      } else {
+        grupoDe.set(p.aluno, p.candidato.ref.aluno);
+      }
+    }
+
+    const todosAlunos=[];
+    for (const it of _bufferImportacao.itens) for (const a of it.turma.alunos) todosAlunos.push(a);
+
+    // ── 2. Cria em lote só os alunoId realmente novos (uma raiz por grupo) ──
+    const raizes = new Set(todosAlunos.map(a => raizDe(a)));
+    const raizesNovo = [...raizes].filter(r => r._decisao?.tipo !== 'vincularCatalogo');
+    const raizesCatalogo = [...raizes].filter(r => r._decisao?.tipo === 'vincularCatalogo');
+
+    let idsCriados=0, idsVinculados=0;
+    if (raizesNovo.length) {
+      const criados = await window.Identidade.criarAtasBatch(raizesNovo.map(r => ({ nome:r.nome })));
+      raizesNovo.forEach((r,i) => { r.alunoId = criados[i].alunoId; });
+      idsCriados = criados.length;
+    }
+    for (const r of raizesCatalogo) {
+      await window.Identidade.vincularAtasExplicito(r._decisao.alunoId, { nome:r.nome });
+      r.alunoId = r._decisao.alunoId;
+      idsVinculados++;
+    }
+
+    // Propaga o alunoId da raiz pra todo mundo do grupo (inclusive quem já
+    // tinha sido decidido automaticamente na análise, fora de pendência)
+    for (const a of todosAlunos) {
+      if (!a.alunoId) a.alunoId = raizDe(a).alunoId;
+    }
+
+    // ── 3. Grava as turmas ──
     const turmasDB=lerTurmasDB();
     let totalAlunos=0;
     const resultadosAbas=[];
 
     for (const it of _bufferImportacao.itens) {
       // Limpa os campos de uso interno da revisão antes de persistir
-      for (const a of it.turma.alunos) { delete a._trajStatus; delete a._trajMotivo; delete a._isNew; }
+      for (const a of it.turma.alunos) { delete a._trajStatus; delete a._trajMotivo; delete a._decisao; delete a._pendenciaChave; }
 
       const idx=turmasDB.findIndex(t=>t.id===it.turma.id);
       if (idx>=0) turmasDB[idx]=it.turma; else turmasDB.push(it.turma);
@@ -1677,10 +1873,27 @@ async function confirmarImportacao(){
     }
 
     await salvarTurmasDB(turmasDB);
-    const aux=_reconstruirAuxLocalmente(turmasDB);
+    // reconstruirAuxiliares() (não _reconstruirAuxLocalmente, que só
+    // atualiza a memória local) — precisa gravar de verdade em `matriculas`
+    // no Firestore, senão recalcularUltimoAnoRegistroBatch() logo abaixo
+    // não encontra nada pra calcular (bug pré-existente corrigido aqui).
+    const aux=reconstruirAuxiliares(turmasDB);
+
+    // ── 4. Recalcula ultimoAnoRegistro em lote único pra toda a leva ──
+    let anoAtivoAtual = null;
+    try {
+      const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
+      anoAtivoAtual = dadosEscola?.configAnoAtivo ?? null;
+    } catch(e) { console.warn('[confirmarImportacao] não foi possível ler configAnoAtivo:', e.message); }
+
+    const idsEnvolvidos = [...new Set(todosAlunos.map(a => a.alunoId).filter(Boolean))];
+    if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+      try { await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, anoAtivoAtual); }
+      catch(e) { console.warn('[confirmarImportacao] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
+    }
 
     const resumoTexto=`TOTAL: ${_bufferImportacao.itens.length} turma(s) • ${totalAlunos} aluno(s)\n`+
-      `IDs novos criados: ${_bufferImportacao.idsCriados} (${totalAlunos-_bufferImportacao.idsCriados} já existiam)\n`+
+      `IDs novos criados: ${idsCriados} • vinculados a existentes: ${idsVinculados} (${totalAlunos-idsCriados-idsVinculados} demais já eram do mesmo grupo)\n`+
       `Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`;
 
     const saidaEl=document.getElementById('saidaXLSX');
@@ -1781,10 +1994,23 @@ async function aplicarMerge() {
   logEl(`Adicionando ${paraAdicionar.length} turma(s)...`,'logJSON');
   const turmasFinais=[...lerTurmasDB(),...paraAdicionar];
   salvarTurmasDB(turmasFinais);
-  const aux=_reconstruirAuxLocalmente(turmasFinais);
+  // reconstruirAuxiliares() (não a versão local-only) — mesma correção de
+  // confirmarImportacao(): sem isso, `matriculas` nunca é gravado de
+  // verdade no Firestore, e recalcularUltimoAnoRegistroBatch() não acha nada.
+  const aux=reconstruirAuxiliares(turmasFinais);
   logEl(`✅ Merge aplicado: +${paraAdicionar.length} turma(s).`,'logJSON');
   logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
   paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
+
+  try {
+    const idsEnvolvidos=[...new Set(paraAdicionar.flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
+    if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+      const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
+      await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, dadosEscola?.configAnoAtivo ?? null);
+      logEl(`↻ ultimoAnoRegistro recalculado para ${idsEnvolvidos.length} aluno(s).`,'logJSON');
+    }
+  } catch(e) { console.warn('[aplicarMerge] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
+
   cancelarMerge();
   renderTabelaTurmas();
   atualizarStats();
