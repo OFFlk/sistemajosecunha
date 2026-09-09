@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Scripts globais -->
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- Fonte -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- CSS globais -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<title>Cadastro de turmas • Atas</title>
+<style>
+/* ══════════════════════════════════════════════════════════
+   CADASTRO-TURMAS.CSS (inline) — módulo de Atas
+   Mesmo padrão visual de cadastro-turma-ativa.html (Ano Ativo);
+   só os campos do formulário mudam (schema em vez de professor,
+   sem status ativa/inativa).
+   ══════════════════════════════════════════════════════════ */
+
+:root {
+  --card:    var(--header-bg, #ffffff);
+  --shadow:  0 4px 20px rgba(0,0,0,0.06);
+  --radius:  14px;
+  --radius2: 10px;
+}
+html[data-theme="dark"] {
+  --card:   #131c2e;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  margin-bottom: 16px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
+.sub, .muted { color: var(--muted); font-size: 13px; }
+
+.grid2    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.split-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .split-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } }
+
+.form-section { margin-top: 18px; }
+.form-section:first-of-type { margin-top: 4px; }
+.form-section-label {
+  font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
+}
+.form-section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.id-badge-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.id-badge-row .label-inline { font-size: 12px; color: var(--muted); font-weight: 700; }
+.id-badge {
+  font-family: ui-monospace, monospace; font-size: 12px; padding: 5px 10px; border-radius: 999px;
+  background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--chip-color);
+}
+
+.field { display: flex; flex-direction: column; min-width: 0; }
+.field label, .label {
+  display: block; font-size: 13px; font-weight: 700; margin: 0 0 6px;
+  color: var(--text); text-transform: none; letter-spacing: 0;
+}
+.field input, .field select, .input {
+  width: 100%; padding: 11px 12px; border: 1px solid var(--field-border); border-radius: 10px;
+  background: var(--field-bg); color: var(--text); font-size: 14px; font-family: 'Nunito', sans-serif;
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus, .field select:focus, .input:focus {
+  border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+.input.readonly { background: var(--chip-bg); color: var(--muted); cursor: default; pointer-events: none; }
+html[data-theme="dark"] .field input, html[data-theme="dark"] .field select, html[data-theme="dark"] .input {
+  background: var(--field-bg); color: var(--text); border-color: var(--field-border);
+}
+html[data-theme="dark"] .field select option { background: #0a1426; color: #e2e8f0; }
+html[data-theme="dark"] input::placeholder { color: rgba(226,232,240,0.45); }
+
+.btn {
+  border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 9px 14px;
+  border-radius: 10px; font-weight: 700; font-size: 14px; text-decoration: none; display: inline-flex;
+  align-items: center; gap: 8px; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s, transform 0.06s;
+}
+.btn:hover { background: var(--chip-bg); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
+.btn.primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
+html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
+.btn.ghost, .btn.secondary { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn.ghost:hover, .btn.secondary:hover {
+  background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .btn.ghost:hover, html[data-theme="dark"] .btn.secondary:hover {
+  background: rgba(124,58,237,0.18); border-color: var(--brand-d, #7c3aed); color: #c4b5fd;
+}
+.btn.outline { background: transparent; border-color: var(--brand, #7c3aed); color: var(--brand, #7c3aed); }
+.btn.outline:hover { background: var(--brand-faded, #f5f3ff); }
+html[data-theme="dark"] .btn.outline { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
+html[data-theme="dark"] .btn.outline:hover { background: rgba(124,58,237,0.18); }
+.btn.small { padding: 6px 10px; font-size: 12px; }
+
+.item.editing { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px var(--brand-faded, rgba(124,58,237,0.12)); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-border);
+  background: var(--chip-bg); color: var(--chip-color); padding: 6px 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 700;
+}
+.chip button { border: 0; background: transparent; cursor: pointer; color: inherit; font-weight: 900; font-size: 14px; line-height: 1; padding: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item {
+  border: 1px solid var(--border); border-radius: var(--radius2); padding: 12px 14px; background: var(--card);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.item:hover { border-color: var(--brand); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
+
+.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+.pill {
+  display: inline-flex; align-items: center; border: 1px solid var(--border); background: var(--chip-bg);
+  border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--chip-color);
+}
+.badge.small { font-size: 11px; padding: 3px 8px; }
+.badge.warn-alunos {
+  background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.35); color: #92400e;
+}
+html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
+
+.help { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; min-height: 14px; }
+.help.err { color: var(--danger); font-weight: 700; }
+.help.ok  { color: #1f8f4a; font-weight: 700; }
+
+.info-note {
+  padding: 12px 14px; border-radius: 10px; background: var(--chip-bg); border: 1px solid var(--chip-border);
+  color: var(--muted); font-size: 13px; margin-top: 12px;
+}
+.info-note strong { color: var(--text); }
+
+.warn {
+  padding: 12px 14px; border-radius: 10px; background: rgba(245,158,11,.10);
+  border: 1px solid rgba(245,158,11,.30); font-size: 13px; margin-top: 12px;
+}
+
+@keyframes toastSubir { from { opacity:0; transform:translateX(-50%) translateY(16px);} to { opacity:1; transform:translateX(-50%) translateY(0);} }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
+.modal-backdrop.open { display: flex; }
+</style>
+</head>
+<body>
+<script>window.Auth && window.Auth.requireAuth();</script>
+<div id="header-placeholder"></div>
+<main class="wrap">
+  <div class="split-grid">
+
+    <div class="card">
+      <h2 style="margin:0 0 10px">Cadastrar / editar turma (Atas)</h2>
+      <div class="sub" style="margin-bottom:10px;">Aqui só os dados da turma. Alunos, notas e situação são lançados em <b>cadastro-atas.html</b>, depois de escolher a turma pelos dois seletores (ano → turma).</div>
+
+      <div class="form-section">
+        <div class="form-section-label">Dados da turma</div>
+        <div class="form-row">
+          <div>
+            <label class="label">Ano letivo</label>
+            <input type="number" id="anoSelect" class="input" inputmode="numeric" step="1" min="2000" max="2100">
+            <div class="help">Preenchido com o ano mais recente já cadastrado (ou o ano atual, se não houver nenhuma turma ainda).</div>
+          </div>
+          <div>
+            <label class="label">Turno</label>
+            <select id="turno" class="input">
+              <option value="MATUTINO">Matutino</option>
+              <option value="VESPERTINO">Vespertino</option>
+              <option value="NOTURNO">Noturno</option>
+              <option value="INTEGRAL">Integral</option>
+            </select>
+            <div class="help">Usado para montar o ID e o nome automático.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-label">Séries</div>
+        <label class="label">Adicionar série</label>
+        <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
+          <select id="serieSelect" class="input">
+            <option value="">(selecione)</option>
+          </select>
+          <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
+          <button class="btn ghost" id="btnClearSeries" type="button">Limpar séries</button>
+        </div>
+        <div id="chipsSeries" class="chips" style="margin-top:10px"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-label">Notas</div>
+        <label class="label">Schema de notas</label>
+        <select id="schemaSelect" class="input"></select>
+        <div class="help">Define as matérias/colunas que vão aparecer em cadastro-atas.html pra essa turma. Configurado em <span class="mono">admin → Edição de ata e schema</span>.</div>
+        <div id="avisoSchemaComAlunos" class="warn" style="display:none;">
+          ⚠️ Essa turma já tem aluno(s) lançado(s). Trocar o schema agora pode desalinhar as colunas de nota já preenchidas.
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-label">Identificação</div>
+        <div>
+          <label class="label">Nome da turma</label>
+          <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO 2026 (MATUTINO)">
+          <div class="help">Preenche automaticamente com séries + ano + turno (você pode editar).</div>
+        </div>
+
+        <input id="turmaId" class="input readonly" readonly style="display:none">
+        <div class="id-badge-row">
+          <span class="label-inline">ID da turma:</span>
+          <span class="id-badge" id="turmaIdBadge">—</span>
+        </div>
+        <div class="help">Formato: <span class="mono">ATUR-ATAS|ANO|TURNO|SÉRIES</span> (+ sufixo A/B/C se repetir).</div>
+        <div id="avisoMudancaId" class="warn" style="display:none;"></div>
+      </div>
+
+      <div class="row" style="margin-top:18px;justify-content:space-between;gap:10px;align-items:center">
+        <div class="pill" id="dbInfo">DB: —</div>
+        <div class="row" style="gap:10px;justify-content:flex-end">
+          <button class="btn ghost" id="btnResetForm" type="button">Limpar formulário</button>
+          <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
+        </div>
+      </div>
+
+      <div class="info-note">
+        <strong>Fluxo:</strong> crie a turma aqui (vazia). Ela aparece imediatamente em <span class="mono">cadastro-atas.html</span>, no 2º seletor, assim que você escolher o ano letivo dela no 1º.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+        <h2 style="margin:0">Turmas cadastradas</h2>
+        <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
+        <span id="countTurmasLista" class="help" style="margin:0"></span>
+      </div>
+      <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> pra carregar no formulário. Não há exclusão nem inativação aqui — turma vazia sem uso pode ser apagada na página de gestão de dados.</div>
+      <div id="listaTurmas" class="list"></div>
+    </div>
+
+  </div>
+</main>
+
+<script src="../header-logic.js"></script>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+
+  /* ── Toasts padronizados (mesmo padrão do resto do sistema) ── */
+  function _showToast(msg, bg, shadow, duration){
+    const existing = document.getElementById('_toastGlobal');
+    if(existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_toastGlobal';
+    toast.style.cssText =
+      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
+      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
+    document.body.appendChild(toast);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+  function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+  function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+  function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+  function setMsg(text, kind){
+    const t = (text||"").toString();
+    if(!t) return;
+    if(kind === "err") _toastErro('⚠️ ' + t);
+    else if(kind === "ok") _toastSucesso('✅ ' + t);
+    else _toastAviso(t);
+  }
+
+  function _escHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+    return new Promise((resolve) => {
+      const cor = corDestaque || '#b45309';
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.style.display = 'flex';
+      backdrop.innerHTML =
+        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+              `${_escHtml(textoConfirmar || 'Continuar')}`+
+            `</button>`+
+          `</div>`+
+        `</div>`;
+      document.body.appendChild(backdrop);
+      function fechar(resultado){ backdrop.remove(); resolve(resultado); }
+      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+      backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+      backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    });
+  }
+
+  /* ── Schemas (mesmo padrão de cadastro-atas.html: localStorage, config feita em admin) ── */
+  const SCHEMAS_KEY = "turmasSchemas_v1";
+  function getDefaultConfig(){
+    return {
+      version: 1, nome: "Padrão (arquivo original)", serieAtiva: true, resultadoAtivo: true, ordenarPor: "nome",
+      colunas: [
+        { key:"port",  label:"Português",  type:"nota", enabled:true },
+        { key:"mat",   label:"Matemática", type:"nota", enabled:true },
+        { key:"hist",  label:"História",   type:"nota", enabled:true },
+        { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
+        { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
+        { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
+        { key:"arte",  label:"Arte",       type:"nota", enabled:true },
+        { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
+      ]
+    };
+  }
+  function normalizeSchema(cfg){
+    const def = getDefaultConfig();
+    const out = {
+      id: String(cfg?.id || cfg?.schemaId || "").trim() || "",
+      version: 1,
+      nome: String(cfg?.nome ?? def.nome),
+      serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
+      resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+      ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
+      colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+    };
+    out.colunas = out.colunas
+      .map(c => ({
+        key: String(c?.key ?? "").trim().toLowerCase(),
+        label: String(c?.label ?? "").trim(),
+        type: (c?.type === "texto") ? "texto" : "nota",
+        enabled: c?.enabled !== false
+      }))
+      .filter(c => c.key && c.label);
+    const seen = new Set();
+    out.colunas = out.colunas.filter(c => { if(seen.has(c.key)) return false; seen.add(c.key); return true; });
+    return out;
+  }
+  function loadSchemas(){
+    try{
+      const raw = localStorage.getItem(SCHEMAS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.map(normalizeSchema) : [];
+    }catch{ return []; }
+  }
+  function getSchemaById(id){
+    return loadSchemas().find(s => String(s.id) === String(id)) || null;
+  }
+  function fillSchemaSelect(valorAtual){
+    const sel = $("schemaSelect");
+    if(!sel) return;
+    const schemas = loadSchemas();
+    sel.innerHTML = "";
+    if(!schemas.length){
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "Padrão (nenhum schema configurado em admin)";
+      sel.appendChild(opt);
+      return;
+    }
+    schemas.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.nome || s.id;
+      sel.appendChild(opt);
+    });
+    if(valorAtual && schemas.some(s => s.id === valorAtual)) sel.value = valorAtual;
+  }
+
+  /* ── Turmas — Firestore direto, cache em memória (sem localStorage/scoping) ── */
+  let TURMAS_CACHE = [];
+  async function carregarTurmasCache(){
+    try{ TURMAS_CACHE = await window.DB.turmas.list(); }
+    catch(e){ console.warn('[cadastro-turmas] carregarTurmasCache:', e); TURMAS_CACHE = []; }
+  }
+  function getTurmas(){ return Array.isArray(TURMAS_CACHE) ? TURMAS_CACHE : []; }
+
+  let seriesSel = [];
+  let editingTurmaId = null;
+  let nomeManual = false;
+
+  function extractYear(v){
+    if(v == null) return null;
+    const n = parseInt(v, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  function getAnoDefault(){
+    const turmas = getTurmas();
+    let max = 0;
+    for(const t of turmas){
+      const a = extractYear(t?.anoLetivo);
+      if(a) max = Math.max(max, a);
+    }
+    return max || new Date().getFullYear();
+  }
+
+  function buildAnoInput(){
+    const anoEl = $("anoSelect");
+    if(anoEl && !anoEl.value) anoEl.value = getAnoDefault();
+  }
+
+  function buildFiltroAnoOptions(){
+    const turmas = getTurmas();
+    const anos = new Set();
+    for(const t of turmas){ if(t && t.anoLetivo) anos.add(String(t.anoLetivo)); }
+    const arr = Array.from(anos).map(x => parseInt(x,10)).filter(n => !isNaN(n)).sort((a,b)=>b-a).map(String);
+
+    const filtroLista = $("filtroAnoLista");
+    if(!filtroLista) return;
+    const valorAnterior = filtroLista.value;
+
+    filtroLista.innerHTML = "";
+    const optTodos = document.createElement("option");
+    optTodos.value = ""; optTodos.textContent = "Todos os anos";
+    filtroLista.appendChild(optTodos);
+    for(const a of arr){
+      const opt = document.createElement("option");
+      opt.value = a; opt.textContent = a;
+      filtroLista.appendChild(opt);
+    }
+    if(valorAnterior && arr.includes(valorAnterior)) filtroLista.value = valorAnterior;
+    else filtroLista.value = "";
+  }
+
+  // Mesma lista que a Atas já usa hoje (SERIES_PADRAO em cadastro-atas.html)
+  function serieOptions(){
+    return [
+      "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
+      "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
+      "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano"
+    ];
+  }
+  function fillSerieSelect(){
+    const sel = $("serieSelect");
+    if(!sel) return;
+    sel.innerHTML = '<option value="">(selecione)</option>';
+    for(const s of serieOptions()){
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      sel.appendChild(opt);
+    }
+  }
+  function normalizeSerie(s){
+    return String(s||"").trim();
+  }
+
+  function turnoAbbrev(turno){
+    const t = String(turno||"").toUpperCase();
+    if(t.startsWith("MAT")) return "MAT";
+    if(t.startsWith("VES")) return "VES";
+    if(t.startsWith("NOT")) return "NOT";
+    if(t.startsWith("INT")) return "INT";
+    return t.substring(0,3) || "TUR";
+  }
+  function slugSerie(s){
+    return String(s||"").trim().toUpperCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/[ºª]/g,"")
+      .replace(/\s+/g,"_")
+      .replace(/[^A-Z0-9_]/g,"");
+  }
+
+  function turmaIdBaseFromFull(id){
+    if(!id) return "";
+    const s = String(id);
+    const parts = s.split("|");
+    if(parts.length >= 5){
+      const last = parts[parts.length-1];
+      if(/^[A-Z]+$/.test(last)) return parts.slice(0,-1).join("|");
+    }
+    return s;
+  }
+  function indexToLetters(n){
+    let x = n, out = "";
+    while(true){
+      out = String.fromCharCode(65 + (x % 26)) + out;
+      x = Math.floor(x/26) - 1;
+      if(x < 0) break;
+    }
+    return out;
+  }
+  function lettersToIndex(s){
+    const str = String(s||"").toUpperCase().replace(/[^A-Z]/g,"");
+    if(!str) return null;
+    let n = 0;
+    for(let i=0;i<str.length;i++) n = n*26 + (str.charCodeAt(i)-64);
+    return n-1;
+  }
+  function buildTurmaIdBase(){
+    const ano = $("anoSelect")?.value || String(getAnoDefault());
+    const turno = turnoAbbrev($("turno")?.value);
+    const seriesSlug = seriesSel.map(slugSerie).filter(Boolean).join("+") || "SEM_SERIE";
+    return `ATUR-ATAS|${ano}|${turno}|${seriesSlug}`;
+  }
+  function sameBase(base, id){
+    if(!base || !id) return false;
+    return id === base || id.startsWith(base + "|");
+  }
+  function ensureFirstGetsA(base, turmas){
+    const idx = turmas.findIndex(t => t && t.turmaId === base);
+    if(idx >= 0) turmas[idx] = { ...turmas[idx], turmaId: base + "|A" };
+    return turmas;
+  }
+  function pickNextIdForBase(base, turmas){
+    const used = new Set();
+    for(const t of turmas){
+      const id = t?.turmaId;
+      if(!sameBase(base, id)) continue;
+      if(id === base) used.add(0);
+      else {
+        const ix = lettersToIndex(id.slice(base.length + 1));
+        if(ix !== null) used.add(ix);
+      }
+    }
+    let n = 0;
+    while(used.has(n)) n++;
+    return base + "|" + indexToLetters(n);
+  }
+  function buildTurmaIdPreview(){
+    const base = buildTurmaIdBase();
+    const turmas = getTurmas();
+    if(editingTurmaId){
+      const baseEdit = turmaIdBaseFromFull(editingTurmaId);
+      if(baseEdit === base) return editingTurmaId;
+      const others = turmas.filter(t => t && t.turmaId !== editingTurmaId);
+      const same = others.filter(t => sameBase(base, t.turmaId));
+      if(!same.length) return base;
+      return pickNextIdForBase(base, ensureFirstGetsA(base, [...others]));
+    }
+    const same = turmas.filter(t => sameBase(base, t.turmaId));
+    if(!same.length) return base;
+    return pickNextIdForBase(base, ensureFirstGetsA(base, [...turmas]));
+  }
+  function buildNomeAuto(){
+    const ano = $("anoSelect")?.value || String(getAnoDefault());
+    const turno = $("turno")?.value || "MATUTINO";
+    const sTxt = seriesSel.length ? seriesSel.join(" e ") : "";
+    if(!sTxt) return `Turma ${ano} (${turno})`;
+    return `${sTxt} ${ano} (${turno})`;
+  }
+  function renderChips(){
+    const box = $("chipsSeries");
+    if(!box) return;
+    box.innerHTML = "";
+    for(const s of seriesSel){
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = `${s} <button type="button" aria-label="remover">×</button>`;
+      chip.querySelector("button").addEventListener("click", ()=>{
+        seriesSel = seriesSel.filter(x=>x!==s);
+        syncDerived();
+        renderChips();
+      });
+      box.appendChild(chip);
+    }
+  }
+  function syncDerived(){
+    const previewId = buildTurmaIdPreview();
+    if($("turmaId")) $("turmaId").value = previewId;
+    if($("turmaIdBadge")) $("turmaIdBadge").textContent = previewId || "—";
+    if(!nomeManual && $("nomeTurma")) $("nomeTurma").value = buildNomeAuto();
+
+    // Avisa se editar mudaria o ID de uma turma que já tem aluno lançado
+    const avisoEl = $("avisoMudancaId");
+    if(avisoEl){
+      if(editingTurmaId && previewId !== editingTurmaId){
+        const t = getTurmas().find(x => x.turmaId === editingTurmaId);
+        const temAlunos = Array.isArray(t?.alunos) && t.alunos.length > 0;
+        avisoEl.style.display = "block";
+        avisoEl.textContent = temAlunos
+          ? `⚠️ Mudar ano/turno/série muda o ID da turma (${editingTurmaId} → ${previewId}). Essa turma JÁ TEM ${t.alunos.length} aluno(s) lançado(s) — os dados de ata/matrícula antigos ficam órfãos, presos no ID velho. Evite mudar esses campos numa turma que já tem aluno.`
+          : `O ID muda de ${editingTurmaId} para ${previewId}. Como a turma ainda não tem aluno lançado, não tem risco.`;
+      } else {
+        avisoEl.style.display = "none";
+      }
+    }
+  }
+  function updateDbInfo(){
+    const el = $("dbInfo");
+    if(el) el.textContent = `DB: turmas=${getTurmas().length}`;
+  }
+
+  function renderListaTurmas(){
+    const list = $("listaTurmas");
+    if(!list) return;
+
+    const filtroAno = $("filtroAnoLista")?.value || "";
+    let turmas = filtroAno ? getTurmas().filter(t => String(t.anoLetivo||"") === filtroAno) : getTurmas();
+
+    const countEl = $("countTurmasLista");
+    if(countEl) countEl.textContent = turmas.length ? `${turmas.length} turma(s)` : "";
+
+    if(!turmas.length){
+      list.innerHTML = '<div class="help">Nenhuma turma cadastrada ainda.</div>';
+      return;
+    }
+
+    turmas = [...turmas].sort((a,b)=>{
+      const diffAno = (Number(b.anoLetivo)||0) - (Number(a.anoLetivo)||0);
+      if(diffAno !== 0) return diffAno;
+      return String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR");
+    });
+
+    list.innerHTML = "";
+    for(const t of turmas){
+      const div = document.createElement("div");
+      div.className = "item" + (editingTurmaId === t.turmaId ? " editing" : "");
+
+      const left = document.createElement("div");
+      const title = document.createElement("h4");
+      title.style.margin = "0 0 6px";
+      title.textContent = t.nome || "(sem nome)";
+
+      const nAlunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
+      const meta = document.createElement("div");
+      meta.innerHTML = `
+        <span class="pill badge small">Ano: ${t.anoLetivo||"—"}</span>
+        <span class="pill badge small">Turno: ${t.turno||"—"}</span>
+        <span class="pill badge small">Schema: ${t.schemaSnapshot?.nome || "—"}</span>
+        <span class="pill badge small ${nAlunos ? 'warn-alunos' : ''}">${nAlunos} aluno(s)</span>
+        <div style="margin-top:6px"><span class="mono">ID:</span> <span class="mono">${t.turmaId||"—"}</span></div>
+        <div style="margin-top:4px">Séries: ${(Array.isArray(t.series)?t.series:[]).join(", ") || "—"}</div>
+      `;
+      left.appendChild(title);
+      left.appendChild(meta);
+
+      const right = document.createElement("div");
+      right.className = "btns";
+      const btnEdit = document.createElement("button");
+      btnEdit.className = "btn outline";
+      btnEdit.type = "button";
+      btnEdit.textContent = "Editar";
+      btnEdit.addEventListener("click", ()=> loadTurma(t.turmaId));
+      right.appendChild(btnEdit);
+
+      div.appendChild(left);
+      div.appendChild(right);
+      list.appendChild(div);
+    }
+  }
+
+  function loadTurma(turmaId){
+    if(!turmaId) return;
+    const t = getTurmas().find(x => x.turmaId === turmaId);
+    if(!t) return;
+
+    editingTurmaId = turmaId;
+
+    if($("anoSelect")) $("anoSelect").value = String(t.anoLetivo || getAnoDefault());
+    if($("turno")) $("turno").value = t.turno || "MATUTINO";
+
+    seriesSel = (Array.isArray(t.series) ? t.series : []).map(normalizeSerie).filter(Boolean);
+
+    if($("nomeTurma")){
+      nomeManual = true;
+      $("nomeTurma").value = t.nome || buildNomeAuto();
+      nomeManual = false;
+    }
+
+    fillSchemaSelect(t.schemaId || "");
+
+    const avisoSchema = $("avisoSchemaComAlunos");
+    if(avisoSchema) avisoSchema.style.display = (Array.isArray(t.alunos) && t.alunos.length) ? "block" : "none";
+
+    renderChips();
+    syncDerived();
+    renderListaTurmas();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  function resetForm(){
+    editingTurmaId = null;
+    seriesSel = [];
+    nomeManual = false;
+
+    if($("anoSelect")) $("anoSelect").value = "";
+    buildAnoInput();
+    if($("turno")) $("turno").value = "MATUTINO";
+    if($("nomeTurma")) $("nomeTurma").value = "";
+    fillSchemaSelect("");
+    if($("avisoSchemaComAlunos")) $("avisoSchemaComAlunos").style.display = "none";
+    if($("avisoMudancaId")) $("avisoMudancaId").style.display = "none";
+
+    renderChips();
+    syncDerived();
+    renderListaTurmas();
+  }
+
+  async function salvarTurma(){
+    const ano = parseInt($("anoSelect")?.value || String(getAnoDefault()), 10);
+    const turno = $("turno")?.value || "MATUTINO";
+    const nome = ($("nomeTurma")?.value || "").trim();
+    const schemaId = $("schemaSelect")?.value || "";
+
+    if(!seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
+    if(!nome){ setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err"); return; }
+
+    const schemaEscolhido = schemaId ? getSchemaById(schemaId) : null;
+    const schemaSnapshot = normalizeSchema(schemaEscolhido || getDefaultConfig());
+
+    const base = buildTurmaIdBase();
+    let turmas = getTurmas().slice();
+
+    let oldId = null, criadoEmExistente = null, alunosExistentes = null;
+    if(editingTurmaId){
+      oldId = editingTurmaId;
+      const existente = turmas.find(t => t && t.turmaId === oldId);
+      if(existente?.criadoEm) criadoEmExistente = existente.criadoEm;
+      if(Array.isArray(existente?.alunos)) alunosExistentes = existente.alunos;
+      turmas = turmas.filter(t => t && t.turmaId !== oldId);
+    }
+
+    let turmaId;
+    const same = turmas.filter(t => sameBase(base, t.turmaId));
+    if(!same.length) turmaId = base;
+    else { turmas = ensureFirstGetsA(base, turmas); turmaId = pickNextIdForBase(base, turmas); }
+
+    if(oldId){
+      const baseEdit = turmaIdBaseFromFull(oldId);
+      if(baseEdit === base) turmaId = oldId;
+    }
+
+    // Confirmação extra se o ID vai mudar E a turma já tem aluno lançado
+    if(oldId && turmaId !== oldId && alunosExistentes && alunosExistentes.length){
+      const confirmou = await _confirmModal({
+        titulo: "⚠️ Isso vai trocar o ID de uma turma com alunos",
+        corpo: `Essa turma já tem ${alunosExistentes.length} aluno(s) lançado(s) em cadastro-atas.html.\n\nMudar ano/turno/série troca o ID de ${oldId} para ${turmaId} — os dados de ata/matrícula já lançados continuam presos no ID antigo (ficam órfãos).\n\nSó continue se tiver certeza. Deseja continuar mesmo assim?`,
+        corDestaque: "#991b1b",
+        textoConfirmar: "Sim, trocar o ID mesmo assim"
+      });
+      if(!confirmou) return;
+    }
+
+    const now = new Date().toISOString();
+    const payload = {
+      _id: turmaId,
+      id: turmaId,
+      turmaId,
+      nome,
+      anoLetivo: ano,
+      series: [...seriesSel],
+      turno,
+      schemaId: schemaSnapshot.id || schemaId || "",
+      schemaSnapshot,
+      origemArquivo: "MANUAL",
+      aba: "MANUAL",
+      criadoEm: criadoEmExistente || now,
+      atualizadoEm: now,
+    };
+    // Só na criação: garante o array vazio. Em edição, NÃO manda essa chave
+    // — save() é merge:true, então omitir preserva os alunos já lançados
+    // em cadastro-atas.html, mesmo que o ID não tenha mudado.
+    if(!oldId) payload.alunos = [];
+
+    try{
+      await window.DB.turmas.save(payload);
+    }catch(e){
+      console.warn('[salvarTurma]', e);
+      setMsg("Erro ao salvar turma.", "err");
+      return;
+    }
+
+    await carregarTurmasCache();
+    buildFiltroAnoOptions();
+    updateDbInfo();
+    setMsg(oldId && oldId !== turmaId ? "Turma salva (o ID mudou — confira o aviso acima antes de lançar aluno)." : "Turma salva!", "ok");
+    resetForm();
+  }
+
+  /* ── events ── */
+  $("btnAddSerie")?.addEventListener("click", ()=>{
+    const s = normalizeSerie($("serieSelect")?.value);
+    if(!s) return;
+    if(!seriesSel.includes(s)) seriesSel.push(s);
+    if($("serieSelect")) $("serieSelect").value = "";
+    syncDerived();
+    renderChips();
+  });
+  $("btnClearSeries")?.addEventListener("click", ()=>{
+    seriesSel = [];
+    syncDerived();
+    renderChips();
+  });
+  $("anoSelect")?.addEventListener("input", syncDerived);
+  $("anoSelect")?.addEventListener("change", syncDerived);
+  $("turno")?.addEventListener("change", syncDerived);
+  $("nomeTurma")?.addEventListener("input", ()=>{ nomeManual = true; });
+  $("btnSalvar")?.addEventListener("click", salvarTurma);
+  $("btnResetForm")?.addEventListener("click", async ()=>{
+    const confirmou = await _confirmModal({
+      titulo: "⚠️ Limpar o formulário?",
+      corpo: "Os dados preenchidos aqui serão perdidos (a turma ainda não foi salva).\n\nDeseja continuar?",
+      textoConfirmar: "Sim, limpar"
+    });
+    if(!confirmou) return;
+    resetForm();
+  });
+  $("filtroAnoLista")?.addEventListener("change", renderListaTurmas);
+
+  /* ── init ── */
+  async function init(){
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+    await carregarTurmasCache();
+    fillSerieSelect();
+    fillSchemaSelect("");
+    buildFiltroAnoOptions();
+    resetForm();
+    renderListaTurmas();
+    updateDbInfo();
+  }
+  init();
+})();
+</script>
+
+</body>
+</html>
