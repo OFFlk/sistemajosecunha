@@ -998,7 +998,12 @@ function detectarModoAvaliacao(matriz, rHead, colMap) {
 function acharLinhaCabecalho(matriz) {
   for (let r=0; r<matriz.length; r++) {
     const j=(matriz[r]||[]).map(normalizarTxt).join(' | ');
-    if ((j.includes('Nº')||j.includes('N°')||j.includes('NO')||j.includes('N '))&&j.includes('NOME')&&j.includes('RESULTADO')) return r;
+    const temNum = j.includes('Nº')||j.includes('N°')||j.includes('NO')||j.includes('N ');
+    const temNome = j.includes('NOME');
+    // "RESULTADO" e "SITUAÇÃO" são usados como sinônimos entre escolas/anos
+    // diferentes pro mesmo indicador (situação final do aluno na ata).
+    const temResultado = j.includes('RESULTADO')||j.includes('SITUA');
+    if (temNum && temNome && temResultado) return r;
   }
   return -1;
 }
@@ -1019,7 +1024,7 @@ function mapearColunas(rowCab) {
     else if (t.includes('ARTE'))  map[c]='arte';
     else if (t.includes('RELIG')) map[c]='relig';
     else if (t.includes('INGL')||t==='ING'||t.includes('LÍNGUA INGLESA')||t.includes('LINGUA INGLESA')) map[c]='ing';
-    else if (t.includes('RESULT')) map[c]='resultado';
+    else if (t.includes('RESULT')||t.includes('SITUA')) map[c]='resultado';
   }
   return map;
 }
@@ -1575,7 +1580,7 @@ async function analisarSelecionadas() {
       const ws=_workbook.Sheets[abaName];
       const matriz=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       const rHead=acharLinhaCabecalho(matriz);
-      if (rHead===-1) { resultadosAbasBloqueadas.push({abaName, motivo:'cabeçalho não encontrado'}); continue; }
+      if (rHead===-1) { resultadosAbasBloqueadas.push({abaName, motivo:'cabeçalho da TABELA DE NOTAS não encontrado (não é o cabeçalho documental da ata) — procurando uma linha com Nº, Nome e Resultado/Situação; confira se algum desses indicadores foi renomeado na planilha'}); continue; }
 
       const info=extrairInfoCabecalho(matriz,rHead,abaName);
 
@@ -1684,6 +1689,7 @@ async function analisarSelecionadas() {
         });
 
         aluno._anoLetivoOcorrencia = info.anoLetivo; // só usado na resolução de grupos 100% novos (recência)
+        aluno._abaOcorrencia = abaName; // só pra exibir contexto nas pendências de identidade
 
         const viaveis = candidatos.filter(c => c.traj.status !== 'vermelho');
         let trajStatusLinha='verde', trajMotivoLinha='';
@@ -1727,7 +1733,7 @@ async function analisarSelecionadas() {
             aluno._pendenciaChave=chave;
             aluno._decisao={ tipo:'novo' }; // default seguro até o usuário marcar
             pendenciasIdentidade.push({
-              chave, aluno, nomeAluno,
+              chave, aluno, nomeAluno, abaName,
               candidato: melhor,
               scorePct: Math.round(melhor.score*100),
             });
@@ -1738,7 +1744,7 @@ async function analisarSelecionadas() {
         if (trajStatusLinha==='vermelho') divergencias.push(`🚫 [Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
         else if (trajStatusLinha==='amarelo' && !aluno._pendenciaChave) divergencias.push(`[Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
 
-        jaProcessados.push({ nomeAluno, anoLetivo:info.anoLetivo, serieDisplay:aluno.serie, resultado:aluno.resultado, aluno });
+        jaProcessados.push({ nomeAluno, anoLetivo:info.anoLetivo, serieDisplay:aluno.serie, resultado:aluno.resultado, aluno, abaName });
         if (aluno._decisao.tipo==='novo') idsNovosEstimados++;
         novos.push(aluno);
       }
@@ -1809,7 +1815,7 @@ async function analisarSelecionadas() {
           oc._pendenciaChave=chave;
           oc._decisao={ tipo:'novo' };
           pendenciasIdentidade.push({
-            chave, aluno:oc, nomeAluno:oc.nome,
+            chave, aluno:oc, nomeAluno:oc.nome, abaName:oc._abaOcorrencia,
             candidato:{ origem:'conflito', alunoIds:ancoras, nomes:ancoras.map(id=>_anchorNomes.get(id)||id) },
             scorePct:100,
             conflito:true,
@@ -1884,12 +1890,13 @@ function renderRevisaoImportacao(buffer){
         `Desmarcado (padrão): entra como aluno novo. Marcado: usa o mesmo alunoId do candidato — nenhum ID novo é gasto.`+
       `</div>`+
       pendencias.map(p => {
+        const abaAtualTxt = p.abaName ? ` <span style="color:var(--muted,#666);">(aba "${esc(p.abaName)}")</span>` : '';
         if (p.conflito) {
           const opcoes = p.candidato.alunoIds.map((id,i) =>
             `<option value="${esc(id)}">${esc(p.candidato.nomes[i])} (${esc(id)})</option>`
           ).join('');
           return `<div style="padding:6px 0;font-size:13px;border-top:1px dashed rgba(146,64,14,0.3);">`+
-            `<div><b>${esc(p.nomeAluno)}</b> bate ao mesmo tempo com <b>${p.candidato.alunoIds.length} cadastros diferentes</b> já existentes no catálogo — possível duplicata pré-existente, só um humano decide:</div>`+
+            `<div><b>${esc(p.nomeAluno)}</b>${abaAtualTxt} bate ao mesmo tempo com <b>${p.candidato.alunoIds.length} cadastros diferentes</b> já existentes no catálogo — possível duplicata pré-existente, só um humano decide:</div>`+
             `<select id="sel_${p.chave}" style="margin-top:4px;">`+
               `<option value="">— aluno novo (nenhum dos dois) —</option>`+
               opcoes+
@@ -1898,11 +1905,11 @@ function renderRevisaoImportacao(buffer){
         }
         const origemTxt = p.candidato.origem==='catalogo'
           ? `já no catálogo (${esc(p.candidato.alunoId)})`
-          : `outra aba desta mesma importação (${esc(p.candidato.ref.anoLetivo||'?')})`;
+          : `aba "${esc(p.candidato.ref.abaName||'?')}" desta mesma importação, ano ${esc(p.candidato.ref.anoLetivo||'?')}`;
         const trajTxt = p.candidato.traj.motivo ? ` — ${esc(p.candidato.traj.motivo)}` : '';
         return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;">`+
           `<input type="checkbox" id="chk_${p.chave}" style="margin-top:3px;">`+
-          `<span><b>${esc(p.nomeAluno)}</b> parece ser <b>${esc(p.candidato.nome)}</b> (${p.scorePct}% de nome, ${origemTxt})${trajTxt}</span>`+
+          `<span><b>${esc(p.nomeAluno)}</b>${abaAtualTxt} parece ser <b>${esc(p.candidato.nome)}</b> (${p.scorePct}% de nome, ${origemTxt})${trajTxt}</span>`+
         `</label>`;
       }).join('')+
     `</div>`
