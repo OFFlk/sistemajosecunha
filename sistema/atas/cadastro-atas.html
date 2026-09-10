@@ -25,9 +25,6 @@
 
 <title>Cadastro de Atas</title>
 
-<!-- PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 <!-- PDF.js — converte PDF em imagens antes do upload -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -62,8 +59,6 @@ html[data-theme="dark"] {
 
 /* Card — padding e margin específicos desta página */
 .card { padding: 20px; margin-bottom: 16px; }
-
-.top-actions{ display:flex; gap:10px; justify-content:flex-end; margin-bottom:14px; flex-wrap:wrap; }
 
 /* Botão secundário */
 .btn.btn-secondary, button.btn-secondary, button.btn.btn-secondary {
@@ -283,8 +278,6 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
       <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
       <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
       <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
-      <button class="btn btn-danger-outline" id="btnInativarTurma" onclick="confirmarInativacaoTurma()" style="display:none; margin-left:auto;">🚫 Inativar turma</button>
-      <button class="btn btn-secondary" id="btnReativarTurma" onclick="reativarTurma()" style="display:none; margin-left:auto;">✅ Reativar turma</button>
     </div>
 
     <div class="table-wrap"><table>
@@ -303,7 +296,6 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
    Helpers
 ========================= */
 const $ = (id) => document.getElementById(id);
-function normStr(v){ return String(v ?? "").trim(); }
 
 /* =========================
    DB por escola (schoolId)
@@ -441,9 +433,6 @@ const DB = (() => {
 /* =========================
    Schema (Admin -> Cadastro)
 ========================= */
-const SCHEMAS_KEY = "turmasSchemas_v1";
-const ACTIVE_SCHEMA_ID_KEY = "turmasSchemaActiveId_v1";
-
 function getDefaultConfig() {
   return {
     version: 1,
@@ -496,101 +485,12 @@ function normalizeSchema(cfg) {
   return out;
 }
 
-function loadSchemas() {
-  try {
-    const raw = localStorage.getItem(SCHEMAS_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.map(normalizeSchema) : [];
-  } catch {
-    return [];
-  }
-}
-
-function getActiveSchemaId() {
-  return localStorage.getItem(ACTIVE_SCHEMA_ID_KEY) || "";
-}
-
-function getSchemaById(id) {
-  const schemas = loadSchemas();
-  return schemas.find(s => String(s.id) === String(id)) || null;
-}
-
-function loadSchemaConfig() {
-  // usa o schema padrão escolhido no Admin
-  const schemas = loadSchemas();
-  if (!schemas.length) return getDefaultConfig();
-
-  const activeId = getActiveSchemaId();
-  return schemas.find(s => s.id === activeId) || schemas[0] || getDefaultConfig();
-}
-
 // ✅ Nesta página o schema é SEMPRE o snapshot da turma escolhida nos selects
 // (ano → turma) — não existe mais "schema ativo global" aqui, isso agora é
 // escolhido em cadastro-turmas.html, na criação da turma.
 let SCHEMA_ATIVO = null;
 function getSchemaAtivoParaTela() {
   return SCHEMA_ATIVO || getDefaultConfig();
-}
-
-let SCHEMAS_CACHE = [];
-let schemaSelecionadoId = ""; // para turma nova (não edição)
-
-function renderSelectSchemasCadastro() {
-  const sel = $("schemaTurma");
-  if (!sel) return;
-
-  SCHEMAS_CACHE = loadSchemas();
-
-  // Se não tiver schemas ainda, cria um "virtual" default
-  if (!SCHEMAS_CACHE.length) {
-    const def = getDefaultConfig();
-    def.id = "default";
-    SCHEMAS_CACHE = [def];
-  }
-
-  // seleciona o padrão do Admin (activeId) ou o primeiro
-  if (!schemaSelecionadoId) {
-    const activeId = getActiveSchemaId();
-    schemaSelecionadoId = SCHEMAS_CACHE.some(s => s.id === activeId) ? activeId : SCHEMAS_CACHE[0].id;
-  }
-
-  sel.innerHTML = SCHEMAS_CACHE.map(s => {
-    const isSel = s.id === schemaSelecionadoId;
-    return `<option value="${s.id}" ${isSel ? "selected" : ""}>${String(s.nome || s.id)}</option>`;
-  }).join("");
-
-  sel.onchange = () => onTrocarSchemaTurma(sel.value);
-
-  // em turma existente, trava o select
-  sel.disabled = !!modoEdicao;
-}
-
-function onTrocarSchemaTurma(id) {
-  if (modoEdicao) {
-    _toastErro("⚠️ Esta turma já existe e usa o schema salvo nela (snapshot).");
-    renderSelectSchemasCadastro();
-    return;
-  }
-
-  schemaSelecionadoId = id;
-
-  // aplica schema selecionado na tela (turma nova)
-  SCHEMA_ATIVO = getSchemaById(id) || loadSchemaConfig();
-
-  // re-render UI
-  renderFormularioDinamico();
-  renderTheadDinamico();
-
-  const schema = getSchemaAtivoParaTela();
-  if (schema.serieAtiva) iniciarSeriesTurma();
-  else {
-    seriesTurma = [];
-    atualizarSerieAtaHiddenEPreview();
-  }
-
-  // como o schema mudou, zera alunos (evita mistura de colunas)
-  alunos = [];
-  atualizarTabela();
 }
 
 function getColunasAtivas(schema) {
@@ -607,21 +507,45 @@ function renderFormularioDinamico() {
   const schema = getSchemaAtivoParaTela();
   const colAtivas = getColunasAtivas(schema);
 
+  // Linha de topo: nome (com busca/vínculo) + situação (resultado final).
+  // Fica sozinha numa linha cheia (grid-column:1/-1) pra não dividir espaço
+  // com os campos de nota — nome pode ter 60+ caracteres, nota tem no
+  // máximo 5, não fazia sentido ocupar a mesma largura de coluna.
   let html = `
-    <div class="campo">
-      <label>Nome do aluno *</label>
-      <div style="display:flex; gap:6px;">
-        <input id="nome" oninput="_limparVinculoCandidato()"
-               onkeydown="if(event.key==='Enter'){event.preventDefault(); buscarCandidatosAluno();}">
-        <button type="button" class="btn btn-secondary btn-mini" style="flex-shrink:0;"
-                onclick="buscarCandidatosAluno()" title="Buscar aluno já cadastrado em alunos-atas (Enter também busca)">
-          🔍 Buscar
-        </button>
+    <div class="linha-topo-cadastro" style="grid-column:1/-1; display:flex; gap:14px; flex-wrap:wrap;">
+      <div class="campo" style="flex:3 1 320px; min-width:260px;">
+        <label>Nome do aluno *</label>
+        <div style="display:flex; gap:6px;">
+          <input id="nome" oninput="_limparVinculoCandidato()"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault(); buscarCandidatosAluno();}">
+          <button type="button" id="btnBuscarNome" class="btn btn-secondary btn-mini" style="flex-shrink:0;"
+                  onclick="handleBuscarOuLimparNome()" title="Buscar aluno já cadastrado em alunos-atas (Enter também busca)">
+            🔍 Buscar
+          </button>
+        </div>
+        <div id="nomeCandidatosWrap" class="hidden" style="margin-top:6px; display:flex; flex-direction:column; gap:4px;"></div>
+        <div id="nomeVinculadoBadge" class="hidden" style="margin-top:6px; font-size:12px; color:var(--muted);"></div>
       </div>
-      <div id="nomeCandidatosWrap" class="hidden" style="margin-top:6px; display:flex; flex-direction:column; gap:4px;"></div>
-      <div id="nomeVinculadoBadge" class="hidden" style="margin-top:6px; font-size:12px; color:var(--muted);"></div>
-    </div>
   `;
+
+  if (schema.resultadoAtivo) {
+    html += `
+      <div class="campo" style="flex:1 1 170px; min-width:150px;">
+        <label>Resultado Final *</label>
+        <select id="resultado">
+          <option>Não informado</option>
+          <option>AP</option>
+          <option>REP</option>
+          <option>DEST</option>
+          <option>TRA</option>
+          <option>FAL</option>
+          <option>AND</option>
+        </select>
+      </div>
+    `;
+  }
+
+  html += `</div>`; // fecha .linha-topo-cadastro
 
   if (schema.serieAtiva) {
     html += `
@@ -641,30 +565,7 @@ function renderFormularioDinamico() {
     `;
   }
 
-  if (schema.resultadoAtivo) {
-    html += `
-      <div class="campo">
-        <label>Resultado Final *</label>
-        <select id="resultado">
-          <option>Não informado</option>
-          <option>AP</option>
-          <option>REP</option>
-          <option>DEST</option>
-          <option>TRA</option>
-          <option>FAL</option>
-          <option>AND</option>
-        </select>
-      </div>
-    `;
-  }
-
   grid.innerHTML = html;
-
-  // Ajusta visibilidade da área de série da turma (cabeçalho)
-  const wrapSerieTurma = $("wrapSerieTurma");
-  if (wrapSerieTurma) {
-    wrapSerieTurma.classList.toggle("hidden", !schema.serieAtiva);
-  }
 }
 
 function renderTheadDinamico() {
@@ -728,30 +629,9 @@ async function carregarDadosEscola() {
 }
 
 /* =========================
-   Ano
-========================= */
-function preencherAnos() {
-  const el = $("ano");
-  if (!el) return;
-
-  const anoAtual = new Date().getFullYear();
-  el.innerHTML = "";
-  for (let a = 1990; a <= anoAtual + 1; a++) {
-    el.innerHTML += `<option${a === anoAtual ? " selected" : ""}>${a}</option>`;
-  }
-}
-
-/* =========================
    Séries (turma e aluno) - mantém sua lógica
    (será usada apenas se schema.serieAtiva = true)
 ========================= */
-const SERIES_PADRAO = [
-  "Alfabetização",
-  "Eixo 1", "Eixo 2", "Eixo 3",
-  "1ª série", "2ª série", "3ª série", "4ª série", "5ª série", "6ª série", "7ª série", "8ª série",
-  "1º ano", "2º ano", "3º ano", "4º ano", "5º ano", "6º ano", "7º ano", "8º ano", "9º ano"
-];
-
 function normalizarSerieChave(s) {
   let t = String(s ?? "").trim().toLowerCase();
   t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -803,37 +683,6 @@ function formatarListaBonita(arr) {
   return `${arr.slice(0, -1).join(", ")} e ${arr[arr.length - 1]}`;
 }
 
-function montarOptionsSeries(disponiveis, selecionadaAtual = "") {
-  const opts = [];
-  opts.push(`<option value="">Selecione...</option>`);
-  disponiveis.forEach(s => {
-    const sel = (s === selecionadaAtual) ? "selected" : "";
-    opts.push(`<option ${sel} value="${s}">${s}</option>`);
-  });
-  return opts.join("");
-}
-
-function atualizarSerieAtaHiddenEPreview() {
-  const schema = getSchemaAtivoParaTela();
-  if (!schema.serieAtiva) {
-    seriesTurma = [];
-    if ($("serieAta")) $("serieAta").value = "";
-    if ($("serieTurmaPreview")) $("serieTurmaPreview").textContent = "";
-    return;
-  }
-
-  seriesTurma = dedupSeries(seriesTurma);
-  const texto = formatarListaBonita(seriesTurma);
-
-  const hidden = $("serieAta");
-  if (hidden) hidden.value = texto;
-
-  const prev = $("serieTurmaPreview");
-  if (prev) prev.textContent = texto ? `Selecionadas: ${texto}` : "Nenhuma série selecionada";
-
-  atualizarSelectSerieAluno();
-}
-
 function atualizarSelectSerieAluno() {
   const schema = getSchemaAtivoParaTela();
   if (!schema.serieAtiva) return;
@@ -863,115 +712,6 @@ function atualizarSelectSerieAluno() {
   const keyAtual = normalizarSerieChave(atual);
   const match = listaUnica.find(s => normalizarSerieChave(s) === keyAtual);
   if (match) selAluno.value = match;
-}
-
-function criarSelectSerieTurma(valorInicial = "") {
-  const schema = getSchemaAtivoParaTela();
-  if (!schema.serieAtiva) return;
-
-  const wrap = $("seriesTurmaWrap");
-  if (!wrap) return;
-
-  valorInicial = formatarSerieBonita(valorInicial);
-
-  const div = document.createElement("div");
-  div.className = "series-linha";
-
-  const select = document.createElement("select");
-  const padraoBonito = SERIES_PADRAO.map(formatarSerieBonita);
-
-  const disponiveis = padraoBonito.filter(s => !seriesTurma.includes(s) || normalizarSerieChave(s) === normalizarSerieChave(valorInicial));
-  select.innerHTML = montarOptionsSeries(disponiveis, valorInicial);
-
-  const existeEquivalente = padraoBonito.some(p => normalizarSerieChave(p) === normalizarSerieChave(valorInicial));
-
-  if (valorInicial && !existeEquivalente) {
-    const optExtra = document.createElement("option");
-    optExtra.value = valorInicial;
-    optExtra.textContent = `${valorInicial} (importado)`;
-    optExtra.selected = true;
-    select.insertBefore(optExtra, select.firstChild);
-  } else if (valorInicial) {
-    const opts = Array.from(select.options);
-    const eq = opts.find(o => normalizarSerieChave(o.value) === normalizarSerieChave(valorInicial));
-    if (eq) eq.selected = true;
-  }
-
-  const btnRemover = document.createElement("button");
-  btnRemover.type = "button";
-  btnRemover.className = "btn btn-danger-outline btn-mini";
-  btnRemover.textContent = "Remover";
-
-  btnRemover.onclick = () => {
-    const v = select.value;
-    if (v) {
-      const keyV = normalizarSerieChave(v);
-      seriesTurma = seriesTurma.filter(x => normalizarSerieChave(x) !== keyV);
-    }
-    div.remove();
-    reRenderSeriesTurma();
-  };
-
-  select.onchange = () => {
-    reCalcularSeriesTurmaDoDOM();
-    reRenderSeriesTurma();
-  };
-
-  div.appendChild(select);
-  div.appendChild(btnRemover);
-  wrap.appendChild(div);
-}
-
-function reCalcularSeriesTurmaDoDOM() {
-  const schema = getSchemaAtivoParaTela();
-  if (!schema.serieAtiva) return;
-
-  const selects = Array.from(document.querySelectorAll("#seriesTurmaWrap select"));
-  const vals = selects.map(s => s.value).filter(v => v);
-  seriesTurma = dedupSeries(vals);
-}
-
-function reRenderSeriesTurma() {
-  const schema = getSchemaAtivoParaTela();
-  if (!schema.serieAtiva) return;
-
-  const wrap = $("seriesTurmaWrap");
-  if (!wrap) return;
-
-  const selects = Array.from(document.querySelectorAll("#seriesTurmaWrap select"));
-  const valores = selects.map(s => s.value);
-
-  wrap.innerHTML = "";
-  valores.forEach(v => criarSelectSerieTurma(v));
-
-  reCalcularSeriesTurmaDoDOM();
-  atualizarSerieAtaHiddenEPreview();
-}
-
-function adicionarSelectSerieTurma() {
-  const schema = getSchemaAtivoParaTela();
-  if (!schema.serieAtiva) return;
-
-  criarSelectSerieTurma("");
-  reCalcularSeriesTurmaDoDOM();
-  reRenderSeriesTurma();
-}
-
-function iniciarSeriesTurma() {
-  const schema = getSchemaAtivoParaTela();
-  const wrap = $("seriesTurmaWrap");
-
-  if (!schema.serieAtiva) {
-    if (wrap) wrap.innerHTML = "";
-    seriesTurma = [];
-    atualizarSerieAtaHiddenEPreview();
-    return;
-  }
-
-  if (wrap) wrap.innerHTML = "";
-  seriesTurma = [];
-  criarSelectSerieTurma("");
-  atualizarSerieAtaHiddenEPreview();
 }
 
 /* =========================
@@ -1038,10 +778,30 @@ let _alunoCandidatoSelecionado = null; // { alunoId, nome, ultimoAnoRegistro } |
 
 function _limparVinculoCandidato() {
   _alunoCandidatoSelecionado = null;
+
+  const nomeEl = $("nome");
+  if (nomeEl) nomeEl.disabled = false;
+
   const wrap = $("nomeCandidatosWrap");
   if (wrap) { wrap.innerHTML = ""; wrap.classList.add("hidden"); }
   const badge = $("nomeVinculadoBadge");
   if (badge) { badge.innerHTML = ""; badge.classList.add("hidden"); }
+
+  const btnBuscar = $("btnBuscarNome");
+  if (btnBuscar) {
+    btnBuscar.innerHTML = "🔍 Buscar";
+    btnBuscar.title = "Buscar aluno já cadastrado em alunos-atas (Enter também busca)";
+  }
+}
+
+// Chamado pelo botão ao lado do nome — alterna entre buscar e limpar a seleção,
+// dependendo se já há um candidato vinculado.
+function handleBuscarOuLimparNome() {
+  if (_alunoCandidatoSelecionado) {
+    _limparVinculoCandidato();
+  } else {
+    buscarCandidatosAluno();
+  }
 }
 
 async function buscarCandidatosAluno() {
@@ -1082,6 +842,13 @@ function _renderCandidatosAluno(lista) {
     btn.type = "button";
     btn.className = "btn btn-gray btn-mini";
     btn.style.textAlign = "left";
+    btn.style.width = "100%";
+    btn.style.maxWidth = "100%";
+    btn.style.boxSizing = "border-box";
+    btn.style.whiteSpace = "normal";
+    btn.style.wordBreak = "break-word";
+    btn.style.overflowWrap = "anywhere";
+    btn.style.lineHeight = "1.4";
     const ultimo = c.ultimoAnoRegistro != null ? ` — último ano: ${c.ultimoAnoRegistro}` : "";
     btn.textContent = `🔗 ${c.nome} (${c.alunoId})${ultimo}`;
     btn.onclick = () => _selecionarCandidatoAluno(c.alunoId, c.nome, c.ultimoAnoRegistro);
@@ -1093,13 +860,29 @@ function _renderCandidatosAluno(lista) {
 function _selecionarCandidatoAluno(alunoId, nome, ultimoAnoRegistro) {
   _alunoCandidatoSelecionado = { alunoId, nome, ultimoAnoRegistro };
 
+  // Trava o campo com o nome EXATO do cadastro vinculado — nunca o texto
+  // parcial que o usuário digitou pra buscar (bug: salvava "linc" em vez de
+  // "lincon da silva araujo"). Fica bloqueado pra evitar editar o nome de
+  // alguém já vinculado a um alunoId existente.
+  const nomeEl = $("nome");
+  if (nomeEl) {
+    nomeEl.value = nome;
+    nomeEl.disabled = true;
+  }
+
   const wrap = $("nomeCandidatosWrap");
   if (wrap) { wrap.innerHTML = ""; wrap.classList.add("hidden"); }
 
   const badge = $("nomeVinculadoBadge");
   if (badge) {
-    badge.innerHTML = `🔗 Será vinculado a <strong>${nome}</strong> (${alunoId}) — <a href="#" onclick="_limparVinculoCandidato(); return false;">desfazer</a>`;
+    badge.innerHTML = `🔗 Será vinculado a <strong>${nome}</strong> (${alunoId})`;
     badge.classList.remove("hidden");
+  }
+
+  const btnBuscar = $("btnBuscarNome");
+  if (btnBuscar) {
+    btnBuscar.innerHTML = "❌ Limpar seleção";
+    btnBuscar.title = "Não é esse aluno? Clique para limpar a seleção e buscar de novo.";
   }
 }
 
@@ -1232,135 +1015,6 @@ function editarAluno(i) {
 }
 
 /* =========================
-   PDF (dinâmico)
-========================= */
-function exportarPDF() {
-  // Garante libs
-  if (!window.jspdf || !window.jspdf.jsPDF) { _toastErro("❌ Biblioteca jsPDF não carregou."); return; }
-
-  const schema = getSchemaAtivoParaTela();
-  const colAtivas = getColunasAtivas(schema);
-
-  const { jsPDF } = window.jspdf;
-
-  // Sempre A4 horizontal (landscape)
-  const doc = new jsPDF("l","mm","a4");
-
-  const imgEscudo = $("escudo");
-  const elNomeEscola = $("nomeEscola");
-  const elEndereco = $("enderecoEscola");
-  const anoTurma = turmaAtual?.anoLetivo || "";
-  const serieTurmaTxt = formatarListaBonita(turmaAtual?.series || turmaAtual?.seriesTurma || []);
-  const turnoTurma = turmaAtual?.turno || "";
-
-  // =========================
-  // Cabeçalho do documento (mantém a estrutura)
-  // =========================
-  let y = 18;
-
-  if (imgEscudo && imgEscudo.src) {
-    try { doc.addImage(imgEscudo, "PNG", 12, y-10, 26, 26); } catch {}
-  }
-
-  doc.setFont("Times","Bold");
-  doc.setFontSize(15);
-  doc.text((elNomeEscola?.textContent || "ESCOLA").toString(), 148.5, y, {align:"center"});
-
-  doc.setFontSize(10);
-  doc.setFont("Times","Normal");
-  doc.text((elEndereco?.textContent || "").toString(), 148.5, y+6, {align:"center"});
-
-  doc.setFontSize(13);
-  doc.setFont("Times","Bold");
-  doc.text("ATA DE RESULTADOS FINAIS", 148.5, y+16, {align:"center"});
-
-  y += 26;
-
-  doc.setFontSize(10);
-  doc.setFont("Times","Normal");
-  doc.text(`ANO: ${anoTurma}`, 12, y);
-
-  if (schema.serieAtiva) {
-    doc.text(`SÉRIE: ${serieTurmaTxt}`, 120, y, {align:"center"});
-  }
-
-  doc.text(`TURNO: ${turnoTurma}`, 285, y, {align:"right"});
-
-  y += 6;
-
-  // =========================
-  // Tabela (estrutura nova)
-  // - largura ponta a ponta (com margem)
-  // - Nº e Nome fixos
-  // - restantes com mesma largura (dependendo do total)
-  // =========================
-  const margemX = 10; // margem para impressão
-  const pageW = doc.internal.pageSize.getWidth();
-  const usableW = pageW - (margemX * 2);
-
-  const head = ["Nº", "Nome"];
-  if (schema.serieAtiva) head.push("Série");
-  for (const c of colAtivas) head.push(c.label);
-  if (schema.resultadoAtivo) head.push("Resultado");
-
-  const body = alunos.map((a,i)=>{
-    const row = [i+1, a.nome ?? ""];
-    if (schema.serieAtiva) row.push(a.serie ?? "");
-    for (const c of colAtivas) row.push(a[c.key] ?? "--");
-    if (schema.resultadoAtivo) row.push(a.resultado ?? "");
-    return row;
-  });
-
-  const totalCols = head.length;
-  const wNum = 10;
-  const wNome = 75;
-
-  const restCols = Math.max(0, totalCols - 2);
-  const wEach = restCols > 0 ? Math.max(8, (usableW - wNum - wNome) / restCols) : 10;
-
-  const columnStyles = {
-    0: { cellWidth: wNum, halign: "center" },
-    1: { cellWidth: wNome, halign: "left", overflow: "linebreak" }
-  };
-
-  // define mesma largura para todas as outras colunas
-  for (let ci = 2; ci < totalCols; ci++) {
-    columnStyles[ci] = { cellWidth: wEach, halign: "center" };
-  }
-
-  // fonte levemente menor quando tem muitas colunas (até ~18)
-  const baseFont = (totalCols >= 16) ? 7 : (totalCols >= 13 ? 8 : 9);
-
-  doc.autoTable({
-    startY: y,
-    theme: "grid",
-    margin: { left: margemX, right: margemX },
-    tableWidth: usableW,
-    styles: {
-      font: "Times",
-      fontSize: baseFont,
-      halign: "center",
-      valign: "middle",
-      cellPadding: 1.4,
-      lineWidth: 0.25,
-      lineColor: 0
-    },
-    headStyles: {
-      fontStyle: "bold",
-      halign: "center",
-      valign: "middle",
-      fillColor: [230,230,230],
-      textColor: 0
-    },
-    columnStyles,
-    head: [head],
-    body
-  });
-
-  doc.save("ata_resultados_finais.pdf");
-}
-
-/* =========================
    DB local (turmasDB)
 ========================= */
 // ── Firebase: lerTurmasDB / salvarTurmasDB ──
@@ -1392,8 +1046,7 @@ async function salvarTurmasDB(turmaObj) {
 
 
 /* =========================
-   DBs do sistema (alunos/aliases/atas/matrículas/metadados)
-   - Mantém a mesma lógica do Admin "Configuração de IDs"
+   Helpers do sistema (IDs determinísticos, status de matrícula)
 ========================= */
 // Remove campos undefined recursivamente (Firebase rejeita undefined)
 function limparUndefined(obj) {
@@ -1406,43 +1059,6 @@ function limparUndefined(obj) {
     );
   }
   return obj;
-}
-
-function lerJSON(key, fallback){
-  try{
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch { return fallback; }
-}
-function salvarJSON(key, val){
-  localStorage.setItem(key, JSON.stringify(val));
-}
-
-// alunosDB: [{id, nomeOficial, criadoEm, atualizadoEm}]
-function lerAlunosDB(){ return lerJSON("alunosDB", []); }
-function salvarAlunosDB(v){ salvarJSON("alunosDB", Array.isArray(v) ? v : []); }
-
-// alunosAliasesDB: { aliasKey: alunoId }
-function lerAliasesDB(){ return lerJSON("alunosAliasesDB", {}); }
-function salvarAliasesDB(v){ salvarJSON("alunosAliasesDB", (v && typeof v === "object") ? v : {}); }
-
-function lerAtasDB(){ return lerJSON("atasDB", []); }
-function salvarAtasDB(v){ salvarJSON("atasDB", Array.isArray(v) ? v : []); }
-
-function lerMatriculasDB(){ return lerJSON("matriculasDB", []); }
-function salvarMatriculasDB(v){ salvarJSON("matriculasDB", Array.isArray(v) ? v : []); }
-
-function lerTurmasMetaDB(){ return lerJSON("turmasMetaDB", []); }
-function salvarTurmasMetaDB(v){ salvarJSON("turmasMetaDB", Array.isArray(v) ? v : []); }
-
-function normNome(s){
-  return String(s||"")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-    .replace(/[^a-z0-9\s]/g,"")
-    .replace(/\s+/g," ");
 }
 
 // proximoAlunoId removido — use window.Identidade.findOrCreate()
@@ -1615,9 +1231,6 @@ async function garantirIdsESistemaParaTurma(turmaObj){
    Seleção de turma (ano → turma) — a turma já existe, criada em
    cadastro-turmas.html. Esta página só lê metadados dela e edita `alunos`.
 ========================= */
-let modoEdicao = false;        // reaproveitado por atualizarBotaoStatusTurma/inativar/reativar
-let idTurmaEditando = "";      // = turmaIdAtual, mantido por compat com essas funções
-let turmaEditandoObj = null;   // = turmaAtual, idem
 let turmaAtual = null;
 let turmaIdAtual = "";
 let TURMAS_CACHE_ATAS = [];
@@ -1680,7 +1293,6 @@ function habilitarFormAluno(habilitado) {
   const grid = $("formGridDinamico");
   if (grid) grid.querySelectorAll("input, select").forEach(el => el.disabled = !habilitado);
   document.querySelectorAll('#cardAlunos .actions .btn').forEach(btn => {
-    if (btn.id === 'btnInativarTurma' || btn.id === 'btnReativarTurma') return; // essas têm sua própria regra
     btn.disabled = !habilitado;
   });
   const aviso = $("avisoSemTurma");
@@ -1704,7 +1316,7 @@ function atualizarInfoTurmaSelecionada() {
  */
 async function selecionarTurma(turmaId) {
   if (!turmaId) {
-    turmaAtual = null; turmaIdAtual = ""; modoEdicao = false; idTurmaEditando = ""; turmaEditandoObj = null;
+    turmaAtual = null; turmaIdAtual = "";
     SCHEMA_ATIVO = null;
     seriesTurma = [];
     alunos = [];
@@ -1712,7 +1324,6 @@ async function selecionarTurma(turmaId) {
     renderTheadDinamico();
     atualizarTabela();
     habilitarFormAluno(false);
-    atualizarBotaoStatusTurma();
     if (window.initScans) window.initScans("", false);
     return;
   }
@@ -1722,9 +1333,6 @@ async function selecionarTurma(turmaId) {
 
   turmaAtual = turma;
   turmaIdAtual = turmaId;
-  modoEdicao = true;
-  idTurmaEditando = turmaId;
-  turmaEditandoObj = turma;
 
   SCHEMA_ATIVO = turma.schemaSnapshot ? normalizeSchema(turma.schemaSnapshot) : normalizeSchema(getDefaultConfig());
 
@@ -1742,7 +1350,6 @@ async function selecionarTurma(turmaId) {
 
   atualizarInfoTurmaSelecionada();
   habilitarFormAluno(true);
-  atualizarBotaoStatusTurma();
 
   if (window.initScans) window.initScans(turmaId, true);
 }
@@ -1947,84 +1554,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </script>
 
-<script>
-/* =========================
-   Status da turma (Ativa/Inativa)
-========================= */
-function atualizarBotaoStatusTurma() {
-  const btnInativar = document.getElementById('btnInativarTurma');
-  const btnReativar = document.getElementById('btnReativarTurma');
-  if (!modoEdicao) {
-    if (btnInativar) btnInativar.style.display = 'none';
-    if (btnReativar) btnReativar.style.display = 'none';
-    return;
-  }
-  const status = String(turmaEditandoObj?.status || 'ATIVA').toUpperCase();
-  if (btnInativar) btnInativar.style.display = status === 'INATIVA' ? 'none' : 'inline-flex';
-  if (btnReativar) btnReativar.style.display = status === 'INATIVA' ? 'inline-flex' : 'none';
-}
-
-async function confirmarInativacaoTurma() {
-  if (!modoEdicao || !idTurmaEditando) return;
-
-  const ok = await _confirmModal({
-    titulo: '⚠️ Inativar esta turma?',
-    corpo: 'Ela deixa de aparecer na pesquisa de atas, mas os dados continuam salvos e podem ser reativados aqui mesmo depois.',
-    corDestaque: '#b91c1c',
-    textoConfirmar: 'Sim, inativar',
-  });
-  if (!ok) return;
-
-  const btn = document.getElementById('btnInativarTurma');
-  if (btn) { btn.disabled = true; btn.textContent = 'Inativando…'; }
-  _toastLoading('⏳ Inativando…');
-
-  try {
-    const _id = turmaEditandoObj?._id || turmaEditandoObj?.id || turmaEditandoObj?.turmaId || idTurmaEditando;
-    await window.DB.turmas.save({ _id, status: 'INATIVA' });
-    if (turmaEditandoObj) turmaEditandoObj.status = 'INATIVA';
-    _invalidarCacheTurmas();
-    atualizarBotaoStatusTurma();
-    _toastSucesso('✅ Turma inativada. Não aparece mais na pesquisa de atas — os dados continuam salvos.');
-  } catch(err) {
-    console.error('[inativarTurma]', err);
-    _toastErro('❌ Erro ao inativar a turma: ' + err.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🚫 Inativar turma'; }
-  }
-}
-
-async function reativarTurma() {
-  if (!modoEdicao || !idTurmaEditando) return;
-
-  const ok = await _confirmModal({
-    titulo: '✅ Reativar esta turma?',
-    corpo: 'Ela volta a aparecer na pesquisa de atas normalmente.',
-    corDestaque: '#166534',
-    textoConfirmar: 'Sim, reativar',
-  });
-  if (!ok) return;
-
-  const btn = document.getElementById('btnReativarTurma');
-  if (btn) { btn.disabled = true; btn.textContent = 'Reativando…'; }
-  _toastLoading('⏳ Reativando…');
-
-  try {
-    const _id = turmaEditandoObj?._id || turmaEditandoObj?.id || turmaEditandoObj?.turmaId || idTurmaEditando;
-    await window.DB.turmas.save({ _id, status: 'ATIVA' });
-    if (turmaEditandoObj) turmaEditandoObj.status = 'ATIVA';
-    _invalidarCacheTurmas();
-    atualizarBotaoStatusTurma();
-    _toastSucesso('✅ Turma reativada.');
-  } catch(err) {
-    console.error('[reativarTurma]', err);
-    _toastErro('❌ Erro ao reativar a turma: ' + err.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '✅ Reativar turma'; }
-  }
-}
-</script>
-
 <script id="atas-scans-js">
 (function(){
   const API_UPLOAD = '/api/atas-upload';
@@ -2160,10 +1689,10 @@ async function reativarTurma() {
   window.initScans = function(turmaId, modoEdit){
     if(!turmaId) return;
     _turmaId = String(turmaId);
-    mostrarScans();
     if(modoEdit) _carregarScans();
-    // No modo criação, oculta o botão após salvar (card já aberto)
-    // No modo edição, mantém o botão visível para o usuário poder abrir/fechar
+    // Carrega os scans em segundo plano, mas só ABRE o card quando o usuário
+    // clicar no botão "📄 Scans" (toggleScans → mostrarScansAviso).
+    // No modo criação, oculta o botão até a turma ser salva.
     if(!modoEdit){
       const btn = document.getElementById('btnContinuarScans');
       if(btn) btn.style.display = 'none';
@@ -2194,8 +1723,6 @@ async function reativarTurma() {
   function _renderExistente(f){
     const lista = document.getElementById('scansLista');
     if(!lista) return;
-    const wrap = document.getElementById('scansWrap');
-    if(wrap) wrap.style.display = 'block';
     const div = document.createElement('div');
     div.className = 'scans-item scan-existente';
     div.innerHTML =
