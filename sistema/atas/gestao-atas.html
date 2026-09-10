@@ -1490,11 +1490,25 @@ function _prefixosBusca(nome){
  * rede razoável de candidatos sem carregar a coleção inteira, depois
  * pontua todos por similaridade() de nome completo e descarta quem não
  * bate o corte — o prefixo curto é só pra achar quem vale a pena comparar.
+ *
+ * @param {string} nome
+ * @param {Map} [cachePrefixo] — cache em memória, escopado a UMA análise
+ *   (declarado dentro de analisarSelecionadas, não é global). Nome comum
+ *   brasileiro repete muito prefixo curto dentro da mesma turma/planilha
+ *   ("Maria"/"Mariana" → "mari") — sem isso, cada linha repetiria a mesma
+ *   query no Firestore. Nunca atravessa duas análises diferentes: o
+ *   catálogo pode ter mudado entre uma e outra (ex.: outra pessoa
+ *   importando ao mesmo tempo, ou um vínculo manual em idaluno.html).
  */
-async function _candidatosCatalogo(nome){
+async function _candidatosCatalogo(nome, cachePrefixo){
   const prefixos = _prefixosBusca(nome);
   if (!prefixos.length) return [];
-  const listas = await Promise.all(prefixos.map(p => window.Identidade.buscarAtasPorNome(p, 25)));
+  const listas = await Promise.all(prefixos.map(async p => {
+    if (cachePrefixo && cachePrefixo.has(p)) return cachePrefixo.get(p);
+    const achados = await window.Identidade.buscarAtasPorNome(p, 25);
+    if (cachePrefixo) cachePrefixo.set(p, achados);
+    return achados;
+  }));
   const porId = new Map();
   for (const lista of listas) for (const a of lista) porId.set(a.alunoId, a);
   return [...porId.values()]
@@ -1509,6 +1523,25 @@ function _candidatosNoLote(nome, jaProcessados){
   return jaProcessados
     .map(p => ({ origem:'lote', ref:p, nome:p.nomeAluno, anoLetivo:p.anoLetivo, score:similaridade(nome, p.nomeAluno) }))
     .filter(c => c.score >= SIMILARIDADE_CUT);
+}
+
+// Mesma regra de "ano mais próximo do ano-ativo" usada por
+// identidade-aluno.js (recalcularUltimoAnoRegistroBatch/_anoMaisProximo),
+// reaplicada aqui só pra escolher, dentro de um grupo 100% novo (nenhum ID
+// de catálogo envolvido) que atravessa vários anos letivos no mesmo lote,
+// qual ocorrência vira a "semente" (nome) do alunoId a criar. Não decide
+// ultimoAnoRegistro — isso é recalculado à parte depois que as matrículas
+// do grupo inteiro já estiverem salvas, então não depende desta escolha.
+function _ocorrenciaMaisProximaDoAnoAtivo(ocorrencias, anoAtivo) {
+  const validos = ocorrencias.map(o => Number(o._anoLetivoOcorrencia)).filter(Number.isFinite);
+  if (!validos.length) return ocorrencias[0];
+  const ativo = Number(anoAtivo);
+  const anteriores = Number.isFinite(ativo) ? validos.filter(a => a <= ativo) : [];
+  let alvo;
+  if (anteriores.length) alvo = Math.max(...anteriores);
+  else if (!Number.isFinite(ativo)) alvo = Math.max(...validos);
+  else alvo = validos.reduce((m,a) => Math.abs(a-ativo) < Math.abs(m-ativo) ? a : m);
+  return ocorrencias.find(o => Number(o._anoLetivoOcorrencia) === alvo) || ocorrencias[0];
 }
 
 async function analisarSelecionadas() {
@@ -1527,6 +1560,16 @@ async function analisarSelecionadas() {
   try {
     const turmasDB=lerTurmasDB(); // estado atual, real — só lido, não alterado aqui
     const abasValidas=[], resultadosAbasBloqueadas=[];
+
+    // Ano-ativo só é usado aqui pra decidir qual ocorrência "semeia" o nome
+    // de um alunoId 100% novo quando o mesmo aluno aparece em vários anos
+    // letivos dentro do próprio lote (ver resolução de componentes mais
+    // abaixo) — não afeta leitura/gravação de mais nada nesta fase.
+    let anoAtivoAtual = null;
+    try {
+      const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
+      anoAtivoAtual = dadosEscola?.configAnoAtivo ?? null;
+    } catch(e) { console.warn('[analisarSelecionadas] não foi possível ler configAnoAtivo:', e.message); }
 
     for (const abaName of selecionadas) {
       const ws=_workbook.Sheets[abaName];
@@ -1573,7 +1616,36 @@ async function analisarSelecionadas() {
     // confirmarImportacao(), depois da revisão humana.
     const pendenciasIdentidade=[];
     const jaProcessados=[]; // {nomeAluno, anoLetivo, serieDisplay, resultado, aluno} em ordem de processamento
+    const cachePrefixo=new Map(); // escopado a ESTA análise — ver nota em _candidatosCatalogo
     let pendCount=0;
+
+    // ── Union-find escopado a ESTA análise (grupos auto-qualificados) ──
+    // Nós são objetos: ocorrências (`aluno`) e "âncoras" de catálogo — um
+    // nó virtual por alunoId já existente que aparece como candidato auto-
+    // qualificado de alguém (não cria nada no Firestore, é só pra achar
+    // componentes conexos em memória). Resolvido só depois que TODAS as
+    // abas selecionadas já passaram pelo loop de linhas, porque um grupo
+    // pode atravessar abas diferentes.
+    const _ufParent=new Map();
+    function _ufFind(x){
+      if (!_ufParent.has(x)) _ufParent.set(x, x);
+      let raiz=x;
+      while (_ufParent.get(raiz)!==raiz) raiz=_ufParent.get(raiz);
+      let cur=x;
+      while (_ufParent.get(cur)!==raiz) { const prox=_ufParent.get(cur); _ufParent.set(cur, raiz); cur=prox; }
+      return raiz;
+    }
+    function _ufUnion(a,b){
+      const ra=_ufFind(a), rb=_ufFind(b);
+      if (ra!==rb) _ufParent.set(ra, rb);
+    }
+    const _anchorNodes=new Map(); // alunoId -> nó âncora {__anchor:true, alunoId}
+    const _anchorNomes=new Map(); // alunoId -> nome (só pra exibir em caso de conflito)
+    function _anchorNode(alunoId, nome){
+      if (!_anchorNodes.has(alunoId)) _anchorNodes.set(alunoId, { __anchor:true, alunoId });
+      if (nome && !_anchorNomes.has(alunoId)) _anchorNomes.set(alunoId, nome);
+      return _anchorNodes.get(alunoId);
+    }
 
     let batchIdx=0, idsNovosEstimados=0, idsVinculadosAuto=0;
     const itensBuffer=[];
@@ -1601,7 +1673,7 @@ async function analisarSelecionadas() {
         }
 
         // ── Candidatos: catálogo (alunos-atas) + mesma análise (outras abas) ──
-        const candCatalogo = await _candidatosCatalogo(nomeAluno);
+        const candCatalogo = await _candidatosCatalogo(nomeAluno, cachePrefixo);
         const candLote = _candidatosNoLote(nomeAluno, jaProcessados);
         const candidatos = [...candCatalogo, ...candLote].map(c => {
           const ultimo = c.origem==='catalogo'
@@ -1610,6 +1682,8 @@ async function analisarSelecionadas() {
           const traj = avaliarTrajetoria(ultimo, {anoLetivo:info.anoLetivo, serieDisplay:aluno.serie});
           return { ...c, traj };
         });
+
+        aluno._anoLetivoOcorrencia = info.anoLetivo; // só usado na resolução de grupos 100% novos (recência)
 
         const viaveis = candidatos.filter(c => c.traj.status !== 'vermelho');
         let trajStatusLinha='verde', trajMotivoLinha='';
@@ -1623,13 +1697,26 @@ async function analisarSelecionadas() {
           const melhor = viaveis[0];
           trajStatusLinha = melhor.traj.status;
           trajMotivoLinha = melhor.traj.motivo;
-          if (melhor.origem==='catalogo' && melhor.score>=SIMILARIDADE_AUTO && melhor.traj.status==='verde') {
-            // Alta confiança: nome quase idêntico + candidato já no
-            // catálogo + trajetória perfeitamente coerente. Vincula sem
-            // perguntar (mesmo padrão de confiança que idaluno.html usava
-            // pra decisão automática antes da checagem manual).
-            aluno._decisao = { tipo:'vincularCatalogo', alunoId:melhor.alunoId };
-            idsVinculadosAuto++;
+
+          // Auto-confiança: nome quase idêntico + trajetória perfeitamente
+          // coerente — de QUALQUER origem, catálogo (Firestore) OU lote
+          // (outra ocorrência desta mesma análise, ex.: mesmo aluno em anos
+          // letivos diferentes dentro do próprio xlsx). Pode haver mais de
+          // um candidato auto-qualificado ao mesmo tempo (ex.: bate com o
+          // catálogo E com outra linha do lote) — normal, os três só
+          // entram no mesmo grupo. A decisão final (vincular/criar/virar
+          // pendência por conflito) só sai depois que TODAS as ocorrências
+          // desta análise passarem por aqui — ver resolução de componentes
+          // logo após o loop de abas.
+          const auto = viaveis.filter(c => c.score>=SIMILARIDADE_AUTO && c.traj.status==='verde');
+
+          if (auto.length) {
+            for (const c of auto) {
+              if (c.origem==='catalogo') _ufUnion(aluno, _anchorNode(c.alunoId, c.nome));
+              else _ufUnion(aluno, c.ref.aluno);
+            }
+            aluno._decisao = { tipo:'novo' }; // provisório — a resolução de componentes decide de verdade
+            aluno._autoResolvido = true;
           } else {
             // Ambíguo — nome parecido (score ${melhor.score}), mas não o
             // suficiente pra decidir sozinho (candidato de outra planilha
@@ -1670,6 +1757,65 @@ async function analisarSelecionadas() {
       const badge=(info.anoLetivo?(avisoAno?'ANO ⚠️':'ANO OK'):'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
 
       itensBuffer.push({abaName, turma, statusTurma, badge, divergencias, qtdAlunos:novos.length});
+    }
+
+    // ── Resolução de componentes auto-qualificados (após TODAS as abas) ──
+    // Um grupo pode atravessar abas diferentes (ex.: mesmo aluno em 2023
+    // numa aba e 2024 noutra) — só dá pra fechar depois que todo mundo já
+    // passou pelo loop acima e gerou suas uniões.
+    const _porRaizUF=new Map();
+    for (const no of _ufParent.keys()) {
+      const raiz=_ufFind(no);
+      if (!_porRaizUF.has(raiz)) _porRaizUF.set(raiz, []);
+      _porRaizUF.get(raiz).push(no);
+    }
+    for (const membros of _porRaizUF.values()) {
+      const ancoras=[...new Set(membros.filter(n=>n.__anchor).map(n=>n.alunoId))];
+      const ocorrencias=membros.filter(n=>!n.__anchor && n._autoResolvido);
+      if (!ocorrencias.length) continue; // componente só de âncora, sem ocorrência real unida (não deve acontecer)
+
+      if (ancoras.length===1) {
+        // Todo o grupo vincula ao mesmo ID já existente no catálogo — um
+        // só vira "raiz" pra chamar vincularAtasExplicito uma única vez em
+        // confirmarImportacao(), os demais puxam dele via grupoDe.
+        const [representante, ...resto]=ocorrencias;
+        representante._decisao={ tipo:'vincularCatalogo', alunoId:ancoras[0] };
+        for (const oc of resto) oc._decisao={ tipo:'agruparLote', comAluno:representante };
+        idsVinculadosAuto += ocorrencias.length;
+        idsNovosEstimados -= ocorrencias.length; // essas linhas tinham sido contadas como 'novo' provisoriamente
+      } else if (ancoras.length===0) {
+        // Pessoa nova, mas aparece em anos letivos diferentes dentro do
+        // próprio lote — um só ID novo pro grupo inteiro (não um por
+        // ocorrência). A ocorrência do ano mais próximo do ano-ativo vira
+        // a "semente" (nome) do cadastro novo; ultimoAnoRegistro é
+        // recalculado à parte depois que as matrículas do grupo já
+        // estiverem salvas, então não depende de qual foi escolhida aqui.
+        const representante=_ocorrenciaMaisProximaDoAnoAtivo(ocorrencias, anoAtivoAtual);
+        representante._decisao={ tipo:'novo' };
+        for (const oc of ocorrencias) {
+          if (oc!==representante) oc._decisao={ tipo:'agruparLote', comAluno:representante };
+        }
+        idsNovosEstimados -= (ocorrencias.length-1); // grupo inteiro conta como 1 novo, não N
+      } else {
+        // Conflito: o grupo bate com 2+ IDs de catálogo diferentes ao
+        // mesmo tempo — decisão de qual ID (se algum) é humana. Pode ser
+        // sinal de duplicata pré-existente no catálogo, não é um erro
+        // necessariamente deste import. Cada ocorrência do grupo vira
+        // pendência individual, com um <select> em vez de checkbox (ver
+        // renderRevisaoImportacao).
+        for (const oc of ocorrencias) {
+          pendCount++;
+          const chave=`pendId_${pendCount}`;
+          oc._pendenciaChave=chave;
+          oc._decisao={ tipo:'novo' };
+          pendenciasIdentidade.push({
+            chave, aluno:oc, nomeAluno:oc.nome,
+            candidato:{ origem:'conflito', alunoIds:ancoras, nomes:ancoras.map(id=>_anchorNomes.get(id)||id) },
+            scorePct:100,
+            conflito:true,
+          });
+        }
+      }
     }
 
     _bufferImportacao={itens:itensBuffer, resultadosAbasBloqueadas, idsNovosEstimados, idsVinculadosAuto, pendenciasIdentidade};
@@ -1738,6 +1884,18 @@ function renderRevisaoImportacao(buffer){
         `Desmarcado (padrão): entra como aluno novo. Marcado: usa o mesmo alunoId do candidato — nenhum ID novo é gasto.`+
       `</div>`+
       pendencias.map(p => {
+        if (p.conflito) {
+          const opcoes = p.candidato.alunoIds.map((id,i) =>
+            `<option value="${esc(id)}">${esc(p.candidato.nomes[i])} (${esc(id)})</option>`
+          ).join('');
+          return `<div style="padding:6px 0;font-size:13px;border-top:1px dashed rgba(146,64,14,0.3);">`+
+            `<div><b>${esc(p.nomeAluno)}</b> bate ao mesmo tempo com <b>${p.candidato.alunoIds.length} cadastros diferentes</b> já existentes no catálogo — possível duplicata pré-existente, só um humano decide:</div>`+
+            `<select id="sel_${p.chave}" style="margin-top:4px;">`+
+              `<option value="">— aluno novo (nenhum dos dois) —</option>`+
+              opcoes+
+            `</select>`+
+          `</div>`;
+        }
         const origemTxt = p.candidato.origem==='catalogo'
           ? `já no catálogo (${esc(p.candidato.alunoId)})`
           : `outra aba desta mesma importação (${esc(p.candidato.ref.anoLetivo||'?')})`;
@@ -1821,7 +1979,33 @@ async function confirmarImportacao(){
       return cur;
     }
 
+    // ── 1a. Semeia o grupoDe com as uniões automáticas já decididas na
+    // análise (mesmo aluno em anos letivos diferentes, dentro do próprio
+    // lote e/ou batendo com o catálogo — ver resolução de componentes em
+    // analisarSelecionadas). SEMPRE antes dos checkboxes manuais abaixo,
+    // porque uma pendência marcada manualmente pode apontar pra um aluno
+    // que já é não-raiz de um grupo automático.
+    for (const it of _bufferImportacao.itens) {
+      for (const a of it.turma.alunos) {
+        if (a._decisao?.tipo === 'agruparLote' && a._decisao.comAluno) {
+          grupoDe.set(a, a._decisao.comAluno);
+        }
+      }
+    }
+
+    // ── 1b. Aplica as escolhas marcadas manualmente na revisão ──
+    // Desmarcado (padrão) = já está como 'novo', nada a fazer. Marcado:
+    // 'catalogo' aponta pro alunoId já existente; 'lote' agrupa com o
+    // candidato de outra aba desta mesma análise. Conflito (2+ âncoras):
+    // usa o valor escolhido no <select> — um dos IDs em conflito, ou vazio
+    // (mantém 'novo', já é o default desde a análise).
     for (const p of (_bufferImportacao.pendenciasIdentidade||[])) {
+      if (p.conflito) {
+        const sel = document.getElementById(`sel_${p.chave}`);
+        const escolha = sel ? sel.value : '';
+        if (escolha) p.aluno._decisao = { tipo:'vincularCatalogo', alunoId:escolha };
+        continue;
+      }
       const chk = document.getElementById(`chk_${p.chave}`);
       if (!chk || !chk.checked) continue;
       if (p.candidato.origem === 'catalogo') {
