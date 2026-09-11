@@ -565,6 +565,18 @@ function renderFormularioDinamico() {
     `;
   }
 
+  // Botão de excluir matrícula — só aparece quando se está editando um aluno
+  // já lançado (via "Editar" na tabela), nunca ao cadastrar um novo. Fica
+  // sozinho no fim da grade de notas, vermelho, pra não ser clicado por engano.
+  html += `
+    <div class="campo" id="wrapExcluirAluno" style="display:none; grid-column:1/-1; align-items:flex-start;">
+      <button type="button" id="btnExcluirAluno" class="btn" onclick="excluirAlunoEmEdicao()"
+              style="background:#991b1b;border-color:#991b1b;color:#fff;">
+        🗑️ Excluir aluno desta turma
+      </button>
+    </div>
+  `;
+
   grid.innerHTML = html;
 }
 
@@ -754,7 +766,72 @@ function limparCamposAluno() {
 
   if (schema.resultadoAtivo && $("resultado")) $("resultado").value = "Não informado";
 
+  _alunoEmEdicao = null;
+  const wrapExcluir = $("wrapExcluirAluno");
+  if (wrapExcluir) wrapExcluir.style.display = "none";
+
   if (nomeEl) nomeEl.focus();
+}
+
+/* ✅ Excluir matrícula (não apaga o alunoId/catálogo — só a matrícula
+   desta turma). Só fica disponível depois de clicar "Editar" na tabela. */
+async function excluirAlunoEmEdicao() {
+  if (!_alunoEmEdicao) return;
+
+  const nome = _alunoEmEdicao.nome || "este aluno";
+  const ok = await _confirmModal({
+    titulo: "🗑️ Excluir matrícula?",
+    corpo: `Remove ${nome} desta turma.\n\nO cadastro do aluno (histórico/ID) NÃO é apagado — só a matrícula nesta turma. Essa ação não pode ser desfeita.`,
+    corDestaque: "#991b1b",
+    textoConfirmar: "Sim, excluir",
+  });
+  if (!ok) return;
+
+  const btn = $("btnExcluirAluno");
+  if (btn) { btn.disabled = true; btn.textContent = "Excluindo…"; }
+
+  try {
+    const alunoId = String(_alunoEmEdicao.alunoId || "").trim();
+
+    // Só existe matrícula salva no Firestore se essa turma já foi salva
+    // com esse aluno antes (alunoId só é atribuído em garantirIdsESistemaParaTurma).
+    // Se for um aluno recém-adicionado nesta sessão (ainda não salvo), o
+    // splice() do editarAluno() já é suficiente — não há nada no banco pra apagar.
+    if (alunoId && turmaIdAtual) {
+      const mid = idMatriculaFrom(turmaIdAtual, alunoId);
+      if (window.DB?.matriculas?.delete) {
+        await window.DB.matriculas.delete(mid);
+      } else {
+        console.warn('[excluirAlunoEmEdicao] window.DB.matriculas.delete não encontrado — confirme o nome do método em db.firebase.js.');
+      }
+
+      // Mantém ultimoAnoRegistro do catálogo (alunos-atas) coerente após a
+      // remoção — mesma função usada em garantirIdsESistemaParaTurma().
+      if (window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+        const escola = await window.DB.escola.get();
+        const anoAtivoAtual = escola?.configAnoAtivo || null;
+        await window.Identidade.recalcularUltimoAnoRegistroBatch([alunoId], anoAtivoAtual);
+      }
+      // Remove esse aluno do doc da turma JÁ — só ele, a partir do que já
+      // está persistido (turmaAtual.alunos), sem tocar em nenhuma outra
+      // edição pendente na tela que ainda não passou por "Salvar no banco".
+      // Senão a turma ficaria listando um aluno cuja matrícula acabou de
+      // ser apagada, até alguém lembrar de salvar de novo.
+      const alunosPersistidos = Array.isArray(turmaAtual?.alunos)
+        ? turmaAtual.alunos.filter(x => String(x?.alunoId || "") !== alunoId)
+        : [];
+      await window.DB.turmas.save({ _id: turmaIdAtual, alunos: alunosPersistidos });
+      if (turmaAtual) turmaAtual.alunos = alunosPersistidos;
+    }
+
+    limparCamposAluno();
+    _toastSucesso(`✅ Matrícula de ${nome} excluída desta turma.`);
+  } catch (err) {
+    console.error("[excluirAlunoEmEdicao]", err);
+    _toastErro("❌ Erro ao excluir a matrícula: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "🗑️ Excluir aluno desta turma"; }
+  }
 }
 
 function ordenarAlunos() {
@@ -775,6 +852,7 @@ function ordenarAlunos() {
    aqui).
 ========================= */
 let _alunoCandidatoSelecionado = null; // { alunoId, nome, ultimoAnoRegistro } | null
+let _alunoEmEdicao = null; // cópia do aluno que foi retirado da lista pra edição (via "Editar") | null
 
 function _limparVinculoCandidato() {
   _alunoCandidatoSelecionado = null;
@@ -1008,6 +1086,12 @@ function editarAluno(i) {
   if (a.alunoIdVinculado) {
     _selecionarCandidatoAluno(a.alunoIdVinculado, a.nome, null);
   }
+
+  // Guarda uma cópia (com alunoId, se essa matrícula já foi salva antes)
+  // pra permitir excluir a matrícula via botão, e mostra o botão.
+  _alunoEmEdicao = { ...a };
+  const wrapExcluir = $("wrapExcluirAluno");
+  if (wrapExcluir) wrapExcluir.style.display = "flex";
 
   alunos.splice(i, 1);
   atualizarTabela();
@@ -1355,13 +1439,21 @@ async function selecionarTurma(turmaId) {
 }
 
 /** Pré-seleciona ano+turma a partir de um turmaId (deep-link, ex.: ?turma=ID). */
-async function selecionarTurmaPorId(turmaId) {
+async function selecionarTurmaPorId(turmaId, travarSelects = false) {
   const turma = TURMAS_CACHE_ATAS.find(t => (t.turmaId || t.id || t._id) === turmaId);
   if (!turma) { _toastErro("❌ Turma não encontrada no banco."); return; }
   if ($("anoLetivoSelect")) $("anoLetivoSelect").value = String(turma.anoLetivo || "");
   carregarSelectTurma(turma.anoLetivo);
   if ($("turmaSelect")) $("turmaSelect").value = turmaId;
   await selecionarTurma(turmaId);
+
+  // Deep-link vindo de outra página (ex.: pesquisa) já chega sabendo
+  // exatamente qual turma quer editar — trava os selects pra evitar trocar
+  // de turma sem querer no meio da edição.
+  if (travarSelects) {
+    if ($("anoLetivoSelect")) $("anoLetivoSelect").disabled = true;
+    if ($("turmaSelect")) $("turmaSelect").disabled = true;
+  }
 }
 
 /* =========================
@@ -1542,7 +1634,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // deep-link opcional: ?turma=ID (aceita ?edit=ID também, por compat)
       const turmaParam = getQueryParam("turma") || getQueryParam("edit");
-      if (turmaParam) await selecionarTurmaPorId(turmaParam);
+      if (turmaParam) await selecionarTurmaPorId(turmaParam, /* travarSelects */ true);
 
     } catch(e) {
       console.error('[DOMContentLoaded]', e);

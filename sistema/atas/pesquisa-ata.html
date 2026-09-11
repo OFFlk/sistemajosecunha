@@ -328,7 +328,7 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
         <div class="detalhe-actions">
           <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
           <button class="btn primary" type="button" onclick="exportarPDFDaTurma()">Exportar PDF</button>
-          <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">✏️ Editar turma</button>
+          <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
           <button class="btn" id="btnEditarNotas" type="button" onclick="abrirPainelNotas()">✏️ Inserir notas</button>
           <button class="btn secondary small" type="button" onclick="fecharTurma()" style="margin-left:auto;">✕ Fechar</button>
         </div>
@@ -665,8 +665,11 @@ function editarTurmaSelecionada() {
     return;
   }
   
-  // Redireciona para a página de cadastro em modo de edição
-  window.location.href = `cadastro-turma.html?edit=${encodeURIComponent(turmaId)}`;
+  // Redireciona pra edição de alunos/notas da ata, já travado nesta turma
+  // (cadastro-atas.html trava os selects de ano/turma quando vem via ?turma=).
+  // Antes apontava pro arquivo antigo cadastro-turma.html (pré-divisão do
+  // módulo em cadastro-turmas.html + cadastro-atas.html) — retirado de uso.
+  window.location.href = `cadastro-atas.html?turma=${encodeURIComponent(turmaId)}`;
 }
 
 /* =========================
