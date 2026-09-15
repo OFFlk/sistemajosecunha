@@ -799,10 +799,10 @@ async function excluirAlunoEmEdicao() {
     // splice() do editarAluno() já é suficiente — não há nada no banco pra apagar.
     if (alunoId && turmaIdAtual) {
       const mid = idMatriculaFrom(turmaIdAtual, alunoId);
-      if (window.DB?.matriculas?.delete) {
-        await window.DB.matriculas.delete(mid);
+      if (window.DB?.matriculas?.remove) {
+        await window.DB.matriculas.remove(mid);
       } else {
-        console.warn('[excluirAlunoEmEdicao] window.DB.matriculas.delete não encontrado — confirme o nome do método em db.firebase.js.');
+        console.warn('[excluirAlunoEmEdicao] window.DB.matriculas.remove não encontrado — confirme o nome do método em db.firebase.js.');
       }
 
       // Mantém ultimoAnoRegistro do catálogo (alunos-atas) coerente após a
