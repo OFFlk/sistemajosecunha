@@ -1435,15 +1435,24 @@ function toggleAba(idx,val)  { _abasInfo[idx].checked=val; }
    evita gastar número de ID (contador atômico, nunca reaproveita) num nome
    repetido que já ia precisar ser fundido manualmente de qualquer jeito.
 ========================= */
-function similaridade(a,b){
-  const nA = window.Identidade.normNome(a), nB = window.Identidade.normNome(b);
+/* =========================
+   Similaridade de nome — comparação por token (não mais string inteira).
+   Motivo da mudança (achado no teste do import grande, 136 turmas): rodar
+   Jaro-Winkler direto na string inteira deixa um sobrenome comum e longo
+   (ex.: "DOS SANTOS", "OLIVEIRA SILVA") dominar o placar de caracteres
+   batidos, mesmo quando o primeiro/segundo nome é completamente diferente
+   — produzia 85-90% pra pessoas claramente diferentes só por
+   compartilharem sobrenome de família, e por outro lado descontava até 5%
+   só por causa de um "DA"/"DE" faltando num erro de digitação óbvio.
+   Ex.: "JAIRO BORGES DOS SANTOS" x "CARLOS RIBEIRO DOS SANTOS" dava 86%.
+========================= */
+function _jaroWinkler(nA, nB){
   if (!nA || !nB) return 0;
   if (nA === nB) return 1;
-
   const mDist = Math.floor(Math.max(nA.length, nB.length)/2)-1;
+  if (mDist < 0) return 0;
   const aMatch = new Array(nA.length).fill(false);
   const bMatch = new Array(nB.length).fill(false);
-
   let matches = 0;
   for (let i=0;i<nA.length;i++){
     const start = Math.max(0, i-mDist);
@@ -1455,7 +1464,6 @@ function similaridade(a,b){
     }
   }
   if (!matches) return 0;
-
   let t = 0, k = 0;
   for (let i=0;i<nA.length;i++){
     if (!aMatch[i]) continue;
@@ -1464,7 +1472,6 @@ function similaridade(a,b){
     k++;
   }
   t = t/2;
-
   const jaro = (matches/nA.length + matches/nB.length + (matches-t)/matches)/3;
   let l = 0;
   for (; l<4 && l<nA.length && l<nB.length && nA[l]===nB[l]; l++);
@@ -1472,7 +1479,43 @@ function similaridade(a,b){
   return jaro + l*p*(1-jaro);
 }
 
-const SIMILARIDADE_CUT = 0.85;  // mesmo padrão default de idaluno.html
+// "de/da/do/das/dos" são artigos de ligação sem valor pra distinguir
+// pessoas — erro de digitação comum é esquecer/inserir um deles, então
+// tiram esses tokens ANTES de comparar (em vez de deixar o Jaro-Winkler
+// penalizar por causa deles).
+const _PARTICULAS_NOME = new Set(['de','da','do','das','dos']);
+function _tokensNome(nome){
+  return window.Identidade.normNome(nome).split(' ').filter(t => t && !_PARTICULAS_NOME.has(t));
+}
+
+function similaridade(a,b){
+  const nA = window.Identidade.normNome(a), nB = window.Identidade.normNome(b);
+  if (!nA || !nB) return 0;
+  if (nA === nB) return 1;
+
+  const tA = _tokensNome(a), tB = _tokensNome(b);
+  if (tA.length && tB.length && tA.length === tB.length) {
+    // Mesmo número de palavras (fora os artigos de ligação) — compara
+    // palavra a palavra, mesma posição, e combina por MÉDIA GEOMÉTRICA
+    // (não média simples): uma palavra muito diferente (tipicamente o
+    // primeiro/segundo nome, o que de fato distingue pessoas) derruba o
+    // placar geral, mesmo que o resto (sobrenome comum) bata perfeito.
+    let prod = 1;
+    for (let i=0;i<tA.length;i++) prod *= Math.max(_jaroWinkler(tA[i], tB[i]), 0.0001);
+    return Math.pow(prod, 1/tA.length);
+  }
+
+  // Número de palavras diferente (nome do meio composto adicionado/
+  // removido, por exemplo) — sem um jeito barato de realinhar direito,
+  // cai pro Jaro-Winkler na string inteira (mesmo comportamento de antes,
+  // mais tolerante a esse caso específico).
+  return _jaroWinkler(nA, nB);
+}
+
+const SIMILARIDADE_CUT = 0.88;  // subido de 85% pra 88% — teste do import grande (136 turmas)
+                                 // mostrou pares de pessoas DIFERENTES com mesmo sobrenome
+                                 // comum passando de 85% mesmo após o fix de comparação por
+                                 // token (ex.: MARIA LUCIA x MARIA RAIMUNDA ALVES DOS SANTOS = 86%)
 const SIMILARIDADE_AUTO = 0.94; // acima disso + trajetória verde + catálogo = vincula sem perguntar
 
 // Prefixo curto (até 4 chars) do 1º e do último token do nome — usado só
@@ -1537,6 +1580,20 @@ function _candidatosNoLote(nome, jaProcessados){
 // qual ocorrência vira a "semente" (nome) do alunoId a criar. Não decide
 // ultimoAnoRegistro — isso é recalculado à parte depois que as matrículas
 // do grupo inteiro já estiverem salvas, então não depende desta escolha.
+// Mesmo critério de identidade-aluno.js (_melhorNome): entre duas grafias
+// do "mesmo" nome dentro de um grupo, prefere a mais completa (mais longa)
+// e dá uma pequena vantagem a quem tem acento — indício de digitação mais
+// cuidadosa. É só um PALPITE razoável, não uma decisão confiável em todo
+// caso (nome maior nem sempre é o certo) — se sair errado, corrige depois
+// em idaluno.html, que tem um botão "✏️ Renomear este aluno" pra isso,
+// sem precisar mexer direto no Firestore.
+function _melhorNomeLocal(a, b) {
+  if (!a) return b || '';
+  if (!b) return a;
+  const temAcento = s => /[\u00C0-\u00FF]/.test(s);
+  return (b.length + (temAcento(b)?10:0)) > (a.length + (temAcento(a)?10:0)) ? b : a;
+}
+
 function _ocorrenciaMaisProximaDoAnoAtivo(ocorrencias, anoAtivo) {
   const validos = ocorrencias.map(o => Number(o._anoLetivoOcorrencia)).filter(Number.isFinite);
   if (!validos.length) return ocorrencias[0];
@@ -1742,7 +1799,7 @@ async function analisarSelecionadas() {
 
         aluno._trajStatus=trajStatusLinha; aluno._trajMotivo=trajMotivoLinha;
         if (trajStatusLinha==='vermelho') divergencias.push(`🚫 [Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
-        else if (trajStatusLinha==='amarelo' && !aluno._pendenciaChave) divergencias.push(`[Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
+        else if (trajStatusLinha==='amarelo' && !aluno._pendenciaChave && !aluno._autoResolvido) divergencias.push(`[Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
 
         jaProcessados.push({ nomeAluno, anoLetivo:info.anoLetivo, serieDisplay:aluno.serie, resultado:aluno.resultado, aluno, abaName });
         if (aluno._decisao.tipo==='novo') idsNovosEstimados++;
@@ -1797,6 +1854,12 @@ async function analisarSelecionadas() {
         // recalculado à parte depois que as matrículas do grupo já
         // estiverem salvas, então não depende de qual foi escolhida aqui.
         const representante=_ocorrenciaMaisProximaDoAnoAtivo(ocorrencias, anoAtivoAtual);
+        // A ocorrência mais recente decide ultimoAnoRegistro (via
+        // recência), mas a GRAFIA do nome usa o critério de melhor-nome
+        // entre TODAS as ocorrências do grupo — evita gravar
+        // acidentalmente uma versão com erro de digitação só porque
+        // calhou de ser a ocorrência mais próxima do ano-ativo.
+        representante._nomeCadastroSugerido = ocorrencias.reduce((m,o) => _melhorNomeLocal(m, o.nome), '');
         representante._decisao={ tipo:'novo' };
         for (const oc of ocorrencias) {
           if (oc!==representante) oc._decisao={ tipo:'agruparLote', comAluno:representante };
@@ -2032,7 +2095,7 @@ async function confirmarImportacao(){
 
     let idsCriados=0, idsVinculados=0;
     if (raizesNovo.length) {
-      const criados = await window.Identidade.criarAtasBatch(raizesNovo.map(r => ({ nome:r.nome })));
+      const criados = await window.Identidade.criarAtasBatch(raizesNovo.map(r => ({ nome: r._nomeCadastroSugerido || r.nome })));
       raizesNovo.forEach((r,i) => { r.alunoId = criados[i].alunoId; });
       idsCriados = criados.length;
     }
