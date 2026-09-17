@@ -473,6 +473,12 @@
     // uso antigo de `alunos` como catálogo do módulo — ver redesenho.
     'alunos-atas': makeCollection('alunos-atas'),
 
+    // Schema de matérias/colunas da ata (editado em schema_ata.html, lido
+    // por cadastro-turmas.html e gravado em turma.schemaSnapshot). Coleção
+    // própria, isolada de `schemas`/`schemasCH` (regras de Carga Horária,
+    // usadas só em histórico — módulo diferente, formato diferente).
+    atasSchemas: makeCollection('atasSchemas'),
+
     // Elo de confirmação cross-módulo: {alunoId, atasId, anoAtivoId,
     // idEngolido, nome, nomeBusca, cpf, vinculadoEm}. Só existe doc aqui
     // depois de fusão confirmada — exclusivamente em idaluno.html (decisão
