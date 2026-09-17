@@ -214,10 +214,10 @@
 <!-- Lógica específica desta página -->
 <script>
 /* =========================
-   Storage keys
+   Dados agora vivem só no Firestore (coleção DB.atasSchemas + campo
+   dadosEscola.atasSchemaAtivoId via DB.escola) — sem localStorage pra
+   dado nenhum, ver redesenho do módulo de Atas.
 ========================= */
-const SCHEMAS_KEY = "turmasSchemas_v1";
-const ACTIVE_SCHEMA_ID_KEY = "turmasSchemaActiveId_v1";
 
 /* =========================
    Default schema
@@ -251,48 +251,53 @@ function uid() {
 }
 
 function loadSchemas() {
+  return window.DB.atasSchemas.list()
+    .then(arr => Array.isArray(arr) ? arr.map(normalizeConfig) : [])
+    .catch(e => { console.warn('[loadSchemas]', e); return []; });
+}
+
+/** Salva UM schema (upsert por _id=id de negócio) e devolve a versão normalizada gravada. */
+async function saveSchema(schema) {
+  const normalized = normalizeConfig(schema);
+  await window.DB.atasSchemas.save({ _id: normalized.id, ...normalized });
+  return normalized;
+}
+
+async function removeSchema(id) {
+  await window.DB.atasSchemas.remove(id);
+}
+
+async function getActiveSchemaId() {
   try {
-    const raw = localStorage.getItem(SCHEMAS_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.map(normalizeConfig) : [];
-  } catch {
-    return [];
+    const escola = await window.DB.escola.get();
+    return escola?.atasSchemaAtivoId || "";
+  } catch (e) {
+    console.warn('[getActiveSchemaId]', e);
+    return "";
   }
 }
-
-function saveSchemas(arr) {
-  const normalized = arr.map(normalizeConfig);
-  localStorage.setItem(SCHEMAS_KEY, JSON.stringify(normalized));
-  try {
-    if (window.DB && window.DB.schemas && window.Auth && window.Auth.getSession())
-      window.DB.schemas.saveAll(normalized).catch(e => console.warn('Firestore schemas:', e));
-  } catch(_) {}
+async function setActiveSchemaId(id) {
+  await window.DB.escola.save({ atasSchemaAtivoId: id });
 }
 
-function getActiveSchemaId() {
-  return localStorage.getItem(ACTIVE_SCHEMA_ID_KEY) || "";
-}
-function setActiveSchemaId(id) {
-  localStorage.setItem(ACTIVE_SCHEMA_ID_KEY, id);
-}
-
-function ensureAtLeastOneSchema() {
-  let schemas = loadSchemas();
-  let activeId = getActiveSchemaId();
+async function ensureAtLeastOneSchema() {
+  let schemas = await loadSchemas();
+  let activeId = await getActiveSchemaId();
 
   if (!schemas.length) {
     const def = getDefaultConfig();
     def.id = uid();
     def.nome = def.nome || "Padrão (arquivo original)";
-    schemas = [def];
-    saveSchemas(schemas);
-    setActiveSchemaId(def.id);
-    return { schemas, activeId: def.id };
+    const salvo = await saveSchema(def);
+    schemas = [salvo];
+    activeId = salvo.id;
+    await setActiveSchemaId(activeId);
+    return { schemas, activeId };
   }
 
   if (!activeId || !schemas.some(s => s.id === activeId)) {
     activeId = schemas[0].id;
-    setActiveSchemaId(activeId);
+    await setActiveSchemaId(activeId);
   }
 
   return { schemas, activeId };
@@ -351,13 +356,13 @@ function renderSchemaSelect() {
   sel.onchange = () => onSelectSchema(sel.value);
 }
 
-function onSelectSchema(id) {
+async function onSelectSchema(id) {
   const found = SCHEMAS.find(s => s.id === id);
   if (!found) return;
 
   CONFIG = found;
   ACTIVE_ID = id;
-  setActiveSchemaId(id);
+  await setActiveSchemaId(id);
 
   renderSchemaSelect();
   render();
@@ -419,43 +424,41 @@ function onToggleSerie() {
   render();
 }
 
-function salvarConfig() {
+async function salvarConfig() {
   CONFIG.nome = document.getElementById("schemaNome").value.trim() || CONFIG.nome;
   CONFIG.serieAtiva = document.getElementById("flagSerie").value === "1";
   CONFIG.resultadoAtivo = document.getElementById("flagResultado").value === "1";
   CONFIG.ordenarPor = document.getElementById("ordenacao").value === "numero" ? "numero" : "nome";
 
-  CONFIG = normalizeConfig(CONFIG);
+  CONFIG = await saveSchema(CONFIG);
 
   const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
   if (idx >= 0) SCHEMAS[idx] = CONFIG;
   else SCHEMAS.push(CONFIG);
 
-  saveSchemas(SCHEMAS);
   showMsg("✅ Schema atualizado e salvo. (Vale para turmas novas)", "ok");
   renderSchemaSelect();
   render();
 }
 
-function resetarPadrao() {
+async function resetarPadrao() {
   if (!confirm("Resetar ESTE schema para o padrão do arquivo original? Isso vale para turmas novas.")) return;
 
   const def = getDefaultConfig();
   def.id = CONFIG.id;
   def.nome = CONFIG.nome || def.nome;
 
-  CONFIG = normalizeConfig(def);
+  CONFIG = await saveSchema(def);
 
   const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
   if (idx >= 0) SCHEMAS[idx] = CONFIG;
-  saveSchemas(SCHEMAS);
 
   showMsg("✅ Schema resetado para o padrão do arquivo original.", "ok");
   renderSchemaSelect();
   render();
 }
 
-function novoSchema() {
+async function novoSchema() {
   const nome = prompt("Nome do novo schema:", "Novo schema");
   if (!nome) return;
 
@@ -463,48 +466,47 @@ function novoSchema() {
   def.id = uid();
   def.nome = nome.trim();
 
-  SCHEMAS.push(normalizeConfig(def));
-  saveSchemas(SCHEMAS);
+  const salvo = await saveSchema(def);
+  SCHEMAS.push(salvo);
 
-  ACTIVE_ID = def.id;
-  setActiveSchemaId(ACTIVE_ID);
-  CONFIG = SCHEMAS.find(s => s.id === ACTIVE_ID);
+  ACTIVE_ID = salvo.id;
+  await setActiveSchemaId(ACTIVE_ID);
+  CONFIG = salvo;
 
   renderSchemaSelect();
   render();
   showMsg("✅ Novo schema criado e selecionado como padrão.", "ok");
 }
 
-function duplicarSchema() {
+async function duplicarSchema() {
   const nome = prompt("Nome do schema duplicado:", (CONFIG.nome || "Cópia") + " (cópia)");
   if (!nome) return;
 
-  const copy = normalizeConfig({ ...CONFIG, id: uid(), nome: nome.trim() });
+  const copy = { ...CONFIG, id: uid(), nome: nome.trim() };
+  const salvo = await saveSchema(copy);
+  SCHEMAS.push(salvo);
 
-  SCHEMAS.push(copy);
-  saveSchemas(SCHEMAS);
-
-  ACTIVE_ID = copy.id;
-  setActiveSchemaId(ACTIVE_ID);
-  CONFIG = copy;
+  ACTIVE_ID = salvo.id;
+  await setActiveSchemaId(ACTIVE_ID);
+  CONFIG = salvo;
 
   renderSchemaSelect();
   render();
   showMsg("✅ Schema duplicado e selecionado como padrão.", "ok");
 }
 
-function excluirSchema() {
+async function excluirSchema() {
   if (SCHEMAS.length <= 1) {
     showMsg("⚠️ Você precisa ter pelo menos 1 schema.", "warn");
     return;
   }
   if (!confirm(`Excluir o schema "${CONFIG.nome}"?`)) return;
 
+  await removeSchema(CONFIG.id);
   SCHEMAS = SCHEMAS.filter(s => s.id !== CONFIG.id);
-  saveSchemas(SCHEMAS);
 
   ACTIVE_ID = SCHEMAS[0].id;
-  setActiveSchemaId(ACTIVE_ID);
+  await setActiveSchemaId(ACTIVE_ID);
   CONFIG = SCHEMAS[0];
 
   renderSchemaSelect();
@@ -581,17 +583,12 @@ function escapeAttr(s) { return escapeHtml(s).replaceAll('"',"&quot;"); }
    Boot
 ========================= */
 document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    await new Promise(res => {
-      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, { once: true });
-    });
-    const dados = await window.DB.loadAll();
-    if (dados.schemas && dados.schemas.length)
-      localStorage.setItem(SCHEMAS_KEY, JSON.stringify(dados.schemas));
-  } catch(e) { console.warn('schema_ata Firestore pré-carga:', e); }
+  await new Promise(res => {
+    if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+    document.addEventListener('auth:ready', res, { once: true });
+  });
 
-  const init = ensureAtLeastOneSchema();
+  const init = await ensureAtLeastOneSchema();
   SCHEMAS = init.schemas;
   ACTIVE_ID = init.activeId;
   CONFIG = SCHEMAS.find(s => s.id === ACTIVE_ID) || SCHEMAS[0];
