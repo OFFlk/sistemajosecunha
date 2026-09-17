@@ -111,6 +111,8 @@ html[data-theme="dark"] .row input, html[data-theme="dark"] .row select {
 }
 .form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
 .actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
+.actions-split{ justify-content:space-between; }
+.actions-group{ display:flex; gap:10px; flex-wrap:wrap; }
 
 /* Tabela — variantes específicas desta página */
 .table-wrap{ overflow-x:auto; padding-bottom:6px; border:1px solid var(--line); border-radius:14px; margin-top:14px; }
@@ -195,6 +197,7 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 </style>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -274,10 +277,15 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
     <!-- ✅ Agora o form é dinâmico -->
     <div class="form-grid" id="formGridDinamico"></div>
 
-    <div class="actions" style="flex-wrap:wrap; gap:8px;">
-      <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
-      <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
-      <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
+    <div class="actions actions-split">
+      <div class="actions-group">
+        <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
+        <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
+        <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
+      </div>
+      <div class="actions-group">
+        <button class="btn btn-secondary" id="btnImportarAta" onclick="abrirImportAta()">📥 Importar desta ata</button>
+      </div>
     </div>
 
     <div class="table-wrap"><table>
@@ -1610,6 +1618,519 @@ async function _salvarNoBancoInterno() {
 
   console.log('✅ Ata salva:', turmaIdAtual);
   _toastSucesso('✅ Alunos e notas salvos.');
+}
+
+/* =========================
+   Importar desta ata (import pontual, uma aba/turma por vez)
+   — spec: handoff-redesenho-import-atas.md v2
+
+   Nada é gravado no Firestore aqui. A revisão só empurra os alunos pro
+   array local `alunos[]` (o mesmo do formulário manual) — quem grava de
+   verdade é o botão "Salvar no banco" já existente, que já chama
+   garantirIdsESistemaParaTurma().
+========================= */
+
+// ── Portado de gestao-atas.html (funções genéricas, reaproveitáveis
+//    conforme handoff — mesmos nomes, decisão de extrair pra arquivo
+//    compartilhado fica pra depois) ──
+function normalizarTxt(v) { return String(v??'').trim().toUpperCase().replace(/\s+/g,' '); }
+function isVazio(v) { return v===null||v===undefined||String(v).trim()===''; }
+
+function _jaroWinkler(nA, nB){
+  if (!nA || !nB) return 0;
+  if (nA === nB) return 1;
+  const mDist = Math.floor(Math.max(nA.length, nB.length)/2)-1;
+  if (mDist < 0) return 0;
+  const aMatch = new Array(nA.length).fill(false);
+  const bMatch = new Array(nB.length).fill(false);
+  let matches = 0;
+  for (let i=0;i<nA.length;i++){
+    const start = Math.max(0, i-mDist);
+    const end = Math.min(i+mDist+1, nB.length);
+    for (let j=start;j<end;j++){
+      if (bMatch[j]) continue;
+      if (nA[i] !== nB[j]) continue;
+      aMatch[i]=true; bMatch[j]=true; matches++; break;
+    }
+  }
+  if (!matches) return 0;
+  let t = 0, k = 0;
+  for (let i=0;i<nA.length;i++){
+    if (!aMatch[i]) continue;
+    while(!bMatch[k]) k++;
+    if (nA[i] !== nB[k]) t++;
+    k++;
+  }
+  t = t/2;
+  const jaro = (matches/nA.length + matches/nB.length + (matches-t)/matches)/3;
+  let l = 0;
+  for (; l<4 && l<nA.length && l<nB.length && nA[l]===nB[l]; l++);
+  const p = 0.1;
+  return jaro + l*p*(1-jaro);
+}
+
+const _PARTICULAS_NOME = new Set(['de','da','do','das','dos']);
+function _tokensNome(nome){
+  return window.Identidade.normNome(nome).split(' ').filter(t => t && !_PARTICULAS_NOME.has(t));
+}
+
+function similaridade(a,b){
+  const nA = window.Identidade.normNome(a), nB = window.Identidade.normNome(b);
+  if (!nA || !nB) return 0;
+  if (nA === nB) return 1;
+  const tA = _tokensNome(a), tB = _tokensNome(b);
+  if (tA.length && tB.length && tA.length === tB.length) {
+    let prod = 1;
+    for (let i=0;i<tA.length;i++) prod *= Math.max(_jaroWinkler(tA[i], tB[i]), 0.0001);
+    return Math.pow(prod, 1/tA.length);
+  }
+  return _jaroWinkler(nA, nB);
+}
+
+// Cortes confirmados pelo usuário nesta rodada: 88% pra aparecer como
+// candidato/pendência (igual v1), 100% pra auto-vínculo (corrigido — a
+// constante 0.94 que ainda existe hoje em gestao-atas.html é tratada como
+// se já fosse 100%, não é pra portar o valor antigo).
+const SIMILARIDADE_CUT = 0.88;
+const SIMILARIDADE_AUTO = 1.0;
+
+function _prefixosBusca(nome){
+  const norm = window.Identidade.normNome(nome);
+  const tokens = norm.split(' ').filter(Boolean);
+  if (!tokens.length) return [];
+  const pfx = s => s.slice(0, Math.min(4, s.length));
+  const prefixos = new Set([pfx(tokens[0])]);
+  if (tokens.length > 1) prefixos.add(pfx(tokens[tokens.length-1]));
+  return [...prefixos].filter(Boolean);
+}
+
+async function _candidatosCatalogo(nome, cachePrefixo){
+  const prefixos = _prefixosBusca(nome);
+  if (!prefixos.length) return [];
+  const listas = await Promise.all(prefixos.map(async p => {
+    if (cachePrefixo && cachePrefixo.has(p)) return cachePrefixo.get(p);
+    const achados = await window.Identidade.buscarAtasPorNome(p, 25);
+    if (cachePrefixo) cachePrefixo.set(p, achados);
+    return achados;
+  }));
+  const porId = new Map();
+  for (const lista of listas) for (const a of lista) porId.set(a.alunoId, a);
+  return [...porId.values()]
+    .map(a => ({ alunoId:a.alunoId, nome:a.nome, score:similaridade(nome, a.nome) }))
+    .filter(c => c.score >= SIMILARIDADE_CUT);
+}
+
+function _categoriaResultado(resultado) {
+  const AVANCA  = ['AP','S','P'];
+  const MANTEM  = ['REP','DEST','C','I','AND'];
+  const BLOQUEIA= ['FAL'];
+  const r = String(resultado||'').trim().toUpperCase();
+  if (BLOQUEIA.includes(r)) return 'BLOQUEIA';
+  if (AVANCA.includes(r))   return 'AVANCA';
+  if (MANTEM.includes(r))   return 'MANTEM';
+  return 'LIVRE';
+}
+
+function _parseSerieCanonica(serieDisplay) {
+  const s = normalizarTxt(serieDisplay);
+  if (!s) return null;
+  if (/ALFABETIZ/.test(s)) return { tipo:'ALFA', num:0 };
+  const mEixo = s.match(/EIXO\s*(\d+)/);
+  if (mEixo) return { tipo:'EIXO', num:Number(mEixo[1]) };
+  const nums = [...s.matchAll(/(\d+)/g)].map(m=>Number(m[1]));
+  if (!nums.length) return null;
+  const num = Math.max(...nums);
+  const tipo = /\bEM\b/.test(s) ? 'EM' : (/S[EÉ]RIE/.test(s) ? 'SERIE' : 'ANO');
+  return { tipo, num };
+}
+
+function avaliarTrajetoria(ultimo, novo) {
+  if (!ultimo) return { status:'verde', motivo:'' };
+  const categoria = _categoriaResultado(ultimo.resultado);
+  if (categoria === 'BLOQUEIA') {
+    return { status:'vermelho', motivo:`último registro conhecido está marcado como Falecido (${ultimo.anoLetivo})` };
+  }
+  const anoUltimo = Number(ultimo.anoLetivo);
+  const anoNovo   = Number(novo.anoLetivo);
+  const gap = anoNovo - anoUltimo;
+  if (!Number.isFinite(gap) || gap < 1) {
+    return { status:'vermelho', motivo:`intervalo de ${Number.isFinite(gap)?gap:'?'} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} não é cronologicamente possível` };
+  }
+  const gapIncomum = gap > 3;
+  const sufixoGap = gapIncomum ? ` (intervalo de ${gap} anos também é incomum — esperado 1 a 3)` : '';
+  if (categoria === 'LIVRE') {
+    return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) sem resultado conclusivo (${ultimo.resultado || 'Não informado'}) — série não conferida${sufixoGap}` };
+  }
+  const serieUltima = _parseSerieCanonica(ultimo.serieDisplay);
+  const serieNova   = _parseSerieCanonica(novo.serieDisplay);
+  if (!serieUltima || !serieNova) {
+    return { status:'amarelo', motivo:`não foi possível interpretar a série de um dos registros para comparação${sufixoGap}` };
+  }
+  if (serieUltima.tipo !== serieNova.tipo) {
+    return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})${sufixoGap}` };
+  }
+  const numEsperado = categoria === 'AVANCA' ? serieUltima.num + 1 : serieUltima.num;
+  if (serieNova.num !== numEsperado) {
+    if (categoria === 'MANTEM' && serieNova.num === serieUltima.num + 1) {
+      return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) foi reprovado/mantido, mas a série avançou mesmo assim (prática comum em anos anteriores) — confira se é o mesmo aluno${sufixoGap}` };
+    }
+    return { status:'amarelo', motivo:`série esperada era ${numEsperado} (${serieUltima.tipo}), mas veio ${serieNova.num}${sufixoGap}` };
+  }
+  if (gapIncomum) {
+    return { status:'amarelo', motivo:`intervalo de ${gap} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} é incomum, mas série e situação são coerentes com progressão normal — confira se é o mesmo aluno` };
+  }
+  return { status:'verde', motivo:'' };
+}
+
+function ultimoRegistroDoAluno(alunoId, turmasDB) {
+  let melhor = null;
+  for (const turma of (turmasDB||[])) {
+    for (const aluno of (turma.alunos||[])) {
+      if (aluno.alunoId !== alunoId) continue;
+      if (!melhor || Number(turma.anoLetivo) > Number(melhor.anoLetivo)) {
+        melhor = { anoLetivo: turma.anoLetivo, serieDisplay: aluno.serie, resultado: aluno.resultado };
+      }
+    }
+  }
+  return melhor;
+}
+
+// ── Parsing da planilha — estrutura (Nº/Nome/Série/Resultado) portada
+//    de gestao-atas.html, sem mudança: o problema da lista fixa era só
+//    nas MATÉRIAS, resolvido abaixo em mapearColunasImport() ──
+function acharLinhaCabecalho(matriz) {
+  for (let r=0; r<matriz.length; r++) {
+    const j=(matriz[r]||[]).map(normalizarTxt).join(' | ');
+    const temNum = j.includes('Nº')||j.includes('N°')||j.includes('NO')||j.includes('N ');
+    const temNome = j.includes('NOME');
+    const temResultado = j.includes('RESULTADO')||j.includes('SITUA');
+    if (temNum && temNome && temResultado) return r;
+  }
+  return -1;
+}
+function linhaTemLegenda(row) { return (row||[]).map(v=>normalizarTxt(v)).join(' ').includes('LEGENDA'); }
+function linhaPareceRodape(row) { const j=(row||[]).map(v=>normalizarTxt(v)).join(' '); return j.includes('APROVADO')||j.includes('REPROVADO')||j.includes('DESISTENTE')||j.includes('TRANSFERIDO')||j.includes('FALECIDO')||j.includes('EM ANDAMENTO'); }
+function isNumeroValido(v) { return !isVazio(v)&&/^[0-9]+$/.test(String(v).trim()); }
+
+// Normalização usada SÓ pra comparar cabeçalho da planilha × label do
+// schema — maiúsculo + sem acento (decisão fechada: comparação EXATA
+// contra `label`, sem usar `key` como candidato alternativo).
+function _normLabel(v) {
+  return String(v??'').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+
+/**
+ * Mapeamento de coluna schema-driven — decisão fechada no handoff v2:
+ * matéria só bate contra `label` (exato, normalizado), nunca contra `key`.
+ * Colunas Nº/Nome/Série/Resultado continuam por detecção genérica (não
+ * fazem parte do problema da lista fixa de 9 matérias).
+ */
+function mapearColunasImport(rowCab, schema) {
+  const colAtivas = getColunasAtivas(schema);
+  const porLabel = new Map();
+  for (const c of colAtivas) porLabel.set(_normLabel(c.label), c);
+
+  const colMap = {};
+  const materiasEncontradas = new Set();
+  const colunasNaoReconhecidas = [];
+
+  for (let c = 0; c < rowCab.length; c++) {
+    const raw = rowCab[c];
+    const t = normalizarTxt(raw);
+    if (!t) continue;
+
+    if (t==='Nº'||t==='N°'||t==='NO'||t==='N') { colMap[c] = {tipo:'num'}; continue; }
+    if (t.includes('NOME')) { colMap[c] = {tipo:'nome'}; continue; }
+    if (schema.serieAtiva && (t==='ANO'||t.includes('SÉRIE')||t.includes('SERIE'))) { colMap[c] = {tipo:'serie'}; continue; }
+    if (schema.resultadoAtivo && (t.includes('RESULTADO')||t.includes('SITUA'))) { colMap[c] = {tipo:'resultado'}; continue; }
+
+    const colSchema = porLabel.get(_normLabel(raw));
+    if (colSchema) {
+      colMap[c] = { tipo:'materia', key: colSchema.key };
+      materiasEncontradas.add(colSchema.key);
+    } else {
+      colunasNaoReconhecidas.push(String(raw).trim());
+    }
+  }
+
+  const materiasSemColuna = colAtivas.filter(c => !materiasEncontradas.has(c.key)).map(c => c.label);
+  return { colMap, materiasSemColuna, colunasNaoReconhecidas };
+}
+
+function _importExtrairLinhas(matriz, rHead, colMap, schema) {
+  const acha = tipo => { const k = Object.keys(colMap).find(k => colMap[k].tipo===tipo); return k!==undefined ? Number(k) : undefined; };
+  const cNum = acha('num'), cNome = acha('nome'), cSerie = acha('serie'), cResultado = acha('resultado');
+  const colsMateria = Object.entries(colMap).filter(([,v])=>v.tipo==='materia');
+  const colunasSchema = getColunasAtivas(schema);
+  const validosResultado = ['AP','REP','DEST','TRA','FAL','AND'];
+
+  const linhas = [];
+  for (let r = rHead+1; r < matriz.length; r++) {
+    const row = matriz[r] || [];
+    if (linhaTemLegenda(row) || linhaPareceRodape(row)) break;
+    const nome = cNome!==undefined ? String(row[cNome]||'').trim() : '';
+    if (!nome || nome==='--' || nome==='-') continue;
+    if (cNum!==undefined && !isNumeroValido(row[cNum])) continue;
+
+    const aluno = { nome };
+    if (cSerie!==undefined && schema.serieAtiva) aluno.serie = formatarSerieBonita(row[cSerie]);
+    if (cResultado!==undefined && schema.resultadoAtivo) {
+      const rraw = normalizarTxt(row[cResultado]);
+      aluno.resultado = validosResultado.includes(rraw) ? rraw : 'Não informado';
+    }
+    for (const [cStr, info] of colsMateria) {
+      const raw = row[Number(cStr)];
+      const schemaCol = colunasSchema.find(x => x.key === info.key);
+      aluno[info.key] = (schemaCol && schemaCol.type==='texto') ? String(raw||'').trim() : formatarNota(raw);
+    }
+    linhas.push(aluno);
+  }
+  return linhas;
+}
+
+// Análise contra o catálogo do Firebase — SEM comparação inter-ocorrência
+// de lote (decisão do redesenho: aposenta o union-find de gestao-atas.html,
+// que só existia por causa do processamento multi-aba).
+async function _importAnalisarCatalogo(linhas) {
+  const turmasDB = await lerTurmasDB();
+  const cachePrefixo = new Map();
+  for (const al of linhas) {
+    const candidatos = await _candidatosCatalogo(al.nome, cachePrefixo);
+    if (!candidatos.length) { al._indicador = 'novo'; continue; }
+
+    for (const c of candidatos) {
+      const ultimo = ultimoRegistroDoAluno(c.alunoId, turmasDB);
+      c.traj = avaliarTrajetoria(ultimo, { anoLetivo: turmaAtual.anoLetivo, serieDisplay: al.serie });
+    }
+
+    if (candidatos.length > 1) {
+      al._indicador = 'multiplos';
+      al._candidatos = candidatos;
+    } else {
+      const c = candidatos[0];
+      al._candidato = c;
+      if (c.score >= SIMILARIDADE_AUTO && c.traj.status === 'verde') al._indicador = 'encontrado';
+      else if (c.score >= SIMILARIDADE_AUTO) al._indicador = 'avisoTrajetoria';
+      else al._indicador = 'duplicidade';
+    }
+  }
+}
+
+// ── UI: modal de import (arquivo → aba → revisão) ──
+let _importAtaWorkbook = null;
+let _importAtaAbaEscolhida = '';
+let _importAtaAlunos = [];
+
+function abrirImportAta() {
+  if (!turmaAtual) { _toastErro('⚠️ Selecione uma turma antes de importar.'); return; }
+  if (typeof XLSX === 'undefined') { _toastErro('❌ Biblioteca de leitura de planilha não carregou. Recarregue a página.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.style.display = 'none';
+  input.addEventListener('change', _importArquivoSelecionado);
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(() => input.remove(), 15000);
+}
+
+function _importArquivoSelecionado(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  _toastLoading('⏳ Lendo planilha…');
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      _importAtaWorkbook = XLSX.read(new Uint8Array(reader.result), {type:'array'});
+      document.getElementById('_toastGlobal')?.remove();
+      _importAbrirModalEscolhaAba();
+    } catch(e) {
+      console.error('[importAta]', e);
+      _toastErro('❌ Erro ao ler o arquivo — confira se é um .xlsx válido.');
+    }
+  };
+  reader.onerror = () => _toastErro('❌ Erro ao ler o arquivo.');
+  reader.readAsArrayBuffer(file);
+}
+
+function _importFecharModal() {
+  document.getElementById('_importAtaModal')?.remove();
+}
+
+function _importMontarModal(bodyHtml, largura) {
+  _importFecharModal();
+  const backdrop = document.createElement('div');
+  backdrop.id = '_importAtaModal';
+  backdrop.className = 'modal-backdrop';
+  backdrop.style.display = 'flex';
+  backdrop.innerHTML =
+    `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:${largura||480}px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+      `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px;">`+
+        `<h3 style="margin:0;font-size:16px;font-weight:800;color:var(--brand,#7c3aed);">📥 Importar desta ata</h3>`+
+        `<button type="button" onclick="_importFecharModal()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;">✕</button>`+
+      `</div>`+
+      bodyHtml+
+    `</div>`;
+  document.body.appendChild(backdrop);
+  backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) _importFecharModal(); });
+}
+
+function _importAbrirModalEscolhaAba() {
+  const abas = _importAtaWorkbook.SheetNames || [];
+  const opts = abas.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  const body = `
+    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">Qual aba da planilha corresponde à turma <b>${escHtml(turmaAtual.nome||turmaIdAtual)}</b>? O resto do arquivo é ignorado — nem chega a ser lido.</p>
+    <select id="_importSelectAba" style="width:100%;padding:10px 12px;border:1px solid var(--field-border,#ddd);border-radius:10px;background:var(--field-bg,#fff);color:var(--ink);font-family:'Nunito',sans-serif;">
+      <option value="">Selecione a aba...</option>
+      ${opts}
+    </select>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+      <button type="button" class="btn ghost" onclick="_importFecharModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="_importConfirmarAba()">Continuar</button>
+    </div>
+  `;
+  _importMontarModal(body, 440);
+}
+
+async function _importConfirmarAba() {
+  const nomeAba = document.getElementById('_importSelectAba')?.value || '';
+  if (!nomeAba) { _toastErro('⚠️ Escolha uma aba.'); return; }
+  _importAtaAbaEscolhida = nomeAba;
+
+  const ws = _importAtaWorkbook.Sheets[nomeAba];
+  const matriz = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  const rHead = acharLinhaCabecalho(matriz);
+  if (rHead === -1) {
+    _toastErro('❌ Não encontrei o cabeçalho da tabela de notas nessa aba (procuro uma linha com Nº, Nome e Resultado/Situação).');
+    return;
+  }
+
+  const schema = getSchemaAtivoParaTela();
+  const { colMap, materiasSemColuna, colunasNaoReconhecidas } = mapearColunasImport(matriz[rHead], schema);
+
+  const temColunaNome = Object.values(colMap).some(v => v.tipo === 'nome');
+  if (!temColunaNome) {
+    _toastErro('❌ Não encontrei a coluna de Nome nessa aba.');
+    return;
+  }
+
+  const linhas = _importExtrairLinhas(matriz, rHead, colMap, schema);
+  if (!linhas.length) {
+    _toastErro('⚠️ Nenhum aluno encontrado nessa aba.');
+    return;
+  }
+
+  _importMontarModal(`<p style="font-size:13px;color:var(--muted);">🔎 Analisando ${linhas.length} aluno(s) contra o catálogo…</p>`, 440);
+  await _importAnalisarCatalogo(linhas);
+
+  _importAtaAlunos = linhas;
+  _importRenderRevisao(materiasSemColuna, colunasNaoReconhecidas);
+}
+
+function _importRenderRevisao(materiasSemColuna, colunasNaoReconhecidas) {
+  let avisosHtml = '';
+  if (materiasSemColuna.length) {
+    avisosHtml += `<div class="aviso-warn">⚠️ Matéria(s) do schema sem coluna correspondente no import: <b>${materiasSemColuna.map(escHtml).join(', ')}</b></div>`;
+  }
+  if (colunasNaoReconhecidas.length) {
+    avisosHtml += `<div class="aviso-warn">⚠️ Coluna(s) do cabeçalho do import não reconhecidas por nenhuma matéria do schema: <b>${colunasNaoReconhecidas.map(escHtml).join(', ')}</b></div>`;
+  }
+
+  const linhasHtml = _importAtaAlunos.map((al, i) => _importRenderLinhaRevisao(al, i)).join('');
+
+  const body = `
+    ${avisosHtml}
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Aba <b>${escHtml(_importAtaAbaEscolhida)}</b> — ${_importAtaAlunos.length} aluno(s) encontrado(s). Nada é salvo ainda.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto;padding-right:4px;">
+      ${linhasHtml}
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+      <button type="button" class="btn ghost" onclick="_importFecharModal()">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="_importConfirmarImportacao()">Importar ${_importAtaAlunos.length} aluno(s)</button>
+    </div>
+  `;
+  _importMontarModal(body, 640);
+}
+
+function _importRenderLinhaRevisao(al, i) {
+  let badge = '', extra = '';
+  const selStyle = 'margin-top:6px;width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--field-border,#ddd);background:var(--field-bg,#fff);color:var(--ink);font-family:\'Nunito\',sans-serif;';
+
+  if (al._indicador === 'encontrado') {
+    badge = `🟢 Vincula a <b>${escHtml(al._candidato.nome)}</b> (${escHtml(al._candidato.alunoId)})`;
+  } else if (al._indicador === 'novo') {
+    badge = `🔵 Aluno novo`;
+  } else if (al._indicador === 'duplicidade') {
+    const c = al._candidato;
+    badge = `🟡 Parecido com <b>${escHtml(c.nome)}</b> (${escHtml(c.alunoId)}, ${Math.round(c.score*100)}%) — é o mesmo aluno?`;
+    extra = `<select id="_impSel_${i}" style="${selStyle}">
+      <option value="novo" selected>Não, é aluno novo</option>
+      <option value="vincular">Sim, é o mesmo — vincular</option>
+    </select>`;
+  } else if (al._indicador === 'avisoTrajetoria') {
+    const c = al._candidato;
+    badge = `⚠️ Nome idêntico a <b>${escHtml(c.nome)}</b> (${escHtml(c.alunoId)}), mas ${escHtml(c.traj.motivo)}`;
+    extra = `<select id="_impSel_${i}" style="${selStyle}">
+      <option value="vincular" selected>Sim, é o mesmo — vincular mesmo assim</option>
+      <option value="novo">Não, é aluno novo</option>
+    </select>`;
+  } else if (al._indicador === 'multiplos') {
+    badge = `🟡 Nome bate com ${al._candidatos.length} candidatos do catálogo ao mesmo tempo — qual é?`;
+    const opts = al._candidatos.map((c,ci) => `<option value="${ci}">${escHtml(c.nome)} (${escHtml(c.alunoId)}, ${Math.round(c.score*100)}%)</option>`).join('');
+    extra = `<select id="_impSel_${i}" style="${selStyle}">
+      <option value="novo" selected>Nenhum, é aluno novo</option>
+      ${opts}
+    </select>`;
+  }
+
+  return `<div style="border:1px solid var(--line,#eee);border-radius:10px;padding:10px 12px;">
+    <div style="font-weight:700;font-size:13px;">${escHtml(al.nome)}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">${badge}</div>
+    ${extra}
+  </div>`;
+}
+
+function _importConfirmarImportacao() {
+  const schema = getSchemaAtivoParaTela();
+  const colunasSchema = getColunasAtivas(schema);
+  let n = 0;
+
+  for (let i = 0; i < _importAtaAlunos.length; i++) {
+    const al = _importAtaAlunos[i];
+    const alunoFinal = { nome: al.nome };
+    if (al.serie !== undefined) alunoFinal.serie = al.serie;
+    if (al.resultado !== undefined) alunoFinal.resultado = al.resultado;
+    for (const c of colunasSchema) {
+      if (al[c.key] !== undefined) alunoFinal[c.key] = al[c.key];
+    }
+
+    const sel = document.getElementById(`_impSel_${i}`);
+    if (al._indicador === 'encontrado') {
+      alunoFinal.alunoIdVinculado = al._candidato.alunoId;
+    } else if (al._indicador === 'avisoTrajetoria') {
+      if (!sel || sel.value === 'vincular') alunoFinal.alunoIdVinculado = al._candidato.alunoId;
+    } else if (al._indicador === 'duplicidade') {
+      if (sel && sel.value === 'vincular') alunoFinal.alunoIdVinculado = al._candidato.alunoId;
+    } else if (al._indicador === 'multiplos') {
+      if (sel && sel.value !== 'novo') {
+        const c = al._candidatos[Number(sel.value)];
+        if (c) alunoFinal.alunoIdVinculado = c.alunoId;
+      }
+    }
+
+    alunos.push(alunoFinal);
+    n++;
+  }
+
+  ordenarAlunos();
+  atualizarTabela();
+  _importFecharModal();
+  _toastSucesso(`✅ ${n} aluno(s) importado(s) da aba "${_importAtaAbaEscolhida}". Revise a tabela e clique em "Salvar no banco" para persistir.`);
+  _importAtaWorkbook = null;
+  _importAtaAbaEscolhida = '';
+  _importAtaAlunos = [];
 }
 
 /* =========================
