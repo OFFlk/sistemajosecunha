@@ -353,8 +353,11 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     });
   }
 
-  /* ── Schemas (mesmo padrão de cadastro-atas.html: localStorage, config feita em admin) ── */
-  const SCHEMAS_KEY = "turmasSchemas_v1";
+  /* ── Schemas do módulo de Atas — Firestore (DB.atasSchemas), sem
+       localStorage. "Schema ativo/padrão" fica em dadosEscola.atasSchemaAtivoId
+       (DB.escola), mesmo campo que schema_ata.html grava. Carregado uma vez
+       no boot (carregarSchemasCache), igual ao padrão já usado por
+       TURMAS_CACHE logo abaixo. ── */
   function getDefaultConfig(){
     return {
       version: 1, nome: "Padrão (arquivo original)", serieAtiva: true, resultadoAtivo: true, ordenarPor: "nome",
@@ -393,15 +396,27 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     out.colunas = out.colunas.filter(c => { if(seen.has(c.key)) return false; seen.add(c.key); return true; });
     return out;
   }
+  let SCHEMAS_CACHE = [];
+  let SCHEMA_ATIVO_ID_CACHE = "";
+  async function carregarSchemasCache(){
+    try {
+      const [schemas, escola] = await Promise.all([
+        window.DB.atasSchemas.list(),
+        window.DB.escola.get(),
+      ]);
+      SCHEMAS_CACHE = Array.isArray(schemas) ? schemas.map(normalizeSchema) : [];
+      SCHEMA_ATIVO_ID_CACHE = escola?.atasSchemaAtivoId || "";
+    } catch(e) {
+      console.warn('[carregarSchemasCache]', e);
+      SCHEMAS_CACHE = [];
+      SCHEMA_ATIVO_ID_CACHE = "";
+    }
+  }
   function loadSchemas(){
-    try{
-      const raw = localStorage.getItem(SCHEMAS_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr.map(normalizeSchema) : [];
-    }catch{ return []; }
+    return SCHEMAS_CACHE;
   }
   function getSchemaById(id){
-    return loadSchemas().find(s => String(s.id) === String(id)) || null;
+    return SCHEMAS_CACHE.find(s => String(s.id) === String(id)) || null;
   }
   function fillSchemaSelect(valorAtual){
     const sel = $("schemaSelect");
@@ -735,7 +750,11 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     buildAnoInput();
     if($("turno")) $("turno").value = "MATUTINO";
     if($("nomeTurma")) $("nomeTurma").value = "";
-    fillSchemaSelect("");
+    // Turma nova = mesmo schema marcado como ativo (dadosEscola.atasSchemaAtivoId,
+    // carregado uma vez no boot junto com SCHEMAS_CACHE) — sem isso, o <select>
+    // caía no 1º item do array por padrão do navegador, que podia não ser o
+    // schema que você acabou de editar/escolher em schema_ata.html.
+    fillSchemaSelect(SCHEMA_ATIVO_ID_CACHE || "");
     if($("avisoSchemaComAlunos")) $("avisoSchemaComAlunos").style.display = "none";
     if($("avisoMudancaId")) $("avisoMudancaId").style.display = "none";
 
@@ -862,8 +881,8 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
       document.addEventListener('auth:ready', res, {once:true});
     });
     await carregarTurmasCache();
+    await carregarSchemasCache();
     fillSerieSelect();
-    fillSchemaSelect("");
     buildFiltroAnoOptions();
     resetForm();
     renderListaTurmas();
