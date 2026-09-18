@@ -1782,17 +1782,50 @@ function avaliarTrajetoria(ultimo, novo) {
   return { status:'verde', motivo:'' };
 }
 
-function ultimoRegistroDoAluno(alunoId, turmasDB) {
-  let melhor = null;
+// Bug identificado em teste (import individual permite ordem cronológica
+// decrescente, ex.: importar 2023 primeiro e 2022 depois — coisa que o
+// import em lote antigo nunca precisava tratar, porque processava sempre
+// em ordem). Por isso não basta olhar o "último" registro (maior
+// anoLetivo): é preciso olhar o vizinho imediatamente ANTES e o
+// imediatamente DEPOIS do ano sendo importado, e avaliar os dois lados.
+function _registrosVizinhosDoAluno(alunoId, turmasDB, anoNovo) {
+  let antes = null, depois = null;
+  const anoNovoNum = Number(anoNovo);
   for (const turma of (turmasDB||[])) {
     for (const aluno of (turma.alunos||[])) {
       if (aluno.alunoId !== alunoId) continue;
-      if (!melhor || Number(turma.anoLetivo) > Number(melhor.anoLetivo)) {
-        melhor = { anoLetivo: turma.anoLetivo, serieDisplay: aluno.serie, resultado: aluno.resultado };
+      const ano = Number(turma.anoLetivo);
+      if (!Number.isFinite(ano) || ano === anoNovoNum) continue;
+      const registro = { anoLetivo: turma.anoLetivo, serieDisplay: aluno.serie, resultado: aluno.resultado };
+      if (ano < anoNovoNum) {
+        if (!antes || ano > Number(antes.anoLetivo)) antes = registro;
+      } else {
+        if (!depois || ano < Number(depois.anoLetivo)) depois = registro;
       }
     }
   }
-  return melhor;
+  return { antes, depois };
+}
+
+// Roda avaliarTrajetoria() nos dois sentidos (antes→novo e novo→depois) e
+// fica com o pior resultado dos dois. avaliarTrajetoria já é "genérica"
+// (recebe um registro mais antigo e um mais novo, não importa qual
+// aconteceu primeiro na vida real vs. qual foi importado primeiro), então
+// dá pra reaproveitar sem duplicar a lógica de categoria/série/gap.
+function avaliarTrajetoriaBidirecional(vizinhos, novo) {
+  const resultados = [];
+  if (vizinhos.antes) {
+    resultados.push(avaliarTrajetoria(vizinhos.antes, novo));
+  }
+  if (vizinhos.depois) {
+    resultados.push(avaliarTrajetoria(
+      { anoLetivo: novo.anoLetivo, serieDisplay: novo.serieDisplay, resultado: novo.resultado },
+      { anoLetivo: vizinhos.depois.anoLetivo, serieDisplay: vizinhos.depois.serieDisplay }
+    ));
+  }
+  if (!resultados.length) return { status:'verde', motivo:'' };
+  const peso = { verde:0, amarelo:1, vermelho:2 };
+  return resultados.reduce((pior, r) => peso[r.status] > peso[pior.status] ? r : pior);
 }
 
 // ── Parsing da planilha — estrutura (Nº/Nome/Série/Resultado) portada
@@ -1901,8 +1934,8 @@ async function _importAnalisarCatalogo(linhas) {
     if (!candidatos.length) { al._indicador = 'novo'; continue; }
 
     for (const c of candidatos) {
-      const ultimo = ultimoRegistroDoAluno(c.alunoId, turmasDB);
-      c.traj = avaliarTrajetoria(ultimo, { anoLetivo: turmaAtual.anoLetivo, serieDisplay: al.serie });
+      const vizinhos = _registrosVizinhosDoAluno(c.alunoId, turmasDB, turmaAtual.anoLetivo);
+      c.traj = avaliarTrajetoriaBidirecional(vizinhos, { anoLetivo: turmaAtual.anoLetivo, serieDisplay: al.serie, resultado: al.resultado });
     }
 
     if (candidatos.length > 1) {
