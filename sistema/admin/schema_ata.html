@@ -100,8 +100,8 @@
 <div class="container">
   <div class="card">
     <div class="warn">
-      <b>Importante:</b> Alterações aqui <b>não</b> alteram turmas já salvas no banco local.
-      Elas só valem para <b>novas turmas</b> (ou quando você clicar em "Resetar padrão").
+      <b>Importante:</b> Alterações aqui <b>não</b> alteram turmas já salvas no banco.
+      Elas só valem para <b>novas turmas</b>.
     </div>
   </div>
 
@@ -120,13 +120,14 @@
           <button class="btn btn-danger" type="button" onclick="excluirSchema()">Excluir</button>
         </div>
         <div class="muted" style="margin-top:6px;">
-          Dica: crie schemas diferentes (ex: Fundamental 1, Fundamental 2) e escolha o padrão que o Cadastro usará.
+          Dica: crie schemas diferentes (ex: Fundamental 1, Fundamental 2) — cada turma escolhe o
+          seu no Cadastro de Turmas. O marcado "(padrão)" aqui é só o que já vem pré-selecionado
+          pra turma nova, e não pode ser excluído.
         </div>
       </div>
     </div>
     <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn btn-primary" onclick="salvarConfig()">Salvar configuração</button>
-      <button class="btn btn-danger" onclick="resetarPadrao()">Resetar padrão do arquivo</button>
     </div>
 
     <div id="msg" style="margin-top:12px;"></div>
@@ -347,26 +348,33 @@ function renderSchemaSelect() {
   const sel = document.getElementById("schemaSelect");
   if (!sel) return;
 
-  sel.innerHTML = SCHEMAS.map(s => {
-    const isActive = s.id === ACTIVE_ID;
-    const label = isActive ? `${s.nome} (padrão)` : s.nome;
+  // Padrão sempre primeiro na lista (não só marcado) — o resto mantém a
+  // ordem que já veio do Firestore.
+  const ordenados = [...SCHEMAS].sort((a, b) => {
+    if (a.id === ACTIVE_ID) return -1;
+    if (b.id === ACTIVE_ID) return 1;
+    return 0;
+  });
+
+  sel.innerHTML = ordenados.map(s => {
+    const isPadrao = s.id === ACTIVE_ID;
+    const label = isPadrao ? `${s.nome} (padrão)` : s.nome;
     return `<option value="${escapeAttr(s.id)}" ${s.id === CONFIG.id ? "selected" : ""}>${escapeHtml(label)}</option>`;
   }).join("");
 
   sel.onchange = () => onSelectSchema(sel.value);
 }
 
-async function onSelectSchema(id) {
+function onSelectSchema(id) {
   const found = SCHEMAS.find(s => s.id === id);
   if (!found) return;
 
+  // Só troca o que está sendo visualizado/editado nesta tela — não mexe em
+  // qual é o schema padrão (isso é fixo, ver ACTIVE_ID/ensureAtLeastOneSchema).
   CONFIG = found;
-  ACTIVE_ID = id;
-  await setActiveSchemaId(id);
 
   renderSchemaSelect();
   render();
-  showMsg("✅ Schema padrão selecionado. (Cadastro usará este por padrão)", "ok");
 }
 
 function render() {
@@ -441,23 +449,6 @@ async function salvarConfig() {
   render();
 }
 
-async function resetarPadrao() {
-  if (!confirm("Resetar ESTE schema para o padrão do arquivo original? Isso vale para turmas novas.")) return;
-
-  const def = getDefaultConfig();
-  def.id = CONFIG.id;
-  def.nome = CONFIG.nome || def.nome;
-
-  CONFIG = await saveSchema(def);
-
-  const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
-  if (idx >= 0) SCHEMAS[idx] = CONFIG;
-
-  showMsg("✅ Schema resetado para o padrão do arquivo original.", "ok");
-  renderSchemaSelect();
-  render();
-}
-
 async function novoSchema() {
   const nome = prompt("Nome do novo schema:", "Novo schema");
   if (!nome) return;
@@ -468,14 +459,11 @@ async function novoSchema() {
 
   const salvo = await saveSchema(def);
   SCHEMAS.push(salvo);
-
-  ACTIVE_ID = salvo.id;
-  await setActiveSchemaId(ACTIVE_ID);
-  CONFIG = salvo;
+  CONFIG = salvo; // só passa a exibir/editar o novo — não vira o padrão
 
   renderSchemaSelect();
   render();
-  showMsg("✅ Novo schema criado e selecionado como padrão.", "ok");
+  showMsg("✅ Novo schema criado.", "ok");
 }
 
 async function duplicarSchema() {
@@ -485,19 +473,16 @@ async function duplicarSchema() {
   const copy = { ...CONFIG, id: uid(), nome: nome.trim() };
   const salvo = await saveSchema(copy);
   SCHEMAS.push(salvo);
-
-  ACTIVE_ID = salvo.id;
-  await setActiveSchemaId(ACTIVE_ID);
-  CONFIG = salvo;
+  CONFIG = salvo; // só passa a exibir/editar a cópia — não vira o padrão
 
   renderSchemaSelect();
   render();
-  showMsg("✅ Schema duplicado e selecionado como padrão.", "ok");
+  showMsg("✅ Schema duplicado.", "ok");
 }
 
 async function excluirSchema() {
-  if (SCHEMAS.length <= 1) {
-    showMsg("⚠️ Você precisa ter pelo menos 1 schema.", "warn");
+  if (CONFIG.id === ACTIVE_ID) {
+    showMsg("⚠️ O schema padrão não pode ser excluído — ele sempre precisa existir no banco.", "warn");
     return;
   }
   if (!confirm(`Excluir o schema "${CONFIG.nome}"?`)) return;
@@ -505,9 +490,8 @@ async function excluirSchema() {
   await removeSchema(CONFIG.id);
   SCHEMAS = SCHEMAS.filter(s => s.id !== CONFIG.id);
 
-  ACTIVE_ID = SCHEMAS[0].id;
-  await setActiveSchemaId(ACTIVE_ID);
-  CONFIG = SCHEMAS[0];
+  // Volta a visualização pro schema padrão (não muda quem é o padrão em si)
+  CONFIG = SCHEMAS.find(s => s.id === ACTIVE_ID) || SCHEMAS[0];
 
   renderSchemaSelect();
   render();
