@@ -301,6 +301,7 @@
             <div class="row-actions">
               ${isMaster ? `
                 <button class="mini" type="button" data-edit="${escapeHtml(sid)}" data-name="${escapeHtml(nm)}" data-display="${escapeHtml(disp)}">Editar</button>
+                <button class="mini" type="button" data-schema-padrao="${escapeHtml(sid)}" title="Cria o schema padrão de Atas se a escola não tiver">Schema padrão</button>
                 <button class="mini danger" type="button" data-del="${escapeHtml(sid)}">Excluir</button>
               ` : `<button class="mini" type="button" data-req-edit="${escapeHtml(sid)}" data-req-name="${escapeHtml(nm)}" data-req-display="${escapeHtml(disp)}">✏️ Solicitar edição</button>`}
             </div>
@@ -322,6 +323,22 @@
           $id.setAttribute('readonly','readonly');
           setMsg('Editando '+editingId+'. Ajuste os campos e clique em Salvar.');
           window.scrollTo({top:0, behavior:'smooth'});
+        });
+      });
+
+      $tbody.querySelectorAll('[data-schema-padrao]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const sid = btn.dataset.schemaPadrao;
+          btn.disabled = true;
+          try{
+            const r = await garantirSchemaPadrao(sid);
+            setMsg(r === 'existia'
+              ? 'A escola '+sid+' já tem o schema padrão de Atas — nada foi alterado.'
+              : 'Schema padrão de Atas criado para '+sid+(r === 'criado_do_legado' ? ' (a partir do schema ativo antigo).' : '.'), 'ok');
+          }catch(e){
+            console.error('[admin_escolas] schema padrão:', e);
+            setMsg('Falha ao criar o schema padrão: '+(e.message||e), 'err');
+          }finally{ btn.disabled = false; }
         });
       });
 
@@ -351,6 +368,52 @@
       $tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Erro ao carregar escolas.</td></tr>';
       console.error('[admin_escolas] renderSchoolRows:', e);
     }
+  }
+
+  /* ── Schema padrão de Atas da escola: doc fixo schools/{sid}/atasSchemas/padrao.
+       Escreve pelo caminho explícito (Auth.db) porque o ADMIN global não está
+       "dentro" da escola alvo — DB.atasSchemas usaria a escola da sessão.
+       Idempotente: se o padrão já existe, não toca em nada. ── */
+  const ATAS_SCHEMA_PADRAO_ID = 'padrao';
+  function atasSchemaPadraoInicial(){
+    return {
+      id: ATAS_SCHEMA_PADRAO_ID,
+      version: 1,
+      nome: 'Padrão',
+      serieAtiva: true,
+      resultadoAtivo: true,
+      ordenarPor: 'nome',
+      colunas: [
+        { key:'port',  label:'Português',        type:'nota', enabled:true },
+        { key:'fis',   label:'Ed. Física',       type:'nota', enabled:true },
+        { key:'arte',  label:'Arte',             type:'nota', enabled:true },
+        { key:'mat',   label:'Matemática',       type:'nota', enabled:true },
+        { key:'hist',  label:'História',         type:'nota', enabled:true },
+        { key:'geo',   label:'Geografia',        type:'nota', enabled:true },
+        { key:'cien',  label:'Ciências',         type:'nota', enabled:true },
+        { key:'relig', label:'Ensino Religioso', type:'nota', enabled:true },
+        { key:'ing',   label:'Língua Inglesa',   type:'nota', enabled:true }
+      ]
+    };
+  }
+  /** @returns {'existia'|'criado'|'criado_do_legado'} */
+  async function garantirSchemaPadrao(sid){
+    const escolaRef = Auth.db.collection('schools').doc(sid);
+    const ref = escolaRef.collection('atasSchemas').doc(ATAS_SCHEMA_PADRAO_ID);
+    if((await ref.get()).exists) return 'existia';
+
+    // Escola do modelo antigo: se atasSchemaAtivoId aponta pra um schema que
+    // existe, o conteúdo dele vira o "padrao" (o original fica como schema
+    // comum). Pode ser apagado depois que as escolas antigas migrarem.
+    let base = atasSchemaPadraoInicial(), origem = 'criado';
+    const escolaSnap = await escolaRef.get();
+    const legadoId = escolaSnap.exists ? String(escolaSnap.data().atasSchemaAtivoId || '').trim() : '';
+    if(legadoId && legadoId !== ATAS_SCHEMA_PADRAO_ID){
+      const legado = await escolaRef.collection('atasSchemas').doc(legadoId).get();
+      if(legado.exists){ base = { ...legado.data(), id: ATAS_SCHEMA_PADRAO_ID }; origem = 'criado_do_legado'; }
+    }
+    await ref.set(base);
+    return origem;
   }
 
   async function makeUniqueSchoolId(base){
@@ -387,8 +450,18 @@
     const btnSave = $frm.querySelector('button[type="submit"]');
     btnSave.disabled = true; btnSave.textContent = 'Salvando...';
     try{
+      const criando = !editingId;
       await Auth.upsertSchool({ name: nm, schoolId: sid, displayName: disp || null });
-      setMsg(editingId ? 'Escola atualizada!' : 'Escola cadastrada!', 'ok');
+
+      // Escola nova já nasce com o schema padrão de Atas. Se falhar, a escola
+      // fica criada e o botão "Schema padrão" da lista refaz só essa parte.
+      let schemaOk = true;
+      if(criando){
+        try{ await garantirSchemaPadrao(sid); }
+        catch(e){ schemaOk = false; console.error('[admin_escolas] garantirSchemaPadrao:', e); }
+      }
+      if(schemaOk) setMsg(criando ? 'Escola cadastrada!' : 'Escola atualizada!', 'ok');
+      else setMsg('Escola cadastrada, mas o schema padrão de Atas NÃO foi criado. Use o botão "Schema padrão" na lista.', 'err');
       editingId = null; idDirty = false;
       $id.removeAttribute('readonly');
       $name.value = ''; $id.value = ''; $display.value = '';
