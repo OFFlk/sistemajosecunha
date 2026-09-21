@@ -48,16 +48,34 @@ body { visibility: hidden; }
 .card { background: #ffffff; }
 html[data-theme="dark"] .card { background: #131c2e; }
 
-/* ── Card de destaque (visão geral): usa a cor de tema escolhida ── */
-.card.card-destaque { background: var(--brand-600); border-color: transparent; }
-html[data-theme="dark"] .card.card-destaque { background: var(--brand-600); border-color: transparent; }
-.card-destaque h3 { color:#fff; }
+/* ── Card de destaque (visão geral): usa a cor escolhida pelo usuário ──
+   --btn-home-bg/border/hover vêm do header.css (mesma cor do botão "Início")
+   e já alternam entre --brand (claro) e --brand-d (escuro).
+   .contraste-claro é ligada por JS quando a cor é clara demais pra texto branco
+   (ex.: paleta "Branco", amarelos no tema escuro). */
+.card.card-destaque {
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,.18);
+  --dest-btn-bd: rgba(255,255,255,.40);
+  --dest-btn-hover: rgba(255,255,255,.28);
+  background: var(--btn-home-bg); border-color: var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #0f172a;
+  --dest-btn-bg: rgba(0,0,0,.08);
+  --dest-btn-bd: rgba(0,0,0,.25);
+  --dest-btn-hover: rgba(0,0,0,.16);
+  border-color: var(--line);
+}
+.card-destaque h3 { color: var(--dest-fg); }
 .card-destaque .stat-box { background:#ffffff; border-color:transparent; }
 html[data-theme="dark"] .card-destaque .stat-box { background:#0f172a; }
+.card-destaque.contraste-claro .stat-box { border-color: var(--line); }
 .card-destaque .btn {
-  background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.40); color:#fff;
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
 }
-.card-destaque .btn:hover:not(:disabled) { background:rgba(255,255,255,.28); border-color:rgba(255,255,255,.60); color:#fff; }
+.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
 
 /* ── Stats ── */
 .stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
@@ -868,6 +886,33 @@ function exportarCSV() {
   _baixar('\uFEFF'+csv, `turmas-atas-${_hoje()}.csv`, 'text/csv;charset=utf-8;');
   setMsg('CSV exportado.', 'ok');
 }
+
+/* =============================================
+   CARD DE DESTAQUE — contraste do texto
+   Lê a cor real do botão "Início" (--btn-home-bg, já resolvida pro tema
+   atual) e escolhe texto branco ou escuro, o que tiver mais contraste.
+   Relê quando o tema/cor muda (evento 'colorchange' do theme-colors.js).
+============================================= */
+function ajustarContrasteDestaque() {
+  const el = document.querySelector('.card-destaque');
+  if (!el) return;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--btn-home-bg').trim();
+  let rgb = null, m;
+  if ((m = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i))) {
+    let h = m[1]; if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    rgb = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  } else if ((m = raw.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i))) {
+    rgb = [Number(m[1]), Number(m[2]), Number(m[3])];
+  }
+  if (!rgb) return;   // formato inesperado: mantém o padrão (texto branco)
+  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  const contrasteBranco = 1.05 / (L + 0.05);
+  const contrasteEscuro = (L + 0.05) / 0.0583;   // #0f172a ≈ luminância 0.0083
+  el.classList.toggle('contraste-claro', contrasteEscuro > contrasteBranco);
+}
+ajustarContrasteDestaque();
+document.addEventListener('colorchange', ajustarContrasteDestaque);
 
 /* =============================================
    IMPORTAR JSON — MERGE
