@@ -285,6 +285,7 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
       </div>
       <div class="actions-group">
         <button class="btn btn-secondary" id="btnImportarAta" onclick="abrirImportAta()">📥 Importar desta ata</button>
+        <button class="btn btn-secondary" id="btnDescartar" onclick="descartarAlteracoes()" title="Descarta o que ainda não foi salvo e volta ao que está no banco">↩️ Descartar alterações</button>
       </div>
     </div>
 
@@ -621,6 +622,10 @@ async function carregarDadosEscola() {
     escola = await window.DB.escola.get() || {};
   } catch(e) {
     console.warn('[carregarDadosEscola]', e);
+    // Falha de leitura ≠ escola inexistente: mostra erro e NÃO cai no aviso
+    // "Nenhuma escola cadastrada" (enganoso nesse caso).
+    setMsg('Não foi possível carregar os dados da escola.', 'err');
+    return;
   }
 
   if (!escola || !Object.keys(escola).length) {
@@ -789,7 +794,7 @@ async function excluirAlunoEmEdicao() {
   const nome = _alunoEmEdicao.nome || "este aluno";
   const ok = await _confirmModal({
     titulo: "🗑️ Excluir matrícula?",
-    corpo: `Remove ${nome} desta turma.\n\nO cadastro do aluno (histórico/ID) NÃO é apagado — só a matrícula nesta turma. Essa ação não pode ser desfeita.`,
+    corpo: `Remove ${escHtml(nome)} desta turma.\n\nO cadastro do aluno (histórico/ID) NÃO é apagado — só a matrícula nesta turma. Essa ação não pode ser desfeita.`,
     corDestaque: "#991b1b",
     textoConfirmar: "Sim, excluir",
   });
@@ -806,6 +811,7 @@ async function excluirAlunoEmEdicao() {
     // Se for um aluno recém-adicionado nesta sessão (ainda não salvo), o
     // splice() do editarAluno() já é suficiente — não há nada no banco pra apagar.
     if (alunoId && turmaIdAtual) {
+      setMsg('Excluindo matrícula…', 'loading');
       const mid = idMatriculaFrom(turmaIdAtual, alunoId);
       if (window.DB?.matriculas?.remove) {
         await window.DB.matriculas.remove(mid);
@@ -905,7 +911,8 @@ async function buscarCandidatosAluno() {
     candidatos = await window.Identidade.buscarAtasPorNome(nome, 8);
   } catch (e) {
     console.warn("[buscarCandidatosAluno]", e);
-    if (wrap) wrap.innerHTML = "❌ Erro ao buscar.";
+    if (wrap) { wrap.innerHTML = ""; wrap.classList.add("hidden"); }
+    setMsg('Erro ao buscar aluno — tente de novo.', 'err');
     return;
   }
 
@@ -972,7 +979,7 @@ function _selecionarCandidatoAluno(alunoId, nome, ultimoAnoRegistro) {
   }
 }
 
-function adicionarAluno() {
+async function adicionarAluno() {
   const schema = getSchemaAtivoParaTela();
   const colAtivas = getColunasAtivas(schema);
 
@@ -985,6 +992,17 @@ function adicionarAluno() {
     const serieEl = $("serie");
     if (seriesTurma.length === 0) { _toastErro("⚠️ Defina a(s) série(s) da turma no cabeçalho antes de adicionar alunos."); return; }
     if (!serieEl || !serieEl.value) { _toastErro("⚠️ Selecione a série do aluno (limitada pela série da turma)."); return; }
+  }
+
+  // Dedup cadastro manual × tabela: mesmo nome já lançado nesta turma → confirma.
+  const chaveNova = _chaveNome(nomeEl.value);
+  if (alunos.some(a => _chaveNome(a.nome) === chaveNova)) {
+    const okDup = await _confirmModal({
+      titulo: "⚠️ Nome repetido",
+      corpo: `Já existe um aluno chamado ${escHtml(nomeEl.value.trim())} nesta turma (na tabela abaixo).\n\nAdicionar mesmo assim? (só faz sentido se forem homônimos)`,
+      textoConfirmar: "Sim, adicionar",
+    });
+    if (!okDup) return;
   }
 
   const aluno = { nome: nomeEl.value.trim() };
@@ -1009,9 +1027,14 @@ function adicionarAluno() {
   // pra esse aluno, só confirma o vínculo (vincularAtasExplicito()).
   if (_alunoCandidatoSelecionado) {
     aluno.alunoIdVinculado = _alunoCandidatoSelecionado.alunoId;
+  } else if (_alunoEmEdicao && _alunoEmEdicao.alunoId) {
+    // Estava editando um aluno já salvo: mantém o alunoId dele. Antes o "Editar"
+    // + "Atualizar" recriava o aluno sem alunoId e ele virava "novo" no save.
+    aluno.alunoId = _alunoEmEdicao.alunoId;
   }
 
   alunos.push(aluno);
+  _dirty = true;
   ordenarAlunos();
   atualizarTabela();
   limparCamposAluno();
@@ -1102,6 +1125,7 @@ function editarAluno(i) {
   if (wrapExcluir) wrapExcluir.style.display = "flex";
 
   alunos.splice(i, 1);
+  _dirty = true;
   atualizarTabela();
   if ($("nome")) $("nome").focus();
 }
@@ -1184,6 +1208,7 @@ async function garantirIdsESistemaParaTurma(turmaObj){
 
   const now = new Date().toISOString();
   const idxVinculados = []; // preenchido no passo 1, reaproveitado no recálculo do passo 3
+  const falhas = [];        // erros parciais — devolvidos pro caller mostrar no toast final
 
   // 1) alunoId via identidade-aluno.js — SEM matching automático (decisão do
   // redesenho): quem já foi vinculado explicitamente na busca (🔍 Buscar)
@@ -1191,13 +1216,18 @@ async function garantirIdsESistemaParaTurma(turmaObj){
   // alunoId novo em lote via criarAtasBatch() — nunca tenta achar sozinho.
   if(!window.Identidade){
     console.warn('[cadastro-turma] identidade-aluno.js não carregado');
+    falhas.push('identidade-aluno.js não carregado');
   } else {
     const idxNovos = [];
     turmaObj.alunos.forEach((al, idx) => {
       const nomeRaw = String(al?.nome||"").trim();
       if (!nomeRaw) return;
       if (al.alunoIdVinculado) idxVinculados.push(idx);
-      else idxNovos.push(idx);
+      // Quem JÁ tem alunoId (carregado do banco ou salvo antes nesta sessão) e
+      // não foi revinculado à mão mantém o que tem. Antes, todo mundo sem
+      // alunoIdVinculado ia pra criarAtasBatch e ganhava um alunoId NOVO a
+      // cada re-salvamento da turma.
+      else if (!String(al.alunoId || "").trim()) idxNovos.push(idx);
     });
 
     // 1a) confirma vínculos explícitos (poucos por turma — já é decisão
@@ -1209,6 +1239,7 @@ async function garantirIdsESistemaParaTurma(turmaObj){
         al.alunoId = alunoId;
       } catch(e) {
         console.warn('[garantirIds] vincularAtasExplicito erro:', e);
+        falhas.push(`vínculo de "${al.nome}"`);
       } finally {
         delete al.alunoIdVinculado; // não persiste esse campo transitório na turma
       }
@@ -1230,6 +1261,7 @@ async function garantirIdsESistemaParaTurma(turmaObj){
         });
       } catch(e) {
         console.warn('[garantirIds] criarAtasBatch erro:', e);
+        falhas.push(`cadastro de ${idxNovos.length} aluno(s) novo(s) no catálogo`);
       }
     }
 
@@ -1260,7 +1292,12 @@ async function garantirIdsESistemaParaTurma(turmaObj){
     criadoEm:      turmaObj?.criadoEm || now,
     atualizadoEm:  now
   });
-  window.DB.atas.save(ataObj).catch(e => console.warn('[garantirIds] ata:', e));
+  try {
+    await window.DB.atas.save(ataObj);
+  } catch(e) {
+    console.warn('[garantirIds] ata:', e);
+    falhas.push('registro da ata');
+  }
 
   // matrículas (batch no Firebase)
   const anoLetivoStr = String(turmaObj?.anoLetivo||"").trim();
@@ -1293,6 +1330,7 @@ async function garantirIdsESistemaParaTurma(turmaObj){
       await window.DB.matriculas.saveAll(matriculas);
     } catch(e) {
       console.warn('[garantirIds] matriculas:', e);
+      falhas.push('matrículas');
     }
   }
 
@@ -1311,11 +1349,13 @@ async function garantirIdsESistemaParaTurma(turmaObj){
         await window.Identidade.recalcularUltimoAnoRegistroBatch(alunoIdsVinculados, anoAtivoAtual);
       } catch(e) {
         console.warn('[garantirIds] recalcularUltimoAnoRegistroBatch erro:', e);
+        falhas.push('atualização do último ano de registro');
       }
     }
   }
 
   console.log(`✅ garantirIds concluído: ${matriculas.length} matrículas | ata: ${ataId}`);
+  return { falhas };
 }
 
 
@@ -1334,7 +1374,11 @@ function getQueryParam(nome) {
 
 async function carregarTurmasCacheAtas() {
   try { TURMAS_CACHE_ATAS = await window.DB.turmas.list(); }
-  catch(e) { console.warn('[carregarTurmasCacheAtas]', e); TURMAS_CACHE_ATAS = []; }
+  catch(e) {
+    console.warn('[carregarTurmasCacheAtas]', e);
+    TURMAS_CACHE_ATAS = [];
+    setMsg('Não foi possível carregar as turmas cadastradas.', 'err');
+  }
 }
 
 function carregarSelectAnoLetivo() {
@@ -1368,14 +1412,16 @@ function carregarSelectTurma(ano) {
     }).join("");
 }
 
-function onAnoLetivoSelectChange() {
+async function onAnoLetivoSelectChange() {
   const ano = $("anoLetivoSelect")?.value || "";
+  if (!(await _liberarTrocaDeTurma())) { _restaurarSelectsDaTurmaAtual(); return; }
   carregarSelectTurma(ano);
   selecionarTurma(""); // limpa a turma escolhida anteriormente
 }
 
-function onTurmaSelectChange() {
+async function onTurmaSelectChange() {
   const turmaId = $("turmaSelect")?.value || "";
+  if (!(await _liberarTrocaDeTurma())) { _restaurarSelectsDaTurmaAtual(); return; }
   selecionarTurma(turmaId);
 }
 
@@ -1407,6 +1453,14 @@ function atualizarInfoTurmaSelecionada() {
  * recalcula turmaId aqui — isso é feito exclusivamente lá.
  */
 async function selecionarTurma(turmaId) {
+  // Trocar de turma começa do zero: fila de scans (não pode vazar pra outra
+  // turma), edição em andamento, estado "sujo" e trava do import.
+  if (window.scansResetar) window.scansResetar();
+  _alunoEmEdicao = null;
+  _alunoCandidatoSelecionado = null;
+  _dirty = false;
+  _destravarImport();
+
   if (!turmaId) {
     turmaAtual = null; turmaIdAtual = "";
     SCHEMA_ATIVO = null;
@@ -1465,6 +1519,107 @@ async function selecionarTurmaPorId(turmaId, travarSelects = false) {
 }
 
 /* =========================
+   Alterações não salvas — trava de troca de turma, "Descartar" e trava do
+   import. Tudo em memória: nenhuma leitura/escrita extra no Firestore.
+========================= */
+let _dirty = false;          // alunos lançados/editados/importados desde o último salvamento
+let _importJaFeito = false;  // o import pontual roda 1x por sessão de turma
+
+function _temAlteracoesNaoSalvas() {
+  const scans = window.scansTemPendentes ? window.scansTemPendentes() : false;
+  return !!(_dirty || _alunoEmEdicao || scans);
+}
+
+function _travarImport() {
+  _importJaFeito = true;
+  const b = $("btnImportarAta");
+  if (b) { b.disabled = true; b.title = "Já importado nesta turma — salve ou descarte as alterações para importar de novo."; }
+}
+function _destravarImport() {
+  _importJaFeito = false;
+  const b = $("btnImportarAta");
+  if (b) { b.disabled = false; b.title = ""; }
+}
+
+// Chave de comparação de nome (mesma normalização do catálogo)
+function _chaveNome(n) {
+  return (window.Identidade && window.Identidade.normNome) ? window.Identidade.normNome(n) : normalizarTxt(n);
+}
+
+// Reconstrói a lista da tela a partir de turmaAtual (já em memória) —
+// traz de volta os alunoId gerados no save, sem ler nada do banco.
+function _recarregarAlunosDaTurma() {
+  const schema = getSchemaAtivoParaTela();
+  alunos = Array.isArray(turmaAtual?.alunos) ? turmaAtual.alunos.map(a => ({ ...a })) : [];
+  if (schema.serieAtiva) alunos = alunos.map(a => ({ ...a, serie: formatarSerieBonita(a.serie) }));
+  ordenarAlunos();
+  atualizarTabela();
+}
+
+async function descartarAlteracoes() {
+  if (!turmaAtual) return;
+  if (!_temAlteracoesNaoSalvas()) {
+    _toastAviso('⚠️ Não há alterações não salvas para descartar.');
+    return;
+  }
+  const ok = await _confirmModal({
+    titulo: "↩️ Descartar alterações?",
+    corpo: "Tudo o que foi lançado, editado ou importado desde o último salvamento — e os scans que estão na fila — será descartado.\n\nA turma volta ao que está salvo no banco. Essa ação não pode ser desfeita.",
+    textoConfirmar: "Sim, descartar",
+  });
+  if (!ok) return;
+  if (window.scansLimparFila) window.scansLimparFila();
+  _recarregarAlunosDaTurma();
+  limparCamposAluno();
+  _dirty = false;
+  _destravarImport();
+  _toastSucesso('✅ Alterações descartadas.');
+}
+
+// Modal de 3 saídas (o _confirmModal só tem 2): 'salvar' | 'descartar' | 'cancelar'
+function _modalDadosNaoSalvos() {
+  return new Promise((resolve) => {
+    const cor = '#b45309';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:460px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">⚠️ Dados não salvos</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">Há alunos lançados/importados ou scans nesta turma que ainda não foram salvos.\n\nO que deseja fazer?</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">`+
+          `<button type="button" class="btn ghost" id="_nsVoltar">Voltar</button>`+
+          `<button type="button" class="btn ghost" id="_nsDescartar">Descartar e continuar</button>`+
+          `<button type="button" id="_nsSalvar" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">Salvar e continuar</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    const fechar = (r) => { backdrop.remove(); resolve(r); };
+    backdrop.querySelector('#_nsVoltar').addEventListener('click', () => fechar('cancelar'));
+    backdrop.querySelector('#_nsDescartar').addEventListener('click', () => fechar('descartar'));
+    backdrop.querySelector('#_nsSalvar').addEventListener('click', () => fechar('salvar'));
+    backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) fechar('cancelar'); });
+  });
+}
+
+// true = pode trocar de turma; false = fica na turma atual
+async function _liberarTrocaDeTurma() {
+  if (!turmaAtual || !_temAlteracoesNaoSalvas()) return true;
+  const r = await _modalDadosNaoSalvos();
+  if (r === 'cancelar') return false;
+  if (r === 'salvar') return !!(await salvarNoBanco());
+  return true; // descartar — selecionarTurma() já reinicia tudo
+}
+
+function _restaurarSelectsDaTurmaAtual() {
+  if (!turmaAtual) return;
+  const ano = String(turmaAtual.anoLetivo || "");
+  if ($("anoLetivoSelect")) $("anoLetivoSelect").value = ano;
+  carregarSelectTurma(ano);
+  if ($("turmaSelect")) $("turmaSelect").value = turmaIdAtual;
+}
+
+/* =========================
    Salvar turma no banco
 ========================= */
 // Toast fixo padrão do sistema — aparece no centro/base da tela, independente do scroll
@@ -1474,10 +1629,46 @@ function _toastSucesso(msg){
 function _toastErro(msg){
   _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
 }
-function _toastLoading(msg){
-  // Duração longa: é substituído pelo toast de sucesso/erro assim que a ação terminar
-  _showToast(msg, '#1e40af', 'rgba(37,99,235,0.95)', 60000);
+function _toastAviso(msg){
+  _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
 }
+function _toastCarregando(msg){
+  // Sem auto-dismiss (duração 0): fica na tela o tempo que a operação levar e
+  // é substituído pelo toast de sucesso/erro/aviso quando ela termina (ou
+  // fechado no ✕). Nesta página isso cobre save, import e upload de scans.
+  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 0);
+  const t = document.getElementById('_toastGlobal');
+  if (t) t.dataset.loading = '1';
+}
+// Remove o toast atual SÓ se ele for um "carregando" — nunca apaga um
+// sucesso/erro/aviso que tenha aparecido no meio do caminho.
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if (t && t.dataset.loading === '1') t.remove();
+}
+// Ponto de entrada padronizado (ver guia-toasts.md).
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+// Rede de segurança: como o "carregando" não expira sozinho, se uma promise
+// falhar sem tratamento no meio de uma operação, troca o azul por um erro em
+// vez de deixá-lo preso na tela.
+window.addEventListener('unhandledrejection', (ev) => {
+  const t = document.getElementById('_toastGlobal');
+  if (t && t.dataset.loading === '1') {
+    console.error('[unhandledrejection]', ev.reason);
+    setMsg('Algo deu errado durante a operação — veja o console.', 'err');
+  }
+});
 function _showToast(msg, bg, shadow, duration){
   const existing = document.getElementById('_toastGlobal');
   if(existing) existing.remove();
@@ -1505,7 +1696,7 @@ function _showToast(msg, bg, shadow, duration){
   btnClose.onclick = () => toast.remove();
   toast.appendChild(btnClose);
   document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  if (duration !== 0) setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500); // 0 = fica até ser substituído/fechado
 }
 
 // Modal de confirmação para decisões importantes (padrão do sistema).
@@ -1546,7 +1737,7 @@ async function salvarNoBanco() {
   const btnSalvar = document.querySelector('button[onclick="salvarNoBanco()"]');
   if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando…'; }
   try {
-    await _salvarNoBancoInterno();
+    return await _salvarNoBancoInterno();
   } finally {
     if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar no banco'; }
   }
@@ -1555,7 +1746,7 @@ async function salvarNoBanco() {
 async function _salvarNoBancoInterno() {
   if (!turmaIdAtual || !turmaAtual) {
     _toastErro("⚠️ Selecione uma turma (ano + turma) antes de salvar.");
-    return;
+    return false;
   }
 
   const schema = getSchemaAtivoParaTela();
@@ -1570,7 +1761,7 @@ async function _salvarNoBancoInterno() {
       corDestaque: "#991b1b",
       textoConfirmar: "Sim, salvar vazio"
     });
-    if (!confirmou) return;
+    if (!confirmou) return false;
   }
 
   // Deriva seriesTurma/serieTexto (nomes usados por garantirIds/ata) a
@@ -1596,28 +1787,62 @@ async function _salvarNoBancoInterno() {
 
   // Salva direto no Firebase (upsert via _id) — metadados (ano/turno/série/
   // schema) continuam os mesmos de cadastro-turmas.html, só `alunos` muda.
-  _toastLoading('⏳ Salvando…');
+  setMsg('Salvando…', 'loading');
   try {
     await salvarTurmasDB(turmaObj);
   } catch(e) {
     console.error('[salvarNoBanco]', e);
     _toastErro('❌ Erro ao salvar — ' + (e.message || e));
-    return;
+    return false;
   }
 
-  // IDs e bancos do sistema (atas/matrículas) em background
-  garantirIdsESistemaParaTurma(turmaObj).catch(e => console.warn("[garantirIds]", e));
+  // IDs e bancos do sistema (atas/matrículas). Antes rodava em background
+  // (fire-and-forget): o "salvo" aparecia antes de terminar e qualquer erro
+  // era engolido. Agora é aguardado e as falhas parciais entram no toast final.
+  let falhasIds = [];
+  setMsg('Vinculando alunos e gerando matrículas…', 'loading');
+  try {
+    const r = await garantirIdsESistemaParaTurma(turmaObj);
+    falhasIds = (r && r.falhas) || [];
+  } catch(e) {
+    console.error("[garantirIds]", e);
+    falhasIds = [e.message || String(e)];
+  }
 
   // ── Scans: dispara upload da fila (a turma já existe desde antes) ──
-  if (window.uploadScansQueue) await window.uploadScansQueue();
+  // O toast FINAL é montado aqui: senão o "salvo" apagaria na hora um erro de
+  // upload. Scan que falhou não fica na fila — o aviso manda enviar depois
+  // pela edição da ata.
+  let resultadoScans = null;
+  if (window.uploadScansQueue) resultadoScans = await window.uploadScansQueue();
 
   turmaAtual = turmaObj; // reflete localmente sem precisar recarregar a página
   const idx = TURMAS_CACHE_ATAS.findIndex(t => (t.turmaId||t.id||t._id) === turmaIdAtual);
   if (idx >= 0) TURMAS_CACHE_ATAS[idx] = turmaObj;
   atualizarInfoTurmaSelecionada();
 
+  // "Refresh" só em memória: traz de volta os alunoId gerados no save (sem
+  // isso, salvar de novo trataria todo mundo como aluno novo). Zero leituras
+  // no Firestore. Também limpa o estado "não salvo" e destrava o import.
+  _recarregarAlunosDaTurma();
+  _dirty = false;
+  _destravarImport();
+
   console.log('✅ Ata salva:', turmaIdAtual);
-  _toastSucesso('✅ Alunos e notas salvos.');
+
+  const falhas = [];
+  if (falhasIds.length) falhas.push(`vínculos/matrículas (${falhasIds.join('; ')})`);
+  if (resultadoScans && resultadoScans.erros.length) {
+    falhas.push(`${resultadoScans.erros.length} scan(s) não enviado(s) — envie depois pela edição da ata (${resultadoScans.erros.join(' | ')})`);
+  }
+  if (falhas.length) {
+    setMsg('Turma salva, mas falhou: ' + falhas.join(' — '), 'err');
+  } else if (resultadoScans && resultadoScans.enviados) {
+    setMsg(`Alunos e notas salvos. ${resultadoScans.enviados} scan(s) enviado(s).`, 'ok');
+  } else {
+    setMsg('Alunos e notas salvos.', 'ok');
+  }
+  return true;
 }
 
 /* =========================
@@ -1926,10 +2151,17 @@ function _importExtrairLinhas(matriz, rHead, colMap, schema) {
 // Análise contra o catálogo do Firebase — SEM comparação inter-ocorrência
 // de lote (decisão do redesenho: aposenta o union-find de gestao-atas.html,
 // que só existia por causa do processamento multi-aba).
-async function _importAnalisarCatalogo(linhas) {
-  const turmasDB = await lerTurmasDB();
+async function _importAnalisarCatalogo(linhas, onProgresso) {
+  // Usa o cache de turmas que a página já carregou no boot (e que o save
+  // atualiza em memória) em vez de lerTurmasDB(), que fazia uma leitura
+  // COMPLETA da coleção de turmas a cada import — e devolvia [] em silêncio
+  // se falhasse (trajetória saía toda 🟢 sem comparar nada).
+  const turmasDB = TURMAS_CACHE_ATAS;
   const cachePrefixo = new Map();
+  let feitos = 0;
   for (const al of linhas) {
+    feitos++;
+    if (onProgresso) onProgresso(feitos, linhas.length);
     const candidatos = await _candidatosCatalogo(al.nome, cachePrefixo);
     if (!candidatos.length) { al._indicador = 'novo'; continue; }
 
@@ -1958,6 +2190,7 @@ let _importAtaAlunos = [];
 
 function abrirImportAta() {
   if (!turmaAtual) { _toastErro('⚠️ Selecione uma turma antes de importar.'); return; }
+  if (_importJaFeito) { _toastAviso('⚠️ Já importado nesta turma. Salve ou descarte as alterações para importar de novo.'); return; }
   if (typeof XLSX === 'undefined') { _toastErro('❌ Biblioteca de leitura de planilha não carregou. Recarregue a página.'); return; }
   const input = document.createElement('input');
   input.type = 'file';
@@ -1972,12 +2205,12 @@ function abrirImportAta() {
 function _importArquivoSelecionado(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
-  _toastLoading('⏳ Lendo planilha…');
+  setMsg('Lendo planilha…', 'loading');
   const reader = new FileReader();
   reader.onload = () => {
     try {
       _importAtaWorkbook = XLSX.read(new Uint8Array(reader.result), {type:'array'});
-      document.getElementById('_toastGlobal')?.remove();
+      _toastLimpar();
       _importAbrirModalEscolhaAba();
     } catch(e) {
       console.error('[importAta]', e);
@@ -2056,7 +2289,25 @@ async function _importConfirmarAba() {
   }
 
   _importMontarModal(`<p style="font-size:13px;color:var(--muted);">🔎 Analisando ${linhas.length} aluno(s) contra o catálogo…</p>`, 440);
-  await _importAnalisarCatalogo(linhas);
+  setMsg(`Analisando ${linhas.length} aluno(s) contra o catálogo…`, 'loading');
+  try {
+    await _importAnalisarCatalogo(linhas, (feitos, total) => {
+      setMsg(`Analisando aluno ${feitos} de ${total}…`, 'loading');
+    });
+  } catch (e) {
+    // Antes: sem try/catch — o modal ficava em "Analisando…" pra sempre e o
+    // erro só aparecia no console. Volta pra escolha de aba (o arquivo já
+    // está lido) e avisa.
+    console.error('[importAta] análise contra o catálogo', e);
+    _importAbrirModalEscolhaAba();
+    setMsg('Erro ao comparar com o catálogo de alunos — ' + (e.message || e), 'err');
+    return;
+  }
+
+  _toastLimpar();
+  // Se o usuário fechou o modal (✕ / clique fora) enquanto analisava, não
+  // reabre a revisão sozinha.
+  if (!document.getElementById('_importAtaModal')) return;
 
   _importAtaAlunos = linhas;
   _importRenderRevisao(materiasSemColuna, colunasNaoReconhecidas);
@@ -2129,9 +2380,14 @@ function _importConfirmarImportacao() {
   const schema = getSchemaAtivoParaTela();
   const colunasSchema = getColunasAtivas(schema);
   let n = 0;
+  let ignorados = 0;
+  // Dedup import × tabela: quem já está na tabela (mesmo nome normalizado) é
+  // ignorado. Só compara contra o que JÁ estava lá antes do import.
+  const nomesNaTabela = new Set(alunos.map(a => _chaveNome(a.nome)));
 
   for (let i = 0; i < _importAtaAlunos.length; i++) {
     const al = _importAtaAlunos[i];
+    if (nomesNaTabela.has(_chaveNome(al.nome))) { ignorados++; continue; }
     const alunoFinal = { nome: al.nome };
     if (al.serie !== undefined) alunoFinal.serie = al.serie;
     if (al.resultado !== undefined) alunoFinal.resultado = al.resultado;
@@ -2160,7 +2416,12 @@ function _importConfirmarImportacao() {
   ordenarAlunos();
   atualizarTabela();
   _importFecharModal();
-  _toastSucesso(`✅ ${n} aluno(s) importado(s) da aba "${_importAtaAbaEscolhida}". Revise a tabela e clique em "Salvar no banco" para persistir.`);
+  if (n > 0) { _dirty = true; _travarImport(); }
+  if (ignorados) {
+    _toastAviso(`⚠️ ${n} aluno(s) importado(s) da aba "${_importAtaAbaEscolhida}"; ${ignorados} ignorado(s) por já estarem na tabela (mesmo nome). Revise e clique em "Salvar no banco".`);
+  } else {
+    _toastSucesso(`✅ ${n} aluno(s) importado(s) da aba "${_importAtaAbaEscolhida}". Revise a tabela e clique em "Salvar no banco" para persistir.`);
+  }
   _importAtaWorkbook = null;
   _importAtaAbaEscolhida = '';
   _importAtaAlunos = [];
@@ -2192,6 +2453,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch(e) {
       console.error('[DOMContentLoaded]', e);
+      setMsg('Erro ao carregar a página — recarregue e tente de novo.', 'err');
     } finally {
       Loading.esconder();
     }
@@ -2217,7 +2479,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setStatus('err', '❌ PDF.js não carregou. Recarregue a página.');
       return [];
     }
-    setStatus('', `⏳ Convertendo "${file.name}"…`);
+    setStatus('loading', `⏳ Convertendo "${file.name}"…`);
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     if (pdf.numPages > MAX_PAGES) {
@@ -2245,12 +2507,18 @@ document.addEventListener("DOMContentLoaded", () => {
   function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
   function fmtData(iso){ return iso ? new Date(iso).toLocaleDateString('pt-BR') : ''; }
 
+  // ÚNICA mudança de feedback: 'loading'/'ok'/'err' agora vão pro toast da
+  // página (o texto inline ficava dentro do card de scans, que pode estar
+  // fechado). Os textos e todos os pontos de chamada continuam os originais.
+  // Sem kind → segue inline como antes (só o aviso "💡 Salve a turma primeiro").
   function setStatus(kind, text){
+    if (kind === 'loading') { _toastCarregando(text); return; }
+    if (kind === 'ok')      { _toastSucesso(text);    return; }
+    if (kind === 'err')     { _toastErro(text);       return; }
     const el = document.getElementById('scansStatus');
     if(!el) return;
-    el.className = 'scans-status' + (kind ? ' '+kind : '');
+    el.className = 'scans-status';
     el.textContent = text;
-    if(kind==='ok') setTimeout(()=>{ el.className='scans-status'; el.textContent=''; }, 4000);
   }
 
   function renderFila(){
@@ -2316,7 +2584,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   window.uploadScansQueue = async function(){
-    if(!_fila.length || !_turmaId) return;
+    if(!_fila.length || !_turmaId) return { enviados: 0, erros: [] };
     setStatus('loading', `⏳ Enviando ${_fila.length} arquivo(s)…`);
     const erros = [];
     const enviados = [];
@@ -2328,8 +2596,9 @@ document.addEventListener("DOMContentLoaded", () => {
     _fila = [];
     document.getElementById('scansLista')?.querySelectorAll('.scan-pendente').forEach(el=>el.remove());
     enviados.forEach(f => _renderExistente(f));
-    if(erros.length) setStatus('err', `⚠️ Falha: ${erros.join(' | ')}`);
-    else if(enviados.length) setStatus('ok', '✅ Scans enviados!');
+    // Devolve o resultado; o toast final é montado por salvarNoBanco() (senão o
+    // "salvo" apagaria o erro na hora).
+    return { enviados: enviados.length, erros };
   };
 
   window.initScans = function(turmaId, modoEdit){
@@ -2363,7 +2632,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await resp.json();
       if(!resp.ok) throw new Error(data.error);
       (data.files||[]).forEach(f => _renderExistente(f));
-    }catch(err){ console.warn('[scans] Erro ao carregar:', err.message); }
+    }catch(err){
+      console.warn('[scans] Erro ao carregar:', err.message);
+      _toastErro('❌ Não foi possível carregar a lista de scans desta turma.');
+    }
   }
 
   function _renderExistente(f){
@@ -2382,7 +2654,13 @@ document.addEventListener("DOMContentLoaded", () => {
         `<button class="btn btn-danger-outline btn-mini" data-fileid="${escHtml(f.fileId)}" data-restype="${escHtml(f.resourceType||'image')}" data-name="${escHtml(f.fileName)}" title="Excluir">🗑️</button>`+
       '</div>';
     div.querySelector('[data-fileid]').addEventListener('click', async function(){
-      if(!confirm(`Excluir "${this.dataset.name}"? Não pode ser desfeito.`)) return;
+      const ok = await _confirmModal({
+        titulo: '🗑️ Excluir scan?',
+        corpo: `Excluir "${escHtml(this.dataset.name)}"?\n\nEssa ação não pode ser desfeita.`,
+        corDestaque: '#991b1b',
+        textoConfirmar: 'Sim, excluir',
+      });
+      if(!ok) return;
       setStatus('loading','⏳ Removendo…');
       try{
         const r = await fetch(API_DELETE,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:this.dataset.fileid,resourceType:this.dataset.restype||'image'})});
@@ -2394,6 +2672,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     lista.appendChild(div);
   }
+
+  // ── Aditivo: usados pela trava de "dados não salvos" / troca de turma ──
+  window.scansTemPendentes = function(){ return _fila.length > 0; };
+  // Só descarta a fila de envio (mantém a lista de scans já enviados)
+  window.scansLimparFila = function(){ _fila = []; renderFila(); };
+  // Troca de turma: esvazia fila E a lista da turma anterior (a nova é recarregada por initScans)
+  window.scansResetar = function(){
+    _fila = []; _turmaId = null;
+    document.getElementById('scansLista')?.querySelectorAll('.scan-pendente,.scan-existente').forEach(el => el.remove());
+  };
 
   // Mostra o card de scans
   window.mostrarScans = function(){
