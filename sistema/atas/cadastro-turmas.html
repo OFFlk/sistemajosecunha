@@ -355,7 +355,7 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
 
   /* ── Schemas do módulo de Atas — Firestore (DB.atasSchemas), sem
        localStorage. O schema padrão é o doc de ID fixo "padrao" dentro
-       de atasSchemas (schema_ata.html garante que ele exista). Carregado uma vez
+       de atasSchemas (criado com a escola, em admin_escolas). Carregado uma vez
        no boot (carregarSchemasCache), igual ao padrão já usado por
        TURMAS_CACHE logo abaixo. ── */
   function getDefaultConfig(){
@@ -773,7 +773,7 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
 
     // Trava: sem schema padrão na coleção, não cadastra turma (nada de
     // cair num schema embutido que não existe no banco).
-    if(!temSchemaPadrao()){ setMsg("Esta escola ainda não tem o schema padrão. Abra a página de Schemas de Ata para ele ser criado e recarregue.", "err"); return; }
+    if(!temSchemaPadrao()){ setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err"); return; }
 
     const schemaEscolhido = (schemaId ? getSchemaById(schemaId) : null) || getSchemaById(SCHEMA_PADRAO_ID);
     const schemaSnapshot = normalizeSchema(schemaEscolhido);
@@ -885,7 +885,7 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     });
     await carregarTurmasCache();
     await carregarSchemasCache();
-    if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Abra a página de Schemas de Ata para ele ser criado e recarregue.", "err");
+    if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err");
     fillSerieSelect();
     buildFiltroAnoOptions();
     resetForm();
