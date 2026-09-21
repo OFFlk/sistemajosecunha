@@ -334,7 +334,7 @@
             const r = await garantirSchemaPadrao(sid);
             setMsg(r === 'existia'
               ? 'A escola '+sid+' já tem o schema padrão de Atas — nada foi alterado.'
-              : 'Schema padrão de Atas criado para '+sid+(r === 'criado_do_legado' ? ' (a partir do schema ativo antigo).' : '.'), 'ok');
+              : 'Schema padrão de Atas criado para '+sid+'.', 'ok');
           }catch(e){
             console.error('[admin_escolas] schema padrão:', e);
             setMsg('Falha ao criar o schema padrão: '+(e.message||e), 'err');
@@ -396,24 +396,15 @@
       ]
     };
   }
-  /** @returns {'existia'|'criado'|'criado_do_legado'} */
+  /** @returns {'existia'|'criado'} */
   async function garantirSchemaPadrao(sid){
     const escolaRef = Auth.db.collection('schools').doc(sid);
     const ref = escolaRef.collection('atasSchemas').doc(ATAS_SCHEMA_PADRAO_ID);
     if((await ref.get()).exists) return 'existia';
 
-    // Escola do modelo antigo: se atasSchemaAtivoId aponta pra um schema que
-    // existe, o conteúdo dele vira o "padrao" (o original fica como schema
-    // comum). Pode ser apagado depois que as escolas antigas migrarem.
-    let base = atasSchemaPadraoInicial(), origem = 'criado';
-    const escolaSnap = await escolaRef.get();
-    const legadoId = escolaSnap.exists ? String(escolaSnap.data().atasSchemaAtivoId || '').trim() : '';
-    if(legadoId && legadoId !== ATAS_SCHEMA_PADRAO_ID){
-      const legado = await escolaRef.collection('atasSchemas').doc(legadoId).get();
-      if(legado.exists){ base = { ...legado.data(), id: ATAS_SCHEMA_PADRAO_ID }; origem = 'criado_do_legado'; }
-    }
+    const base = atasSchemaPadraoInicial();
     await ref.set(base);
-    return origem;
+    return 'criado';
   }
 
   async function makeUniqueSchoolId(base){
