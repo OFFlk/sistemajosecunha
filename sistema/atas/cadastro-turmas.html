@@ -354,8 +354,8 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
   }
 
   /* ── Schemas do módulo de Atas — Firestore (DB.atasSchemas), sem
-       localStorage. "Schema ativo/padrão" fica em dadosEscola.atasSchemaAtivoId
-       (DB.escola), mesmo campo que schema_ata.html grava. Carregado uma vez
+       localStorage. O schema padrão é o doc de ID fixo "padrao" dentro
+       de atasSchemas (schema_ata.html garante que ele exista). Carregado uma vez
        no boot (carregarSchemasCache), igual ao padrão já usado por
        TURMAS_CACHE logo abaixo. ── */
   function getDefaultConfig(){
@@ -397,20 +397,18 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     return out;
   }
   let SCHEMAS_CACHE = [];
-  let SCHEMA_ATIVO_ID_CACHE = "";
+  const SCHEMA_PADRAO_ID = "padrao";
   async function carregarSchemasCache(){
     try {
-      const [schemas, escola] = await Promise.all([
-        window.DB.atasSchemas.list(),
-        window.DB.escola.get(),
-      ]);
+      const schemas = await window.DB.atasSchemas.list();
       SCHEMAS_CACHE = Array.isArray(schemas) ? schemas.map(normalizeSchema) : [];
-      SCHEMA_ATIVO_ID_CACHE = escola?.atasSchemaAtivoId || "";
     } catch(e) {
       console.warn('[carregarSchemasCache]', e);
       SCHEMAS_CACHE = [];
-      SCHEMA_ATIVO_ID_CACHE = "";
     }
+  }
+  function temSchemaPadrao(){
+    return SCHEMAS_CACHE.some(s => String(s.id) === SCHEMA_PADRAO_ID);
   }
   function loadSchemas(){
     return SCHEMAS_CACHE;
@@ -421,19 +419,23 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
   function fillSchemaSelect(valorAtual){
     const sel = $("schemaSelect");
     if(!sel) return;
-    const schemas = loadSchemas();
+    // Padrão sempre primeiro (e é o que o <select> assume quando o valor
+    // pedido não existe mais, ex.: turma antiga com schema excluído).
+    const schemas = loadSchemas().slice().sort((a, b) =>
+      (String(a.id) === SCHEMA_PADRAO_ID ? -1 : 0) - (String(b.id) === SCHEMA_PADRAO_ID ? -1 : 0));
     sel.innerHTML = "";
     if(!schemas.length){
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = "Padrão (nenhum schema configurado em admin)";
+      opt.textContent = "Nenhum schema cadastrado";
       sel.appendChild(opt);
       return;
     }
     schemas.forEach(s => {
       const opt = document.createElement("option");
       opt.value = s.id;
-      opt.textContent = s.nome || s.id;
+      const nome = s.nome || s.id;
+      opt.textContent = String(s.id) === SCHEMA_PADRAO_ID ? `${nome} (padrão)` : nome;
       sel.appendChild(opt);
     });
     if(valorAtual && schemas.some(s => s.id === valorAtual)) sel.value = valorAtual;
@@ -750,11 +752,8 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     buildAnoInput();
     if($("turno")) $("turno").value = "MATUTINO";
     if($("nomeTurma")) $("nomeTurma").value = "";
-    // Turma nova = mesmo schema marcado como ativo (dadosEscola.atasSchemaAtivoId,
-    // carregado uma vez no boot junto com SCHEMAS_CACHE) — sem isso, o <select>
-    // caía no 1º item do array por padrão do navegador, que podia não ser o
-    // schema que você acabou de editar/escolher em schema_ata.html.
-    fillSchemaSelect(SCHEMA_ATIVO_ID_CACHE || "");
+    // Turma nova = schema padrão (doc "padrao" de atasSchemas).
+    fillSchemaSelect(SCHEMA_PADRAO_ID);
     if($("avisoSchemaComAlunos")) $("avisoSchemaComAlunos").style.display = "none";
     if($("avisoMudancaId")) $("avisoMudancaId").style.display = "none";
 
@@ -772,8 +771,12 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     if(!seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
     if(!nome){ setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err"); return; }
 
-    const schemaEscolhido = schemaId ? getSchemaById(schemaId) : null;
-    const schemaSnapshot = normalizeSchema(schemaEscolhido || getDefaultConfig());
+    // Trava: sem schema padrão na coleção, não cadastra turma (nada de
+    // cair num schema embutido que não existe no banco).
+    if(!temSchemaPadrao()){ setMsg("Esta escola ainda não tem o schema padrão. Abra a página de Schemas de Ata para ele ser criado e recarregue.", "err"); return; }
+
+    const schemaEscolhido = (schemaId ? getSchemaById(schemaId) : null) || getSchemaById(SCHEMA_PADRAO_ID);
+    const schemaSnapshot = normalizeSchema(schemaEscolhido);
 
     const base = buildTurmaIdBase();
     let turmas = getTurmas().slice();
@@ -882,6 +885,7 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     });
     await carregarTurmasCache();
     await carregarSchemasCache();
+    if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Abra a página de Schemas de Ata para ele ser criado e recarregue.", "err");
     fillSerieSelect();
     buildFiltroAnoOptions();
     resetForm();
