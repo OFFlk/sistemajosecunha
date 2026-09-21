@@ -117,6 +117,17 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
 
 /* ── Botão danger desta página ── */
 .btn-danger { background:var(--danger-500,#b91c1c); border-color:var(--danger-500,#b91c1c); color:#fff; }
+
+/* Corrige o botão "Gerenciar schemas": é <a>, não <button>. No tema
+   escuro, base.css tem `html[data-theme="dark"] a { color: var(--brand-d) }`,
+   que pesa mais (seletor de atributo = classe) que `.btn-primary { color:#fff }`
+   sozinho — o texto virava a própria cor de fundo do botão (invisível).
+   `a.btn.btn-primary` (duas classes) já pesa mais que aquela regra em
+   qualquer tema, sem precisar mexer em base.css/components.css. */
+a.btn.btn-primary,
+a.btn.btn-primary:hover {
+  color: #fff;
+}
 .btn-danger:hover:not(:disabled) { background:var(--danger-600,#991b1b); border-color:var(--danger-600,#991b1b); }
 
 /* ── row-btns ── */
