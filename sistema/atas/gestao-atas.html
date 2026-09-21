@@ -16,7 +16,6 @@
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/base.css">
@@ -49,6 +48,17 @@ body { visibility: hidden; }
 .card { background: #ffffff; }
 html[data-theme="dark"] .card { background: #131c2e; }
 
+/* ── Card de destaque (visão geral): usa a cor de tema escolhida ── */
+.card.card-destaque { background: var(--brand-600); border-color: transparent; }
+html[data-theme="dark"] .card.card-destaque { background: var(--brand-600); border-color: transparent; }
+.card-destaque h3 { color:#fff; }
+.card-destaque .stat-box { background:#ffffff; border-color:transparent; }
+html[data-theme="dark"] .card-destaque .stat-box { background:#0f172a; }
+.card-destaque .btn {
+  background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.40); color:#fff;
+}
+.card-destaque .btn:hover:not(:disabled) { background:rgba(255,255,255,.28); border-color:rgba(255,255,255,.60); color:#fff; }
+
 /* ── Stats ── */
 .stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
 .stat-box {
@@ -72,11 +82,6 @@ input[type="checkbox"] {
   accent-color: var(--brand-600);
   cursor:pointer;
 }
-
-/* ── Lista de abas XLSX ── */
-.aba-list { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-top:12px; }
-.aba-item { display:grid; grid-template-columns:20px 1fr; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); }
-.aba-item:last-child { border-bottom:none; }
 
 /* ── Merge preview ── */
 .merge-item { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-radius:8px; border:1px solid var(--line); background:var(--bg); margin-bottom:6px; font-size:13px; }
@@ -109,14 +114,6 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
   display: none; align-items: center; justify-content: center;
   padding: 18px; z-index: 50;
 }
-
-/* ── Resultado da importação (log estruturado) ── */
-.import-aba { border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin-bottom:8px; }
-.import-aba.tem-divergencia { border-color:var(--warn-bd); background:var(--warn-bg); }
-.import-aba.bloqueada { border-color:var(--err-bd); background:var(--err-bg); }
-.import-aba-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
-.import-aba-divs { margin-top:8px; font-size:12px; color:var(--muted); }
-.import-aba-divs.collapsed { display:none; }
 </style>
 </head>
 <body>
@@ -126,7 +123,7 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
 <div class="container">
 
   <!-- ── ESTATÍSTICAS ── -->
-  <div class="card">
+  <div class="card card-destaque">
     <h3 style="margin-top:0;">📊 Visão geral — módulo de atas</h3>
     <div class="stats-row">
       <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas</div></div>
@@ -137,31 +134,19 @@ html[data-theme="dark"] .badge.err  { color:#fca5a5; }
     <div class="row-btns" style="margin-top:14px;">
       <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
     </div>
-    <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
   </div>
 
-  <!-- ── IMPORTAR XLSX ── -->
+  <!-- ── SCHEMAS DE ATA ── -->
   <div class="card">
-    <div class="sec-header" onclick="toggleSec('secXLSX')">
-      <h3 style="margin-top:0;">📊 Importar XLSX de atas</h3>
-      <span class="sec-toggle" id="togSecXLSX">▼</span>
-    </div>
-    <div class="sec-body" id="secXLSX">
-      <p class="muted">
-        Importe planilhas Excel. Cada aba vira uma turma. O importador detecta automaticamente
-        ano letivo, turno e série. Turmas com o mesmo ID são substituídas; novas são adicionadas.
-      </p>
-      <div class="row-btns">
-        <label class="btn btn-primary" id="lblXLSX" style="cursor:pointer;">
-          📂 Escolher Excel (.xlsx)
-          <input type="file" id="fileXlsx" accept=".xlsx,.xls" style="display:none" onchange="carregarXLSX(event)">
-        </label>
-        <button class="btn btn-gray"    id="btnSelTodas" onclick="selecionarAbas(true)"  disabled>Selecionar todas</button>
-        <button class="btn btn-gray"    id="btnDesTodas" onclick="selecionarAbas(false)" disabled>Desmarcar todas</button>
-        <button class="btn btn-primary" id="btnImportar" onclick="analisarSelecionadas()" disabled>Importar selecionadas</button>
-      </div>
-      <div class="aba-list" id="listaAbas" style="display:none;"></div>
-      <div class="summary"  id="saidaXLSX" style="display:none;"></div>
+    <h3 style="margin-top:0;">🧩 Schemas de ata</h3>
+    <p class="muted">
+      O schema define as matérias de uma ata e como as colunas da planilha são lidas na importação.
+      Toda escola tem um schema padrão, que pode ser editado mas não excluído. Se uma turma tem
+      matérias diferentes, crie, duplique ou edite outros schemas e escolha qual deles a turma usa
+      ao cadastrá-la.
+    </p>
+    <div class="row-btns">
+      <a class="btn btn-primary" href="../atas/schema_ata.html">🧩 Gerenciar schemas</a>
     </div>
   </div>
 
@@ -308,7 +293,7 @@ function dbWrite(base, val) {
       // Para turmasDB: cada turma tem seu array de alunos/notas — usa saveAllFull para
       // garantir que o documento inteiro é sobrescrito (sem merge), preservando o campo alunos.
       // Retorna a Promise (não engole erro) pra quem chama poder esperar e mostrar
-      // falha real ao usuário — antes, confirmarImportacao() nunca via esse erro.
+      // falha real ao usuário.
       if (base === 'turmasDB') {
         return _saveAllFull('turmas', val).catch(e => { console.warn('Firestore turmasDB:', e); throw e; });
       } else {
@@ -439,9 +424,6 @@ function ehTurmaDeAtas(t) {
 }
 
 async function inicializar() {
-  clearLogEl('logGeral');
-  logEl('Carregando dados do Firestore...', 'logGeral');
-
   // identidade-aluno.js v2 não tem catálogo em memória nem promise de
   // "pronto" — cada chamada (buscarAtasPorNome, criarAtasBatch, etc.) já é
   // pontual e aguarda Auth sozinha.
@@ -454,19 +436,16 @@ async function inicializar() {
     });
     if (window.DB && window.DB.turmas) {
       const todasFirestore = await window.DB.turmas.list();
-      const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
       // Mantém TODAS as turmas no cache local (não esconde as suspeitas) —
       // elas são marcadas visualmente na tabela e continuam selecionáveis para apagar.
       _mem[dbKey('turmasDB')] = todasFirestore;
-      logEl(`Firestore: ${todasFirestore.length} turma(s) total (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado — marcada${suspeitas.length===1?'':'s'} na tabela, não escondida${suspeitas.length===1?'':'s'})`, 'logGeral');
     }
   } catch(e) {
-    logEl('⚠️ Sem conexão com Firestore — usando cache local.', 'logGeral');
+    setMsg('Sem conexão com Firestore — usando cache local.', 'warn');
   }
 
   atualizarStats();
   renderTabelaTurmas();
-  logEl('✅ Pronto.', 'logGeral');
 }
 
 function atualizarStats() {
@@ -476,7 +455,6 @@ function atualizarStats() {
   document.getElementById('statTurmas').textContent   = turmas.length;
   document.getElementById('statAlunos').textContent   = totalAlunos;
   document.getElementById('statSemId').textContent    = semId;
-  if (semId > 0) logEl(`⚠️ ${semId} aluno(s) sem alunoId — use a página de IDs (config) para corrigir.`, 'logGeral');
   _atualizarStatAlunosAtas();
 }
 
@@ -491,8 +469,8 @@ function _atualizarStatAlunosAtas(){
 }
 
 async function recarregar() {
-  clearLogEl('logGeral');
-  logEl('Recarregando...', 'logGeral');
+  setMsg('Recarregando…', 'loading');
+  let falhou = false;
   try {
     if (window.DB && window.DB.turmas) {
       // Limpa o cache interno do db.firebase.js (a chave é o nome da coleção)
@@ -500,16 +478,15 @@ async function recarregar() {
       // O cache real fica em _cache['turmas'] dentro do db.firebase.js — não acessível diretamente;
       // basta chamar list() que ele já verifica o timestamp.
       const todasFirestore = await window.DB.turmas.list();
-      const suspeitas = todasFirestore.filter(t => !ehTurmaDeAtas(t));
       _mem[dbKey('turmasDB')] = todasFirestore;
-      logEl(`Firestore: ${todasFirestore.length} turma(s) (${suspeitas.length} suspeita${suspeitas.length===1?'':'s'}/legado)`, 'logGeral');
     }
   } catch(e) {
-    logEl('⚠️ Sem conexão com Firestore — usando cache local.', 'logGeral');
+    falhou = true;
+    setMsg('Sem conexão com Firestore — usando cache local.', 'warn');
   }
   atualizarStats();
   renderTabelaTurmas();
-  logEl('✅ Recarregado.', 'logGeral');
+  if (!falhou) setMsg('Dados recarregados.', 'ok');
 }
 
 /* =============================================
@@ -521,48 +498,6 @@ function toggleSec(id) {
   if (!body) return;
   const col = body.classList.toggle('collapsed');
   if (tog) tog.classList.toggle('collapsed', col);
-}
-
-// Monta o HTML do resultado da importação: uma linha por aba (com badge
-// de status), e a lista de divergências de série/etapa dessa aba
-// escondida atrás de um toggle — em vez de despejar tudo cru na tela.
-function renderResultadoImportacao(resultadosAbas, resumoTexto){
-  const limpas = resultadosAbas.filter(r => r.ok && r.divergencias.length===0);
-  const comProblema = resultadosAbas.filter(r => !r.ok || r.divergencias.length>0);
-
-  const resumoLimpas = limpas.length ? (
-    `<div class="import-aba" style="display:flex;align-items:center;gap:8px;">`+
-      `<span class="badge ok">✅ ${limpas.length} ata(s) importada(s) sem avisos</span>`+
-    `</div>`
-  ) : '';
-
-  const linhas = comProblema.map((r, i) => {
-    if (!r.ok) {
-      return `<div class="import-aba bloqueada"><div class="import-aba-head">`+
-        `<span>🚫 <b>${esc(r.abaName)}</b> — não importada</span><span class="badge err">${esc(r.motivo)}</span>`+
-        `</div></div>`;
-    }
-    const divCount = r.divergencias.length;
-    const toggleId = `_impDiv${i}`;
-    const divergHtml = divCount ? (
-      `<div class="import-aba-divs collapsed" id="${toggleId}">`+
-        r.divergencias.slice(0,8).map(d=>`<div>• ${esc(d)}</div>`).join('')+
-        (divCount>8 ? `<div>… e mais ${divCount-8} divergência(s).</div>` : '')+
-      `</div>`
-    ) : '';
-    const toggleBtn = divCount ? (
-      `<span class="badge warn" style="cursor:pointer;" onclick="`+
-      `document.getElementById('${toggleId}').classList.toggle('collapsed')">`+
-      `⚠️ ${divCount} divergência(s) — ver</span>`
-    ) : '';
-    return `<div class="import-aba${divCount?' tem-divergencia':''}">`+
-      `<div class="import-aba-head">`+
-        `<span>✅ <b>${esc(r.abaName)}</b> — ${r.qtdAlunos} aluno(s)</span>`+
-        `<span class="badge warn">${esc(r.badge)}</span>${toggleBtn}`+
-      `</div>${divergHtml}</div>`;
-  }).join('');
-
-  return resumoLimpas + linhas + `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;">${esc(resumoTexto).replace(/\n/g,'<br>')}</div>`;
 }
 
 function esc(s) {
@@ -921,7 +856,7 @@ async function exportarJSON() {
   catch(_) { alunosAtas = []; }
   _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:2, turmasDB:lerTurmasDB(), alunosAtasDB:alunosAtas }, null, 2),
     `backup-atas-${_hoje()}.json`, 'application/json');
-  logEl('✅ JSON exportado.', 'logGeral');
+  setMsg('JSON exportado.', 'ok');
 }
 
 function exportarCSV() {
@@ -931,1239 +866,7 @@ function exportarCSV() {
     linhas.push([t.id||t.turmaId||'', t.aba||'', t.anoLetivo||'', t.turno||'', t.serieTexto||'', t.origemArquivo||'', Array.isArray(t.alunos)?t.alunos.length:0]);
   const csv = linhas.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   _baixar('\uFEFF'+csv, `turmas-atas-${_hoje()}.csv`, 'text/csv;charset=utf-8;');
-  logEl('✅ CSV exportado.', 'logGeral');
-}
-
-/* =============================================
-   IMPORTAR XLSX — parsing completo (portado do importar.html)
-============================================= */
-let _workbook    = null;
-let _nomeArquivo = '';
-let _abasInfo    = [];
-// Buffer da análise de importação (verde/amarelo/vermelho) — nada em
-// turmasDB/Firestore é alterado até confirmarImportacao() ser chamado, e
-// nenhum alunoId é criado ou vinculado durante a análise (só decidido —
-// ver analisarSelecionadas()/pendenciasIdentidade). Por isso cancelar a
-// importação não precisa de nenhuma limpeza: nada foi persistido ainda.
-let _bufferImportacao = null;
-
-function normalizarTxt(v) { return String(v??'').trim().toUpperCase().replace(/\s+/g,' '); }
-function isVazio(v)        { return v===null||v===undefined||String(v).trim()===''; }
-
-function toNotaSistema(v) {
-  if (isVazio(v)) return '--';
-  const s = String(v).trim().toUpperCase();
-  if (s==='-'||s==='--') return '--';
-  if (['CSA','CPA','CNA','CPLA','CPRA'].includes(s)) return s;
-  const n = Number(s.replace(',','.'));
-  return !Number.isNaN(n) ? n.toFixed(1).replace('.',',') : '--';
-}
-
-// Retorna { resultado, divergente, motivo }. `divergente` sinaliza quando a
-// situação (última coluna: AP/REP/TRA/DEST/...) veio vazia ou "--" numa
-// linha que tem nome e notas preenchidos — provável erro de digitação ou
-// lacuna real da ata original, vale conferir. Só passa em silêncio quando
-// a linha inteira é vazia/placeholder (`notasVaziasNaLinha`), mesmo
-// critério usado em qualificarIndicadorAluno() pra série.
-function toResultado(v, notasVaziasNaLinha) {
-  const s = normalizarTxt(v);
-  if (['AP','REP','DEST','TRA','FAL','AND'].includes(s)) return { resultado: s, divergente: false, motivo: '' };
-  if (s==='C'||s==='CON') return { resultado: 'C', divergente: false, motivo: '' };
-  if (s==='S') return { resultado: 'S', divergente: false, motivo: '' };
-  if (s==='P') return { resultado: 'P', divergente: false, motivo: '' };
-  if (s==='I') return { resultado: 'I', divergente: false, motivo: '' };
-  if (s.includes('SATISF'))   return { resultado: 'S', divergente: false, motivo: '' };
-  if (s.includes('PARCIAL'))  return { resultado: 'P', divergente: false, motivo: '' };
-  if (s.includes('INSATISF')) return { resultado: 'I', divergente: false, motivo: '' };
-  if (s.includes('CONSERVAD'))return { resultado: 'C', divergente: false, motivo: '' };
-  if (notasVaziasNaLinha) return { resultado: 'Não informado', divergente: false, motivo: '' };
-  return { resultado: 'Não informado', divergente: true, motivo: `situação "${s||'--'}" não informada, mas há notas preenchidas — conferir se é erro de digitação ou lacuna da ata original` };
-}
-
-function linhaTemLegenda(row)  { return (row||[]).map(v=>normalizarTxt(v)).join(' ').includes('LEGENDA'); }
-function linhaPareceRodape(row){ const j=(row||[]).map(v=>normalizarTxt(v)).join(' '); return j.includes('APROVADO')||j.includes('REPROVADO')||j.includes('DESISTENTE')||j.includes('TRANSFERIDO')||j.includes('FALECIDO')||j.includes('EM ANDAMENTO'); }
-function isNumeroValido(v)     { return !isVazio(v)&&/^[0-9]+$/.test(String(v).trim()); }
-
-function detectarModoAvaliacao(matriz, rHead, colMap) {
-  const colsNotas = Object.entries(colMap).filter(([_,f])=>['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(f)).map(([c])=>Number(c));
-  const desSet = new Set(['CSA','CPA','CNA','CPLA','CPRA']);
-  for (let r=rHead+1; r<matriz.length; r++) {
-    const row=matriz[r]||[];
-    if (linhaTemLegenda(row)||linhaPareceRodape(row)) break;
-    for (const c of colsNotas) if (desSet.has(String(row[c]??'').trim().toUpperCase())) return 'desempenho';
-  }
-  return 'numerico';
-}
-
-function acharLinhaCabecalho(matriz) {
-  for (let r=0; r<matriz.length; r++) {
-    const j=(matriz[r]||[]).map(normalizarTxt).join(' | ');
-    const temNum = j.includes('Nº')||j.includes('N°')||j.includes('NO')||j.includes('N ');
-    const temNome = j.includes('NOME');
-    // "RESULTADO" e "SITUAÇÃO" são usados como sinônimos entre escolas/anos
-    // diferentes pro mesmo indicador (situação final do aluno na ata).
-    const temResultado = j.includes('RESULTADO')||j.includes('SITUA');
-    if (temNum && temNome && temResultado) return r;
-  }
-  return -1;
-}
-
-function mapearColunas(rowCab) {
-  const map={};
-  for (let c=0; c<rowCab.length; c++) {
-    const t=normalizarTxt(rowCab[c]);
-    if (t==='Nº'||t==='N°'||t==='NO'||t==='N') map[c]='num';
-    else if (t.includes('NOME')) map[c]='nome';
-    else if (t==='ANO'||t.includes('SÉRIE')||t.includes('SERIE')) map[c]='serieAluno';
-    else if (t.includes('PORT'))  map[c]='port';
-    else if (t.includes('MAT'))   map[c]='mat';
-    else if (t.includes('HIST'))  map[c]='hist';
-    else if (t.includes('GEO'))   map[c]='geo';
-    else if (t.includes('CIÊN')||t.includes('CIEN')) map[c]='cien';
-    else if (t.includes('FÍS')||t.includes('FIS'))   map[c]='fis';
-    else if (t.includes('ARTE'))  map[c]='arte';
-    else if (t.includes('RELIG')) map[c]='relig';
-    else if (t.includes('INGL')||t==='ING'||t.includes('LÍNGUA INGLESA')||t.includes('LINGUA INGLESA')) map[c]='ing';
-    else if (t.includes('RESULT')||t.includes('SITUA')) map[c]='resultado';
-  }
-  return map;
-}
-
-function serieTextoParaLista(serieTexto) {
-  const s=normalizarTxt(serieTexto).replace(/\./g,'');
-  if (!s) return [];
-  const partes=s.split(/\s+E\s+|\/|,|;|\+|-|–/).map(p=>p.trim()).filter(Boolean);
-  const temAno=s.includes(' ANO'), temSerie=s.includes(' SERIE')||s.includes(' SÉRIE');
-  const out=[];
-  for (let p of partes) {
-    if (!p.includes('ANO')&&!p.includes('SERIE')&&!p.includes('SÉRIE')) { if(temAno) p+=' ANO'; else if(temSerie) p+=' SÉRIE'; }
-    out.push(p.toLowerCase().replace(/\s+/g,' ').replace(' ano','º ano').replace(' série','ª série').replace(' serie','ª série'));
-  }
-  return [...new Set(out)];
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Qualificação do indicador do aluno (ANO/SÉRIE)
-   ─────────────────────────────────────────────────────────────
-   Na planilha, a coluna "ANO"/"SÉRIE" de cada aluno traz só o
-   indicador cru: "1º", "3ª e 4ª", "ALFA", "E1"... — mesmo em
-   turmas multisseriadas ou de aceleração. O texto completo
-   ("1º Ano", "Alfabetização", "Eixo 1"...) só existe no
-   cabeçalho da ata. Essas funções combinam os dois. */
-
-// Checa, na linha crua da planilha (antes de qualquer normalização pro
-// objeto `aluno`), se todas as colunas de nota mapeadas estão vazias ou
-// são placeholder ("-"/"--"). Usado só pra decidir se um indicador de
-// série "--" é uma linha genuinamente vazia (não avisa) ou um aluno de
-// verdade com a série faltando (avisa). Sem colunas de nota mapeadas,
-// não dá pra avaliar — assume vazio, pra não gerar aviso indevido numa
-// ata que nem usa essas colunas.
-function todasNotasVaziasNaLinha(row, colMap) {
-  const camposNota=['port','mat','hist','geo','cien','fis','arte','relig','ing'];
-  const cols=Object.entries(colMap).filter(([_,f])=>camposNota.includes(f)).map(([c])=>Number(c));
-  if (!cols.length) return true;
-  return cols.every(c=>{
-    const v=String(row[c]??'').trim();
-    return v===''||v==='-'||v==='--';
-  });
-}
-
-// Lê o cabeçalho da ata e descobre o "vocabulário" esperado pra essa
-// turma: de que tipo são as séries (ANO/SÉRIE/EM/EIXO/ALFA/LIVRE) e,
-// quando aplicável, quais números são esperados (pra turmas com lista
-// explícita ou aceleração). "LIVRE" é o caso "MULTI-SERIADA": o
-// cabeçalho não define um vocabulário único, então cada aluno é
-// resolvido pelo próprio símbolo (º=Ano, ª=Série).
-function detectarVocabularioCabecalho(serieTextoCabecalho) {
-  const s = normalizarTxt(serieTextoCabecalho);
-  if (!s) return { tipo: 'LIVRE', nums: [] };
-  if (/MULTI[- ]?SERIAD/.test(s)) return { tipo: 'LIVRE', nums: [] };
-  if (/ALFABETIZ/.test(s)) return { tipo: 'ALFA', nums: [] };
-  if (/EIXO/.test(s)) return { tipo: 'EIXO', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
-  if (/\bEM\b|ENSINO M[EÉ]DIO/.test(s)) return { tipo: 'EM', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
-  if (/ANO/.test(s)) return { tipo: 'ANO', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
-  if (/S[EÉ]RIE/.test(s)) return { tipo: 'SERIE', nums: [...s.matchAll(/\d+/g)].map(m=>m[0]) };
-  return { tipo: 'LIVRE', nums: [] };
-}
-
-const PALAVRA_POR_TIPO = { ANO: 'Ano', SERIE: 'Série', EM: 'EM' };
-const ORDINAL_POR_TIPO = { ANO: 'º', SERIE: 'ª', EM: 'º' };
-
-// Combina o indicador cru do aluno com o vocabulário do cabeçalho.
-// Retorna { serie, divergente, motivo }. `divergente` sinaliza quando o
-// indicador do aluno não bate com o que o cabeçalho anunciava (número
-// fora da lista esperada, ou símbolo º/ª incompatível com o tipo do
-// cabeçalho) — não bloqueia o import, só registra no log pra revisão.
-//
-// `notasVaziasNaLinha` (calculado por linha, ver todasNotasVaziasNaLinha)
-// diferencia dois casos de indicador "--": linha genuinamente placeholder
-// (nome/notas também vazios — não avisa) de uma linha com nome e notas
-// preenchidos mas só a série faltando (avisa — provável erro de
-// digitação ou lacuna real da ata original que vale conferir).
-function qualificarIndicadorAluno(raw, vocab, notasVaziasNaLinha) {
-  const s = normalizarTxt(raw);
-  if (!s) return { serie: '', divergente: false, motivo: '' };
-
-  // "--"/"-" é o mesmo marcador genérico de "não informado" usado em outras
-  // colunas da ata (não é específico de nenhum tipo de turma). Só é aceito
-  // sem aviso quando o resto da linha também está vazio/placeholder —
-  // caso contrário (aluno de verdade, com notas, só sem série) sinaliza
-  // divergência pra revisão manual.
-  if (s==='-'||s==='--') {
-    if (notasVaziasNaLinha) return { serie: '--', divergente: false, motivo: '' };
-    return { serie: '--', divergente: true, motivo: 'indicador "--" (não informado), mas há notas/resultado preenchidos — conferir se é erro de digitação ou lacuna da ata original' };
-  }
-
-  if (/^ALFA/.test(s)) {
-    const divergente = vocab.tipo !== 'LIVRE' && vocab.tipo !== 'ALFA';
-    return { serie: 'Alfabetização', divergente, motivo: divergente ? `indicador "ALFA" mas cabeçalho é ${vocab.tipo}` : '' };
-  }
-
-  const mEixo = s.match(/^E\s*(\d+)$/);
-  if (mEixo) {
-    const num = mEixo[1];
-    const tipoDivergente = vocab.tipo !== 'LIVRE' && vocab.tipo !== 'EIXO';
-    const numDivergente = vocab.tipo === 'EIXO' && vocab.nums.length && !vocab.nums.includes(num);
-    const divergente = tipoDivergente || numDivergente;
-    let motivo = '';
-    if (tipoDivergente) motivo = `indicador "E${num}" mas cabeçalho é ${vocab.tipo}`;
-    else if (numDivergente) motivo = `eixo ${num} fora do esperado pelo cabeçalho (${vocab.nums.join(',')})`;
-    return { serie: `Eixo ${num}`, divergente, motivo };
-  }
-
-  // Ordinal(is): "1º", "3ª", ou par de aceleração "1º e 2º" / "3ª e 4ª"
-  const ords = [...s.matchAll(/(\d+)\s*([ºª])/g)];
-  if (ords.length) {
-    const nums = ords.map(m=>m[1]);
-    const simbolos = [...new Set(ords.map(m=>m[2]))];
-
-    if (vocab.tipo === 'LIVRE' || vocab.tipo === 'ALFA' || vocab.tipo === 'EIXO') {
-      // Sem vocabulário definido pelo cabeçalho — usa o próprio símbolo
-      // do indicador pra decidir Ano (º) ou Série (ª).
-      const simbolo = simbolos[0] || 'º';
-      const palavra = simbolo === 'ª' ? 'Série' : 'Ano';
-      const divergente = vocab.tipo === 'ALFA' || vocab.tipo === 'EIXO'; // cabeçalho dizia outra coisa
-      return { serie: `${nums.map(n=>n+simbolo).join(' e ')} ${palavra}`, divergente, motivo: divergente ? `indicador numérico mas cabeçalho é ${vocab.tipo}` : '' };
-    }
-
-    // Cabeçalho define o tipo (ANO/SÉRIE/EM) — usa a palavra do cabeçalho,
-    // não o símbolo do aluno. Não confere º/ª: na prática, quem preenchia
-    // atas antigas nem sempre respeitava a concordância de gênero
-    // ("1º" em turma de "série" é comum e não indica erro de dado).
-    const simboloEsperado = ORDINAL_POR_TIPO[vocab.tipo];
-    const palavra = PALAVRA_POR_TIPO[vocab.tipo];
-    const numsForaDaLista = vocab.nums.length && nums.some(n => !vocab.nums.includes(n));
-    const divergente = numsForaDaLista;
-    const motivo = numsForaDaLista ? `número(s) ${nums.join(',')} fora do esperado pelo cabeçalho (${vocab.nums.join(',')})` : '';
-    return { serie: `${nums.map(n=>n+simboloEsperado).join(' e ')} ${palavra}`, divergente, motivo };
-  }
-
-  // Não reconhecido — devolve como veio, sem qualificar, e sinaliza.
-  return { serie: s, divergente: true, motivo: `indicador "${s}" não reconhecido` };
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Plausibilidade de trajetória (verde/amarelo/vermelho)
-   ─────────────────────────────────────────────────────────────
-   Decide se um novo registro de Ata é uma continuação plausível do
-   último registro já vinculado àquele alunoId no catálogo. NÃO decide
-   fusões sozinha — só classifica, pra alimentar a revisão da importação
-   (verde = segue normal · amarelo = aviso, não bloqueia · vermelho =
-   bloqueia e vai pra fila de anomalia).
-
-   Regra combinada (ano letivo + série), com a categoria do ÚLTIMO
-   resultado decidindo o que se espera a seguir:
-     AVANÇA  (Aprovado/Satisfatório/Parcial) → série esperada = anterior+1
-     MANTÉM  (Reprovado/Desistente/Conservado/Insatisfatória/Em andamento)
-             → série esperada = igual à anterior
-     LIVRE   (Transferido/Não informado) → sem expectativa de série,
-             só valida o intervalo de anos (o que aconteceu na outra
-             escola, ou por trás do dado ausente, é desconhecido)
-     BLOQUEIA (Falecido) → qualquer reaparecimento é sempre vermelho
-
-   Chamada por analisarSelecionadas() (fase de análise) — ver função
-   avaliarTrajetoria() usada ali, junto com o buffer verde/amarelo/vermelho
-   revisado antes de confirmarImportacao() gravar de fato no Firestore.
-── */
-
-function _categoriaResultado(resultado) {
-  const AVANCA  = ['AP','S','P'];
-  const MANTEM  = ['REP','DEST','C','I','AND'];
-  const BLOQUEIA= ['FAL'];
-  const r = String(resultado||'').trim().toUpperCase();
-  if (BLOQUEIA.includes(r)) return 'BLOQUEIA';
-  if (AVANCA.includes(r))   return 'AVANCA';
-  if (MANTEM.includes(r))   return 'MANTEM';
-  return 'LIVRE'; // TRA, "Não informado", ou qualquer resultado não mapeado
-}
-
-// Extrai { tipo, num } de um texto de série já qualificado (ex.: "5º Ano",
-// "3ª Série", "Eixo 2", "Alfabetização"). Em indicadores de aceleração
-// ("1º e 2º Ano"), usa o MAIOR número — é o que define onde o aluno estará
-// ao concluir aquele ano letivo.
-function _parseSerieCanonica(serieDisplay) {
-  const s = normalizarTxt(serieDisplay);
-  if (!s) return null;
-  if (/ALFABETIZ/.test(s)) return { tipo:'ALFA', num:0 };
-  const mEixo = s.match(/EIXO\s*(\d+)/);
-  if (mEixo) return { tipo:'EIXO', num:Number(mEixo[1]) };
-  const nums = [...s.matchAll(/(\d+)/g)].map(m=>Number(m[1]));
-  if (!nums.length) return null;
-  const num = Math.max(...nums);
-  const tipo = /\bEM\b/.test(s) ? 'EM' : (/S[EÉ]RIE/.test(s) ? 'SERIE' : 'ANO');
-  return { tipo, num };
-}
-
-/**
- * @param {Object|null} ultimo { anoLetivo, serieDisplay, resultado } — última
- *   ata já vinculada ao alunoId candidato (null = sem histórico, primeira vez).
- * @param {Object} novo { anoLetivo, serieDisplay } — registro sendo importado.
- * @returns {{status:'verde'|'amarelo'|'vermelho', motivo:string}}
- */
-function avaliarTrajetoria(ultimo, novo) {
-  if (!ultimo) return { status:'verde', motivo:'' };
-
-  const categoria = _categoriaResultado(ultimo.resultado);
-
-  if (categoria === 'BLOQUEIA') {
-    return { status:'vermelho', motivo:`último registro conhecido está marcado como Falecido (${ultimo.anoLetivo})` };
-  }
-
-  const anoUltimo = Number(ultimo.anoLetivo);
-  const anoNovo   = Number(novo.anoLetivo);
-  const gap = anoNovo - anoUltimo;
-
-  // Só bloqueia (vermelho) o que é cronologicamente impossível: ano novo
-  // igual ou anterior ao último já registrado. Um intervalo grande (>3
-  // anos) é improvável, mas não impossível — aluno pode ter saído e
-  // voltado anos depois. Em vez de travar aqui sem olhar o resto, segue
-  // avaliando série/situação normalmente e, se tudo mais for coerente,
-  // vira amarelo com um aviso específico do intervalo — decisão de
-  // "é o mesmo aluno ou não" fica com quem revisa, não travada de cara.
-  if (!Number.isFinite(gap) || gap < 1) {
-    return { status:'vermelho', motivo:`intervalo de ${Number.isFinite(gap)?gap:'?'} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} não é cronologicamente possível` };
-  }
-  const gapIncomum = gap > 3;
-  const sufixoGap = gapIncomum ? ` (intervalo de ${gap} anos também é incomum — esperado 1 a 3)` : '';
-
-  if (categoria === 'LIVRE') {
-    return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) sem resultado conclusivo (${ultimo.resultado || 'Não informado'}) — série não conferida${sufixoGap}` };
-  }
-
-  const serieUltima = _parseSerieCanonica(ultimo.serieDisplay);
-  const serieNova   = _parseSerieCanonica(novo.serieDisplay);
-
-  if (!serieUltima || !serieNova) {
-    return { status:'amarelo', motivo:`não foi possível interpretar a série de um dos registros para comparação${sufixoGap}` };
-  }
-
-  if (serieUltima.tipo !== serieNova.tipo) {
-    return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})${sufixoGap}` };
-  }
-
-  const numEsperado = categoria === 'AVANCA' ? serieUltima.num + 1 : serieUltima.num;
-
-  if (serieNova.num !== numEsperado) {
-    // Caso conhecido: reprovado/mantido no último registro, mas a série
-    // avançou mesmo assim — prática comum em anos anteriores (a escola
-    // promovia o aluno reprovado). Não é necessariamente erro de
-    // digitação, então ganha um motivo específico em vez do genérico.
-    if (categoria === 'MANTEM' && serieNova.num === serieUltima.num + 1) {
-      return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) foi reprovado/mantido, mas a série avançou mesmo assim (prática comum em anos anteriores) — confira se é o mesmo aluno${sufixoGap}` };
-    }
-    return { status:'amarelo', motivo:`série esperada era ${numEsperado} (${serieUltima.tipo}), mas veio ${serieNova.num}${sufixoGap}` };
-  }
-
-  if (gapIncomum) {
-    return { status:'amarelo', motivo:`intervalo de ${gap} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} é incomum, mas série e situação são coerentes com progressão normal — confira se é o mesmo aluno` };
-  }
-
-  return { status:'verde', motivo:'' };
-}
-
-// Varre turmasDB e devolve a ata mais recente (maior anoLetivo) já
-// vinculada a um alunoId — usada como referência pra avaliarTrajetoria().
-function ultimoRegistroDoAluno(alunoId, turmasDB) {
-  let melhor = null;
-  for (const turma of (turmasDB||[])) {
-    for (const aluno of (turma.alunos||[])) {
-      if (aluno.alunoId !== alunoId) continue;
-      if (!melhor || Number(turma.anoLetivo) > Number(melhor.anoLetivo)) {
-        melhor = { anoLetivo: turma.anoLetivo, serieDisplay: aluno.serie, resultado: aluno.resultado };
-      }
-    }
-  }
-  return melhor;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Validação do Ano Letivo do cabeçalho
-   ─────────────────────────────────────────────────────────────
-   Diferente da série (que dá pra corrigir depois, dentro do sistema,
-   via select), o ano letivo é usado como parte do ID da turma e do
-   casamento de CH no histórico — se vier errado, quebra a exportação
-   de forma silenciosa, e o usuário não teria como perceber olhando
-   só a tela (o select do ano ativo mostraria o valor errado como se
-   fosse normal). Por isso tem dois níveis:
-   - "block": caractere não numérico ou 5+ dígitos — claramente não é
-     um ano. A turma NÃO é importada (evita entrar lixo no banco),
-     mas isso não afeta as outras abas selecionadas.
-   - "warn": só dígitos, até 4, mas fora da faixa plausível pra uma
-     ata escolar (ex.: 1898, 1695, 850) — provável erro de digitação.
-     Ainda assim é importado, só fica sinalizado pra revisão. */
-function validarAnoLetivo(anoRaw) {
-  const s = String(anoRaw||'').trim();
-  if (!s) return { nivel:'warn', motivo:'ano letivo não encontrado no cabeçalho' };
-  if (!/^\d+$/.test(s)) {
-    return { nivel:'block', motivo:`ano letivo "${s}" contém caractere não numérico` };
-  }
-  if (s.length >= 5) {
-    return { nivel:'block', motivo:`ano letivo "${s}" tem ${s.length} dígitos — não parece um ano válido` };
-  }
-  const num = parseInt(s,10);
-  const anoAtual = new Date().getFullYear();
-  const MIN_ANO = 1900; // piso de sanidade — ajuste se a escola tiver atas mais antigas
-  if (num < MIN_ANO || num > anoAtual+1) {
-    return { nivel:'warn', motivo:`ano letivo "${s}" fora da faixa esperada (${MIN_ANO}–${anoAtual+1}) — confira se não é erro de digitação` };
-  }
-  return { nivel:'ok', motivo:'' };
-}
-
-function extrairAnoSerieTurnoDaAba(abaName) {
-  const s=normalizarTxt(abaName);
-  const mAno=s.match(/\b(19|20)\d{2}\b/);
-  const anoLetivo=mAno?mAno[0]:'';
-  let turno='';
-  if (/\bVESP\b|\bVESPERTIN\b/.test(s)) turno='VESPERTINO';
-  else if (/\bMAT\b|\bMATUTIN\b/.test(s)) turno='MATUTINO';
-  else if (/\bNOT\b|\bNOTURN\b/.test(s)) turno='NOTURNO';
-  let serieTexto='';
-  const mEixo=s.match(/\bEIXO\s*[1-3]\b/); if(mEixo) serieTexto=mEixo[0].replace(/\s+/g,' ').toUpperCase();
-  const mAlfa=s.match(/\bALFABETIZACAO\b|\bALFABETIZAÇÃO\b/); if(!serieTexto&&mAlfa) serieTexto='Alfabetização';
-  const mOrd=s.match(/\b([1-9])\s*(º|ª)\b/); if(!serieTexto&&mOrd) serieTexto=`${mOrd[1]}${mOrd[2]}`;
-  const mMultiAno=s.match(/\b[1-9]\s*º\s*(E\s*[1-9]\s*º)+\s*ANO\b/); if(!serieTexto&&mMultiAno) serieTexto=mMultiAno[0];
-  const mMultiSerie=s.match(/\b[1-8]\s*ª\s*(E\s*[1-8]\s*ª)+\s*S(É|E)RIE\b/); if(!serieTexto&&mMultiSerie) serieTexto=mMultiSerie[0];
-  return { anoLetivo, turno, serieTexto };
-}
-
-function extrairInfoCabecalho(matriz, rHead, abaName) {
-  const info={ anoLetivo:'', turno:'', serieTexto:'', seriesTurma:[] };
-  const maxR=Math.min(rHead,35);
-
-  function pegaAbaixo(r, c, tipo) {
-    const rowB=matriz[r+1]||[];
-    for (let dc=0; dc<=6; dc++) {
-      const s=String(rowB[c+dc]??'').trim(); if(!s) continue;
-      if (tipo==='ANO'   && /^(19|20)\d{2}$/.test(s)) return s;
-      if (tipo==='TURNO' && ['MATUTINO','VESPERTINO','NOTURNO'].includes(normalizarTxt(s))) return normalizarTxt(s);
-      if (tipo==='SERIE' && normalizarTxt(s)!=='--') return s;
-    }
-    return '';
-  }
-
-  for (let r=0; r<maxR; r++) {
-    const row=matriz[r]||[];
-    for (let c=0; c<row.length; c++) {
-      const cell=normalizarTxt(row[c]);
-      if (!info.anoLetivo  && (cell==='ANO'||cell.startsWith('ANO')))                                              { const v=pegaAbaixo(r,c,'ANO');   if(v) info.anoLetivo=v; }
-      if (!info.serieTexto && (cell==='SERIE'||cell==='SÉRIE'||cell.includes('SERIE')||cell.includes('SÉRIE')))    { const v=pegaAbaixo(r,c,'SERIE'); if(v) info.serieTexto=v; }
-      if (!info.turno      && (cell==='TURNO'||cell.includes('TURNO')))                                            { const v=pegaAbaixo(r,c,'TURNO'); if(v) info.turno=v; }
-    }
-  }
-  const fb=extrairAnoSerieTurnoDaAba(abaName);
-  if (!info.anoLetivo)  info.anoLetivo =fb.anoLetivo;
-  if (!info.turno)      info.turno     =fb.turno;
-  if (!info.serieTexto) info.serieTexto=fb.serieTexto;
-  if (info.serieTexto)  info.seriesTurma=serieTextoParaLista(info.serieTexto);
-  return info;
-}
-
-function montarIdTurma({anoLetivo,turno,serieTexto,aba}) {
-  return `${(anoLetivo||'SEM-ANO').trim()}|${(turno||'SEM-TURNO').trim()}|${(serieTexto||'SEM-SERIE').trim()}|${(aba||'SEM-ABA').trim()}`;
-}
-
-/* ─── UI do importador ─── */
-function carregarXLSX(event) {
-  const file=event.target.files?.[0]; if(!file) return;
-  _nomeArquivo=file.name;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    _workbook=XLSX.read(new Uint8Array(reader.result),{type:'array'});
-    _abasInfo=_workbook.SheetNames.map(n=>({name:n,checked:true}));
-    renderListaAbas();
-    if (IS_ADMIN) {
-      ['btnSelTodas','btnDesTodas','btnImportar'].forEach(id=>{
-        const el=document.getElementById(id); if(el) el.disabled=false;
-      });
-    }
-    const saida=document.getElementById('saidaXLSX');
-    saida.style.display='block';
-    saida.textContent=`Arquivo: ${_nomeArquivo}\nAbas encontradas: ${_workbook.SheetNames.length}\nSelecione as abas e clique em "Importar selecionadas".`;
-  };
-  reader.readAsArrayBuffer(file);
-  event.target.value='';
-}
-
-function renderListaAbas() {
-  const lista=document.getElementById('listaAbas');
-  lista.style.display=_abasInfo.length?'block':'none';
-  lista.innerHTML=_abasInfo.map((aba,idx)=>`
-    <div class="aba-item">
-      <input type="checkbox" ${aba.checked?'checked':''} onchange="toggleAba(${idx},this.checked)">
-      <div>
-        <b>${esc(aba.name)}</b>
-        <span class="badge" style="margin-left:6px;">aba</span>
-        <div class="muted" style="font-size:12px;margin-top:2px;">Será salva como turma separada.</div>
-      </div>
-    </div>`).join('');
-}
-
-function selecionarAbas(val) { _abasInfo=_abasInfo.map(a=>({...a,checked:!!val})); renderListaAbas(); }
-function toggleAba(idx,val)  { _abasInfo[idx].checked=val; }
-
-/**
- * FASE 1 — Análise. Lê o xlsx, resolve identidade (window.Identidade — isso
- * já persiste no catálogo, ver nota no _bufferImportacao) e avalia a
- * plausibilidade de trajetória de cada aluno (avaliarTrajetoria). NÃO grava
- * nenhuma turma em turmasDB/Firestore ainda — monta um buffer em memória e
- * mostra uma revisão (verde/amarelo/vermelho) antes de confirmar.
- */
-/* =========================
-   Similaridade de nome (Jaro-Winkler) — portada de idaluno.html.
-   Usada aqui pra resolver identidade DURANTE o import (antes do alunoId
-   nascer), em vez de só depois em idaluno.html — decisão da pendência v12:
-   evita gastar número de ID (contador atômico, nunca reaproveita) num nome
-   repetido que já ia precisar ser fundido manualmente de qualquer jeito.
-========================= */
-/* =========================
-   Similaridade de nome — comparação por token (não mais string inteira).
-   Motivo da mudança (achado no teste do import grande, 136 turmas): rodar
-   Jaro-Winkler direto na string inteira deixa um sobrenome comum e longo
-   (ex.: "DOS SANTOS", "OLIVEIRA SILVA") dominar o placar de caracteres
-   batidos, mesmo quando o primeiro/segundo nome é completamente diferente
-   — produzia 85-90% pra pessoas claramente diferentes só por
-   compartilharem sobrenome de família, e por outro lado descontava até 5%
-   só por causa de um "DA"/"DE" faltando num erro de digitação óbvio.
-   Ex.: "JAIRO BORGES DOS SANTOS" x "CARLOS RIBEIRO DOS SANTOS" dava 86%.
-========================= */
-function _jaroWinkler(nA, nB){
-  if (!nA || !nB) return 0;
-  if (nA === nB) return 1;
-  const mDist = Math.floor(Math.max(nA.length, nB.length)/2)-1;
-  if (mDist < 0) return 0;
-  const aMatch = new Array(nA.length).fill(false);
-  const bMatch = new Array(nB.length).fill(false);
-  let matches = 0;
-  for (let i=0;i<nA.length;i++){
-    const start = Math.max(0, i-mDist);
-    const end = Math.min(i+mDist+1, nB.length);
-    for (let j=start;j<end;j++){
-      if (bMatch[j]) continue;
-      if (nA[i] !== nB[j]) continue;
-      aMatch[i]=true; bMatch[j]=true; matches++; break;
-    }
-  }
-  if (!matches) return 0;
-  let t = 0, k = 0;
-  for (let i=0;i<nA.length;i++){
-    if (!aMatch[i]) continue;
-    while(!bMatch[k]) k++;
-    if (nA[i] !== nB[k]) t++;
-    k++;
-  }
-  t = t/2;
-  const jaro = (matches/nA.length + matches/nB.length + (matches-t)/matches)/3;
-  let l = 0;
-  for (; l<4 && l<nA.length && l<nB.length && nA[l]===nB[l]; l++);
-  const p = 0.1;
-  return jaro + l*p*(1-jaro);
-}
-
-// "de/da/do/das/dos" são artigos de ligação sem valor pra distinguir
-// pessoas — erro de digitação comum é esquecer/inserir um deles, então
-// tiram esses tokens ANTES de comparar (em vez de deixar o Jaro-Winkler
-// penalizar por causa deles).
-const _PARTICULAS_NOME = new Set(['de','da','do','das','dos']);
-function _tokensNome(nome){
-  return window.Identidade.normNome(nome).split(' ').filter(t => t && !_PARTICULAS_NOME.has(t));
-}
-
-function similaridade(a,b){
-  const nA = window.Identidade.normNome(a), nB = window.Identidade.normNome(b);
-  if (!nA || !nB) return 0;
-  if (nA === nB) return 1;
-
-  const tA = _tokensNome(a), tB = _tokensNome(b);
-  if (tA.length && tB.length && tA.length === tB.length) {
-    // Mesmo número de palavras (fora os artigos de ligação) — compara
-    // palavra a palavra, mesma posição, e combina por MÉDIA GEOMÉTRICA
-    // (não média simples): uma palavra muito diferente (tipicamente o
-    // primeiro/segundo nome, o que de fato distingue pessoas) derruba o
-    // placar geral, mesmo que o resto (sobrenome comum) bata perfeito.
-    let prod = 1;
-    for (let i=0;i<tA.length;i++) prod *= Math.max(_jaroWinkler(tA[i], tB[i]), 0.0001);
-    return Math.pow(prod, 1/tA.length);
-  }
-
-  // Número de palavras diferente (nome do meio composto adicionado/
-  // removido, por exemplo) — sem um jeito barato de realinhar direito,
-  // cai pro Jaro-Winkler na string inteira (mesmo comportamento de antes,
-  // mais tolerante a esse caso específico).
-  return _jaroWinkler(nA, nB);
-}
-
-const SIMILARIDADE_CUT = 0.88;  // subido de 85% pra 88% — teste do import grande (136 turmas)
-                                 // mostrou pares de pessoas DIFERENTES com mesmo sobrenome
-                                 // comum passando de 85% mesmo após o fix de comparação por
-                                 // token (ex.: MARIA LUCIA x MARIA RAIMUNDA ALVES DOS SANTOS = 86%)
-const SIMILARIDADE_AUTO = 0.94; // acima disso + trajetória verde + catálogo = vincula sem perguntar
-
-// Prefixo curto (até 4 chars) do 1º e do último token do nome — usado só
-// pra estreitar a busca no Firestore (nunca carrega a coleção inteira). A
-// decisão final de "é a mesma pessoa" sempre passa por similaridade() no
-// nome completo, não pelo prefixo — o prefixo é só pra achar candidatos.
-function _prefixosBusca(nome){
-  const norm = window.Identidade.normNome(nome);
-  const tokens = norm.split(' ').filter(Boolean);
-  if (!tokens.length) return [];
-  const pfx = s => s.slice(0, Math.min(4, s.length));
-  const prefixos = new Set([pfx(tokens[0])]);
-  if (tokens.length > 1) prefixos.add(pfx(tokens[tokens.length-1]));
-  return [...prefixos].filter(Boolean);
-}
-
-/**
- * Busca candidatos no catálogo já existente (alunos-atas) por nome
- * parecido. Duas queries de prefixo curto (nome + sobrenome) pra pegar uma
- * rede razoável de candidatos sem carregar a coleção inteira, depois
- * pontua todos por similaridade() de nome completo e descarta quem não
- * bate o corte — o prefixo curto é só pra achar quem vale a pena comparar.
- *
- * @param {string} nome
- * @param {Map} [cachePrefixo] — cache em memória, escopado a UMA análise
- *   (declarado dentro de analisarSelecionadas, não é global). Nome comum
- *   brasileiro repete muito prefixo curto dentro da mesma turma/planilha
- *   ("Maria"/"Mariana" → "mari") — sem isso, cada linha repetiria a mesma
- *   query no Firestore. Nunca atravessa duas análises diferentes: o
- *   catálogo pode ter mudado entre uma e outra (ex.: outra pessoa
- *   importando ao mesmo tempo, ou um vínculo manual em idaluno.html).
- */
-async function _candidatosCatalogo(nome, cachePrefixo){
-  const prefixos = _prefixosBusca(nome);
-  if (!prefixos.length) return [];
-  const listas = await Promise.all(prefixos.map(async p => {
-    if (cachePrefixo && cachePrefixo.has(p)) return cachePrefixo.get(p);
-    const achados = await window.Identidade.buscarAtasPorNome(p, 25);
-    if (cachePrefixo) cachePrefixo.set(p, achados);
-    return achados;
-  }));
-  const porId = new Map();
-  for (const lista of listas) for (const a of lista) porId.set(a.alunoId, a);
-  return [...porId.values()]
-    .map(a => ({ origem:'catalogo', alunoId:a.alunoId, nome:a.nome, score:similaridade(nome, a.nome) }))
-    .filter(c => c.score >= SIMILARIDADE_CUT);
-}
-
-// Candidatos dentro da MESMA análise (linhas já processadas antes desta,
-// de qualquer aba selecionada) — cobre o caso de um aluno aparecer em 2
-// abas/anos do mesmo arquivo com pequena variação de grafia.
-function _candidatosNoLote(nome, jaProcessados){
-  return jaProcessados
-    .map(p => ({ origem:'lote', ref:p, nome:p.nomeAluno, anoLetivo:p.anoLetivo, score:similaridade(nome, p.nomeAluno) }))
-    .filter(c => c.score >= SIMILARIDADE_CUT);
-}
-
-// Mesma regra de "ano mais próximo do ano-ativo" usada por
-// identidade-aluno.js (recalcularUltimoAnoRegistroBatch/_anoMaisProximo),
-// reaplicada aqui só pra escolher, dentro de um grupo 100% novo (nenhum ID
-// de catálogo envolvido) que atravessa vários anos letivos no mesmo lote,
-// qual ocorrência vira a "semente" (nome) do alunoId a criar. Não decide
-// ultimoAnoRegistro — isso é recalculado à parte depois que as matrículas
-// do grupo inteiro já estiverem salvas, então não depende desta escolha.
-// Mesmo critério de identidade-aluno.js (_melhorNome): entre duas grafias
-// do "mesmo" nome dentro de um grupo, prefere a mais completa (mais longa)
-// e dá uma pequena vantagem a quem tem acento — indício de digitação mais
-// cuidadosa. É só um PALPITE razoável, não uma decisão confiável em todo
-// caso (nome maior nem sempre é o certo) — se sair errado, corrige depois
-// em idaluno.html, que tem um botão "✏️ Renomear este aluno" pra isso,
-// sem precisar mexer direto no Firestore.
-function _melhorNomeLocal(a, b) {
-  if (!a) return b || '';
-  if (!b) return a;
-  const temAcento = s => /[\u00C0-\u00FF]/.test(s);
-  return (b.length + (temAcento(b)?10:0)) > (a.length + (temAcento(a)?10:0)) ? b : a;
-}
-
-function _ocorrenciaMaisProximaDoAnoAtivo(ocorrencias, anoAtivo) {
-  const validos = ocorrencias.map(o => Number(o._anoLetivoOcorrencia)).filter(Number.isFinite);
-  if (!validos.length) return ocorrencias[0];
-  const ativo = Number(anoAtivo);
-  const anteriores = Number.isFinite(ativo) ? validos.filter(a => a <= ativo) : [];
-  let alvo;
-  if (anteriores.length) alvo = Math.max(...anteriores);
-  else if (!Number.isFinite(ativo)) alvo = Math.max(...validos);
-  else alvo = validos.reduce((m,a) => Math.abs(a-ativo) < Math.abs(m-ativo) ? a : m);
-  return ocorrencias.find(o => Number(o._anoLetivoOcorrencia) === alvo) || ocorrencias[0];
-}
-
-async function analisarSelecionadas() {
-  if (!IS_ADMIN || !_workbook) return;
-  const selecionadas=_abasInfo.filter(a=>a.checked).map(a=>a.name);
-  if (!selecionadas.length) { alert('Selecione pelo menos uma aba.'); return; }
-  if (!window.Identidade)   { alert('Módulo de identidade não carregado. Recarregue a página.'); return; }
-
-  const btnImp=document.getElementById('btnImportar');
-  if (btnImp) { btnImp.disabled=true; btnImp.textContent='Analisando...'; }
-  const saida=document.getElementById('saidaXLSX');
-  saida.style.display='block';
-  saida.textContent='';
-  setMsg(`Analisando ${selecionadas.length} aba(s)…`, 'loading');
-
-  try {
-    const turmasDB=lerTurmasDB(); // estado atual, real — só lido, não alterado aqui
-    const abasValidas=[], resultadosAbasBloqueadas=[];
-
-    // Ano-ativo só é usado aqui pra decidir qual ocorrência "semeia" o nome
-    // de um alunoId 100% novo quando o mesmo aluno aparece em vários anos
-    // letivos dentro do próprio lote (ver resolução de componentes mais
-    // abaixo) — não afeta leitura/gravação de mais nada nesta fase.
-    let anoAtivoAtual = null;
-    try {
-      const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
-      anoAtivoAtual = dadosEscola?.configAnoAtivo ?? null;
-    } catch(e) { console.warn('[analisarSelecionadas] não foi possível ler configAnoAtivo:', e.message); }
-
-    for (const abaName of selecionadas) {
-      const ws=_workbook.Sheets[abaName];
-      const matriz=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-      const rHead=acharLinhaCabecalho(matriz);
-      if (rHead===-1) { resultadosAbasBloqueadas.push({abaName, motivo:'cabeçalho da TABELA DE NOTAS não encontrado (não é o cabeçalho documental da ata) — procurando uma linha com Nº, Nome e Resultado/Situação; confira se algum desses indicadores foi renomeado na planilha'}); continue; }
-
-      const info=extrairInfoCabecalho(matriz,rHead,abaName);
-
-      const anoCheck=validarAnoLetivo(info.anoLetivo);
-      if (anoCheck.nivel==='block') {
-        resultadosAbasBloqueadas.push({abaName, motivo:`ano letivo inválido: ${anoCheck.motivo}`});
-        continue; // não afeta as outras abas selecionadas
-      }
-
-      const colMap=mapearColunas(matriz[rHead]);
-      const modoAvaliacao=detectarModoAvaliacao(matriz,rHead,colMap);
-      const cNome=Object.keys(colMap).find(k=>colMap[k]==='nome');
-      const cNum =Object.keys(colMap).find(k=>colMap[k]==='num');
-      const linhasDaAba=[];
-
-      for (let r=rHead+1; r<matriz.length; r++) {
-        const row=matriz[r]||[];
-        if (linhaTemLegenda(row)||linhaPareceRodape(row)) break;
-        const nome=cNome!==undefined?String(row[Number(cNome)]).trim():'';
-        if (!nome) continue;
-        // Linha de numeração em branco na ata original (erro humano de
-        // transcrição): "--" no lugar do nome só pra não quebrar a
-        // numeração impressa. Sistema não depende de sumário numérico
-        // (é banco pesquisável) — ignora a linha, não cria aluno.
-        if (nome==='--'||nome==='-') continue;
-        if (cNum!==undefined&&!isNumeroValido(row[Number(cNum)])) continue;
-        linhasDaAba.push({row,nomeAluno:nome,colMap,modoAvaliacao});
-      }
-
-      abasValidas.push({abaName,info,colMap,modoAvaliacao,linhas:linhasDaAba,avisoAno:anoCheck.nivel==='warn'?anoCheck.motivo:null});
-    }
-
-    // Resolução de identidade: NENHUM alunoId é criado ou vinculado aqui —
-    // só decidido. Isso resolve a pendência v12 (contador atômico não
-    // reaproveita número; criar um ID "provisório" numa pendência ambígua
-    // significava perder esse número pra sempre se a resposta fosse "é a
-    // mesma pessoa"). A criação/vínculo de verdade só acontece em
-    // confirmarImportacao(), depois da revisão humana.
-    const pendenciasIdentidade=[];
-    const jaProcessados=[]; // {nomeAluno, anoLetivo, serieDisplay, resultado, aluno} em ordem de processamento
-    const cachePrefixo=new Map(); // escopado a ESTA análise — ver nota em _candidatosCatalogo
-    let pendCount=0;
-
-    // ── Union-find escopado a ESTA análise (grupos auto-qualificados) ──
-    // Nós são objetos: ocorrências (`aluno`) e "âncoras" de catálogo — um
-    // nó virtual por alunoId já existente que aparece como candidato auto-
-    // qualificado de alguém (não cria nada no Firestore, é só pra achar
-    // componentes conexos em memória). Resolvido só depois que TODAS as
-    // abas selecionadas já passaram pelo loop de linhas, porque um grupo
-    // pode atravessar abas diferentes.
-    const _ufParent=new Map();
-    function _ufFind(x){
-      if (!_ufParent.has(x)) _ufParent.set(x, x);
-      let raiz=x;
-      while (_ufParent.get(raiz)!==raiz) raiz=_ufParent.get(raiz);
-      let cur=x;
-      while (_ufParent.get(cur)!==raiz) { const prox=_ufParent.get(cur); _ufParent.set(cur, raiz); cur=prox; }
-      return raiz;
-    }
-    function _ufUnion(a,b){
-      const ra=_ufFind(a), rb=_ufFind(b);
-      if (ra!==rb) _ufParent.set(ra, rb);
-    }
-    const _anchorNodes=new Map(); // alunoId -> nó âncora {__anchor:true, alunoId}
-    const _anchorNomes=new Map(); // alunoId -> nome (só pra exibir em caso de conflito)
-    function _anchorNode(alunoId, nome){
-      if (!_anchorNodes.has(alunoId)) _anchorNodes.set(alunoId, { __anchor:true, alunoId });
-      if (nome && !_anchorNomes.has(alunoId)) _anchorNomes.set(alunoId, nome);
-      return _anchorNodes.get(alunoId);
-    }
-
-    let batchIdx=0, idsNovosEstimados=0, idsVinculadosAuto=0;
-    const itensBuffer=[];
-
-    for (const {abaName,info,colMap,modoAvaliacao,linhas,avisoAno} of abasValidas) {
-      const vocab=detectarVocabularioCabecalho(info.serieTexto);
-      const divergencias=avisoAno ? [`[Ano letivo] ${avisoAno}`] : [];
-      const novos=[];
-      for (const {row,nomeAluno} of linhas) {
-        const aluno={nome:nomeAluno,serie:'',alunoId:null,port:'--',mat:'--',hist:'--',geo:'--',cien:'--',fis:'--',arte:'--',relig:'--',ing:'--',resultado:'Não informado'};
-        const notasVaziasNaLinha=todasNotasVaziasNaLinha(row,colMap);
-        for (const [cStr,field] of Object.entries(colMap)) {
-          const v=row[Number(cStr)];
-          if (field==='serieAluno') {
-            const q=qualificarIndicadorAluno(v,vocab,notasVaziasNaLinha);
-            aluno.serie=q.serie;
-            if (q.divergente) divergencias.push(`${nomeAluno}: "${String(v||'').trim()}" — ${q.motivo}`);
-          }
-          else if (field==='resultado') {
-            const qr=toResultado(v,notasVaziasNaLinha);
-            aluno.resultado=qr.resultado;
-            if (qr.divergente) divergencias.push(`${nomeAluno}: "${String(v||'').trim()}" — ${qr.motivo}`);
-          }
-          else if (['port','mat','hist','geo','cien','fis','arte','relig','ing'].includes(field)) aluno[field]=toNotaSistema(v);
-        }
-
-        // ── Candidatos: catálogo (alunos-atas) + mesma análise (outras abas) ──
-        const candCatalogo = await _candidatosCatalogo(nomeAluno, cachePrefixo);
-        const candLote = _candidatosNoLote(nomeAluno, jaProcessados);
-        const candidatos = [...candCatalogo, ...candLote].map(c => {
-          const ultimo = c.origem==='catalogo'
-            ? ultimoRegistroDoAluno(c.alunoId, turmasDB)
-            : { anoLetivo:c.ref.anoLetivo, serieDisplay:c.ref.serieDisplay, resultado:c.ref.resultado };
-          const traj = avaliarTrajetoria(ultimo, {anoLetivo:info.anoLetivo, serieDisplay:aluno.serie});
-          return { ...c, traj };
-        });
-
-        aluno._anoLetivoOcorrencia = info.anoLetivo; // só usado na resolução de grupos 100% novos (recência)
-        aluno._abaOcorrencia = abaName; // só pra exibir contexto nas pendências de identidade
-
-        const viaveis = candidatos.filter(c => c.traj.status !== 'vermelho');
-        let trajStatusLinha='verde', trajMotivoLinha='';
-
-        if (!viaveis.length) {
-          // Nenhum candidato plausível (nem parecido, nem cronologicamente
-          // coerente) — aluno novo de verdade, sem ambiguidade.
-          aluno._decisao = { tipo:'novo' };
-        } else {
-          viaveis.sort((a,b)=> (b.score-a.score) || ((a.traj.status==='verde'?0:1)-(b.traj.status==='verde'?0:1)));
-          const melhor = viaveis[0];
-          trajStatusLinha = melhor.traj.status;
-          trajMotivoLinha = melhor.traj.motivo;
-
-          // Auto-confiança: nome quase idêntico + trajetória perfeitamente
-          // coerente — de QUALQUER origem, catálogo (Firestore) OU lote
-          // (outra ocorrência desta mesma análise, ex.: mesmo aluno em anos
-          // letivos diferentes dentro do próprio xlsx). Pode haver mais de
-          // um candidato auto-qualificado ao mesmo tempo (ex.: bate com o
-          // catálogo E com outra linha do lote) — normal, os três só
-          // entram no mesmo grupo. A decisão final (vincular/criar/virar
-          // pendência por conflito) só sai depois que TODAS as ocorrências
-          // desta análise passarem por aqui — ver resolução de componentes
-          // logo após o loop de abas.
-          const auto = viaveis.filter(c => c.score>=SIMILARIDADE_AUTO && c.traj.status==='verde');
-
-          if (auto.length) {
-            for (const c of auto) {
-              if (c.origem==='catalogo') _ufUnion(aluno, _anchorNode(c.alunoId, c.nome));
-              else _ufUnion(aluno, c.ref.aluno);
-            }
-            aluno._decisao = { tipo:'novo' }; // provisório — a resolução de componentes decide de verdade
-            aluno._autoResolvido = true;
-          } else {
-            // Ambíguo — nome parecido (score ${melhor.score}), mas não o
-            // suficiente pra decidir sozinho (candidato de outra planilha
-            // desta mesma análise, ou trajetória só "amarela"). Vira
-            // pendência: fica como "novo" por padrão até confirmação.
-            pendCount++;
-            const chave=`pendId_${pendCount}`;
-            aluno._pendenciaChave=chave;
-            aluno._decisao={ tipo:'novo' }; // default seguro até o usuário marcar
-            pendenciasIdentidade.push({
-              chave, aluno, nomeAluno, abaName,
-              candidato: melhor,
-              scorePct: Math.round(melhor.score*100),
-            });
-          }
-        }
-
-        aluno._trajStatus=trajStatusLinha; aluno._trajMotivo=trajMotivoLinha;
-        if (trajStatusLinha==='vermelho') divergencias.push(`🚫 [Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
-        else if (trajStatusLinha==='amarelo' && !aluno._pendenciaChave && !aluno._autoResolvido) divergencias.push(`[Trajetória] ${nomeAluno}: ${trajMotivoLinha}`);
-
-        jaProcessados.push({ nomeAluno, anoLetivo:info.anoLetivo, serieDisplay:aluno.serie, resultado:aluno.resultado, aluno, abaName });
-        if (aluno._decisao.tipo==='novo') idsNovosEstimados++;
-        novos.push(aluno);
-      }
-
-      const id=montarIdTurma({anoLetivo:info.anoLetivo,turno:info.turno,serieTexto:info.serieTexto,aba:abaName});
-      const turma={
-        id, turmaId:id, origemArquivo:_nomeArquivo, aba:abaName,
-        anoLetivo:info.anoLetivo||'', turno:info.turno||'',
-        seriesTurma:info.seriesTurma||[], serieTexto:info.serieTexto||'',
-        alunos:novos, criadoEm:new Date().toISOString(),
-      };
-
-      const temVermelho=novos.some(a=>a._trajStatus==='vermelho');
-      const temAmarelo =divergencias.length>0;
-      const statusTurma=temVermelho?'vermelho':(temAmarelo?'amarelo':'verde');
-      const badge=(info.anoLetivo?(avisoAno?'ANO ⚠️':'ANO OK'):'ANO ?')+' | '+(info.turno?'TURNO OK':'TURNO ?')+' | '+(info.serieTexto?'SÉRIE OK':'SÉRIE ?');
-
-      itensBuffer.push({abaName, turma, statusTurma, badge, divergencias, qtdAlunos:novos.length});
-    }
-
-    // ── Resolução de componentes auto-qualificados (após TODAS as abas) ──
-    // Um grupo pode atravessar abas diferentes (ex.: mesmo aluno em 2023
-    // numa aba e 2024 noutra) — só dá pra fechar depois que todo mundo já
-    // passou pelo loop acima e gerou suas uniões.
-    const _porRaizUF=new Map();
-    for (const no of _ufParent.keys()) {
-      const raiz=_ufFind(no);
-      if (!_porRaizUF.has(raiz)) _porRaizUF.set(raiz, []);
-      _porRaizUF.get(raiz).push(no);
-    }
-    for (const membros of _porRaizUF.values()) {
-      const ancoras=[...new Set(membros.filter(n=>n.__anchor).map(n=>n.alunoId))];
-      const ocorrencias=membros.filter(n=>!n.__anchor && n._autoResolvido);
-      if (!ocorrencias.length) continue; // componente só de âncora, sem ocorrência real unida (não deve acontecer)
-
-      if (ancoras.length===1) {
-        // Todo o grupo vincula ao mesmo ID já existente no catálogo — um
-        // só vira "raiz" pra chamar vincularAtasExplicito uma única vez em
-        // confirmarImportacao(), os demais puxam dele via grupoDe.
-        const [representante, ...resto]=ocorrencias;
-        representante._decisao={ tipo:'vincularCatalogo', alunoId:ancoras[0] };
-        for (const oc of resto) oc._decisao={ tipo:'agruparLote', comAluno:representante };
-        idsVinculadosAuto += ocorrencias.length;
-        idsNovosEstimados -= ocorrencias.length; // essas linhas tinham sido contadas como 'novo' provisoriamente
-      } else if (ancoras.length===0) {
-        // Pessoa nova, mas aparece em anos letivos diferentes dentro do
-        // próprio lote — um só ID novo pro grupo inteiro (não um por
-        // ocorrência). A ocorrência do ano mais próximo do ano-ativo vira
-        // a "semente" (nome) do cadastro novo; ultimoAnoRegistro é
-        // recalculado à parte depois que as matrículas do grupo já
-        // estiverem salvas, então não depende de qual foi escolhida aqui.
-        const representante=_ocorrenciaMaisProximaDoAnoAtivo(ocorrencias, anoAtivoAtual);
-        // A ocorrência mais recente decide ultimoAnoRegistro (via
-        // recência), mas a GRAFIA do nome usa o critério de melhor-nome
-        // entre TODAS as ocorrências do grupo — evita gravar
-        // acidentalmente uma versão com erro de digitação só porque
-        // calhou de ser a ocorrência mais próxima do ano-ativo.
-        representante._nomeCadastroSugerido = ocorrencias.reduce((m,o) => _melhorNomeLocal(m, o.nome), '');
-        representante._decisao={ tipo:'novo' };
-        for (const oc of ocorrencias) {
-          if (oc!==representante) oc._decisao={ tipo:'agruparLote', comAluno:representante };
-        }
-        idsNovosEstimados -= (ocorrencias.length-1); // grupo inteiro conta como 1 novo, não N
-      } else {
-        // Conflito: o grupo bate com 2+ IDs de catálogo diferentes ao
-        // mesmo tempo — decisão de qual ID (se algum) é humana. Pode ser
-        // sinal de duplicata pré-existente no catálogo, não é um erro
-        // necessariamente deste import. Cada ocorrência do grupo vira
-        // pendência individual, com um <select> em vez de checkbox (ver
-        // renderRevisaoImportacao).
-        for (const oc of ocorrencias) {
-          pendCount++;
-          const chave=`pendId_${pendCount}`;
-          oc._pendenciaChave=chave;
-          oc._decisao={ tipo:'novo' };
-          pendenciasIdentidade.push({
-            chave, aluno:oc, nomeAluno:oc.nome, abaName:oc._abaOcorrencia,
-            candidato:{ origem:'conflito', alunoIds:ancoras, nomes:ancoras.map(id=>_anchorNomes.get(id)||id) },
-            scorePct:100,
-            conflito:true,
-          });
-        }
-      }
-    }
-
-    _bufferImportacao={itens:itensBuffer, resultadosAbasBloqueadas, idsNovosEstimados, idsVinculadosAuto, pendenciasIdentidade};
-
-    const saidaEl=document.getElementById('saidaXLSX');
-    saidaEl.innerHTML=renderRevisaoImportacao(_bufferImportacao);
-    const temVermelho=itensBuffer.some(it=>it.statusTurma==='vermelho');
-    setMsg(temVermelho
-      ? 'Análise concluída — há turma(s) bloqueada(s). Remova-as da lista pra poder salvar.'
-      : 'Análise concluída. Revise e confirme para salvar.', temVermelho?'warn':'ok');
-
-  } catch(err) {
-    console.error('[gerir-dados] Erro XLSX:', err);
-    saida.textContent='❌ Erro inesperado: '+(err.message||err);
-    setMsg('Erro ao analisar: '+(err.message||err), 'err');
-  } finally {
-    if (btnImp) { btnImp.disabled=false; btnImp.textContent='Importar selecionadas'; }
-  }
-}
-
-/** Monta o HTML da tela de revisão (verde/amarelo/vermelho) do buffer. */
-function renderRevisaoImportacao(buffer){
-  const cores={verde:{bg:'#166534',label:'✅ OK'},amarelo:{bg:'#92400e',label:'⚠️ Aviso'},vermelho:{bg:'#991b1b',label:'🚫 Bloqueado'}};
-  const cards=buffer.itens.map((it,idx)=>{
-    const c=cores[it.statusTurma];
-    const divCount=it.divergencias.length;
-    const toggleId=`_revDiv${idx}`;
-    const divergHtml=divCount?(
-      `<div class="import-aba-divs collapsed" id="${toggleId}">`+
-        it.divergencias.slice(0,12).map(d=>`<div>• ${esc(d)}</div>`).join('')+
-        (divCount>12?`<div>… e mais ${divCount-12} item(ns).</div>`:'')+
-      `</div>`
-    ):'';
-    const toggleBtn=divCount?(
-      `<span class="badge warn" style="cursor:pointer;" onclick="`+
-      `document.getElementById('${toggleId}').classList.toggle('collapsed')">`+
-      `${divCount} aviso(s) — ver</span>`
-    ):'';
-    return `<div class="import-aba" style="border-left:4px solid ${c.bg};padding-left:10px;">`+
-      `<div class="import-aba-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">`+
-        `<span>${esc(it.abaName)} — ${it.qtdAlunos} aluno(s)</span>`+
-        `<span style="display:flex;gap:8px;align-items:center;">`+
-          `<span class="badge" style="background:${c.bg};color:#fff;">${c.label}</span>${toggleBtn}`+
-          `<button type="button" class="btn" onclick="removerTurmaDoBuffer(${idx})">Remover</button>`+
-        `</span>`+
-      `</div>${divergHtml}</div>`;
-  }).join('');
-
-  const bloqueadas=buffer.resultadosAbasBloqueadas||[];
-  const bloqueadasHtml=bloqueadas.length?bloqueadas.map(r=>
-    `<div class="import-aba bloqueada"><div class="import-aba-head">`+
-      `<span>🚫 <b>${esc(r.abaName)}</b> — não processada</span><span class="badge err">${esc(r.motivo)}</span>`+
-    `</div></div>`
-  ).join(''):'';
-
-  const temVermelho=buffer.itens.some(it=>it.statusTurma==='vermelho');
-  const totalTurmas=buffer.itens.length;
-  const totalAlunos=buffer.itens.reduce((s,it)=>s+it.qtdAlunos,0);
-
-  const pendencias = buffer.pendenciasIdentidade || [];
-  const pendenciasHtml = pendencias.length ? (
-    `<div style="margin-bottom:14px;border:1px solid #92400e;border-radius:8px;padding:10px;background:rgba(146,64,14,0.08);">`+
-      `<div style="font-weight:600;margin-bottom:6px;">🔗 ${pendencias.length} possível vínculo de identidade — revise antes de confirmar</div>`+
-      `<div style="font-size:12px;color:var(--muted,#666);margin-bottom:8px;">`+
-        `Nome parecido com alguém já existente, mas não o suficiente pra decidir sozinho. `+
-        `Desmarcado (padrão): entra como aluno novo. Marcado: usa o mesmo alunoId do candidato — nenhum ID novo é gasto.`+
-      `</div>`+
-      pendencias.map(p => {
-        const abaAtualTxt = p.abaName ? ` <span style="color:var(--muted,#666);">(aba "${esc(p.abaName)}")</span>` : '';
-        if (p.conflito) {
-          const opcoes = p.candidato.alunoIds.map((id,i) =>
-            `<option value="${esc(id)}">${esc(p.candidato.nomes[i])} (${esc(id)})</option>`
-          ).join('');
-          return `<div style="padding:6px 0;font-size:13px;border-top:1px dashed rgba(146,64,14,0.3);">`+
-            `<div><b>${esc(p.nomeAluno)}</b>${abaAtualTxt} bate ao mesmo tempo com <b>${p.candidato.alunoIds.length} cadastros diferentes</b> já existentes no catálogo — possível duplicata pré-existente, só um humano decide:</div>`+
-            `<select id="sel_${p.chave}" style="margin-top:4px;">`+
-              `<option value="">— aluno novo (nenhum dos dois) —</option>`+
-              opcoes+
-            `</select>`+
-          `</div>`;
-        }
-        const origemTxt = p.candidato.origem==='catalogo'
-          ? `já no catálogo (${esc(p.candidato.alunoId)})`
-          : `aba "${esc(p.candidato.ref.abaName||'?')}" desta mesma importação, ano ${esc(p.candidato.ref.anoLetivo||'?')}`;
-        const trajTxt = p.candidato.traj.motivo ? ` — ${esc(p.candidato.traj.motivo)}` : '';
-        return `<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;">`+
-          `<input type="checkbox" id="chk_${p.chave}" style="margin-top:3px;">`+
-          `<span><b>${esc(p.nomeAluno)}</b>${abaAtualTxt} parece ser <b>${esc(p.candidato.nome)}</b> (${p.scorePct}% de nome, ${origemTxt})${trajTxt}</span>`+
-        `</label>`;
-      }).join('')+
-    `</div>`
-  ) : '';
-
-  const aviso=`<div style="margin-bottom:10px;font-size:13px;color:var(--muted,#666);">`+
-    `Revise antes de confirmar — nenhuma turma foi salva ainda e nenhum alunoId foi criado ou vinculado. `+
-    `Isso só acontece ao confirmar, já considerando as escolhas acima.`+
-  `</div>`;
-
-  const rodape=`<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;">`+
-    `<div>${totalTurmas} turma(s) analisada(s) • ${totalAlunos} aluno(s)`+
-      (temVermelho?' • <b style="color:#991b1b;">remova as turmas bloqueadas pra poder salvar</b>':'')+
-    `</div>`+
-    `<div style="display:flex;gap:8px;">`+
-      `<button type="button" class="btn" onclick="cancelarImportacao()">Cancelar tudo</button>`+
-      `<button type="button" class="btn btn-primary" id="btnConfirmarImportacao" ${(temVermelho||!totalTurmas)?'disabled':''} onclick="confirmarImportacao()">✅ Confirmar e salvar</button>`+
-    `</div>`+
-  `</div>`;
-
-  return aviso + pendenciasHtml + cards + bloqueadasHtml + rodape;
-}
-
-/** Remove uma turma da revisão (não afeta o que já está salvo — nada foi salvo ainda). */
-function removerTurmaDoBuffer(idx){
-  if (!_bufferImportacao) return;
-  _bufferImportacao.itens.splice(idx,1);
-  const saidaEl=document.getElementById('saidaXLSX');
-  saidaEl.innerHTML=renderRevisaoImportacao(_bufferImportacao);
-  const temVermelho=_bufferImportacao.itens.some(it=>it.statusTurma==='vermelho');
-  setMsg(temVermelho?'Ainda há turma(s) bloqueada(s) na lista.':'Pronto para confirmar.', temVermelho?'warn':'ok');
-}
-
-/** Cancela a análise inteira. Nada foi criado/vinculado ainda (isso só acontece em confirmarImportacao), então não há limpeza a fazer. */
-async function cancelarImportacao(){
-  if (!_bufferImportacao) return;
-  _bufferImportacao=null;
-  const saidaEl=document.getElementById('saidaXLSX');
-  saidaEl.innerHTML='';
-  saidaEl.style.display='none';
-  setMsg('Importação cancelada. Nenhuma turma foi salva, nenhum alunoId foi criado.', 'warn');
-}
-
-/**
- * FASE 2 — Confirma. Grava só as turmas que sobraram no buffer (as removidas
- * na revisão ficam de fora) em turmasDB/Firestore.
- */
-/**
- * FASE 2 — Confirma. Resolve as pendências de identidade marcadas na
- * revisão, cria/vincula os alunoId de verdade (só agora — nada foi
- * criado durante a análise), e grava as turmas que sobraram no buffer.
- */
-async function confirmarImportacao(){
-  if (!_bufferImportacao || !_bufferImportacao.itens.length) return;
-  if (_bufferImportacao.itens.some(it=>it.statusTurma==='vermelho')) {
-    alert('Ainda há turma(s) bloqueada(s) na revisão. Remova-as antes de confirmar.');
-    return;
-  }
-
-  const btn=document.getElementById('btnConfirmarImportacao');
-  if (btn) { btn.disabled=true; btn.textContent='Salvando...'; }
-  setMsg('Resolvendo identidade dos alunos…', 'loading');
-
-  try {
-    // ── 1. Aplica as escolhas marcadas nas pendências (checkboxes) ──
-    // Desmarcado (padrão) = já está como 'novo', nada a fazer. Marcado:
-    // 'catalogo' aponta pro alunoId já existente; 'lote' agrupa com o
-    // candidato de outra aba desta mesma análise (union-find simples —
-    // os dois vão compartilhar UM único alunoId, criado só uma vez).
-    const grupoDe = new Map(); // aluno (não-raiz) -> aluno de quem ele "puxa"
-    function raizDe(aluno){
-      let cur = aluno;
-      while (grupoDe.has(cur)) cur = grupoDe.get(cur);
-      return cur;
-    }
-
-    // ── 1a. Semeia o grupoDe com as uniões automáticas já decididas na
-    // análise (mesmo aluno em anos letivos diferentes, dentro do próprio
-    // lote e/ou batendo com o catálogo — ver resolução de componentes em
-    // analisarSelecionadas). SEMPRE antes dos checkboxes manuais abaixo,
-    // porque uma pendência marcada manualmente pode apontar pra um aluno
-    // que já é não-raiz de um grupo automático.
-    for (const it of _bufferImportacao.itens) {
-      for (const a of it.turma.alunos) {
-        if (a._decisao?.tipo === 'agruparLote' && a._decisao.comAluno) {
-          grupoDe.set(a, a._decisao.comAluno);
-        }
-      }
-    }
-
-    // ── 1b. Aplica as escolhas marcadas manualmente na revisão ──
-    // Desmarcado (padrão) = já está como 'novo', nada a fazer. Marcado:
-    // 'catalogo' aponta pro alunoId já existente; 'lote' agrupa com o
-    // candidato de outra aba desta mesma análise. Conflito (2+ âncoras):
-    // usa o valor escolhido no <select> — um dos IDs em conflito, ou vazio
-    // (mantém 'novo', já é o default desde a análise).
-    for (const p of (_bufferImportacao.pendenciasIdentidade||[])) {
-      if (p.conflito) {
-        const sel = document.getElementById(`sel_${p.chave}`);
-        const escolha = sel ? sel.value : '';
-        if (escolha) p.aluno._decisao = { tipo:'vincularCatalogo', alunoId:escolha };
-        continue;
-      }
-      const chk = document.getElementById(`chk_${p.chave}`);
-      if (!chk || !chk.checked) continue;
-      if (p.candidato.origem === 'catalogo') {
-        p.aluno._decisao = { tipo:'vincularCatalogo', alunoId:p.candidato.alunoId };
-      } else {
-        grupoDe.set(p.aluno, p.candidato.ref.aluno);
-      }
-    }
-
-    const todosAlunos=[];
-    for (const it of _bufferImportacao.itens) for (const a of it.turma.alunos) todosAlunos.push(a);
-
-    // ── 2. Cria em lote só os alunoId realmente novos (uma raiz por grupo) ──
-    const raizes = new Set(todosAlunos.map(a => raizDe(a)));
-    const raizesNovo = [...raizes].filter(r => r._decisao?.tipo !== 'vincularCatalogo');
-    const raizesCatalogo = [...raizes].filter(r => r._decisao?.tipo === 'vincularCatalogo');
-
-    let idsCriados=0, idsVinculados=0;
-    if (raizesNovo.length) {
-      const criados = await window.Identidade.criarAtasBatch(raizesNovo.map(r => ({ nome: r._nomeCadastroSugerido || r.nome })));
-      raizesNovo.forEach((r,i) => { r.alunoId = criados[i].alunoId; });
-      idsCriados = criados.length;
-    }
-    for (const r of raizesCatalogo) {
-      await window.Identidade.vincularAtasExplicito(r._decisao.alunoId, { nome:r.nome });
-      r.alunoId = r._decisao.alunoId;
-      idsVinculados++;
-    }
-
-    // Propaga o alunoId da raiz pra todo mundo do grupo (inclusive quem já
-    // tinha sido decidido automaticamente na análise, fora de pendência)
-    for (const a of todosAlunos) {
-      if (!a.alunoId) a.alunoId = raizDe(a).alunoId;
-    }
-
-    // ── 3. Grava as turmas ──
-    const turmasDB=lerTurmasDB();
-    let totalAlunos=0;
-    const resultadosAbas=[];
-
-    for (const it of _bufferImportacao.itens) {
-      // Limpa os campos de uso interno da revisão antes de persistir
-      for (const a of it.turma.alunos) { delete a._trajStatus; delete a._trajMotivo; delete a._decisao; delete a._pendenciaChave; }
-
-      const idx=turmasDB.findIndex(t=>t.id===it.turma.id);
-      if (idx>=0) turmasDB[idx]=it.turma; else turmasDB.push(it.turma);
-      totalAlunos+=it.qtdAlunos;
-      resultadosAbas.push({abaName:it.abaName, ok:true, qtdAlunos:it.qtdAlunos, badge:it.badge, divergencias:it.divergencias});
-    }
-
-    await salvarTurmasDB(turmasDB);
-    // reconstruirAuxiliares() (não _reconstruirAuxLocalmente, que só
-    // atualiza a memória local) — precisa gravar de verdade em `matriculas`
-    // no Firestore, senão recalcularUltimoAnoRegistroBatch() logo abaixo
-    // não encontra nada pra calcular (bug pré-existente corrigido aqui).
-    const aux=reconstruirAuxiliares(turmasDB);
-
-    // ── 4. Recalcula ultimoAnoRegistro em lote único pra toda a leva ──
-    let anoAtivoAtual = null;
-    try {
-      const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
-      anoAtivoAtual = dadosEscola?.configAnoAtivo ?? null;
-    } catch(e) { console.warn('[confirmarImportacao] não foi possível ler configAnoAtivo:', e.message); }
-
-    const idsEnvolvidos = [...new Set(todosAlunos.map(a => a.alunoId).filter(Boolean))];
-    if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
-      try { await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, anoAtivoAtual); }
-      catch(e) { console.warn('[confirmarImportacao] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
-    }
-
-    const resumoTexto=`TOTAL: ${_bufferImportacao.itens.length} turma(s) • ${totalAlunos} aluno(s)\n`+
-      `IDs novos criados: ${idsCriados} • vinculados a existentes: ${idsVinculados} (${totalAlunos-idsCriados-idsVinculados} demais já eram do mesmo grupo)\n`+
-      `Bancos auxiliares: atas=${aux.atas.length} • matrículas=${aux.mats.length}`;
-
-    const saidaEl=document.getElementById('saidaXLSX');
-    saidaEl.innerHTML=renderResultadoImportacao(resultadosAbas, resumoTexto);
-    _bufferImportacao=null;
-
-    renderTabelaTurmas();
-    atualizarStats();
-    setMsg(`${resultadosAbas.length} turma(s) e ${totalAlunos} aluno(s) importados.`, 'ok');
-
-  } catch(err) {
-    console.error('[gerir-dados] Erro ao confirmar importação:', err);
-    setMsg('Erro ao salvar: '+(err.message||err), 'err');
-  } finally {
-    if (btn) { btn.disabled=false; btn.textContent='✅ Confirmar e salvar'; }
-  }
+  setMsg('CSV exportado.', 'ok');
 }
 
 /* =============================================
@@ -2248,9 +951,9 @@ async function aplicarMerge() {
   logEl(`Adicionando ${paraAdicionar.length} turma(s)...`,'logJSON');
   const turmasFinais=[...lerTurmasDB(),...paraAdicionar];
   salvarTurmasDB(turmasFinais);
-  // reconstruirAuxiliares() (não a versão local-only) — mesma correção de
-  // confirmarImportacao(): sem isso, `matriculas` nunca é gravado de
-  // verdade no Firestore, e recalcularUltimoAnoRegistroBatch() não acha nada.
+  // reconstruirAuxiliares() (não a versão local-only): sem isso, `matriculas`
+  // nunca é gravado de verdade no Firestore, e
+  // recalcularUltimoAnoRegistroBatch() não acha nada.
   const aux=reconstruirAuxiliares(turmasFinais);
   logEl(`✅ Merge aplicado: +${paraAdicionar.length} turma(s).`,'logJSON');
   logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
