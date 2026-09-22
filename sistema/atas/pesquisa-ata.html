@@ -192,30 +192,15 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
   accent-color: var(--brand);
 }
 
-/* ── Coluna de nome na tabela de edição de notas ── */
-.nome-col {
-  min-width: 100px;
-  max-width: 150px;
+/* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-
-/* ── Célula de nome clicável (expandir/retrair) ── */
-#tNotasEdit .nome-edit {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s, color 0.15s;
-}
-#tNotasEdit .nome-edit:hover {
-  background: color-mix(in srgb, var(--primary) 15%, transparent);
-  color: var(--primary-text);
-}
-#tNotasEdit .nome-edit.expanded {
-  white-space: normal;
-  max-width: none;
-  font-weight: 600;
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; z-index: 50;
 }
 </style>
 
@@ -329,7 +314,6 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
           <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
           <button class="btn primary" type="button" onclick="exportarPDFDaTurma()">Exportar PDF</button>
           <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
-          <button class="btn" id="btnEditarNotas" type="button" onclick="abrirPainelNotas()">✏️ Inserir notas</button>
           <button class="btn secondary small" type="button" onclick="fecharTurma()" style="margin-left:auto;">✕ Fechar</button>
         </div>
 
@@ -348,34 +332,6 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
         </div>
 
         <div class="summary" id="resumoTurma"></div>
-
-        <!-- Painel de edição de notas (apenas para atas do Ano Ativo) -->
-        <div id="painelNotas">
-          <div class="pn-header">
-            <span>✏️ Inserir / editar notas</span>
-            <div class="pn-header-actions">
-              <button id="btnSalvarNotas" type="button">💾 Salvar notas</button>
-              <button id="btnFecharNotas" type="button"
-                onclick="document.getElementById('painelNotas').classList.remove('visible')">✕ Fechar</button>
-            </div>
-          </div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th class="nome-col">Nome</th>
-                  <th>Série</th>
-                  <th>Port</th><th>Mat</th><th>Hist</th><th>Geo</th>
-                  <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th><th>Ing</th>
-                  <th>Resultado</th>
-                </tr>
-              </thead>
-              <tbody id="tNotasEdit"></tbody>
-            </table>
-          </div>
-          <div id="msgSalvarNotas"></div>
-        </div>
 
       </div><!-- /detalhesBox -->
     </div>
@@ -396,6 +352,102 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 
 <!-- SCRIPT 3 — DB por escola (Namespacing) + lógica principal da página -->
 <script>
+/* =========================
+   Toasts padronizados + modal de confirmação (ver guia-toasts.md)
+========================= */
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  // duration 0 = fica até virar outro toast ou ser fechado (usado só pelo "carregando")
+  if (duration !== 0) setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){
+  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 0);
+  const t = document.getElementById('_toastGlobal');
+  if(t) t.dataset.loading = '1';
+}
+// Remove o toast atual SÓ se ele for um "carregando" — nunca apaga um
+// sucesso/erro/aviso que tenha aparecido no meio do caminho.
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.dataset.loading === '1') t.remove();
+}
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+window.addEventListener('unhandledrejection', (ev) => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.dataset.loading === '1'){
+    console.error('[unhandledrejection]', ev.reason);
+    setMsg('Algo deu errado — veja o console.', 'err');
+  }
+});
+
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${_escHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    function fechar(resultado){ backdrop.remove(); resolve(resultado); }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
+}
+
 /* =========================
    Permissões
 ========================= */
@@ -583,21 +635,11 @@ function selecionarTurma(id) {
   const serieTxt = turmaSelecionada.serieTexto ||
     (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "?");
 
-  const isAnoAtivo = turmaSelecionada.origem === 'ano-ativo' ||
-    String(turmaSelecionada.turmaId||turmaSelecionada.id||turmaSelecionada._id||'').endsWith('-AATIVO');
-
   document.getElementById("detalhesMeta").innerHTML =
     `<b>${turmaSelecionada.aba || turmaSelecionada.nome || "Turma"}</b><br>` +
     `ID: ${turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId || "?"}<br>` +
     (turmaSelecionada.origemArquivo ? `Arquivo: ${turmaSelecionada.origemArquivo}<br>` : '') +
-    `Ano: <b>${turmaSelecionada.anoLetivo || "?"}</b> · Turno: <b>${turmaSelecionada.turno || "?"}</b> · Série: <b>${serieTxt}</b>` +
-    (isAnoAtivo ? ` <span class="badge-ativo">Gerada pelo Ano Ativo</span>` : '');
-
-  const painel = document.getElementById('painelNotas');
-  painel.classList.remove('visible');
-
-  const btnEditar = document.getElementById('btnEditarNotas');
-  if(btnEditar) btnEditar.style.display = isAnoAtivo ? 'inline-flex' : 'none';
+    `Ano: <b>${turmaSelecionada.anoLetivo || "?"}</b> · Turno: <b>${turmaSelecionada.turno || "?"}</b> · Série: <b>${serieTxt}</b>`;
 
   const btnEditarTurma = document.getElementById('btnEditarTurma');
   if(btnEditarTurma) btnEditarTurma.style.display = _podeEditar ? 'inline-flex' : 'none';
@@ -636,7 +678,6 @@ function fecharTurma() {
 
   document.getElementById("detalhesVazio").style.display = "block";
   document.getElementById("detalhesBox").style.display = "none";
-  document.getElementById("painelNotas").classList.remove("visible");
 
   const container = document.getElementById("container");
   if (container) {
@@ -655,13 +696,13 @@ function fecharTurma() {
 ========================= */
 function editarTurmaSelecionada() {
   if (!turmaSelecionada) {
-    alert("Nenhuma turma selecionada.");
+    setMsg("Nenhuma turma selecionada.", "err");
     return;
   }
   
   const turmaId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
   if (!turmaId) {
-    alert("ID da turma não encontrado.");
+    setMsg("ID da turma não encontrado.", "err");
     return;
   }
   
@@ -781,6 +822,20 @@ async function carregarDadosEscola() {
 async function exportarPDFDaTurma() {
   if (!turmaSelecionada) return;
 
+  setMsg('Gerando PDF…', 'loading');
+  try{
+    await _exportarPDFDaTurmaInterno();
+    // Sem toast de sucesso: o próprio download que o navegador abre já é a
+    // confirmação. Só limpa o "carregando" (sem apagar um erro que apareça
+    // por outro motivo enquanto isso).
+    _toastLimpar();
+  }catch(e){
+    console.error('[pesquisa-ata] Falha ao gerar PDF:', e);
+    setMsg('Erro ao gerar o PDF — tente novamente.', 'err');
+  }
+}
+
+async function _exportarPDFDaTurmaInterno() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF("p","mm","a4");
 
@@ -837,6 +892,7 @@ async function exportarPDFDaTurma() {
    Boot
 ========================= */
 async function carregar() {
+  let falhaTurmas = false;
   try{
     await new Promise(res=>{
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
@@ -851,6 +907,7 @@ async function carregar() {
   }catch(e){
     console.warn('[pesquisa-ata] Falha ao carregar turmas do Firestore:', e);
     turmasTodas = [];
+    falhaTurmas = true; // distinto de "carregou certinho e não tem turma nenhuma"
   }
 
   recomputarTurmasBase();
@@ -880,6 +937,8 @@ async function carregar() {
     if(_jaFoiPesquisado) aplicarFiltros();
   };
 
+  if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
+
   Loading.esconder();
 }
 
@@ -891,168 +950,6 @@ let _ordemAsc = false; // false = mais recente primeiro (padrão)
 document.addEventListener("DOMContentLoaded", carregar);
 </script>
 
-
-<!-- SCRIPT 4 — Edição de notas inline -->
-<script>
-const DISC_NOTAS_PADRAO = [
-  { key:'port',  label:'Port'   },
-  { key:'mat',   label:'Mat'    },
-  { key:'hist',  label:'Hist'   },
-  { key:'geo',   label:'Geo'    },
-  { key:'cien',  label:'Ciên'   },
-  { key:'fis',   label:'Ed.Fís' },
-  { key:'arte',  label:'Arte'   },
-  { key:'relig', label:'Rel'    },
-  { key:'ing',   label:'Ing'    },
-];
-
-function _getDiscNotas(turma){
-  const snap = turma?.schemaSnapshot;
-  if(snap && Array.isArray(snap.colunas) && snap.colunas.length){
-    return snap.colunas
-      .filter(c => c.enabled !== false && c.type !== 'texto')
-      .map(c => ({ key: c.key, label: c.label || c.key }));
-  }
-  return DISC_NOTAS_PADRAO;
-}
-
-const DISC_NOTAS = DISC_NOTAS_PADRAO;
-const RESULTADOS = ['APROVADO','REPROVADO','APROVADO POR CONSELHO','TRANSFERIDO','FALECIDO','NÃO INFORMADO'];
-const RESULTADOS_SIGLA = {
-  'APROVADO': 'AP',
-  'REPROVADO': 'REP',
-  'APROVADO POR CONSELHO': 'APC',
-  'TRANSFERIDO': 'TRANS',
-  'FALECIDO': 'FAL',
-  'NÃO INFORMADO': 'N/I'
-};
-
-function abrirPainelNotas(){
-  if(!turmaSelecionada) return;
-  renderTabelaEdit(turmaSelecionada.alunos || []);
-  const painel = document.getElementById('painelNotas');
-  painel.classList.add('visible');
-  painel.scrollIntoView({ behavior:'smooth', block:'start' });
-  document.getElementById('btnSalvarNotas').onclick = salvarNotas;
-}
-
-function renderTabelaEdit(alunos){
-  const tbody = document.getElementById('tNotasEdit');
-  tbody.innerHTML = '';
-  const discCols = _getDiscNotas(turmaSelecionada);
-
-  const thead = tbody.closest('table')?.querySelector('thead tr');
-  if(thead){
-    const fixedCols = ['#','Nome','Série'];
-    const resultCol = turmaSelecionada?.schemaSnapshot?.resultadoAtivo !== false ? ['Resultado'] : [];
-    const allLabels = [...fixedCols, ...discCols.map(d=> d.key.charAt(0).toUpperCase()+d.key.slice(1)), ...resultCol];
-    thead.innerHTML = allLabels.map(l=>`<th>${l}</th>`).join('');
-  }
-
-  alunos.forEach((a, i) => {
-    const tr = document.createElement('tr');
-    const nomeCompleto = nomeAtual(a);
-    const primeiroNome = nomeCompleto.split(' ')[0];
-    
-    const notaCells = discCols.map(d => {
-      const v = a[d.key] ?? '';
-      return `<td><input type="text" class="nota-input" data-idx="${i}" data-field="${d.key}" value="${v}" maxlength="6" /></td>`;
-    }).join('');
-    
-    const resOpts = RESULTADOS.map(r =>
-      `<option value="${r}" ${(a.resultado||'') === r ? 'selected' : ''}>${RESULTADOS_SIGLA[r] || r}</option>`
-    ).join('');
-    
-    tr.innerHTML = `
-      <td class="num-edit">${i+1}</td>
-      <td class="nome-edit"
-          title="${nomeCompleto} (Clique para expandir/retrair)"
-          data-full="${nomeCompleto}"
-          data-short="${primeiroNome}"
-        >${primeiroNome}</td>
-      <td><input type="text" class="serie-input" data-idx="${i}" data-field="serie" value="${a.serie||''}" maxlength="30" /></td>
-      ${notaCells}
-      <td><select data-idx="${i}" data-field="resultado">${resOpts}</select></td>
-    `;
-    tbody.appendChild(tr);
-  });
-  
-  // Adiciona event listener para clique nos nomes
-  tbody.querySelectorAll('.nome-edit').forEach(cell => {
-    cell.addEventListener('click', function() {
-      const isExpanded = this.classList.contains('expanded');
-      const fullName = this.dataset.full;
-      const shortName = this.dataset.short;
-      
-      if (isExpanded) {
-        this.textContent = shortName;
-        this.classList.remove('expanded');
-      } else {
-        this.textContent = fullName;
-        this.classList.add('expanded');
-      }
-    });
-  });
-}
-
-/**
- * Grava só o documento desta turma no Firestore (schools/{id}/turmas/{turmaId}),
- * sem merge — mesmo padrão de _saveAllFull em gestao-atas.html. Evita reescrever
- * a coleção inteira de turmas a cada edição de notas (o que a versão antiga fazia).
- */
-async function _salvarTurmaNoFirestore(turma){
-  const schoolId = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : null;
-  const turmaId = turma.id || turma._id || turma.turmaId;
-  if (!schoolId || !turmaId) throw new Error('schoolId ou turmaId ausente ao salvar turma.');
-  const { ...dados } = turma;
-  dados.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-  await window.Auth.db
-    .collection('schools').doc(schoolId)
-    .collection('turmas').doc(turmaId)
-    .set(dados);
-}
-
-async function salvarNotas(){
-  if(!turmaSelecionada) return;
-  const alunos = (turmaSelecionada.alunos || []).map((a) => ({ ...a }));
-  const campos = [...document.querySelectorAll('#tNotasEdit input, #tNotasEdit select')];
-  campos.forEach(el => {
-    const idx = parseInt(el.dataset.idx, 10);
-    const field = el.dataset.field;
-    if(!isNaN(idx) && field && alunos[idx]) alunos[idx][field] = el.value;
-  });
-
-  turmaSelecionada.alunos = alunos;
-  const selId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
-  const idx = turmas.findIndex(t => (t.id || t._id || t.turmaId) === selId);
-  if(idx >= 0) turmas[idx] = turmaSelecionada;
-  const idxTodas = turmasTodas.findIndex(t => (t.id || t._id || t.turmaId) === selId);
-  if(idxTodas >= 0) turmasTodas[idxTodas] = turmaSelecionada;
-
-  const msg = document.getElementById('msgSalvarNotas');
-
-  try{
-    await _salvarTurmaNoFirestore(turmaSelecionada);
-  }catch(e){
-    console.warn('[pesquisa-ata] Falha ao salvar notas no Firestore:', e);
-    if(msg){
-      msg.textContent = `❌ Falha ao salvar — tente novamente.`;
-      msg.style.display = 'block';
-    }
-    return;
-  }
-
-  alunosView = alunos.slice();
-  renderAlunos(alunosView);
-  renderResumoTurma(turmaSelecionada);
-
-  if(msg){
-    msg.textContent = `✅ Notas salvas — ${alunos.length} aluno(s) atualizados.`;
-    msg.style.display = 'block';
-    setTimeout(()=>{ msg.style.display='none'; }, 4000);
-  }
-}
-</script>
 
 
 <!-- SCRIPT 5 — Pesquisa por aluno (bloco isolado) -->
@@ -1088,17 +985,17 @@ async function salvarNotas(){
     const out = document.getElementById("alunoResultados");
 
     if (!qEl || !out) {
-      alert("Erro: área de pesquisa do aluno não encontrada na página.");
+      setMsg("Erro: área de pesquisa do aluno não encontrada na página.", "err");
       return;
     }
 
     const termo = normNome(qEl.value);
     const parcial = !!(parcialEl && parcialEl.checked);
 
-    if (!termo) { alert("Digite o nome do aluno."); return; }
+    if (!termo) { setMsg("Digite o nome do aluno.", "err"); return; }
 
     if (typeof window.obterTurmas !== "function") {
-      alert("Erro: turmas ainda não carregadas.");
+      setMsg("Erro: turmas ainda não carregadas.", "err");
       return;
     }
 
@@ -1142,7 +1039,7 @@ async function salvarNotas(){
           <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — ${escapeHtml(h.turno || "?")} — <span style="font-weight:700;">${escapeHtml(h.aluno || "")}</span></div>
         </div>
         <div class="aluno-result-actions">
-          <button class="btn ghost small" type="button" onclick="(window.selecionarTurma||function(){alert('Função Abrir não encontrada.');})('${h.id}')">Abrir</button>
+          <button class="btn ghost small" type="button" onclick="(window.selecionarTurma||function(){setMsg('Função Abrir não encontrada.','err');})('${h.id}')">Abrir</button>
         </div>
       </div>
     `).join("");
