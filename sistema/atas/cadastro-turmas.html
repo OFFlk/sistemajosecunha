@@ -14,6 +14,8 @@
 })();
 </script>
 
+<script src="../loading-overlay.js"></script>
+
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
@@ -316,13 +318,41 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
   function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
   function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
   function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+  function _toastCarregando(msg){
+    // Sem auto-dismiss (duração 0): fica até virar sucesso/erro/aviso, ou até
+    // fechar no ✕. Só usado em "Salvar turma", a única ação desta página que
+    // o usuário fica esperando (a tela de loading de página cobre o boot).
+    _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 0);
+    const t = document.getElementById('_toastGlobal');
+    if(t) t.dataset.loading = '1';
+  }
+  // Remove o toast atual SÓ se ele for um "carregando" — nunca apaga um
+  // sucesso/erro/aviso que tenha aparecido no meio do caminho.
+  function _toastLimpar(){
+    const t = document.getElementById('_toastGlobal');
+    if(t && t.dataset.loading === '1') t.remove();
+  }
   function setMsg(text, kind){
     const t = (text||"").toString();
     if(!t) return;
     if(kind === "err") _toastErro('⚠️ ' + t);
     else if(kind === "ok") _toastSucesso('✅ ' + t);
-    else _toastAviso(t);
+    else if(kind === "warn") _toastAviso('⚠️ ' + t);
+    else if(kind === "loading") _toastCarregando('⏳ ' + t);
+    else {
+      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+      _toastAviso(t);
+    }
   }
+  // Rede de segurança: se algo falhar sem tratamento no meio de um "carregando",
+  // troca o azul por erro em vez de deixá-lo preso na tela.
+  window.addEventListener('unhandledrejection', (ev) => {
+    const t = document.getElementById('_toastGlobal');
+    if(t && t.dataset.loading === '1'){
+      console.error('[unhandledrejection]', ev.reason);
+      setMsg('Algo deu errado — veja o console.', 'err');
+    }
+  });
 
   function _escHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -402,9 +432,11 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     try {
       const schemas = await window.DB.atasSchemas.list();
       SCHEMAS_CACHE = Array.isArray(schemas) ? schemas.map(normalizeSchema) : [];
+      return true;
     } catch(e) {
       console.warn('[carregarSchemasCache]', e);
       SCHEMAS_CACHE = [];
+      return false; // distinto de "carregou certinho e está vazio" — ver init()
     }
   }
   function temSchemaPadrao(){
@@ -444,8 +476,8 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
   /* ── Turmas — Firestore direto, cache em memória (sem localStorage/scoping) ── */
   let TURMAS_CACHE = [];
   async function carregarTurmasCache(){
-    try{ TURMAS_CACHE = await window.DB.turmas.list(); }
-    catch(e){ console.warn('[cadastro-turmas] carregarTurmasCache:', e); TURMAS_CACHE = []; }
+    try{ TURMAS_CACHE = await window.DB.turmas.list(); return true; }
+    catch(e){ console.warn('[cadastro-turmas] carregarTurmasCache:', e); TURMAS_CACHE = []; return false; }
   }
   function getTurmas(){ return Array.isArray(TURMAS_CACHE) ? TURMAS_CACHE : []; }
 
@@ -832,6 +864,7 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     // em cadastro-atas.html, mesmo que o ID não tenha mudado.
     if(!oldId) payload.alunos = [];
 
+    setMsg('Salvando…', 'loading');
     try{
       await window.DB.turmas.save(payload);
     }catch(e){
@@ -840,10 +873,17 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
       return;
     }
 
-    await carregarTurmasCache();
+    // Atualiza a lista local (sem isso, o item recém-salvo não aparece na
+    // lista à direita nem no preview de próximo ID). Se essa releitura falhar,
+    // a turma FOI salva — o toast final precisa dizer isso, não "erro ao salvar".
+    const okReload = await carregarTurmasCache();
     buildFiltroAnoOptions();
     updateDbInfo();
-    setMsg(oldId && oldId !== turmaId ? "Turma salva (o ID mudou — confira o aviso acima antes de lançar aluno)." : "Turma salva!", "ok");
+    if(!okReload){
+      setMsg("Turma salva, mas não foi possível atualizar a lista — recarregue a página.", "err");
+    } else {
+      setMsg(oldId && oldId !== turmaId ? "Turma salva (o ID mudou — confira o aviso acima antes de lançar aluno)." : "Turma salva!", "ok");
+    }
     resetForm();
   }
 
@@ -874,23 +914,38 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
     });
     if(!confirmou) return;
     resetForm();
+    setMsg("Formulário limpo.", "warn");
   });
   $("filtroAnoLista")?.addEventListener("change", renderListaTurmas);
 
   /* ── init ── */
   async function init(){
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
-    await carregarTurmasCache();
-    await carregarSchemasCache();
-    if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err");
-    fillSerieSelect();
-    buildFiltroAnoOptions();
-    resetForm();
-    renderListaTurmas();
-    updateDbInfo();
+    try {
+      await new Promise(res=>{
+        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+        document.addEventListener('auth:ready', res, {once:true});
+      });
+      const okTurmas = await carregarTurmasCache();
+      const okSchemas = await carregarSchemasCache();
+      fillSerieSelect();
+      buildFiltroAnoOptions();
+      resetForm();
+      renderListaTurmas();
+      updateDbInfo();
+      // Erro de leitura ≠ "schema padrão não existe" — antes os dois casos
+      // caíam na mesma mensagem (falha silenciosa também zerava SCHEMAS_CACHE).
+      if(!okTurmas) setMsg("Não foi possível carregar as turmas cadastradas — recarregue a página.", "err");
+      else if(!okSchemas) setMsg("Não foi possível carregar os schemas — recarregue a página.", "err");
+      else if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err");
+    } catch(e) {
+      // Não havia catch-all até aqui: uma exceção no boot travava a página
+      // com a tela de loading presa (Loading.esconder() nunca era chamado).
+      console.error('[init]', e);
+      setMsg('Erro ao carregar a página — recarregue e tente de novo.', 'err');
+    } finally {
+      // Sempre esconde a tela de loading, mesmo se o boot falhar.
+      Loading.esconder();
+    }
   }
   init();
 })();
