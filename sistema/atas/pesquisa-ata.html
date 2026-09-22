@@ -192,6 +192,31 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
   accent-color: var(--brand);
 }
 
+/* ── Card de destaque na cor do usuário (mesmo mecanismo de gestão-atas) ── */
+.card.card-destaque {
+  background: var(--btn-home-bg);
+  border-color: var(--btn-home-border);
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,0.16);
+  --dest-btn-bd: rgba(255,255,255,0.55);
+  --dest-btn-hover: rgba(255,255,255,0.26);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #1e293b;
+  --dest-btn-bg: rgba(15,23,42,0.08);
+  --dest-btn-bd: rgba(15,23,42,0.35);
+  --dest-btn-hover: rgba(15,23,42,0.14);
+}
+.card-destaque .section-title { color: var(--dest-fg); }
+.card-destaque .muted { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+.card-destaque label { color: var(--dest-fg); }
+.card-destaque .aluno-search-checkbox { color: var(--dest-fg); }
+.card-destaque .btn {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+}
+.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+
 /* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
 @keyframes toastSubir {
   from { opacity: 0; transform: translateX(-50%) translateY(16px); }
@@ -218,7 +243,7 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 <div class="wrap">
 
   <!-- Filtros -->
-  <div class="card">
+  <div class="card card-destaque">
     <p class="section-title">Filtros</p>
 
     <div class="filters">
@@ -312,7 +337,17 @@ html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); bo
 
         <div class="detalhe-actions">
           <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
-          <button class="btn primary" type="button" onclick="exportarPDFDaTurma()">Exportar PDF</button>
+          <div style="position:relative;display:inline-block;" id="wrapExportAta">
+            <button class="btn primary" type="button" id="btnAtaExportar">Exportar ▾</button>
+            <div id="dropExportAta" style="display:none;position:absolute;left:0;top:calc(100% + 6px);
+              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
+              box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:180px;padding:6px 0;
+              flex-direction:column;">
+              <button class="btn" id="btnExportAtaPdf" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Exportar PDF</button>
+              <button class="btn" id="btnExportAtaCsv" type="button" disabled title="Em breve — aguardando definição das colunas do schema"
+                style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;opacity:0.5;cursor:not-allowed;">📊 Exportar CSV</button>
+            </div>
+          </div>
           <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
           <button class="btn secondary small" type="button" onclick="fecharTurma()" style="margin-left:auto;">✕ Fechar</button>
         </div>
@@ -411,6 +446,22 @@ function setMsg(text, kind){
     _toastAviso(t);
   }
 }
+// Card de destaque: decide texto claro/escuro pela luminância real da cor
+// escolhida em perfil.html (mesmo cálculo usado em gestão-atas), e reajusta
+// sozinho quando a pessoa troca de cor sem recarregar a página.
+function ajustarContrasteDestaque(){
+  const el = document.querySelector('.card-destaque');
+  if(!el) return;
+  const bg = getComputedStyle(el).backgroundColor;
+  const m = bg.match(/\d+(\.\d+)?/g);
+  if(!m || m.length < 3) return;
+  const [r,g,b] = m.map(Number);
+  const lin = (c) => { c/=255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+  const luminancia = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+  el.classList.toggle('contraste-claro', luminancia > 0.5);
+}
+document.addEventListener('colorchange', ajustarContrasteDestaque);
+
 window.addEventListener('unhandledrejection', (ev) => {
   const t = document.getElementById('_toastGlobal');
   if(t && t.dataset.loading === '1'){
@@ -819,6 +870,29 @@ async function carregarDadosEscola() {
   return padrao;
 }
 
+// Dropdown "Exportar" (mesmo padrão de abrir/fechar do pesquisa-ano-ativo.html).
+// Só o PDF está ligado a uma função de verdade — o CSV fica "disabled" no
+// HTML até a análise do schema definir as colunas; por isso não tem
+// addEventListener aqui (não há handler nenhum pra escrever ainda).
+(function(){
+  const btn  = document.getElementById("btnAtaExportar");
+  const drop = document.getElementById("dropExportAta");
+  if (!btn || !drop) return;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const aberto = drop.style.display !== "none";
+    drop.style.display = aberto ? "none" : "flex";
+  });
+  document.addEventListener("click", () => { drop.style.display = "none"; });
+  drop.addEventListener("click", (e) => { e.stopPropagation(); });
+
+  document.getElementById("btnExportAtaPdf").addEventListener("click", () => {
+    drop.style.display = "none";
+    exportarPDFDaTurma();
+  });
+})();
+
 async function exportarPDFDaTurma() {
   if (!turmaSelecionada) return;
 
@@ -939,6 +1013,7 @@ async function carregar() {
 
   if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
 
+  ajustarContrasteDestaque();
   Loading.esconder();
 }
 
