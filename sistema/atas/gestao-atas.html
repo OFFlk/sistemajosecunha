@@ -188,7 +188,9 @@ a.btn.btn-primary:hover {
     <div class="sec-body" id="secJSON">
       <p class="muted">
         Importe um JSON gerado por esta página. O sistema conserva o que for idêntico,
-        adiciona o que for novo e avisa turmas suspeitas (mesma série e ano).
+        adiciona o que for novo e avisa turmas suspeitas (mesma série e ano) e schemas em
+        conflito (mesmo ID, conteúdo diferente) — schemas em conflito vêm desmarcados por
+        padrão e nunca são sobrescritos sem confirmação.
       </p>
       <div class="row-btns">
         <label class="btn btn-outline" id="lblJSON" style="cursor:pointer;">
@@ -202,7 +204,12 @@ a.btn.btn-primary:hover {
           <button class="btn btn-primary" id="btnAplicarMerge" onclick="aplicarMerge()">✅ Aplicar merge</button>
           <button class="btn btn-gray" onclick="cancelarMerge()">✖ Cancelar</button>
         </div>
+        <div class="muted" style="font-size:12px; font-weight:800; margin-bottom:4px;">Turmas</div>
         <div id="mergeLista"></div>
+        <div id="mergeSchemasWrap" style="display:none; margin-top:14px;">
+          <div class="muted" style="font-size:12px; font-weight:800; margin-bottom:4px;">Schemas de ata</div>
+          <div id="mergeListaSchemas"></div>
+        </div>
       </div>
       <div class="console" id="logJSON" style="display:none;"></div>
     </div>
@@ -215,7 +222,7 @@ a.btn.btn-primary:hover {
       <span class="sec-toggle" id="togSecExport">▼</span>
     </div>
     <div class="sec-body" id="secExport">
-      <p class="muted">Exporta turmasDB + alunos-atas do módulo de atas. Faça backup antes de qualquer limpeza.</p>
+      <p class="muted">Exporta turmasDB + alunos-atas + schemas de ata do módulo. Faça backup antes de qualquer limpeza.</p>
       <div class="row-btns">
         <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
         <button class="btn btn-outline" id="btnExportCSV"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
@@ -699,6 +706,28 @@ function _reconstruirAuxLocalmente(turmas) {
 }
 
 /* =============================================
+   APAGAR TURMAS — limpeza de scans no Cloudinary
+   Complementa a exclusão no Firestore chamando a rota que apaga TODOS os
+   arquivos da pasta atas/{turmaId_slug} + a pasta em si (ver
+   functions/api/atas-delete-turma.js). Sem isso, apagar a turma deixava
+   a pasta de scans órfã pra sempre no Cloudinary.
+============================================= */
+async function _apagarScansCloudinary(turmaId) {
+  try {
+    const resp = await fetch('/api/atas-delete-turma', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turmaId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+    return { ok: true, deletedCount: data.deletedCount || 0, folderRemoved: !!data.folderRemoved };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+/* =============================================
    APAGAR TURMAS
 ============================================= */
 async function apagarSelecionadas() {
@@ -775,6 +804,22 @@ async function apagarSelecionadas() {
           await window.DB.matriculas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
         } catch(e) {
           avisos.push(`⚠️ "${nomeTurma}": erro ao limpar atas/matrículas — ${e.message}`);
+        }
+      }
+
+      // Limpa os scans da turma no Cloudinary (arquivos + pasta).
+      // Best-effort: falha aqui NÃO impede a exclusão da turma (já feita
+      // acima) — só gera um aviso no log. Sem isso, a pasta de scans da
+      // turma (atas/{turmaId_slug}) fica órfã pra sempre no Cloudinary.
+      if (docIdPrimario) {
+        const resScan = await _apagarScansCloudinary(docIdPrimario);
+        if (resScan.ok) {
+          if (resScan.deletedCount > 0) {
+            avisos.push(`ℹ️ "${nomeTurma}": ${resScan.deletedCount} scan(s) removido(s) do Cloudinary`
+              + (resScan.folderRemoved ? '' : ' (pasta não pôde ser removida — verificar manualmente)'));
+          }
+        } else {
+          avisos.push(`⚠️ "${nomeTurma}": falha ao limpar scans no Cloudinary — ${resScan.error}`);
         }
       }
     }
@@ -883,7 +928,10 @@ async function exportarJSON() {
   let alunosAtas = [];
   try { alunosAtas = (window.DB?.['alunos-atas']) ? await window.DB['alunos-atas'].list() : []; }
   catch(_) { alunosAtas = []; }
-  _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:2, turmasDB:lerTurmasDB(), alunosAtasDB:alunosAtas }, null, 2),
+  let atasSchemas = [];
+  try { atasSchemas = (window.DB?.atasSchemas) ? await window.DB.atasSchemas.list() : []; }
+  catch(_) { atasSchemas = []; }
+  _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:3, turmasDB:lerTurmasDB(), alunosAtasDB:alunosAtas, atasSchemas }, null, 2),
     `backup-atas-${_hoje()}.json`, 'application/json');
   setMsg('JSON exportado.', 'ok');
 }
@@ -934,18 +982,19 @@ function analisarJSON(event) {
   const file=event.target.files?.[0]; if(!file) return;
   clearLogEl('logJSON');
   const reader=new FileReader();
-  reader.onload=()=>{
+  reader.onload=async ()=>{
     try {
       const dump=JSON.parse(reader.result);
       if (!Array.isArray(dump.turmasDB)) { logEl('❌ JSON inválido: campo turmasDB ausente.','logJSON'); return; }
-      _analisarMerge(dump.turmasDB);
+      const schemasEntrada = Array.isArray(dump.atasSchemas) ? dump.atasSchemas : [];
+      await _analisarMerge(dump.turmasDB, schemasEntrada);
     } catch(e) { logEl('❌ Erro ao ler JSON: '+e.message,'logJSON'); }
   };
   reader.readAsText(file);
   event.target.value='';
 }
 
-function _analisarMerge(turmasEntrada) {
+async function _analisarMerge(turmasEntrada, schemasEntrada) {
   const turmasAtuais=lerTurmasDB();
   const mapaAtual=new Map(turmasAtuais.map(t=>[t.id||t.turmaId,t]));
   const novas=[], iguais=[], suspeitas=[];
@@ -958,15 +1007,52 @@ function _analisarMerge(turmasEntrada) {
     if (parecidas.length) suspeitas.push({nova:t,parecidaCom:parecidas}); else novas.push(t);
   }
 
-  _pendingMerge={novas,iguais,suspeitas};
+  const schemas = await _analisarMergeSchemas(schemasEntrada||[]);
+
+  _pendingMerge={ turmas:{novas,iguais,suspeitas}, schemas };
   _renderMergePreview();
+}
+
+/**
+ * Compara schemas do JSON com os que já existem em `atasSchemas` (Firestore).
+ * Sem esse ID no banco → "novo" (entra direto). Mesmo ID: conteúdo igual →
+ * "idêntico" (ignorado); diferente → "conflito" (checkbox desmarcado por
+ * padrão — nunca sobrescreve sem confirmação explícita, ainda mais
+ * importante pro `padrao`, que só o admin global deveria recriar).
+ * A comparação ignora campos voláteis (updatedAt/createdAt/criadoEm/
+ * atualizadoEm) pra não marcar "conflito" só por causa do timestamp do
+ * Firestore não bater com o do JSON exportado. Sem o shape exato do schema
+ * (schema_ata.html/db.firebase.js não foram lidos por este chat), pode
+ * sobrar algum falso "conflito" por outro campo de metadado desconhecido —
+ * o efeito é só pedir uma confirmação a mais, nunca sobrescrever sozinho.
+ */
+async function _analisarMergeSchemas(schemasEntrada) {
+  let atuais = [];
+  try { atuais = (window.DB?.atasSchemas) ? await window.DB.atasSchemas.list() : []; }
+  catch(e) { console.warn('[merge] falha ao ler atasSchemas atuais:', e.message); }
+  const mapaAtual = new Map(atuais.map(s => [String(s._id||s.id||''), s]));
+  const VOLATEIS = ['updatedAt','createdAt','criadoEm','atualizadoEm'];
+  const limpar = obj => { const c={...obj}; VOLATEIS.forEach(k=>delete c[k]); return c; };
+
+  const novos=[], iguais=[], conflitos=[];
+  for (const s of schemasEntrada) {
+    const id = String(s._id||s.id||'').trim(); if(!id) continue;
+    const atual = mapaAtual.get(id);
+    if (!atual) { novos.push(s); continue; }
+    const igual = JSON.stringify(limpar(s)) === JSON.stringify(limpar(atual));
+    if (igual) iguais.push(s); else conflitos.push({novo:s, atual});
+  }
+  return { novos, iguais, conflitos };
 }
 
 function _renderMergePreview() {
   if (!_pendingMerge) return;
-  const {novas,iguais,suspeitas}=_pendingMerge;
+  const {novas,iguais,suspeitas}=_pendingMerge.turmas;
+  const {novos:schemasNovos,iguais:schemasIguais,conflitos:schemasConflitos}=_pendingMerge.schemas;
   document.getElementById('mergePreview').style.display='block';
-  document.getElementById('mergeResumo').textContent=`${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s)`;
+  document.getElementById('mergeResumo').innerHTML =
+    `Turmas: ${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s)<br>`+
+    `Schemas: ${schemasNovos.length} novo(s) · ${schemasIguais.length} idêntico(s) · ${schemasConflitos.length} conflito(s)`;
 
   const lista=document.getElementById('mergeLista'); lista.innerHTML='';
 
@@ -995,34 +1081,85 @@ function _renderMergePreview() {
     div.innerHTML=`<span class="badge">IDÊNTICA</span> <b>${esc(t.aba||t.id)}</b> — será ignorada`;
     lista.appendChild(div);
   }
+
+  const wrapSchemas=document.getElementById('mergeSchemasWrap');
+  const listaSchemas=document.getElementById('mergeListaSchemas'); listaSchemas.innerHTML='';
+  wrapSchemas.style.display=(schemasNovos.length||schemasIguais.length||schemasConflitos.length)?'block':'none';
+
+  for (const s of schemasNovos) {
+    const id=s._id||s.id, nome=s.nome||s.titulo||id;
+    const div=document.createElement('div'); div.className='merge-item nova';
+    div.innerHTML=`<span class="badge ok">NOVO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span>`;
+    listaSchemas.appendChild(div);
+  }
+
+  for (let i=0; i<schemasConflitos.length; i++) {
+    const {novo}=schemasConflitos[i];
+    const id=novo._id||novo.id, nome=novo.nome||novo.titulo||id;
+    const ehPadrao = id==='padrao';
+    const div=document.createElement('div'); div.className='merge-item suspeita';
+    div.innerHTML=`
+      <input type="checkbox" id="chkSchemaConf${i}" style="flex-shrink:0;margin-top:2px;">
+      <div>
+        <span class="badge warn">CONFLITO${ehPadrao?' · PADRÃO':''}</span>
+        <b style="margin-left:6px;">${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span><br>
+        <span class="muted" style="font-size:11px;">⚠️ Já existe um schema com este ID e conteúdo diferente${ehPadrao?' — este é o schema padrão da escola, confirme com atenção':''}. Desmarcado por padrão: marque só se quiser <b>sobrescrever</b> o schema atual pelo do backup.</span>
+      </div>`;
+    listaSchemas.appendChild(div);
+  }
+
+  for (const s of schemasIguais) {
+    const id=s._id||s.id, nome=s.nome||s.titulo||id;
+    const div=document.createElement('div'); div.className='merge-item igual';
+    div.innerHTML=`<span class="badge">IDÊNTICO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span> — será ignorado`;
+    listaSchemas.appendChild(div);
+  }
 }
 
 async function aplicarMerge() {
   if (!IS_ADMIN||!_pendingMerge) return;
-  const {novas,suspeitas}=_pendingMerge;
+  const {novas,suspeitas}=_pendingMerge.turmas;
+  const {novos:schemasNovos,conflitos:schemasConflitos}=_pendingMerge.schemas;
   const suspeitasIncluir=suspeitas.filter((_,i)=>document.getElementById(`chkSus${i}`)?.checked).map(s=>s.nova);
   const paraAdicionar=[...novas,...suspeitasIncluir];
-  clearLogEl('logJSON');
-  if (!paraAdicionar.length) { logEl('ℹ️ Nenhuma turma nova para adicionar.','logJSON'); cancelarMerge(); return; }
-  logEl(`Adicionando ${paraAdicionar.length} turma(s)...`,'logJSON');
-  const turmasFinais=[...lerTurmasDB(),...paraAdicionar];
-  salvarTurmasDB(turmasFinais);
-  // reconstruirAuxiliares() (não a versão local-only): sem isso, `matriculas`
-  // nunca é gravado de verdade no Firestore, e
-  // recalcularUltimoAnoRegistroBatch() não acha nada.
-  const aux=reconstruirAuxiliares(turmasFinais);
-  logEl(`✅ Merge aplicado: +${paraAdicionar.length} turma(s).`,'logJSON');
-  logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
-  paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
+  const schemasConflitosIncluir=schemasConflitos.filter((_,i)=>document.getElementById(`chkSchemaConf${i}`)?.checked).map(c=>c.novo);
+  const schemasParaSalvar=[...schemasNovos,...schemasConflitosIncluir];
 
-  try {
-    const idsEnvolvidos=[...new Set(paraAdicionar.flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
-    if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
-      const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
-      await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, dadosEscola?.configAnoAtivo ?? null);
-      logEl(`↻ ultimoAnoRegistro recalculado para ${idsEnvolvidos.length} aluno(s).`,'logJSON');
+  clearLogEl('logJSON');
+  if (!paraAdicionar.length && !schemasParaSalvar.length) { logEl('ℹ️ Nada selecionado para adicionar.','logJSON'); cancelarMerge(); return; }
+
+  if (paraAdicionar.length) {
+    logEl(`Adicionando ${paraAdicionar.length} turma(s)...`,'logJSON');
+    const turmasFinais=[...lerTurmasDB(),...paraAdicionar];
+    salvarTurmasDB(turmasFinais);
+    // reconstruirAuxiliares() (não a versão local-only): sem isso, `matriculas`
+    // nunca é gravado de verdade no Firestore, e
+    // recalcularUltimoAnoRegistroBatch() não acha nada.
+    const aux=reconstruirAuxiliares(turmasFinais);
+    logEl(`✅ Merge de turmas aplicado: +${paraAdicionar.length} turma(s).`,'logJSON');
+    logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
+    paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
+
+    try {
+      const idsEnvolvidos=[...new Set(paraAdicionar.flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
+      if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+        const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
+        await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, dadosEscola?.configAnoAtivo ?? null);
+        logEl(`↻ ultimoAnoRegistro recalculado para ${idsEnvolvidos.length} aluno(s).`,'logJSON');
+      }
+    } catch(e) { console.warn('[aplicarMerge] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
+  }
+
+  if (schemasParaSalvar.length) {
+    logEl(`Salvando ${schemasParaSalvar.length} schema(s)...`,'logJSON');
+    let ok=0, falhas=0;
+    for (const s of schemasParaSalvar) {
+      try { await window.DB.atasSchemas.save(s); ok++; }
+      catch(e) { falhas++; console.warn('[aplicarMerge] falha ao salvar schema', s._id||s.id, e.message); }
     }
-  } catch(e) { console.warn('[aplicarMerge] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
+    logEl(`✅ Schemas salvos: ${ok}${falhas?` • ⚠️ ${falhas} falharam (veja o console)`:''}.`,'logJSON');
+    schemasParaSalvar.forEach(s=>logEl(`  ✔ ${s.nome||s.titulo||s._id||s.id}`,'logJSON'));
+  }
 
   cancelarMerge();
   renderTabelaTurmas();
@@ -1033,6 +1170,8 @@ function cancelarMerge() {
   _pendingMerge=null;
   document.getElementById('mergePreview').style.display='none';
   document.getElementById('mergeLista').innerHTML='';
+  document.getElementById('mergeListaSchemas').innerHTML='';
+  document.getElementById('mergeSchemasWrap').style.display='none';
 }
 </script>
 

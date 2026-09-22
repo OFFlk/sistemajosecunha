@@ -216,6 +216,11 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
   background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
 }
 .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+/* Sem isto, "html[data-theme=dark] .btn.primary" (mais específico) vence e o
+   botão "Pesquisar" volta pra cor de marca padrão — ilegível sobre o card
+   já colorido pela cor do usuário no tema escuro. */
+html[data-theme="dark"] .card-destaque .btn { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
 
 /* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
 @keyframes toastSubir {
@@ -278,10 +283,6 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
     <div class="filter-actions">
       <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
       <span class="muted">Ou pesquise vazio para ver todas as turmas.</span>
-      <label class="aluno-search-checkbox" style="margin-left:auto;">
-        <input type="checkbox" id="fInativas">
-        Exibir atas inativas
-      </label>
     </div>
     <div class="muted" style="margin-top:10px;">
       DB local: <b id="dbInfo">carregando...</b>
@@ -355,7 +356,7 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
         <div class="table-scroll">
           <table>
             <thead>
-              <tr>
+              <tr id="theadAlunosRow">
                 <th>Nº</th><th>Nome</th><th>Série</th>
                 <th>Port</th><th>Mat</th><th>Hist</th><th>Geo</th>
                 <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th><th>Ing</th>
@@ -561,12 +562,78 @@ window.nomeAtual = nomeAtual;
 /* =========================
    Utilitários
 ========================= */
-function recomputarTurmasBase() {
-  const exibirInativas = document.getElementById("fInativas")?.checked;
-  turmas = turmasTodas.filter(t => {
-    const inativa = String(t.status || "ATIVA").toUpperCase() === "INATIVA";
-    return exibirInativas ? inativa : !inativa;
+// Mantém o filtro "só turmas ativas" que já era o padrão (checkbox desmarcado);
+// só a opção de ALTERNAR pra ver as inativas foi removida (legada).
+// Schema da turma (schemaSnapshot, gravado no doc da turma na criação — ver
+// cadastro-atas.html). Mesmos defaults/normalização usados no resto do
+// módulo, pra não divergir do que outras páginas consideram "schema padrão".
+function getDefaultConfig() {
+  return {
+    version: 1,
+    nome: "Padrão (arquivo original)",
+    serieAtiva: true,
+    resultadoAtivo: true,
+    ordenarPor: "nome",
+    colunas: [
+      { key:"port",  label:"Português",  type:"nota", enabled:true },
+      { key:"mat",   label:"Matemática", type:"nota", enabled:true },
+      { key:"hist",  label:"História",   type:"nota", enabled:true },
+      { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
+      { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
+      { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
+      { key:"arte",  label:"Arte",       type:"nota", enabled:true },
+      { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
+    ]
+  };
+}
+function normalizeSchema(cfg) {
+  const def = getDefaultConfig();
+  const out = {
+    id: String(cfg?.id || cfg?.schemaId || "").trim() || "",
+    version: 1,
+    nome: String(cfg?.nome ?? def.nome),
+    serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
+    resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+    ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
+    colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+  };
+  out.colunas = out.colunas
+    .map(c => ({
+      key: String(c?.key ?? "").trim().toLowerCase(),
+      label: String(c?.label ?? "").trim(),
+      type: (c?.type === "texto") ? "texto" : "nota",
+      enabled: c?.enabled !== false
+    }))
+    .filter(c => c.key && c.label);
+  const seen = new Set();
+  out.colunas = out.colunas.filter(c => {
+    if (seen.has(c.key)) return false;
+    seen.add(c.key);
+    return true;
   });
+  return out;
+}
+function getColunasAtivas(schema) {
+  return (schema?.colunas || []).filter(c => c.enabled);
+}
+// Schema de verdade da turma selecionada (schemaSnapshot) — cai no schema
+// padrão só se a turma não tiver nenhum salvo (legado/turma antiga).
+function schemaDaTurmaSelecionada() {
+  return normalizeSchema(turmaSelecionada?.schemaSnapshot || getDefaultConfig());
+}
+function renderTheadAlunos(schema) {
+  const tr = document.getElementById("theadAlunosRow");
+  if (!tr) return;
+  const colAtivas = getColunasAtivas(schema);
+  let html = `<th>Nº</th><th>Nome</th>`;
+  if (schema.serieAtiva) html += `<th>Série</th>`;
+  for (const c of colAtivas) html += `<th>${_escHtml(c.label)}</th>`;
+  if (schema.resultadoAtivo) html += `<th>Resultado</th>`;
+  tr.innerHTML = html;
+}
+
+function recomputarTurmasBase() {
+  turmas = turmasTodas.filter(t => String(t.status || "ATIVA").toUpperCase() !== "INATIVA");
 }
 
 function norm(v) {
@@ -695,6 +762,7 @@ function selecionarTurma(id) {
   const btnEditarTurma = document.getElementById('btnEditarTurma');
   if(btnEditarTurma) btnEditarTurma.style.display = _podeEditar ? 'inline-flex' : 'none';
 
+  renderTheadAlunos(schemaDaTurmaSelecionada());
   alunosView = (turmaSelecionada.alunos || []).slice();
   renderAlunos(alunosView);
 
@@ -771,23 +839,19 @@ function renderAlunos(lista) {
   const tbody = document.getElementById("tAlunos");
   tbody.innerHTML = "";
 
+  const schema = schemaDaTurmaSelecionada();
+  const colAtivas = getColunasAtivas(schema);
+
   lista.forEach((a, idx) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
+    let html = `
       <td class="num-col">${idx+1}</td>
       <td class="nome-aluno">${nomeAtual(a)}</td>
-      <td>${a.serie || ""}</td>
-      <td>${a.port ?? "--"}</td>
-      <td>${a.mat ?? "--"}</td>
-      <td>${a.hist ?? "--"}</td>
-      <td>${a.geo ?? "--"}</td>
-      <td>${a.cien ?? "--"}</td>
-      <td>${a.fis ?? "--"}</td>
-      <td>${a.arte ?? "--"}</td>
-      <td>${a.relig ?? "--"}</td>
-      <td>${a.ing ?? "--"}</td>
-      <td>${a.resultado ?? "Não informado"}</td>
     `;
+    if (schema.serieAtiva) html += `<td>${a.serie || ""}</td>`;
+    for (const c of colAtivas) html += `<td>${a[c.key] ?? "--"}</td>`;
+    if (schema.resultadoAtivo) html += `<td>${a.resultado ?? "Não informado"}</td>`;
+    tr.innerHTML = html;
     tbody.appendChild(tr);
   });
 }
@@ -947,15 +1011,26 @@ async function _exportarPDFDaTurmaInterno() {
 
   const alunos = turmaSelecionada.alunos || [];
 
+  const schemaPdf = schemaDaTurmaSelecionada();
+  const colAtivasPdf = getColunasAtivas(schemaPdf);
+
+  const headPdf = ["Nº","Nome"];
+  if (schemaPdf.serieAtiva) headPdf.push("Série");
+  colAtivasPdf.forEach(c => headPdf.push(c.label));
+  if (schemaPdf.resultadoAtivo) headPdf.push("Resultado");
+
   doc.autoTable({
     startY: y,
     theme: "grid",
     styles: { font: "Times", fontSize: 9, halign: "center" },
-    head: [["Nº","Nome","Série","Port","Mat","Hist","Geo","Ciên","Ed.Fís","Arte","Rel","Ing","Resultado"]],
-    body: alunos.map((a,i)=>[
-      i+1, nomeAtual(a), a.serie, a.port, a.mat, a.hist, a.geo,
-      a.cien, a.fis, a.arte, a.relig, a.ing, a.resultado
-    ])
+    head: [headPdf],
+    body: alunos.map((a,i)=>{
+      const linha = [i+1, nomeAtual(a)];
+      if (schemaPdf.serieAtiva) linha.push(a.serie);
+      colAtivasPdf.forEach(c => linha.push(a[c.key]));
+      if (schemaPdf.resultadoAtivo) linha.push(a.resultado);
+      return linha;
+    })
   });
 
   const safe = String(turmaSelecionada.aba || "turma").replace(/[\\/:*?"<>|]/g, "_");
@@ -1005,11 +1080,6 @@ async function carregar() {
   document.getElementById("fTurno").onchange  = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fSerie").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
-  document.getElementById("fInativas").onchange = function(){
-    recomputarTurmasBase();
-    preencherFiltroAno(turmas);
-    if(_jaFoiPesquisado) aplicarFiltros();
-  };
 
   if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
 
