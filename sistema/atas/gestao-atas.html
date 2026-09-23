@@ -12,6 +12,8 @@
 })();
 </script>
 
+<script src="../loading-overlay.js"></script>
+
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -143,6 +145,32 @@ a.btn.btn-primary:hover {
   display: none; align-items: center; justify-content: center;
   padding: 18px; z-index: 50;
 }
+
+/* ── Painel de log flutuante e fechável (ex.: log de exclusão) ──
+   Diferente do toast padrão (_showToast, auto-some em poucos segundos):
+   este fica até o usuário fechar, porque o conteúdo é um log de várias
+   linhas, não uma mensagem curta. */
+.log-floating {
+  position: fixed; right: 20px; bottom: 20px; z-index: 60;
+  width: min(440px, calc(100vw - 40px)); max-height: 55vh;
+  background: var(--card-bg, #fff); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.28);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.log-floating-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-weight: 800; font-size: 13px; flex-shrink: 0;
+}
+.log-floating-close {
+  border: 0; background: transparent; cursor: pointer;
+  font-size: 15px; line-height: 1; color: var(--muted); padding: 2px 4px;
+}
+.log-floating-close:hover { color: var(--text, #111); }
+.log-floating .console {
+  margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  overflow: auto; max-height: calc(55vh - 44px);
+}
 </style>
 </head>
 <body>
@@ -261,7 +289,13 @@ a.btn.btn-primary:hover {
           </tbody>
         </table>
       </div>
-      <div class="console" id="logApagar" style="display:none;"></div>
+      <div id="logApagarWrap" class="log-floating" style="display:none;">
+        <div class="log-floating-head">
+          <span>🗑️ Log de exclusão</span>
+          <button type="button" class="log-floating-close" onclick="_fecharLogFloating('logApagarWrap')" aria-label="Fechar">✖</button>
+        </div>
+        <div class="console" id="logApagar"></div>
+      </div>
     </div>
   </div>
 
@@ -443,10 +477,20 @@ function logEl(msg, id) {
   if (!el) return;
   el.style.display = 'block';
   el.textContent  += (el.textContent ? '\n' : '') + msg;
+  // Se existir um painel flutuante pra esse log (ex.: logApagarWrap), mostra
+  // ele também. Pra logs sem painel (ex.: logJSON), isso não faz nada.
+  const wrap = document.getElementById(id + 'Wrap');
+  if (wrap) wrap.style.display = 'flex';
 }
 function clearLogEl(id) {
   const el = document.getElementById(id);
   if (el) { el.textContent = ''; el.style.display = 'none'; }
+  const wrap = document.getElementById(id + 'Wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+function _fecharLogFloating(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (wrap) wrap.style.display = 'none';
 }
 
 // Turmas do ano-ativo não têm origemArquivo nem aba preenchida com nome de planilha
@@ -482,6 +526,11 @@ async function inicializar() {
 
   atualizarStats();
   renderTabelaTurmas();
+  // Esconde a tela de loading só depois que stats/tabela já estão prontas —
+  // evita o placeholder "Carregando..." aparecer por baixo quando o overlay
+  // some. Roda tanto no caminho de sucesso quanto no de erro de conexão
+  // (o catch acima não interrompe a função, só avisa via toast).
+  Loading.esconder();
 }
 
 function atualizarStats() {
@@ -738,7 +787,13 @@ async function apagarSelecionadas() {
   const turmas  = lerTurmasDB();
   const aApagar = indices.map(i => turmas[i]).filter(Boolean);
   const nomes   = aApagar.map(t => t.aba || t.id || t._id || t.turmaId || '?');
-  if (!confirm(`Apagar ${aApagar.length} turma(s)?\n\n${nomes.join('\n')}\n\nEsta ação não pode ser desfeita.`)) return;
+  const confirmou = await _confirmModal({
+    titulo: '🗑️ Apagar turma(s)?',
+    corpo: `Apagar ${aApagar.length} turma(s)?\n\n${nomes.join('\n')}\n\nEsta ação não pode ser desfeita.`,
+    corDestaque: '#991b1b',
+    textoConfirmar: 'Sim, apagar'
+  });
+  if (!confirmou) return;
 
   const btnAp = document.getElementById('btnApagarSel');
   if (btnAp) { btnAp.disabled = true; btnAp.textContent = 'Apagando...'; }
