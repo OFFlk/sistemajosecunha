@@ -627,7 +627,10 @@ function renderTheadAlunos(schema) {
   const colAtivas = getColunasAtivas(schema);
   let html = `<th>Nº</th><th>Nome</th>`;
   if (schema.serieAtiva) html += `<th>Série</th>`;
-  for (const c of colAtivas) html += `<th>${_escHtml(c.label)}</th>`;
+  // O ID (key) é usado em vez do nome completo (label) de propósito: o campo
+  // de ID já tem limite de caracteres na criação do schema, então a coluna
+  // fica curta e a tabela não desconfigura o layout da página.
+  for (const c of colAtivas) html += `<th>${_escHtml(c.key)}</th>`;
   if (schema.resultadoAtivo) html += `<th>Resultado</th>`;
   tr.innerHTML = html;
 }
@@ -920,13 +923,22 @@ function aplicarFiltros() {
 async function carregarDadosEscola() {
   const padrao = { nome: "Nome da Escola", endereco: "Endereço da Escola", escudo: "" };
   try {
-    // Lê direto do Firestore (coleção "escola") em vez de confiar em localStorage
-    // como cache — mesmo motivo do resto da página: pode estar desatualizado ou
-    // nunca ter sido escrito aqui.
-    if (window.DB && window.DB.escola && typeof window.DB.escola.list === "function") {
-      const lista = await window.DB.escola.list();
-      const d = Array.isArray(lista) ? lista[0] : lista;
-      if (d) return { nome: d.nome || padrao.nome, endereco: d.endereco || padrao.endereco, escudo: d.escudo || "" };
+    // DB.escola é documento único (.get()/.save()), não coleção — .list() não
+    // existe nessa API. Era por isso que o PDF sempre saía com o texto de
+    // exemplo: a chamada abaixo nunca existiu de verdade, então a função caía
+    // direto no "padrao" em silêncio (o catch nem chegava a disparar).
+    if (window.DB && window.DB.escola && typeof window.DB.escola.get === "function") {
+      const d = await window.DB.escola.get();
+      if (d) return {
+        nome: d.nome || padrao.nome,
+        endereco: d.endereco || padrao.endereco,
+        escudo: d.escudo || "",
+        cidade: d.cidade || d.municipio || "",
+        uf: d.uf || d.UF || "",
+        inep: d.inep || d.codigoInep || "",
+        email: d.email || "",
+        telefone: d.telefone || d.tel || "",
+      };
     }
   } catch (e) {
     console.warn("[pesquisa-ata] Falha ao carregar dados da escola:", e);
@@ -973,44 +985,96 @@ async function exportarPDFDaTurma() {
   }
 }
 
+// Cabeçalho institucional (logo + nome + endereço + linha separadora),
+// mesmo layout de pesquisa-ano-ativo. Retorna o Y onde o conteúdo pode
+// começar. unit "pt" (não "mm") — igual ao resto do módulo de export.
+function _desenharCabecalhoEscolaAta(doc, escola, titulo, pageWidth){
+  const L = 28, R = pageWidth - 28;
+  let y = 20;
+
+  let logoW = 0;
+  if (escola && escola.escudo) {
+    try { const s = 48; doc.addImage(escola.escudo, "PNG", L, y, s, s); logoW = s + 10; } catch {}
+  }
+
+  const tx = L + logoW;
+  if (escola && escola.nome) {
+    doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(11,63,191);
+    doc.text(String(escola.nome).toUpperCase(), tx, y + 13);
+
+    doc.setFont(undefined, "normal"); doc.setTextColor(60);
+    let subY = y + 24;
+    const partes = [];
+    if (escola.endereco) partes.push(escola.endereco);
+    const cidade = [escola.cidade, escola.uf].filter(Boolean).join("/");
+    if (cidade) partes.push(cidade);
+    if (escola.inep) partes.push(`INEP: ${escola.inep}`);
+    if (escola.email) partes.push(`E-mail: ${escola.email}`);
+    if (escola.telefone) partes.push(`Tel: ${escola.telefone}`);
+    if (partes.length) {
+      doc.setFontSize(8);
+      const linha = doc.splitTextToSize(partes.join("  •  "), R - tx - 10);
+      doc.text(linha, tx, subY);
+      subY += linha.length * 10;
+    }
+    y = Math.max(y + 50, subY + 4);
+  } else {
+    y += (logoW ? 52 : 0);
+  }
+
+  doc.setDrawColor(11,63,191); doc.setLineWidth(1.2);
+  doc.line(L, y, R, y);
+  y += 8;
+
+  doc.setFontSize(12); doc.setFont(undefined, "bold"); doc.setTextColor(20);
+  doc.text(titulo, L, y + 9);
+  doc.setFont(undefined, "normal"); doc.setTextColor(0);
+  y += 20;
+
+  return y;
+}
+
+// Largura fixa por coluna, em vez de deixar todas iguais: Nº e notas são
+// curtos por natureza (no máx. "10,0" ou "99"), Nome precisa de espaço de
+// verdade, e uma coluna do tipo "texto" (schema) pode ter valores mais
+// longos que uma nota comum. Quando o conteúdo não cabe, quebra dentro da
+// própria célula (overflow:'linebreak') em vez de esticar a tabela.
+function _montarColumnStylesAta(schema, colAtivas){
+  const styles = {};
+  let i = 0;
+  styles[i++] = { cellWidth: 26,  halign: "center" }; // Nº
+  styles[i++] = { cellWidth: 150, halign: "left"   }; // Nome
+  if (schema.serieAtiva) styles[i++] = { cellWidth: 55, halign: "center" }; // Série
+  for (const c of colAtivas) {
+    styles[i++] = { cellWidth: c.type === "texto" ? 80 : 44, halign: "center" };
+  }
+  if (schema.resultadoAtivo) styles[i++] = { cellWidth: 75, halign: "center" }; // Resultado
+  return styles;
+}
+
 async function _exportarPDFDaTurmaInterno() {
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF("p","mm","a4");
+  // Paisagem: tabelas de ata têm muitas colunas e sobra pouco espaço na
+  // vertical — perder altura de página compensa mais do que ganhar largura.
+  const doc = new jsPDF({ orientation: "l", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
 
   const escola = await carregarDadosEscola();
 
-  let y = 20;
-
-  if (escola.escudo) {
-    try { doc.addImage(escola.escudo, "PNG", 15, y-10, 30, 30); } catch {}
-  }
-
-  doc.setFont("Times","Bold");
-  doc.setFontSize(14);
-  doc.text(escola.nome, 105, y, {align:"center"});
-
-  doc.setFontSize(11);
-  doc.setFont("Times","Normal");
-  doc.text(escola.endereco, 105, y+7, {align:"center"});
-
-  doc.setFontSize(13);
-  doc.setFont("Times","Bold");
-  doc.text("ATA DE RESULTADOS FINAIS", 105, y+18, {align:"center"});
-
-  y += 30;
-
   const serieTxt = turmaSelecionada.serieTexto ||
     (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "");
+  const ano   = turmaSelecionada.anoLetivo || "";
+  const turno = turmaSelecionada.turno || "";
+
+  let y = _desenharCabecalhoEscolaAta(doc, escola, "ATA DE RESULTADOS FINAIS", pageWidth);
 
   doc.setFontSize(10);
-  doc.text(`ANO: ${turmaSelecionada.anoLetivo || ""}`, 20, y);
-  doc.text(`SÉRIE: ${serieTxt || ""}`, 80, y);
-  doc.text(`TURNO: ${turmaSelecionada.turno || ""}`, 150, y);
-
-  y += 5;
+  doc.text(`ANO: ${ano}`, 28, y);
+  doc.text(`SÉRIE: ${serieTxt}`, 160, y);
+  doc.text(`TURNO: ${turno}`, 320, y);
+  y += 14;
 
   const alunos = turmaSelecionada.alunos || [];
-
   const schemaPdf = schemaDaTurmaSelecionada();
   const colAtivasPdf = getColunasAtivas(schemaPdf);
 
@@ -1021,8 +1085,12 @@ async function _exportarPDFDaTurmaInterno() {
 
   doc.autoTable({
     startY: y,
-    theme: "grid",
-    styles: { font: "Times", fontSize: 9, halign: "center" },
+    styles: { fontSize: 9, cellPadding: {top:4,bottom:4,left:5,right:5}, overflow: "linebreak", lineColor: [210,220,240], lineWidth: 0.3 },
+    headStyles: { fillColor: [11,63,191], textColor: 255, fontStyle: "bold", fontSize: 9, halign: "center" },
+    alternateRowStyles: { fillColor: [243,246,255] },
+    bodyStyles: { textColor: [30,30,50] },
+    columnStyles: _montarColumnStylesAta(schemaPdf, colAtivasPdf),
+    margin: { left: 28, right: 28 },
     head: [headPdf],
     body: alunos.map((a,i)=>{
       const linha = [i+1, nomeAtual(a)];
@@ -1033,8 +1101,15 @@ async function _exportarPDFDaTurmaInterno() {
     })
   });
 
-  const safe = String(turmaSelecionada.aba || "turma").replace(/[\\/:*?"<>|]/g, "_");
-  doc.save(`ata_${safe}.pdf`);
+  // Nome do arquivo pelo identificador da turma (série + ano + turno), não
+  // mais por "aba" — em turmas criadas manualmente (não importadas de
+  // planilha) esse campo guarda a ORIGEM do cadastro ("MANUAL"), não um nome,
+  // e o arquivo saía "ata_MANUAL.pdf" para qualquer turma cadastrada assim.
+  const idPartes = [serieTxt, ano, turno].filter(Boolean).join("_");
+  const safe = String(idPartes || turmaSelecionada.aba || "turma")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
+  doc.save(`ATA_${safe}.pdf`);
 }
 
 /* =========================
