@@ -183,7 +183,17 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
 </style>
 </head>
 <body>
-<script>window.Auth && window.Auth.requireAuth();</script>
+<script>
+window.Auth && window.Auth.requireAuth();
+// requireRole() só aceita 1 role — aqui liberamos admin + gestor e
+// bloqueamos só 'user' (pending/!session já são tratados por requireAuth acima).
+window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
+  const _s = window.Auth.getSession && window.Auth.getSession();
+  if (_s && _s.role === 'user') {
+    window.location.replace('/atas.html?erro=acesso-negado');
+  }
+});
+</script>
 <div id="header-placeholder"></div>
 <main class="wrap">
   <div class="split-grid">
