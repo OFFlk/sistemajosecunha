@@ -241,8 +241,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         <label class="label">Schema de notas</label>
         <select id="schemaSelect" class="input"></select>
         <div class="help">Define as matérias/colunas que vão aparecer em cadastro-atas.html pra essa turma. Configurado em <span class="mono">admin → Edição de ata e schema</span>.</div>
-        <div id="avisoSchemaComAlunos" class="warn" style="display:none;">
-          ⚠️ Essa turma já tem aluno(s) lançado(s). Trocar o schema agora pode desalinhar as colunas de nota já preenchidas.
+        <div id="avisoSchemaBloqueado" class="warn" style="display:none;">
+          🔒 O schema não pode ser alterado depois que a turma é criada. Ao salvar, a turma continua com o schema original.
         </div>
       </div>
 
@@ -461,6 +461,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   function fillSchemaSelect(valorAtual){
     const sel = $("schemaSelect");
     if(!sel) return;
+    sel.disabled = false; // (o modo edição trava; ver mostrarSchemaDaTurma)
     // Padrão sempre primeiro (e é o que o <select> assume quando o valor
     // pedido não existe mais, ex.: turma antiga com schema excluído).
     const schemas = loadSchemas().slice().sort((a, b) =>
@@ -481,6 +482,29 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       sel.appendChild(opt);
     });
     if(valorAtual && schemas.some(s => s.id === valorAtual)) sel.value = valorAtual;
+  }
+
+  /* Modo edição: o schema de uma turma NUNCA muda depois de criada. O select
+     vira só um mostrador travado, com o schema que a turma realmente usa (o
+     snapshot gravado nela — não a lista atual, onde ele pode ter sido editado
+     ou até excluído). salvarTurma() não lê esse select em edição. */
+  function mostrarSchemaDaTurma(t){
+    const sel = $("schemaSelect");
+    if(!sel) return;
+    const id = String(t?.schemaId || "");
+    const nome = String(t?.schemaSnapshot?.nome || "").trim() || id;
+    const aindaExiste = !!(id && getSchemaById(id));
+    let rotulo;
+    if(!nome) rotulo = "Sem schema registrado";
+    else if(!aindaExiste) rotulo = `${nome} (schema removido do sistema — mantido na turma)`;
+    else rotulo = nome;
+    sel.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "__schema_da_turma__"; // valor irrelevante: nunca é lido em edição
+    opt.textContent = rotulo;
+    sel.appendChild(opt);
+    sel.value = opt.value;
+    sel.disabled = true;
   }
 
   /* ── Turmas — Firestore direto, cache em memória (sem localStorage/scoping) ── */
@@ -774,10 +798,9 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       nomeManual = false;
     }
 
-    fillSchemaSelect(t.schemaId || "");
-
-    const avisoSchema = $("avisoSchemaComAlunos");
-    if(avisoSchema) avisoSchema.style.display = (Array.isArray(t.alunos) && t.alunos.length) ? "block" : "none";
+    // Edição: o schema é o do documento original e não pode ser trocado.
+    mostrarSchemaDaTurma(t);
+    if($("avisoSchemaBloqueado")) $("avisoSchemaBloqueado").style.display = "block";
 
     renderChips();
     syncDerived();
@@ -796,7 +819,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     if($("nomeTurma")) $("nomeTurma").value = "";
     // Turma nova = schema padrão (doc "padrao" de atasSchemas).
     fillSchemaSelect(SCHEMA_PADRAO_ID);
-    if($("avisoSchemaComAlunos")) $("avisoSchemaComAlunos").style.display = "none";
+    if($("avisoSchemaBloqueado")) $("avisoSchemaBloqueado").style.display = "none";
     if($("avisoMudancaId")) $("avisoMudancaId").style.display = "none";
 
     renderChips();
@@ -804,29 +827,52 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     renderListaTurmas();
   }
 
+  /* Mensagem que sobrevive ao hard refresh da edição: o toast de "salvo" não
+     pode morrer junto com a página. Lida uma vez no init() e apagada. */
+  const CHAVE_MSG_POS_RELOAD = "cadastroTurmas.msgPosReload";
+  function guardarMsgPosReload(text, kind){
+    try{ sessionStorage.setItem(CHAVE_MSG_POS_RELOAD, JSON.stringify({ text, kind })); }catch(_){}
+  }
+  function lerMsgPosReload(){
+    try{
+      const raw = sessionStorage.getItem(CHAVE_MSG_POS_RELOAD);
+      if(!raw) return null;
+      sessionStorage.removeItem(CHAVE_MSG_POS_RELOAD);
+      const m = JSON.parse(raw);
+      return (m && m.text) ? m : null;
+    }catch(_){ return null; }
+  }
+
   async function salvarTurma(){
     const ano = parseInt($("anoSelect")?.value || String(getAnoDefault()), 10);
     const turno = $("turno")?.value || "MATUTINO";
     const nome = ($("nomeTurma")?.value || "").trim();
-    const schemaId = $("schemaSelect")?.value || "";
+    const ehEdicao = !!editingTurmaId;
 
     if(!seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
     if(!nome){ setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err"); return; }
 
-    // Trava: sem schema padrão na coleção, não cadastra turma (nada de
-    // cair num schema embutido que não existe no banco).
-    if(!temSchemaPadrao()){ setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err"); return; }
-
-    const schemaEscolhido = (schemaId ? getSchemaById(schemaId) : null) || getSchemaById(SCHEMA_PADRAO_ID);
-    const schemaSnapshot = normalizeSchema(schemaEscolhido);
+    // Schema: só existe escolha na CRIAÇÃO. Em edição o select está travado e
+    // esta função nunca lê nem regrava o schema (o payload copia o do documento
+    // original, mais abaixo).
+    let schemaId = "", schemaSnapshot = null;
+    if(!ehEdicao){
+      // Trava: sem schema padrão na coleção, não cadastra turma (nada de
+      // cair num schema embutido que não existe no banco).
+      if(!temSchemaPadrao()){ setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err"); return; }
+      schemaId = $("schemaSelect")?.value || "";
+      const schemaEscolhido = (schemaId ? getSchemaById(schemaId) : null) || getSchemaById(SCHEMA_PADRAO_ID);
+      schemaSnapshot = normalizeSchema(schemaEscolhido);
+    }
 
     const base = buildTurmaIdBase();
     let turmas = getTurmas().slice();
 
-    let oldId = null, criadoEmExistente = null, alunosExistentes = null;
+    let oldId = null, criadoEmExistente = null, alunosExistentes = null, docOriginal = null;
     if(editingTurmaId){
       oldId = editingTurmaId;
       const existente = turmas.find(t => t && t.turmaId === oldId);
+      docOriginal = existente || null;
       if(existente?.criadoEm) criadoEmExistente = existente.criadoEm;
       if(Array.isArray(existente?.alunos)) alunosExistentes = existente.alunos;
       turmas = turmas.filter(t => t && t.turmaId !== oldId);
@@ -862,17 +908,27 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       anoLetivo: ano,
       series: [...seriesSel],
       turno,
-      schemaId: schemaSnapshot.id || schemaId || "",
-      schemaSnapshot,
-      origemArquivo: "MANUAL",
-      aba: "MANUAL",
       criadoEm: criadoEmExistente || now,
       atualizadoEm: now,
     };
-    // Só na criação: garante o array vazio. Em edição, NÃO manda essa chave
-    // — save() é merge:true, então omitir preserva os alunos já lançados
-    // em cadastro-atas.html, mesmo que o ID não tenha mudado.
-    if(!oldId) payload.alunos = [];
+    if(!oldId){
+      // Criação: schema escolhido + origem manual + array de alunos vazio.
+      payload.schemaId = schemaSnapshot.id || schemaId || "";
+      payload.schemaSnapshot = schemaSnapshot;
+      payload.origemArquivo = "MANUAL";
+      payload.aba = "MANUAL";
+      payload.alunos = [];
+    } else if(docOriginal){
+      // Edição: schema, origem e aba ficam EXATAMENTE como no documento original
+      // (nada de renormalizar nem de regravar "MANUAL" por cima de turma importada).
+      // Copia só o que existe — Firestore rejeita undefined. Se o ID mudou, o doc
+      // novo nasce com o schema do original em vez de ficar sem snapshot.
+      // NÃO manda `alunos`: save() é merge:true, então omitir preserva os alunos
+      // já lançados em cadastro-atas.html quando o ID não muda.
+      ["schemaId", "schemaSnapshot", "origemArquivo", "aba"].forEach(k => {
+        if(docOriginal[k] !== undefined) payload[k] = docOriginal[k];
+      });
+    }
 
     setMsg('Salvando…', 'loading');
     try{
@@ -883,16 +939,31 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       return;
     }
 
-    // Atualiza a lista local (sem isso, o item recém-salvo não aparece na
-    // lista à direita nem no preview de próximo ID). Se essa releitura falhar,
-    // a turma FOI salva — o toast final precisa dizer isso, não "erro ao salvar".
+    // EDIÇÃO: hard refresh. A página fica estática depois de salvar, então
+    // recarrega do zero; a confirmação é guardada e exibida após o reload.
+    if(ehEdicao){
+      const idMudou = oldId !== turmaId;
+      guardarMsgPosReload(
+        idMudou
+          ? `Turma salva. O ID mudou de ${oldId} para ${turmaId} — os alunos já lançados continuam no ID antigo.`
+          : "Turma salva!",
+        idMudou ? "warn" : "ok"
+      );
+      window.location.reload();
+      return;
+    }
+
+    // CRIAÇÃO: sem reload — atualiza a lista local (sem isso, o item recém-salvo
+    // não aparece na lista à direita nem no preview de próximo ID) e reseta o
+    // formulário. Se essa releitura falhar, a turma FOI salva — o toast final
+    // precisa dizer isso, não "erro ao salvar".
     const okReload = await carregarTurmasCache();
     buildFiltroAnoOptions();
     updateDbInfo();
     if(!okReload){
       setMsg("Turma salva, mas não foi possível atualizar a lista — recarregue a página.", "err");
     } else {
-      setMsg(oldId && oldId !== turmaId ? "Turma salva (o ID mudou — confira o aviso acima antes de lançar aluno)." : "Turma salva!", "ok");
+      setMsg("Turma salva!", "ok");
     }
     resetForm();
   }
@@ -944,8 +1015,10 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       updateDbInfo();
       // Erro de leitura ≠ "schema padrão não existe" — antes os dois casos
       // caíam na mesma mensagem (falha silenciosa também zerava SCHEMAS_CACHE).
+      const msgPosReload = lerMsgPosReload(); // confirmação de uma edição que acabou de recarregar a página
       if(!okTurmas) setMsg("Não foi possível carregar as turmas cadastradas — recarregue a página.", "err");
       else if(!okSchemas) setMsg("Não foi possível carregar os schemas — recarregue a página.", "err");
+      else if(msgPosReload) setMsg(msgPosReload.text, msgPosReload.kind || "ok");
       else if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err");
     } catch(e) {
       // Não havia catch-all até aqui: uma exceção no boot travava a página
