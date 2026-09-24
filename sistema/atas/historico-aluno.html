@@ -1110,28 +1110,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }catch(e){ console.warn('historico-aluno: Firestore pré-carga:', e); }
 
-  construirIndex();
+  // A partir daqui, qualquer erro (ex.: construirIndex() quebrando por dado
+  // inesperado) não pode deixar a tela de loading presa pra sempre — por
+  // isso o finally com Loading.esconder(), mesmo padrão já usado no boot
+  // de cadastro-turmas.html.
+  try{
+    construirIndex();
 
-  // Enter no input dispara busca
-  $("q").addEventListener("keydown", (ev)=>{
-    if (ev.key === "Enter"){ ev.preventDefault(); buscar(); }
-  });
-
-  // Dropdown "Exportar ▾" (PDF / CSV) do painel de detalhes do aluno
-  (function(){
-    const btn  = $("btnExportarSel");
-    const drop = $("dropExportHistorico");
-    btn.addEventListener("click", (e)=>{
-      e.stopPropagation();
-      drop.style.display = (drop.style.display === "flex") ? "none" : "flex";
+    // Enter no input dispara busca
+    $("q").addEventListener("keydown", (ev)=>{
+      if (ev.key === "Enter"){ ev.preventDefault(); buscar(); }
     });
-    document.addEventListener("click", ()=>{ drop.style.display = "none"; });
-    drop.addEventListener("click", (e)=> e.stopPropagation());
-    $("btnExportarPdfSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoPDF(); });
-    $("btnExportarCsvSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoCSV(); });
-  })();
 
-  Loading.esconder(); // ← linha adicionada
+    // Dropdown "Exportar ▾" (PDF / CSV) do painel de detalhes do aluno
+    (function(){
+      const btn  = $("btnExportarSel");
+      const drop = $("dropExportHistorico");
+      btn.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        drop.style.display = (drop.style.display === "flex") ? "none" : "flex";
+      });
+      document.addEventListener("click", ()=>{ drop.style.display = "none"; });
+      drop.addEventListener("click", (e)=> e.stopPropagation());
+      $("btnExportarPdfSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoPDF(); });
+      $("btnExportarCsvSel").addEventListener("click", ()=>{ drop.style.display = "none"; exportarHistoricoSelecionadoCSV(); });
+    })();
+  }catch(e){
+    console.error('historico-aluno: erro ao inicializar a página', e);
+    setMsg('Erro ao carregar a página. Recarregue e tente de novo.', 'err');
+  }finally{
+    // Sempre esconde a tela de loading, mesmo se o boot falhar.
+    Loading.esconder();
+  }
 });
 </script>
 
