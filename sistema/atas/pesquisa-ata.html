@@ -1034,21 +1034,51 @@ function _desenharCabecalhoEscolaAta(doc, escola, titulo, pageWidth){
   return y;
 }
 
-// Largura fixa por coluna, em vez de deixar todas iguais: Nº e notas são
-// curtos por natureza (no máx. "10,0" ou "99"), Nome precisa de espaço de
-// verdade, e uma coluna do tipo "texto" (schema) pode ter valores mais
-// longos que uma nota comum. Quando o conteúdo não cabe, quebra dentro da
-// própria célula (overflow:'linebreak') em vez de esticar a tabela.
-function _montarColumnStylesAta(schema, colAtivas){
+// Largura de coluna: Nº fixo e estreito (aprovado como está). Nome é
+// FLEXÍVEL — absorve o que sobrar depois de todas as outras colunas, pra a
+// tabela sempre bater exatamente com as margens da linha azul do cabeçalho,
+// em vez de sobrar espaço em branco à direita. Série e Resultado são
+// calculados pelo texto real (cabeçalho/valores), então cada um usa só o
+// espaço que precisa. Colunas de matéria: largura AINDA fixa em 44pt — não
+// mexida agora de propósito, aguardando avaliação com o ID (key) no lugar
+// do nome completo (label) antes de decidir se precisa encolher mais.
+function _montarColumnStylesAta(doc, schema, colAtivas, alunos, larguraDisponivel){
   const styles = {};
+  const larguras = [];
   let i = 0;
-  styles[i++] = { cellWidth: 26,  halign: "center" }; // Nº
-  styles[i++] = { cellWidth: 150, halign: "left"   }; // Nome
-  if (schema.serieAtiva) styles[i++] = { cellWidth: 55, halign: "center" }; // Série
-  for (const c of colAtivas) {
-    styles[i++] = { cellWidth: c.type === "texto" ? 80 : 44, halign: "center" };
+
+  styles[i] = { cellWidth: 26, halign: "center" }; larguras.push(26); i++; // Nº
+
+  const nomeIdx = i; i++; // preenchido por último, com o espaço restante
+
+  if (schema.serieAtiva) {
+    doc.setFont(undefined, "bold"); doc.setFontSize(9);
+    let maxTxt = doc.getTextWidth("Série");
+    doc.setFont(undefined, "normal");
+    for (const a of alunos) maxTxt = Math.max(maxTxt, doc.getTextWidth(String(a.serie ?? "")));
+    const w = Math.ceil(maxTxt) + 12; // ~6pt de cada lado
+    styles[i] = { cellWidth: w, halign: "center" }; larguras.push(w); i++;
   }
-  if (schema.resultadoAtivo) styles[i++] = { cellWidth: 75, halign: "center" }; // Resultado
+
+  for (const c of colAtivas) {
+    const w = c.type === "texto" ? 80 : 44; // inalterado — ver comentário acima
+    styles[i] = { cellWidth: w, halign: "center" }; larguras.push(w); i++;
+  }
+
+  if (schema.resultadoAtivo) {
+    doc.setFont(undefined, "bold"); doc.setFontSize(9);
+    const textW = doc.getTextWidth("Resultado");
+    doc.setFont(undefined, "normal");
+    const pad = 2; // exatamente os ~2pt de cada lado pedidos
+    const w = Math.ceil(textW) + pad * 2;
+    styles[i] = { cellWidth: w, halign: "center", cellPadding: { top:4, bottom:4, left:pad, right:pad } };
+    larguras.push(w); i++;
+  }
+
+  const somaOutras = larguras.reduce((a,b) => a+b, 0);
+  const MIN_NOME = 90; // piso pra schemas com muitas colunas não espremerem o nome a zero
+  styles[nomeIdx] = { cellWidth: Math.max(MIN_NOME, larguraDisponivel - somaOutras), halign: "left" };
+
   return styles;
 }
 
@@ -1080,7 +1110,9 @@ async function _exportarPDFDaTurmaInterno() {
 
   const headPdf = ["Nº","Nome"];
   if (schemaPdf.serieAtiva) headPdf.push("Série");
-  colAtivasPdf.forEach(c => headPdf.push(c.label));
+  // ID da matéria (key), não o nome completo (label) — mesmo motivo da
+  // tabela em tela: o label estourava a largura da coluna.
+  colAtivasPdf.forEach(c => headPdf.push(c.key));
   if (schemaPdf.resultadoAtivo) headPdf.push("Resultado");
 
   doc.autoTable({
@@ -1089,7 +1121,7 @@ async function _exportarPDFDaTurmaInterno() {
     headStyles: { fillColor: [11,63,191], textColor: 255, fontStyle: "bold", fontSize: 9, halign: "center" },
     alternateRowStyles: { fillColor: [243,246,255] },
     bodyStyles: { textColor: [30,30,50] },
-    columnStyles: _montarColumnStylesAta(schemaPdf, colAtivasPdf),
+    columnStyles: _montarColumnStylesAta(doc, schemaPdf, colAtivasPdf, alunos, pageWidth - 28 - 28),
     margin: { left: 28, right: 28 },
     head: [headPdf],
     body: alunos.map((a,i)=>{
