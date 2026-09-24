@@ -129,6 +129,38 @@ html[data-theme="dark"] button.btn-primary:hover {
 html[data-theme="dark"] .btn-serie { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
 .btn-serie:hover { background: var(--brand-faded, #f5f3ff); }
 
+/* ── Card de destaque na cor do usuário (mesmo mecanismo de gestão-atas /
+   pesquisa-ata.html) — aplicado no card "Buscar aluno", equivalente ao
+   card "Filtros" de pesquisa-ata.html ── */
+.card.card-destaque {
+  background: var(--btn-home-bg);
+  border-color: var(--btn-home-border);
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,0.16);
+  --dest-btn-bd: rgba(255,255,255,0.55);
+  --dest-btn-hover: rgba(255,255,255,0.26);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #1e293b;
+  --dest-btn-bg: rgba(15,23,42,0.08);
+  --dest-btn-bd: rgba(15,23,42,0.35);
+  --dest-btn-hover: rgba(15,23,42,0.14);
+}
+.card-destaque h2 { color: var(--dest-fg); }
+.card-destaque .muted { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+.card-destaque label { color: var(--dest-fg); }
+.card-destaque .btn {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+}
+.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+/* Mesma especificidade de "html[data-theme='dark'] .btn.btn-primary" (acima) —
+   sem isto, o botão "Pesquisar" volta pra cor de marca padrão no tema escuro,
+   ilegível sobre o card já colorido. Mesmo bug (e mesmo fix, por ordem no
+   arquivo) já corrigido em pesquisa-ata.html. */
+html[data-theme="dark"] .card-destaque .btn { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+
 /* ===== Card ===== */
 .card{
   background:var(--card);
@@ -246,7 +278,7 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
 <div id="header-placeholder"></div>
 
 <div class="container">
-<div class="card">
+<div class="card card-destaque">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
       <h2 style="margin:0;">Buscar aluno</h2>
       <a class="btn" href="pesquisa-ata.html">🔎 Pesquisar por turma</a>
@@ -428,6 +460,23 @@ const DB = (() => {
   return { key, read, write, getActiveSchoolId };
 })();
 
+
+// Card de destaque: decide texto claro/escuro pela luminância real da cor
+// escolhida em perfil.html (mesmo cálculo usado em gestão-atas e
+// pesquisa-ata.html), e reajusta sozinho quando a pessoa troca de cor sem
+// recarregar a página.
+function ajustarContrasteDestaque(){
+  const el = document.querySelector('.card-destaque');
+  if(!el) return;
+  const bg = getComputedStyle(el).backgroundColor;
+  const m = bg.match(/\d+(\.\d+)?/g);
+  if(!m || m.length < 3) return;
+  const [r,g,b] = m.map(Number);
+  const lin = (c) => { c/=255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+  const luminancia = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+  el.classList.toggle('contraste-claro', luminancia > 0.5);
+}
+document.addEventListener('colorchange', ajustarContrasteDestaque);
 
 function normNome(s){
   return String(s || "")
@@ -1116,6 +1165,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // de cadastro-turmas.html.
   try{
     construirIndex();
+    ajustarContrasteDestaque();
 
     // Enter no input dispara busca
     $("q").addEventListener("keydown", (ev)=>{
