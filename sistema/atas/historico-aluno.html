@@ -154,12 +154,31 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
   background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
 }
 .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
-/* Mesma especificidade de "html[data-theme='dark'] .btn.btn-primary" (acima) —
-   sem isto, o botão "Pesquisar" volta pra cor de marca padrão no tema escuro,
-   ilegível sobre o card já colorido. Mesmo bug (e mesmo fix, por ordem no
-   arquivo) já corrigido em pesquisa-ata.html. */
+/* O sistema reforça .btn-primary com o seletor "button.btn.btn-primary"
+   (tipo + 2 classes) especificamente pra não ser sobrescrito pelo .btn
+   base — isso também vence ".card-destaque .btn" (só 2 classes, sem tipo).
+   Por isso aqui entro com o MESMO reforço de tipo, mais a classe extra do
+   card, ficando estritamente mais específico (não dependo de ordem no
+   arquivo). Mesmo bug (botão "Pesquisar" ficando com a cor de marca padrão,
+   ilegível sobre o card colorido) já visto e corrigido em pesquisa-ata.html. */
+.card-destaque .btn.btn-primary,
+.card-destaque button.btn.btn-primary {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+}
+.card-destaque .btn.btn-primary:hover:not(:disabled),
+.card-destaque button.btn.btn-primary:hover:not(:disabled) {
+  background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
+}
 html[data-theme="dark"] .card-destaque .btn { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
 html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+html[data-theme="dark"] .card-destaque .btn.btn-primary,
+html[data-theme="dark"] .card-destaque button.btn.btn-primary {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+}
+html[data-theme="dark"] .card-destaque .btn.btn-primary:hover:not(:disabled),
+html[data-theme="dark"] .card-destaque button.btn.btn-primary:hover:not(:disabled) {
+  background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
+}
 
 /* ===== Card ===== */
 .card{
@@ -213,7 +232,7 @@ th.th-nota, td.col-nota{ width:42px; font-size:11px; }
 .hidden{ display:none !important; }
 
 /* ===== Complementos específicos: Histórico por Aluno ===== */
-.split{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; align-items:start;}
+.split{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; align-items:stretch;}
 @media (max-width: 980px){ .split{grid-template-columns:1fr;} }
 
 .muted{color:var(--muted); font-size:13px;}
@@ -304,7 +323,7 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
       </div>
       <div id="lista" class="list" style="margin-top:10px;">
         <div style="padding:12px;" class="hint">
-          Dica: a pesquisa procura nos nomes salvos dentro de cada turma do <b>turmasDB</b>.
+          Digite um nome ou ID de aluno e clique em <b>Pesquisar</b>.
         </div>
       </div>
     </div>
@@ -1085,7 +1104,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     try{ _escolaCache = (await window.DB.escola.get()) || {}; }
     catch(e){ console.warn('historico-aluno: falha ao carregar dados da escola', e); _escolaCache = {}; }
 
-    $("dbInfo").textContent = `Escola: ${DB.getActiveSchoolId()} • busca em tempo real, sem cache local`;
+    const nomeEscola = (_escolaCache.displayName || _escolaCache.name || _escolaCache.nome || DB.getActiveSchoolId()).toString().trim();
+    $("dbInfo").textContent = `Escola: ${nomeEscola} • busca em tempo real, sem cache local`;
 
     ajustarContrasteDestaque();
 
