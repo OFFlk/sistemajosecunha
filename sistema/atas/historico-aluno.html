@@ -286,13 +286,9 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
     <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin-top:10px;">
       <div style="flex:1; min-width:200px;">
         <label>Nome do aluno</label>
-        <input id="q" placeholder='Ex: "José da Silva" ou apenas "jose"' />
+        <input id="q" placeholder='Nome (começo) ou ID do aluno (ex: ALU-000123)' />
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding-bottom:2px;">
-        <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:13px; white-space:nowrap;">
-          <input type="checkbox" id="parcial" checked />
-          Buscar por parte do nome
-        </label>
         <button class="btn btn-primary" type="button" onclick="buscar()">Pesquisar</button>
         <button class="btn btn-gray" type="button" onclick="limpar()">Limpar</button>
       </div>
@@ -405,59 +401,30 @@ function setMsg(text, kind){
 }
 
 /* =========================
-   DB por escola (Namespacing)
+   Escola ativa (sem cache de dados — só a sessão em si)
 ========================= */
 const DB = (() => {
-  function readJSON(key, fallback){
-    try{
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    }catch{ return fallback; }
-  }
-  function writeJSON(key, value){
-    localStorage.setItem(key, JSON.stringify(value));
-  }
   function getSession(){
     try{
       if (window.Auth && typeof window.Auth.getSession === "function"){
         return window.Auth.getSession();
       }
     }catch{}
-    return readJSON("auth_session_v2", null);
+    return null;
   }
   function getActiveSchoolId(){
     const sess = getSession() || {};
     const sid = String(sess.schoolId || "").trim() || "SEM_ESCOLA";
     if (sid === "ADMIN"){
+      // admin_active_school_v1 é preferência de UI do header (qual escola o
+      // admin está "olhando"), não dado do módulo de atas — não é cache
+      // de dados do Firestore, então não conflita com "sem localStorage".
       const active = String(localStorage.getItem("admin_active_school_v1") || "").trim();
       return active || "ADMIN";
     }
     return sid;
   }
-  function key(base){
-    return `schools:${getActiveSchoolId()}:${base}`;
-  }
-  function migrateIfNeeded(base, fallback){
-    const scopedKey = key(base);
-    if (localStorage.getItem(scopedKey) == null){
-      const legacy = localStorage.getItem(base);
-      if (legacy != null){
-        localStorage.setItem(scopedKey, legacy);
-      } else if (fallback !== undefined){
-        writeJSON(scopedKey, fallback);
-      }
-    }
-    return scopedKey;
-  }
-  function read(base, fallback){
-    const k = migrateIfNeeded(base, fallback);
-    return readJSON(k, fallback);
-  }
-  function write(base, value){
-    const k = key(base);
-    writeJSON(k, value);
-  }
-  return { key, read, write, getActiveSchoolId };
+  return { getActiveSchoolId };
 })();
 
 
@@ -495,22 +462,10 @@ function escapeHtml(s){
     .replaceAll("'","&#039;");
 }
 
-function lerTurmasDB(){
-  return DB.read("turmasDB", []);
-}
-
-function lerAlunosDB(){
-  return DB.read("alunosDB", []);
-}
-
-function lerAliasesDB(){
-  // aceita objeto { aliasKey: alunoId } ou lista legado
-  return DB.read("alunosAliasesDB", {});
-}
-
-function carregarEscola(){
-  return DB.read("dadosEscola", {});
-}
+// Dados da escola (nome/endereço/escudo p/ cabeçalho do PDF) — carregados
+// uma única vez no boot (1 leitura pontual, não é coleção) e guardados
+// só em memória (variável do módulo), nunca em localStorage.
+let _escolaCache = {};
 
 function formatarListaBonita(arr){
   if (!arr || arr.length === 0) return "";
@@ -537,11 +492,6 @@ function tituloTurma(t){
   return { base, extras };
 }
 
-/* =========================
-   Índice de alunos
-========================= */
-let INDEX = [];
-let SELECTED_KEY = "";
 
 
 const RESULT_META = {
@@ -572,130 +522,88 @@ function renderAusencia(de, ate){
 
 
 
-function construirIndex(){
-  const turmas = lerTurmasDB();
-  // Usa Identidade.lerTodos() — enxerga alunos de AMBOS os módulos (atas + ano-ativo)
-  // Fallback para lerAlunosDB() se o módulo não estiver carregado ainda
-  const alunosDB = window.Identidade ? window.Identidade.lerTodos() : lerAlunosDB();
+/* =========================
+   Busca pontual (sem índice local)
+========================= */
+let _alunoSelecionado = null; // aluno atualmente aberto no painel de detalhes
 
-  // aliasMap: normNome(nomeOficial) -> alunoId
-  // Construído direto do catálogo unificado — sem depender do alunosAliasesDB
-  const aliasMap = new Map();
-  (alunosDB || []).forEach(r => {
-    const id   = String(r?.alunoId || r?.id || "").trim();
-    const nome = String(r?.nomeOficial || r?.nome || "").trim();
-    if (id && nome) aliasMap.set(normNome(nome), id);
-  });
+// Turmas podem ter um campo "id"/"turmaId" embutido no documento que nem
+// sempre é igual ao _id real do Firestore (convenção legada já vista em
+// gestão-atas.html: t.id || t.turmaId || t._id). Por isso, se a leitura
+// direta pelo _id não achar nada, cai pra uma query filtrada (ainda
+// pontual, não escaneia a coleção) pelos campos legados.
+async function _buscarTurmaPorId(turmaId){
+  const id = String(turmaId || "").trim();
+  if (!id) return null;
+  try{
+    const porDocId = await window.DB.turmas.get(id);
+    if (porDocId) return { ...porDocId, id: porDocId.id || porDocId._id };
+  }catch(e){ console.warn('historico-aluno: turmas.get falhou', e); }
+  try{
+    let res = await window.DB.turmas.whereEquals('id', id, { limit: 1 });
+    if (!res || !res.length) res = await window.DB.turmas.whereEquals('turmaId', id, { limit: 1 });
+    if (res && res[0]) return { ...res[0], id: res[0].id || res[0]._id };
+  }catch(e){ console.warn('historico-aluno: turmas.whereEquals falhou', e); }
+  return null;
+}
 
-  // 2) nomeOficial por alunoId (do catálogo)
-  const nomeOficial = new Map();
-  (alunosDB || []).forEach(r => {
-    const id = String(r?.alunoId || r?.id || "").trim();
-    const nome = String(r?.nomeOficial || r?.nome || "").trim();
-    if (id && nome && !nomeOficial.has(id)) nomeOficial.set(id, nome);
-  });
+// Monta o mesmo formato de "aluno" que o resto do arquivo (render, PDF,
+// CSV) já espera — só que buscando ao vivo, pontual, em vez de escanear
+// turmasDB inteiro. Custo por busca: 1 query em matriculas (filtrada por
+// alunoId) + 1 leitura por turma que esse aluno específico cursou.
+async function montarAlunoComOcorrencias(candidato){
+  const alunoId = String(candidato.alunoId || "").trim();
+  const display = candidato.nome || alunoId;
+  const nomeKey = normNome(display);
 
-  // 3) cria entradas base a partir do catálogo unificado
-  const map = new Map(); // groupKey -> item
-  (alunosDB || []).forEach(r => {
-    const alunoId = String(r?.id || r?.alunoId || "").trim();
-    if (!alunoId) return;
-    const display = String(r?.nomeOficial || r?.nome || "").trim() || alunoId;
-    const nomeKey = normNome(display);
-    const groupKey = `ID:${alunoId}`;
-    map.set(groupKey, {
-      key: groupKey,
-      alunoId,
-      nomeKey,
-      nomes: new Set([display]),
-      display,
-      ocorrencias: []
-    });
-  });
+  const matriculas = await window.DB.matriculas.whereEquals('alunoId', alunoId);
+  const turmaIds = Array.from(new Set(
+    (matriculas || []).map(m => String(m?.turmaId || "").trim()).filter(Boolean)
+  ));
 
-  // helper para garantir uma entrada (ID ou nome)
-  function ensureEntry({ alunoId, nomeRaw }){
-    const id = String(alunoId || "").trim();
-    const nome = String(nomeRaw || "").trim();
-    const nomeKey = normNome(nome);
-    const groupKey = id ? `ID:${id}` : `NM:${nomeKey}`;
-    if (!map.has(groupKey)){
-      const display = id ? (nomeOficial.get(id) || nome || id) : (nome || "(sem nome)");
-      map.set(groupKey, {
-        key: groupKey,
-        alunoId: id,
-        nomeKey: id ? normNome(nomeOficial.get(id) || nome || id) : nomeKey,
-        nomes: new Set(nome ? [nome] : []),
-        display,
-        ocorrencias: []
-      });
-    } else if (nome){
-      map.get(groupKey).nomes.add(nome);
-      // mantém display mais completo quando não há nome oficial
-      const it = map.get(groupKey);
-      if (!it.alunoId && nome.length > String(it.display||"").length) it.display = nome;
-    }
-    return map.get(groupKey);
-  }
+  const turmas = (await Promise.all(turmaIds.map(_buscarTurmaPorId))).filter(Boolean);
 
-  // 4) indexa ocorrências varrendo turmasDB (onde estão as notas)
-  for (const t of (turmas || [])){
+  const ocorrencias = [];
+  for (const t of turmas){
     const ano = extrairAno(t);
     const turno = String(t?.turno || "").trim();
     const serieTurma = String(t?.serieTexto || "").trim() || (Array.isArray(t?.seriesTurma) ? formatarListaBonita(t.seriesTurma) : "");
     const alunos = Array.isArray(t?.alunos) ? t.alunos : [];
 
-    for (const a of alunos){
-      const nomeRaw = String(a?.nome || "").trim();
-      if (!nomeRaw) continue;
+    // mesmo fallback de 3 níveis usado na exportação: alunoId exato →
+    // nome normalizado exato → nome normalizado "contém" (nomes legados
+    // inconsistentes, sem alunoId gravado na linha da turma).
+    const alvo = alunos.find(a => String(a?.alunoId||"").trim() === alunoId)
+      || alunos.find(a => normNome(a?.nome) === nomeKey)
+      || alunos.find(a => normNome(a?.nome).includes(nomeKey))
+      || null;
+    if (!alvo) continue; // matrícula aponta pra essa turma, mas a linha não foi encontrada
 
-      const nomeKey = normNome(nomeRaw);
-      const alunoId = String(a?.alunoId || aliasMap.get(nomeKey) || "").trim();
-
-      const it = ensureEntry({ alunoId, nomeRaw });
-
-      it.ocorrencias.push({
-        turmaId: t.id,
-        ano: ano || "",
-        turno: turno || "",
-        serie: String(a?.serie || "").trim() || serieTurma || "",
-        resultado: String(a?.resultado || "Não informado"),
-        nomeRaw,
-        nomeKey,
-        alunoId: alunoId || it.alunoId || "",
-        turma: t
-      });
-    }
+    const nomeRaw = String(alvo?.nome || "").trim();
+    ocorrencias.push({
+      turmaId: t.id,
+      ano: ano || "",
+      turno: turno || "",
+      serie: String(alvo?.serie || "").trim() || serieTurma || "",
+      resultado: String(alvo?.resultado || "Não informado"),
+      nomeRaw,
+      nomeKey: normNome(nomeRaw),
+      alunoId,
+      turma: t
+    });
   }
 
-  // 5) materializa e calcula min/max anos (p/ timeline)
-  INDEX = Array.from(map.values())
-    .map(it => {
-      const anosNum = (it.ocorrencias || [])
-        .map(o => parseInt(String(o.ano||"0"),10))
-        .filter(n => !isNaN(n) && n > 0);
-      const minAno = anosNum.length ? Math.min(...anosNum) : null;
-      const maxAno = anosNum.length ? Math.max(...anosNum) : null;
-      return { ...it, minAno, maxAno, qtd: (it.ocorrencias||[]).length };
-    })
-    // Esta página é do módulo de ATAS: só entram alunos com pelo menos
-    // uma ocorrência em turmasDB. Alunos que existem só no catálogo
-    // unificado (ex.: só no Ano Ativo, nunca lançados em ata) ficam de fora.
-    .filter(it => it.qtd > 0);
-
-  INDEX.sort((a,b)=> String(a.display).localeCompare(String(b.display),'pt-BR'));
-
-  // meta no topo
-  $("dbInfo").textContent =
-    `Sistema: turmasDB=${(turmas||[]).length} • alunos (unificados)=${(alunosDB||[]).length} • escola=${DB.getActiveSchoolId()} • alunos indexados=${INDEX.length}`;
-
-  // dica inicial
-  if (!INDEX.length){
-    $("lista").innerHTML = `<div style="padding:12px;" class="hint">
-      Nenhum aluno encontrado nos bancos locais (<b>alunosDB</b>/<b>turmasDB</b>) neste domínio.<br/>
-      Dica: abra pelo <b>mesmo localhost</b> onde você importou os dados.
-    </div>`;
-  }
+  const anosNum = ocorrencias.map(o => parseInt(String(o.ano||"0"),10)).filter(n => !isNaN(n) && n>0);
+  return {
+    key: `ID:${alunoId}`,
+    alunoId,
+    nomeKey,
+    display,
+    ocorrencias,
+    minAno: anosNum.length ? Math.min(...anosNum) : null,
+    maxAno: anosNum.length ? Math.max(...anosNum) : null,
+    qtd: ocorrencias.length
+  };
 }
 
 
@@ -703,76 +611,100 @@ function limpar(){
   $("q").value = "";
   $("lista").innerHTML = `<div style="padding:12px;" class="hint">Digite um nome e clique em <b>Pesquisar</b>.</div>`;
   $("count").textContent = "";
-  SELECTED_KEY = "";
+  _alunoSelecionado = null;
   $("detalhes").innerHTML = `<span class="muted">Selecione um aluno na lista para ver o histórico.</span>`;
   $("btnExportarSel").disabled = true;
 }
 
-function buscar(){
+// Regex bem permissiva pro padrão de alunoId usado no sistema (ex.: ALU-000123)
+const _RE_ALUNO_ID = /^ALU-?\d+$/i;
+
+async function buscar(){
   const termoRaw = $("q").value;
-  const termo = normNome(termoRaw);
-  const parcial = $("parcial").checked;
+  const termo = termoRaw.trim();
 
   if (!termo){
     setMsg("Digite o nome ou ID do aluno.", "warn");
     return;
   }
 
-  function alunoMatches(a){
-    const toks = [];
-    toks.push(normNome(a.display || ""));
-    toks.push(String(a.alunoId || "").trim().toLowerCase());
-    toks.push(String(a.nomeKey || "").trim());
+  $("lista").innerHTML = `<div style="padding:12px;" class="hint">Buscando…</div>`;
+  $("count").textContent = "";
 
-    // inclui variações de nome encontradas nas turmas
-    if (a.nomes && typeof a.nomes.forEach === "function"){
-      try { a.nomes.forEach(n => toks.push(normNome(n))); } catch {}
+  let candidatos = [];
+  try{
+    if (_RE_ALUNO_ID.test(termo)){
+      const um = await window.Identidade.buscarAtasPorId(termo);
+      candidatos = um ? [um] : [];
+    } else {
+      candidatos = await window.Identidade.buscarAtasPorNome(termo);
     }
-
-    // remove vazios
-    const clean = toks.filter(Boolean);
-
-    if (parcial){
-      return clean.some(t => t.includes(termo));
-    }
-    // exato: bate pelo nome normalizado OU pelo ID
-    return clean.some(t => t === termo) || String(a.alunoId||"").trim().toLowerCase() === termo;
-  }
-
-  const res = INDEX.filter(alunoMatches);
-
-  $("count").textContent = `${res.length} resultado(s)`;
-
-  if (!res.length){
-    $("lista").innerHTML = `<div style="padding:12px;" class="hint">Nenhum aluno encontrado para <b>${escapeHtml(termoRaw)}</b>.</div>`;
+  }catch(e){
+    console.error('historico-aluno: falha na busca', e);
+    $("lista").innerHTML = `<div style="padding:12px;" class="hint">Erro ao buscar. Tente de novo.</div>`;
+    setMsg("Erro ao buscar aluno.", "err");
     return;
   }
 
-  $("lista").innerHTML = res.map(a => {
-    const faixa = (a.minAno && a.maxAno) ? `${a.minAno}–${a.maxAno}` : "—";
+  $("count").textContent = `${candidatos.length} resultado(s)`;
+
+  if (!candidatos.length){
+    $("lista").innerHTML = `<div style="padding:12px;" class="hint">Nenhum aluno encontrado para <b>${escapeHtml(termoRaw)}</b>.<br/>
+      A busca por nome procura só pelo <b>começo</b> do nome (ex.: "maria" acha "Maria Silva", mas não acha por "silva" sozinho).</div>`;
+    return;
+  }
+
+  $("lista").innerHTML = candidatos.map(a => {
     const idBadge = a.alunoId ? `<span class="pill">${escapeHtml(a.alunoId)}</span>` : ``;
     return `
-      <div class="item" onclick="selecionarAluno('${a.key}')">
+      <div class="item" onclick="selecionarAluno('${escapeHtml(a.alunoId)}')">
         <div>
-          <div class="title">${escapeHtml(a.display)} ${idBadge} <span class="pill">${faixa}</span> <span class="pill">${a.qtd} registro(s)</span></div>
+          <div class="title">${escapeHtml(a.nome)} ${idBadge}</div>
           <div class="sub">Clique para abrir o histórico</div>
         </div>
         <div class="right">
-          <button class="btn btn-gray" type="button" onclick="event.stopPropagation(); selecionarAluno('${a.key}')">Abrir</button>
+          <button class="btn btn-gray" type="button" onclick="event.stopPropagation(); selecionarAluno('${escapeHtml(a.alunoId)}')">Abrir</button>
         </div>
       </div>
     `;
   }).join("");
+
+  // guarda os candidatos crus (nome/alunoId) pra montar o histórico só
+  // quando o aluno for de fato selecionado — evita ler matriculas/turmas
+  // de todo mundo que aparece na lista.
+  window._candidatosBusca = new Map(candidatos.map(a => [a.alunoId, a]));
 }
 
 
 
-function selecionarAluno(key){
-  const aluno = INDEX.find(a => a.key === key);
-  if (!aluno) return;
 
-  SELECTED_KEY = key;
+async function selecionarAluno(alunoId){
+  const candidato = (window._candidatosBusca && window._candidatosBusca.get(alunoId))
+    || { alunoId, nome: alunoId };
+
+  $("detalhes").innerHTML = `<span class="muted">Carregando histórico…</span>`;
+  $("btnExportarSel").disabled = true;
+
+  let aluno;
+  try{
+    aluno = await montarAlunoComOcorrencias(candidato);
+  }catch(e){
+    console.error('historico-aluno: falha ao montar histórico do aluno', e);
+    $("detalhes").innerHTML = `<span class="muted">Erro ao carregar o histórico. Tente de novo.</span>`;
+    setMsg("Erro ao carregar histórico do aluno.", "err");
+    return;
+  }
+
+  _alunoSelecionado = aluno;
   $("btnExportarSel").disabled = false;
+
+  if (!aluno.ocorrencias.length){
+    $("detalhes").innerHTML = `
+      <div style="font-size:18px; font-weight:900;">${escapeHtml(aluno.display)}</div>
+      <div class="muted" style="margin-top:8px;">Nenhuma ocorrência em turmas de ata encontrada pra esse aluno.</div>
+    `;
+    return;
+  }
 
   // ordena ocorrências por ano
   const occ = aluno.ocorrencias.slice().sort((x,y)=>{
@@ -844,7 +776,7 @@ function selecionarAluno(key){
               </div>
               <div class="tright">
                 <button class="btn btn-gray" type="button" onclick="abrirTurmaTabela('${escapeHtml(t.id)}')">Ver turma</button>
-                <button class="btn btn-primary" type="button" onclick="exportarOcorrencia('${escapeHtml(t.id)}','${escapeHtml(aluno.key)}')">Exportar ano</button>
+                <button class="btn btn-primary" type="button" onclick="exportarOcorrencia('${escapeHtml(t.id)}','${escapeHtml(aluno.alunoId)}')">Exportar ano</button>
               </div>
             </div>
           `;
@@ -876,22 +808,18 @@ function exportarHistoricoSelecionado(){
 }
 
 function exportarHistoricoSelecionadoPDF(){
-  if (!SELECTED_KEY) { setMsg("Selecione um aluno antes de exportar.", "warn"); return; }
-  const aluno = INDEX.find(a => a.key === SELECTED_KEY);
-  if (!aluno) return;
-  exportarHistoricoAlunoPDF(aluno);
+  if (!_alunoSelecionado) { setMsg("Selecione um aluno antes de exportar.", "warn"); return; }
+  exportarHistoricoAlunoPDF(_alunoSelecionado);
 }
 
 function exportarHistoricoSelecionadoCSV(){
-  if (!SELECTED_KEY) { setMsg("Selecione um aluno antes de exportar.", "warn"); return; }
-  const aluno = INDEX.find(a => a.key === SELECTED_KEY);
-  if (!aluno) return;
-  exportarHistoricoCSV(aluno);
+  if (!_alunoSelecionado) { setMsg("Selecione um aluno antes de exportar.", "warn"); return; }
+  exportarHistoricoCSV(_alunoSelecionado);
 }
 
-function exportarOcorrencia(turmaId, alunoKey){
-  const aluno = INDEX.find(a => a.key === alunoKey);
-  if (!aluno) return;
+function exportarOcorrencia(turmaId, alunoId){
+  const aluno = _alunoSelecionado;
+  if (!aluno || aluno.alunoId !== alunoId) return;
 
   const occ = aluno.ocorrencias.filter(o => o.turmaId === turmaId);
   if (!occ.length) { setMsg("Ocorrência não encontrada.", "warn"); return; }
@@ -1102,7 +1030,7 @@ function exportarHistoricoAlunoPDF(aluno, somenteOcc=null){
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF("l","mm","a4");
-  const escola = carregarEscola();
+  const escola = _escolaCache;
 
   const startY = desenharCabecalhoHistoricoNovo(doc, escola, "ATA DE RESULTADOS FINAIS", `Histórico do aluno — ${aluno.display}`);
   const { head, body } = _construirHeadBodyHistorico(aluno, occ);
@@ -1141,30 +1069,24 @@ function exportarHistoricoCSV(aluno, somenteOcc=null){
    Boot
 ========================= */
 document.addEventListener("DOMContentLoaded", async () => {
-  // Pré-carrega dados do Firestore no localStorage antes de construir o índice
+  // Sem pré-carga: nada de ler coleções inteiras nem gravar em localStorage
+  // no boot. Busca e histórico são 100% sob demanda (ver buscar() e
+  // montarAlunoComOcorrencias()). Qualquer erro aqui não pode deixar a tela
+  // de loading presa pra sempre — por isso o finally com Loading.esconder(),
+  // mesmo padrão já usado no boot de cadastro-turmas.html.
   try{
     await new Promise(res=>{
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
       document.addEventListener('auth:ready', res, {once:true});
     });
-    const dados = await window.DB.loadAll();
-    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
-    if(sid){
-      const pre = (k)=>`schools:${sid}:${k}`;
-      if(dados.turmasDB)   localStorage.setItem(pre('turmasDB'),   JSON.stringify(dados.turmasDB));
-      if(dados.alunosDB)   localStorage.setItem(pre('alunosDB'),   JSON.stringify(dados.alunosDB));
-      if(dados.matriculas) localStorage.setItem(pre('alunosAliasesDB'), JSON.stringify(dados.matriculas));
-      if(dados.dadosEscola && Object.keys(dados.dadosEscola).length)
-        localStorage.setItem(pre('dadosEscola'), JSON.stringify(dados.dadosEscola));
-    }
-  }catch(e){ console.warn('historico-aluno: Firestore pré-carga:', e); }
 
-  // A partir daqui, qualquer erro (ex.: construirIndex() quebrando por dado
-  // inesperado) não pode deixar a tela de loading presa pra sempre — por
-  // isso o finally com Loading.esconder(), mesmo padrão já usado no boot
-  // de cadastro-turmas.html.
-  try{
-    construirIndex();
+    // Dados da escola (nome/endereço/escudo pro cabeçalho do PDF) — 1
+    // leitura pontual, feita uma vez, guardada só em memória.
+    try{ _escolaCache = (await window.DB.escola.get()) || {}; }
+    catch(e){ console.warn('historico-aluno: falha ao carregar dados da escola', e); _escolaCache = {}; }
+
+    $("dbInfo").textContent = `Escola: ${DB.getActiveSchoolId()} • busca em tempo real, sem cache local`;
+
     ajustarContrasteDestaque();
 
     // Enter no input dispara busca
