@@ -1732,7 +1732,49 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   });
 }
 
+/* Trava de salvamento com formulário de aluno "em andamento" (pendência 11).
+   Bloqueio direto — sem opção de confirmar/ignorar (diferente da trava de
+   "dados não salvos" ao trocar de turma). Cobre dois casos:
+   1) "Editar" tirou o aluno da tabela e ele ainda não voltou via "Atualizar"
+      (salvar assim faz o aluno sumir da turma);
+   2) algo digitado no formulário que nunca virou linha (esqueceu o "Adicionar").
+   Não conta a série: ela fica pré-selecionada de propósito (turma de série única). */
+function _formularioAlunoTemConteudo() {
+  if (_alunoEmEdicao) return true;
+
+  const schema = getSchemaAtivoParaTela();
+
+  const nomeEl = $("nome");
+  if (nomeEl && String(nomeEl.value || "").trim()) return true;
+
+  for (const c of getColunasAtivas(schema)) {
+    const el = document.getElementById(c.key);
+    if (el && String(el.value || "").trim()) return true;
+  }
+
+  if (schema.resultadoAtivo) {
+    const resEl = $("resultado");
+    if (resEl && resEl.value !== "Não informado") return true;
+  }
+
+  return false;
+}
+
 async function salvarNoBanco() {
+  // Trava do formulário em andamento: roda antes de qualquer outra coisa (inclusive
+  // do "Salvando…") e vale também pro "Salvar e continuar" do modal de troca de turma.
+  if (turmaAtual && _formularioAlunoTemConteudo()) {
+    if (_alunoEmEdicao) {
+      const nomeEd = String(_alunoEmEdicao.nome || "").trim();
+      _toastErro(`⚠️ ${nomeEd ? `"${nomeEd}"` : "Um aluno"} está em edição e fora da tabela. Clique em "Adicionar / Atualizar" antes de salvar.`);
+    } else {
+      _toastErro('⚠️ Há dados digitados no formulário que ainda não entraram na tabela. Clique em "Adicionar / Atualizar" (ou limpe os campos) antes de salvar.');
+    }
+    const nomeEl = $("nome");
+    if (nomeEl) nomeEl.focus();
+    return false;
+  }
+
   // Anti-duplo-clique: desabilita o botão durante o save
   const btnSalvar = document.querySelector('button[onclick="salvarNoBanco()"]');
   if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando…'; }
