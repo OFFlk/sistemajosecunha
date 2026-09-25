@@ -720,14 +720,14 @@ function renderListaTurmas(lista) {
     div.innerHTML = `
       <div class="left">
         <div>
-          <b>${titulo || "Turma"}</b>
+          <b>${_escHtml(titulo || "Turma")}</b>
         </div>
         <div class="badges-row">
-          <span class="badge">${anoTxt}</span>
-          <span class="badge badge-serie">${serieTxt || "?"}</span>
+          <span class="badge">${_escHtml(anoTxt)}</span>
+          <span class="badge badge-serie">${_escHtml(serieTxt || "?")}</span>
         </div>
         <div class="muted item-meta">
-          ${turnoTxt} · ${alunosTxt}
+          ${_escHtml(turnoTxt)} · ${_escHtml(alunosTxt)}
         </div>
       </div>
       <div class="right" onclick="event.stopPropagation()">
@@ -757,10 +757,10 @@ function selecionarTurma(id) {
     (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "?");
 
   document.getElementById("detalhesMeta").innerHTML =
-    `<b>${turmaSelecionada.aba || turmaSelecionada.nome || "Turma"}</b><br>` +
-    `ID: ${turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId || "?"}<br>` +
-    (turmaSelecionada.origemArquivo ? `Arquivo: ${turmaSelecionada.origemArquivo}<br>` : '') +
-    `Ano: <b>${turmaSelecionada.anoLetivo || "?"}</b> · Turno: <b>${turmaSelecionada.turno || "?"}</b> · Série: <b>${serieTxt}</b>`;
+    `<b>${_escHtml(turmaSelecionada.aba || turmaSelecionada.nome || "Turma")}</b><br>` +
+    `ID: ${_escHtml(turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId || "?")}<br>` +
+    (turmaSelecionada.origemArquivo ? `Arquivo: ${_escHtml(turmaSelecionada.origemArquivo)}<br>` : '') +
+    `Ano: <b>${_escHtml(turmaSelecionada.anoLetivo || "?")}</b> · Turno: <b>${_escHtml(turmaSelecionada.turno || "?")}</b> · Série: <b>${_escHtml(serieTxt)}</b>`;
 
   const btnEditarTurma = document.getElementById('btnEditarTurma');
   if(btnEditarTurma) btnEditarTurma.style.display = _podeEditar ? 'inline-flex' : 'none';
@@ -849,7 +849,7 @@ function renderAlunos(lista) {
     const tr = document.createElement("tr");
     let html = `
       <td class="num-col">${idx+1}</td>
-      <td class="nome-aluno">${nomeAtual(a)}</td>
+      <td class="nome-aluno">${_escHtml(nomeAtual(a))}</td>
     `;
     if (schema.serieAtiva) html += `<td>${a.serie || ""}</td>`;
     for (const c of colAtivas) html += `<td>${a[c.key] ?? "--"}</td>`;
