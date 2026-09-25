@@ -345,8 +345,8 @@ html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: v
               box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:180px;padding:6px 0;
               flex-direction:column;">
               <button class="btn" id="btnExportAtaPdf" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Exportar PDF</button>
-              <button class="btn" id="btnExportAtaCsv" type="button" disabled title="Em breve — aguardando definição das colunas do schema"
-                style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;opacity:0.5;cursor:not-allowed;">📊 Exportar CSV</button>
+              <button class="btn" id="btnExportAtaCsv" type="button"
+                style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 Exportar CSV</button>
             </div>
           </div>
           <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
@@ -536,6 +536,11 @@ async function carregarCatalogoNomes(){
   }catch(e){
     console.warn("[pesquisa-ata] Falha ao carregar catálogo de identidade:", e);
     _mapaNomes = new Map();
+    // Não bloqueia a página — sem catálogo, nomeAtual() cai no aluno.nome bruto,
+    // que só fica desatualizado se o aluno foi corrigido/fundido depois em
+    // idaluno.html (o vínculo em si continua correto). Risco raro, mas silencioso
+    // sem este aviso.
+    setMsg("Não foi possível carregar o catálogo de nomes atualizados — nomes exibidos podem estar desatualizados para algum aluno corrigido recentemente.", "warn");
   }
 }
 
@@ -920,6 +925,21 @@ function aplicarFiltros() {
 /* =========================
    Exportar PDF
 ========================= */
+// Nome de arquivo compartilhado por PDF e CSV: pelo identificador da turma
+// (série + ano + turno), não por "aba" — em turmas criadas manualmente (não
+// importadas de planilha) esse campo guarda a ORIGEM do cadastro ("MANUAL"),
+// não um nome, e o arquivo saía "ata_MANUAL.pdf" pra qualquer turma cadastrada
+// assim. "aba" só entra como último recurso se os três campos vierem vazios.
+function _nomeArquivoAta(turma, extensao){
+  const serieTxt = turma.serieTexto ||
+    (turma.seriesTurma?.length ? formatarListaBonita(turma.seriesTurma) : "");
+  const idPartes = [serieTxt, turma.anoLetivo || "", turma.turno || ""].filter(Boolean).join("_");
+  const safe = String(idPartes || turma.aba || "turma")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
+  return `ATA_${safe}.${extensao}`;
+}
+
 async function carregarDadosEscola() {
   const padrao = { nome: "Nome da Escola", endereco: "Endereço da Escola", escudo: "" };
   try {
@@ -966,6 +986,10 @@ async function carregarDadosEscola() {
   document.getElementById("btnExportAtaPdf").addEventListener("click", () => {
     drop.style.display = "none";
     exportarPDFDaTurma();
+  });
+  document.getElementById("btnExportAtaCsv").addEventListener("click", () => {
+    drop.style.display = "none";
+    exportarCSVDaTurma();
   });
 })();
 
@@ -1069,9 +1093,22 @@ function _montarColumnStylesAta(doc, schema, colAtivas, alunos, larguraDisponive
     doc.setFont(undefined, "bold"); doc.setFontSize(9);
     const textW = doc.getTextWidth("Resultado");
     doc.setFont(undefined, "normal");
-    const pad = 2; // exatamente os ~2pt de cada lado pedidos
-    const w = Math.ceil(textW) + pad * 2;
-    styles[i] = { cellWidth: w, halign: "center", cellPadding: { top:4, bottom:4, left:pad, right:pad } };
+    // Bug real (confirmado rodando o autoTable de verdade, não só calculando
+    // no papel): um cellPadding customizado em columnStyles é aplicado no
+    // CORPO da célula, mas é IGNORADO no CABEÇALHO — o cabeçalho sempre usa o
+    // padding padrão da tabela (5pt de cada lado, top-level `styles.cellPadding`
+    // logo abaixo). A versão anterior calculava a largura assumindo 2pt de
+    // padding em vez dos 5pt que o cabeçalho de fato usa, então sobrava só
+    // ~0.7pt de área de texto — o suficiente pra qualquer arredondamento de
+    // fonte empurrar "Resultado" pra 2 linhas.
+    // Sem cellPadding customizado aqui: a coluna usa o padding padrão, igual
+    // a todas as outras, e a largura é calculada em cima desse padding real
+    // (5pt de cada lado) + 3pt de folga (testado contra o autoTable real:
+    // o mínimo que não quebra linha é 53pt pra "Resultado" nesta fonte).
+    const PAD_PADRAO = 5;
+    const SAFETY_MARGIN = 3;
+    const w = Math.ceil(textW) + PAD_PADRAO * 2 + SAFETY_MARGIN;
+    styles[i] = { cellWidth: w, halign: "center" };
     larguras.push(w); i++;
   }
 
@@ -1133,15 +1170,63 @@ async function _exportarPDFDaTurmaInterno() {
     })
   });
 
-  // Nome do arquivo pelo identificador da turma (série + ano + turno), não
-  // mais por "aba" — em turmas criadas manualmente (não importadas de
-  // planilha) esse campo guarda a ORIGEM do cadastro ("MANUAL"), não um nome,
-  // e o arquivo saía "ata_MANUAL.pdf" para qualquer turma cadastrada assim.
-  const idPartes = [serieTxt, ano, turno].filter(Boolean).join("_");
-  const safe = String(idPartes || turmaSelecionada.aba || "turma")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
-    .replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
-  doc.save(`ATA_${safe}.pdf`);
+  doc.save(_nomeArquivoAta(turmaSelecionada, "pdf"));
+}
+
+/* =========================
+   Exportar CSV
+   Mesmo formato do CSV completo de pesquisa-ano-ativo.html: separador ";",
+   linhas terminadas em "\r\n", tudo entre aspas (com "" pra aspas internas)
+   e BOM UTF-8 no início — é o que faz o Excel em pt-BR abrir já em colunas,
+   com acentuação correta, em vez de tudo numa coluna só ou com "?" no lugar
+   de acento.
+   Colunas seguem o schema real da turma (mesma fonte que a tela e o PDF:
+   schemaDaTurmaSelecionada()), não um layout fixo — cabeçalho de matéria usa
+   o "key" (ID curto), não o "label" completo, pelo mesmo motivo do PDF: são
+   os nomes de coluna que a escola já reconhece pelo schema, e mantém as três
+   saídas (tela, PDF, CSV) consistentes entre si.
+========================= */
+async function exportarCSVDaTurma() {
+  if (!turmaSelecionada) return;
+  try {
+    _exportarCSVDaTurmaInterno();
+  } catch (e) {
+    console.error('[pesquisa-ata] Falha ao gerar CSV:', e);
+    setMsg('Erro ao gerar o CSV — tente novamente.', 'err');
+  }
+}
+
+function _exportarCSVDaTurmaInterno() {
+  const alunos = turmaSelecionada.alunos || [];
+  const schema = schemaDaTurmaSelecionada();
+  const colAtivas = getColunasAtivas(schema);
+
+  const header = ["Nº", "Nome"];
+  if (schema.serieAtiva) header.push("Série");
+  colAtivas.forEach(c => header.push(c.key));
+  if (schema.resultadoAtivo) header.push("Resultado");
+
+  const linhas = [header, ...alunos.map((a, i) => {
+    const linha = [i + 1, nomeAtual(a)];
+    if (schema.serieAtiva) linha.push(a.serie ?? "");
+    colAtivas.forEach(c => linha.push(a[c.key] ?? ""));
+    if (schema.resultadoAtivo) linha.push(a.resultado ?? "Não informado");
+    return linha;
+  })];
+
+  const csv = linhas
+    .map(cols => cols.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';'))
+    .join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = _nomeArquivoAta(turmaSelecionada, "csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /* =========================
