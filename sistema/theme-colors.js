@@ -174,6 +174,45 @@
     },
   };
 
+  // ── Contraste de "card de destaque" (antes duplicado em 3 páginas do
+  // módulo de atas: gestao-atas.html, pesquisa-ata.html, historico-aluno.html)
+  //
+  // Um card de destaque usa a cor de marca (--brand / --btn-home-bg) como
+  // background. Só a luminância real dessa cor diz se o texto deve ser claro
+  // ou escuro — não dá pra decidir pela paleta escolhida sozinha, porque o
+  // mesmo nome de paleta pode render tons bem diferentes entre os temas claro
+  // e escuro. calcularLuminancia() faz a conta padrão (WCAG, sRGB relative
+  // luminance); ajustarContraste() lê o background computado do elemento,
+  // calcula, e alterna a classe CSS "contraste-claro" (cada página already
+  // define o CSS de ".card-destaque.contraste-claro" — isso não muda, só a
+  // função que decide QUANDO aplicar a classe é que sai da página).
+  function calcularLuminancia(corCss) {
+    const m = String(corCss || '').match(/\d+(\.\d+)?/g);
+    if (!m || m.length < 3) return null;
+    const [r, g, b] = m.map(Number);
+    const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  }
+
+  function ajustarContraste(seletor) {
+    seletor = seletor || '.card-destaque';
+    document.querySelectorAll(seletor).forEach((el) => {
+      const luminancia = calcularLuminancia(getComputedStyle(el).backgroundColor);
+      if (luminancia === null) return;
+      el.classList.toggle('contraste-claro', luminancia > 0.5);
+    });
+  }
+
+  // Cada página ainda precisa chamar ThemeColors.ajustarContraste() UMA VEZ
+  // depois que o próprio card existir no DOM (o script deste arquivo roda no
+  // <head>, antes do <body> — não dá pra centralizar essa primeira chamada
+  // aqui). O que dá pra centralizar é o reajuste automático quando a pessoa
+  // troca de cor sem recarregar a página — por isso o listener abaixo já
+  // cobre as 3 páginas sem cada uma precisar registrar o próprio listener.
+  // Se a página não tiver nenhum ".card-destaque", o querySelectorAll acima
+  // só devolve uma lista vazia — sem custo, sem erro.
+  document.addEventListener('colorchange', () => ajustarContraste());
+
   function apply(key) {
     const palette = palettes[key] || palettes['violet'];
     const root    = document.documentElement;
@@ -202,5 +241,5 @@
   new MutationObserver(function () { apply(get()); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  window.ThemeColors = { apply, get, palettes };
+  window.ThemeColors = { apply, get, palettes, ajustarContraste, calcularLuminancia };
 })();
