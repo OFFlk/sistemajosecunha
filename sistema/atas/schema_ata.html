@@ -77,18 +77,33 @@
   }
   .card-destaque h3 { color: var(--dest-fg); }
   .card-destaque label { color: var(--dest-fg); }
-  /* Botões soltos direto no fundo do card (Novo schema, Duplicar, Excluir,
-     Salvar, + Adicionar matéria) ganham o mesmo "filtro" claro/escuro que
-     o botão Recarregar já usa em gestao-atas.html — em vez da cor pura,
-     que ficava quase invisível em cima do próprio fundo da mesma cor.
-     :not(table .btn) deixa de fora as setas/Remover da tabela, que têm um
-     problema diferente (ver regras de .btn-gray mais abaixo). */
-  .card-destaque .btn:not(table .btn) {
+  /* Botões soltos direto no fundo do card, por variante — não dá pra
+     tratar ".btn" genérico igual pra todos (ficava tudo com a mesma cara,
+     inclusive o Excluir perdendo o vermelho de aviso). :not(table .btn)
+     em todas: deixa de fora as setas/Remover da tabela, que têm um
+     problema à parte (ver .btn-gray mais abaixo). */
+  /* Primário (Novo schema, Salvar, + Adicionar matéria): preenchido, no
+     mesmo "filtro" claro/escuro que o botão Recarregar já usa em
+     gestao-atas.html — em vez da cor pura, que ficava quase invisível em
+     cima do próprio fundo da mesma cor. */
+  .card-destaque .btn-primary:not(table .btn) {
     background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
   }
-  .card-destaque .btn:not(table .btn):hover:not(:disabled) {
+  .card-destaque .btn-primary:not(table .btn):hover:not(:disabled) {
     background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
   }
+  /* Outline (Duplicar): sem preenchimento, só borda + texto na cor de
+     contraste calculada pro card (--dest-fg). */
+  .card-destaque .btn-outline:not(table .btn) {
+    background: transparent; border-color: var(--dest-fg); color: var(--dest-fg);
+  }
+  .card-destaque .btn-outline:not(table .btn):hover:not(:disabled) {
+    background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
+  }
+  /* Danger (Excluir): de propósito SEM regra aqui — cai na própria
+     .btn-danger global (vermelho sólido), igual ao "Remover" da tabela do
+     card 4. Continua sendo um aviso de ação destrutiva mesmo dentro do
+     card de destaque. */
 
   /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
      guia-migracao-contraste-theme-colors.md, Parte 2). Checado antes de
@@ -516,10 +531,12 @@ function render() {
           <option value="texto" ${c.type==="texto"?"selected":""}>Texto</option>
         </select>
       </td>
-      <td style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-        <button class="btn btn-gray" onclick="moveUp(${idx})">&#8593;</button>
-        <button class="btn btn-gray" onclick="moveDown(${idx})">&#8595;</button>
-        <button class="btn btn-danger" onclick="removeCol(${idx})">Remover</button>
+      <td>
+        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn btn-gray" onclick="moveUp(${idx})">&#8593;</button>
+          <button class="btn btn-gray" onclick="moveDown(${idx})">&#8595;</button>
+          <button class="btn btn-danger" onclick="removeCol(${idx})">Remover</button>
+        </div>
       </td>
     `;
     tb.appendChild(tr);

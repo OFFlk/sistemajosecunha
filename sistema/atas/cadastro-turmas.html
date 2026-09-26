@@ -163,10 +163,45 @@ html[data-theme="dark"] .btn.outline:hover { background: rgba(124,58,237,0.18); 
 .list { display: flex; flex-direction: column; gap: 10px; }
 .item {
   border: 1px solid var(--border); border-radius: var(--radius2); padding: 12px 14px; background: var(--card);
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
   transition: background 0.3s, border-color 0.3s;
 }
 .item:hover { border-color: var(--brand); }
+
+.detalhes-toggle {
+  font-size: 12px; font-weight: 700; color: var(--brand, #7c3aed); cursor: pointer; user-select: none;
+}
+.detalhes-toggle:hover { text-decoration: underline; }
+html[data-theme="dark"] .detalhes-toggle { color: var(--brand-d, #7c3aed); }
+
+/* Botão "Editar" de cada item da lista: .btn.outline usa var(--brand) na
+   borda/texto sem fundo — em paletas bem claras (ex. "Branco", onde
+   --brand é #fff) isso ficava quase invisível contra o fundo neutro do
+   .item. Aqui ganha um preenchimento fixo com os mesmos tokens usados
+   pelos chips/badges de marca no resto do sistema — contraste garantido
+   em qualquer paleta, sem depender de o quão clara/escura a cor escolhida
+   é. Escopado só aqui: não muda o botão "Adicionar" (também .btn.outline),
+   que fica em outro card. */
+.item .btns .btn.outline {
+  background: var(--brand-faded, #f5f3ff);
+  border-color: var(--brand-border, #ddd6fe);
+  color: var(--brand-text, #6d28d9);
+}
+.item .btns .btn.outline:hover {
+  background: var(--brand, #7c3aed);
+  border-color: var(--brand, #7c3aed);
+  color: #fff;
+}
+html[data-theme="dark"] .item .btns .btn.outline {
+  background: var(--brand-faded-d, rgba(124,58,237,0.28));
+  border-color: var(--brand-border-d, #7c3aed);
+  color: var(--brand-text-d, #c4b5fd);
+}
+html[data-theme="dark"] .item .btns .btn.outline:hover {
+  background: var(--brand-d, #7c3aed);
+  border-color: var(--brand-d, #7c3aed);
+  color: #fff;
+}
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
 
@@ -806,27 +841,58 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     });
 
     list.innerHTML = "";
-    for(const t of turmas){
+    turmas.forEach((t, idx) => {
       const div = document.createElement("div");
       div.className = "item" + (editingTurmaId === t.turmaId ? " editing" : "");
 
       const left = document.createElement("div");
+      left.style.cssText = "flex:1;min-width:0;";
+
+      // Linha 1 — nome da turma
       const title = document.createElement("h4");
       title.style.margin = "0 0 6px";
       title.textContent = t.nome || "(sem nome)";
 
+      // Linha 2 — Ano, Turno e uma badge por série (série vira badge própria
+      // pra não formar um badge único gigante quando a turma tem várias).
+      const series = Array.isArray(t.series) ? t.series : [];
+      const seriesBadges = series.length
+        ? series.map(s => `<span class="pill badge small">${_escHtml(s)}</span>`).join("")
+        : `<span class="pill badge small">Sem série</span>`;
+      const linha2 = document.createElement("div");
+      linha2.className = "row";
+      linha2.style.cssText = "gap:6px;row-gap:6px;margin-top:2px;";
+      linha2.innerHTML =
+        `<span class="pill badge small">Ano: ${t.anoLetivo||"—"}</span>`+
+        `<span class="pill badge small">Turno: ${t.turno||"—"}</span>`+
+        seriesBadges;
+
+      // Linha 3 — quantidade de alunos + toggle "Detalhes" (Schema + ID,
+      // ocultos por padrão; raramente precisados no dia a dia).
       const nAlunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
-      const meta = document.createElement("div");
-      meta.innerHTML = `
-        <span class="pill badge small">Ano: ${t.anoLetivo||"—"}</span>
-        <span class="pill badge small">Turno: ${t.turno||"—"}</span>
-        <span class="pill badge small">Schema: ${t.schemaSnapshot?.nome || "—"}</span>
-        <span class="pill badge small ${nAlunos ? 'warn-alunos' : ''}">${nAlunos} aluno(s)</span>
-        <div style="margin-top:6px"><span class="mono">ID:</span> <span class="mono">${t.turmaId||"—"}</span></div>
-        <div style="margin-top:4px">Séries: ${(Array.isArray(t.series)?t.series:[]).join(", ") || "—"}</div>
-      `;
+      const detalhesId = `detTurma${idx}`;
+      const linha3 = document.createElement("div");
+      linha3.className = "row";
+      linha3.style.cssText = "gap:10px;row-gap:6px;margin-top:6px;align-items:center;";
+      linha3.innerHTML =
+        `<span class="pill badge small ${nAlunos ? 'warn-alunos' : ''}">${nAlunos} aluno(s)</span>`+
+        `<span class="detalhes-toggle" tabindex="0" role="button" `+
+          `onclick="event.stopPropagation(); const d=document.getElementById('${detalhesId}'); const ab=d.style.display==='block'; d.style.display= ab?'none':'block'; this.textContent = ab?'Detalhes ▾':'Detalhes ▴';">`+
+          `Detalhes ▾`+
+        `</span>`;
+
+      const detalhes = document.createElement("div");
+      detalhes.id = detalhesId;
+      detalhes.className = "help";
+      detalhes.style.cssText = "display:none;margin-top:6px;";
+      detalhes.innerHTML =
+        `<div>Schema: ${_escHtml(t.schemaSnapshot?.nome || "—")}</div>`+
+        `<div style="margin-top:2px"><span class="mono">ID:</span> <span class="mono">${_escHtml(t.turmaId||"—")}</span></div>`;
+
       left.appendChild(title);
-      left.appendChild(meta);
+      left.appendChild(linha2);
+      left.appendChild(linha3);
+      left.appendChild(detalhes);
 
       const right = document.createElement("div");
       right.className = "btns";
@@ -840,7 +906,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       div.appendChild(left);
       div.appendChild(right);
       list.appendChild(div);
-    }
+    });
   }
 
   function loadTurma(turmaId){
