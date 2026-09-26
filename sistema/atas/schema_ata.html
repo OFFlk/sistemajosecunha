@@ -48,6 +48,52 @@
   .container { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; }
   .card { background: var(--card); border: 1px solid var(--border, #ddd6fe); border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); margin-bottom: 18px; transition: background 0.3s, border-color 0.3s; }
 
+  /* ── Card de destaque: usa a cor de marca escolhida pela pessoa (mesma do
+     botão "Início", exposta por header.css como --btn-home-bg/border) —
+     mesmo padrão já usado em gestao-atas.html. .contraste-claro é ligada
+     por ThemeColors.ajustarContraste() (theme-colors.js) quando a cor
+     escolhida é clara demais pra texto branco. Só o FUNDO do card muda:
+     inputs/select/table continuam com o próprio background opaco deles
+     (var(--card) neutro), então "por baixo" tudo parece igual — só o h3 e
+     os <label> soltos (sem caixa própria) precisam de --dest-fg pra não
+     ficarem ilegíveis em cima da cor de marca. */
+  .card.card-destaque {
+    --dest-fg: #ffffff;
+    background: var(--btn-home-bg); border-color: var(--btn-home-border);
+  }
+  html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+  .card.card-destaque.contraste-claro {
+    --dest-fg: #0f172a;
+    border-color: var(--border, #ddd6fe);
+  }
+  .card-destaque h3 { color: var(--dest-fg); }
+  .card-destaque label { color: var(--dest-fg); }
+
+  /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
+     guia-migracao-contraste-theme-colors.md, Parte 2). Checado antes de
+     colar: esta página já define --card/--border/--text nos mesmos moldes
+     do guia (ver seção 2.1.1), então não precisou remapear nada aqui. ===== */
+  .info-tip{
+    position:relative; display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; margin-left:6px; border-radius:50%;
+    border:1.5px solid currentColor; color:inherit; opacity:.72;
+    font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+    line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+  }
+  .info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+  .info-tip-bubble{
+    display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+    width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+    background:var(--card); border:1.5px solid var(--border, #ddd6fe); color:var(--text, #1e1b4b);
+    box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+    white-space:normal; cursor:default;
+  }
+  .info-tip.open .info-tip-bubble{ display:block; }
+  /* Variante larga: cards com bastante largura sobrando e uma dica grande
+     (ex.: explicação de card inteiro) não precisam ficar espremidos em
+     260px só porque o padrão da maioria das dicas é curto. */
+  .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+
   h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
   h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
   .muted { color: var(--muted, #6b7280); }
@@ -105,9 +151,13 @@
     </div>
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Configuração atual</h3>
-    <div id="resumo" class="muted"></div>
+  <div class="card card-destaque">
+    <h3 style="margin-top:0;">Configuração atual
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble wide">Schemas criados nessa página são listados na página de cadastro de turmas — com isso, é possível indicar qual schema de notas a turma cadastrada vai usar. Caso sua ata tenha matérias ou características diferentes do schema padrão que vem pré-selecionado, clique em "Novo schema" e crie um schema do zero, ou deixe selecionado "Padrão" no seletor abaixo e edite as informações nos cards seguintes desta página.</span>
+      </span>
+    </h3>
 
     <div style="margin-top:12px;" class="grid">
       <div style="grid-column: 1 / -1;">
@@ -118,11 +168,6 @@
           <button class="btn btn-primary" type="button" onclick="novoSchema()">Novo schema</button>
           <button class="btn btn-outline" type="button" onclick="duplicarSchema()">Duplicar</button>
           <button class="btn btn-danger" id="btnExcluirSchema" type="button" onclick="excluirSchema()">Excluir</button>
-        </div>
-        <div class="muted" style="margin-top:6px;">
-          Dica: crie schemas diferentes (ex: Fundamental 1, Fundamental 2) — cada turma escolhe o
-          seu no Cadastro de Turmas. O marcado "(padrão)" aqui é só o que já vem pré-selecionado
-          pra turma nova, e não pode ser excluído.
         </div>
       </div>
     </div>
@@ -137,18 +182,25 @@
     <h3 style="margin-top:0;">Regras gerais</h3>
     <div class="grid">
       <div>
-        <label><b>Coluna "Série" ativa?</b></label>
+        <label><b>Coluna "Série" ativa?</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Se desativar, o cadastro não exigirá série.</span>
+          </span>
+        </label>
         <select id="flagSerie" onchange="onToggleSerie()">
           <option value="1">Sim (exige série e mostra selects)</option>
           <option value="0">Não (remove série e some selects)</option>
         </select>
-        <div class="muted" style="margin-top:6px;">
-          Regra automática: se desativar, o cadastro não exigirá série.
-        </div>
       </div>
 
       <div>
-        <label><b>Mostrar "Resultado Final"?</b></label>
+        <label><b>Mostrar "Resultado Final"?</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Se desativar, o cadastro não exigirá resultado final.</span>
+          </span>
+        </label>
         <select id="flagResultado">
           <option value="1">Sim</option>
           <option value="0">Não</option>
@@ -156,7 +208,12 @@
       </div>
 
       <div>
-        <label><b>Ordenar alunos por</b></label>
+        <label><b>Ordenar alunos por</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Indica a ordem de exibição dos alunos, após realização do cadastro de atas.</span>
+          </span>
+        </label>
         <select id="ordenacao">
           <option value="nome">Nome (A-Z)</option>
           <option value="numero">Número (ordem de cadastro)</option>
@@ -164,36 +221,58 @@
       </div>
 
       <div>
-        <label><b>Nome do schema</b></label>
+        <label><b>Nome do schema</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Nome que será exibido no seletor em cadastro-turmas.</span>
+          </span>
+        </label>
         <input id="schemaNome" placeholder="Ex: Padrão 2026" />
       </div>
     </div>
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Colunas de notas (matérias)</h3>
-    <div class="muted">
-      Aqui você adiciona/remove matérias como Inglês. Cada coluna tem um <b>id</b> (chave) e um <b>rótulo</b>.
-    </div>
+  <div class="card card-destaque">
+    <h3 style="margin-top:0;">Colunas de notas (matérias)
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble wide">Aqui você adiciona/remove matérias. A ordem das matérias importa: a primeira de cima será a primeira da esquerda na ata — isso não interfere na importação de atas, apenas na exibição e exportação de documentos. Você pode alterar a ordem na coluna "Ações" da tabela abaixo; para mais detalhes, clique no (i) ao lado de "Ações".</span>
+      </span>
+    </h3>
 
     <div style="margin-top:12px;" class="grid">
       <div>
-        <label>Chave (id) *</label>
+        <label>Chave (id) *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Abreviatura da matéria. É exibida na visualização da ata dentro do sistema e em algumas exportações documentais.</span>
+          </span>
+        </label>
         <input id="novaKey" placeholder="ex: ingles" />
       </div>
       <div>
-        <label>Rótulo *</label>
+        <label>Rótulo *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Nome completo da matéria. Usado para verificação de erros e em algumas exportações documentais.</span>
+          </span>
+        </label>
         <input id="novoLabel" placeholder="ex: Inglês / Língua Estrangeira" />
       </div>
       <div>
-        <label>Tipo</label>
+        <label>Tipo
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Método de avaliação. Nota = valor numérico quantitativo (ex.: 10,0). Texto = valor conceitual (ex.: CPLA).</span>
+          </span>
+        </label>
         <select id="novoTipo">
           <option value="nota">Nota</option>
           <option value="texto">Texto</option>
         </select>
       </div>
       <div style="display:flex; align-items:flex-end;">
-        <button class="btn btn-primary" style="width:100%;" onclick="adicionarColuna()">+ Adicionar coluna</button>
+        <button class="btn btn-primary" style="width:100%;" onclick="adicionarColuna()">+ Adicionar matéria</button>
       </div>
     </div>
 
@@ -204,7 +283,12 @@
           <th>Chave (id)</th>
           <th>Rótulo</th>
           <th>Tipo</th>
-          <th>Ações</th>
+          <th>Ações
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+              i
+              <span class="info-tip-bubble">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" exclui a matéria da tabela do schema. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
+            </span>
+          </th>
         </tr>
       </thead>
       <tbody id="colsTbody"></tbody>
@@ -355,15 +439,6 @@ function render() {
   document.getElementById("flagSerie").value = CONFIG.serieAtiva ? "1" : "0";
   document.getElementById("flagResultado").value = CONFIG.resultadoAtivo ? "1" : "0";
   document.getElementById("ordenacao").value = CONFIG.ordenarPor || "nome";
-
-  const resumo = document.getElementById("resumo");
-  const colAtivas = CONFIG.colunas.filter(c => c.enabled).length;
-  resumo.innerHTML = `
-    <b>Schema:</b> ${escapeHtml(CONFIG.nome)} |
-    <b>Série:</b> ${CONFIG.serieAtiva ? "ATIVA" : "DESATIVADA"} |
-    <b>Resultado:</b> ${CONFIG.resultadoAtivo ? "ATIVO" : "DESATIVADO"} |
-    <b>Colunas ativas:</b> ${colAtivas}
-  `;
 
   const btnExcluir = document.getElementById("btnExcluirSchema");
   if (btnExcluir) btnExcluir.disabled = (CONFIG.id === PADRAO_ID); // padrão não se exclui
@@ -565,7 +640,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderSchemaSelect();
   render();
 
+  // Contraste dos cards de destaque é centralizado em theme-colors.js (ver
+  // guia-migracao-contraste-theme-colors.md, Parte 1). Sem argumento,
+  // ThemeColors.ajustarContraste() já cobre os dois `.card-destaque` desta
+  // página ("Configuração atual" e "Colunas de notas") de uma vez —
+  // theme-colors.js reage sozinho ao 'colorchange' depois disso.
+  if (window.ThemeColors) ThemeColors.ajustarContraste();
+
   Loading.esconder(); // ← linha adicionada
+});
+
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora (ver
+// guia-migracao-contraste-theme-colors.md, Parte 2.3). Um só listener pra
+// página inteira, mesmo com vários ícones.
+document.addEventListener("click", ()=>{
+  document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
 });
 </script>
 
