@@ -79,6 +79,12 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
 }
 .card-destaque h2 { color: var(--dest-fg); }
 .card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+/* Exceção: .help dentro de um .item (o texto de "Detalhes") não deve herdar
+   a cor fixa do fundo colorido — o .item é um card neutro por baixo
+   (var(--card), branco ou escuro conforme o tema), não fica direto sobre o
+   fundo de marca. Sem isso, o texto ficava com a cor certa só quando o
+   tema escuro calhava de "bater" com a marca — invisível no tema claro. */
+.card-destaque .item .help { color: var(--muted); }
 .card-destaque .info-tip { color: var(--dest-fg); }
 .card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
@@ -144,10 +150,10 @@ html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); bord
 html[data-theme="dark"] .btn.ghost:hover, html[data-theme="dark"] .btn.secondary:hover {
   background: rgba(124,58,237,0.18); border-color: var(--brand-d, #7c3aed); color: #c4b5fd;
 }
-.btn.outline { background: transparent; border-color: var(--brand, #7c3aed); color: var(--brand, #7c3aed); }
-.btn.outline:hover { background: var(--brand-faded, #f5f3ff); }
-html[data-theme="dark"] .btn.outline { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
-html[data-theme="dark"] .btn.outline:hover { background: rgba(124,58,237,0.18); }
+.btn.outline { background: var(--brand-faded, #f5f3ff); border-color: var(--brand-border, #ddd6fe); color: var(--brand-text, #6d28d9); }
+.btn.outline:hover { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
+html[data-theme="dark"] .btn.outline { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+html[data-theme="dark"] .btn.outline:hover { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); color: #fff; }
 .btn.small { padding: 6px 10px; font-size: 12px; }
 
 .item.editing { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px var(--brand-faded, rgba(124,58,237,0.12)); }
@@ -169,10 +175,10 @@ html[data-theme="dark"] .btn.outline:hover { background: rgba(124,58,237,0.18); 
 .item:hover { border-color: var(--brand); }
 
 .detalhes-toggle {
-  font-size: 12px; font-weight: 700; color: var(--brand, #7c3aed); cursor: pointer; user-select: none;
+  font-size: 12px; font-weight: 700; color: var(--brand-text, #6d28d9); cursor: pointer; user-select: none;
 }
 .detalhes-toggle:hover { text-decoration: underline; }
-html[data-theme="dark"] .detalhes-toggle { color: var(--brand-d, #7c3aed); }
+html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); }
 
 /* Botão "Editar" de cada item da lista: .btn.outline usa var(--brand) na
    borda/texto sem fundo — em paletas bem claras (ex. "Branco", onde
