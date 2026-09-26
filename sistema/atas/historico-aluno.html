@@ -287,7 +287,26 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
 .export-drop .btn{
   width:100%; border-radius:0; border:none; justify-content:flex-start; padding:10px 16px; background:transparent;
 }
-.export-drop .btn:hover{ background:var(--brand-faded, #f5f3ff); }
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
+   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
+   próprio .info-tip-bubble, junto de onde é usado. Bloco pensado pra ser
+   copiado igual em outras páginas do módulo quando entrarem na fila. ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:18px; height:18px; margin-left:6px; border-radius:50%;
+  background:var(--chip-bg); border:1.5px solid var(--chip-border); color:var(--chip-color);
+  font-size:12px; font-weight:800; line-height:1; cursor:pointer; user-select:none;
+  vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ background:var(--brand-faded, #f5f3ff); border-color:var(--brand, #7c3aed); color:var(--brand-text, #6d28d9); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); padding:10px 12px; border-radius:10px;
+  background:var(--card); border:1.5px solid var(--border); color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
 </style>
 
 <title>Histórico por Aluno</title>
@@ -304,7 +323,12 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin-top:10px;">
       <div style="flex:1; min-width:200px;">
-        <label>Nome do aluno</label>
+        <label>Nome do aluno
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            ⓘ
+            <span class="info-tip-bubble">Caso não saiba exatamente o nome do aluno, pesquise-o na página anterior (pesquisa de atas) e volte aqui com o nome completo.</span>
+          </span>
+        </label>
         <input id="q" placeholder='Nome (começo) ou ID do aluno (ex: ALU-000123)' />
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding-bottom:2px;">
@@ -1199,6 +1223,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Enter no input dispara busca
     $("q").addEventListener("keydown", (ev)=>{
       if (ev.key === "Enter"){ ev.preventDefault(); buscar(); }
+    });
+
+    // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+    // Mesmo padrão do dropdown "Exportar ▾" logo abaixo.
+    document.addEventListener("click", ()=>{
+      document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
     });
 
     // Dropdown "Exportar ▾" (PDF / CSV) do painel de detalhes do aluno
