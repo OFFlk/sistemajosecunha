@@ -59,15 +59,36 @@
      ficarem ilegíveis em cima da cor de marca. */
   .card.card-destaque {
     --dest-fg: #ffffff;
+    --dest-btn-bg: rgba(255,255,255,.18);
+    --dest-btn-bd: rgba(255,255,255,.40);
+    --dest-btn-hover: rgba(255,255,255,.28);
+    --dest-panel-bg: rgba(255,255,255,.10);
+    --table-cell-bg: #ffffff;
     background: var(--btn-home-bg); border-color: var(--btn-home-border);
   }
-  html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+  html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); --table-cell-bg: #0a1426; }
   .card.card-destaque.contraste-claro {
     --dest-fg: #0f172a;
+    --dest-btn-bg: rgba(0,0,0,.08);
+    --dest-btn-bd: rgba(0,0,0,.25);
+    --dest-btn-hover: rgba(0,0,0,.16);
+    --dest-panel-bg: rgba(0,0,0,.06);
     border-color: var(--border, #ddd6fe);
   }
   .card-destaque h3 { color: var(--dest-fg); }
   .card-destaque label { color: var(--dest-fg); }
+  /* Botões soltos direto no fundo do card (Novo schema, Duplicar, Excluir,
+     Salvar, + Adicionar matéria) ganham o mesmo "filtro" claro/escuro que
+     o botão Recarregar já usa em gestao-atas.html — em vez da cor pura,
+     que ficava quase invisível em cima do próprio fundo da mesma cor.
+     :not(table .btn) deixa de fora as setas/Remover da tabela, que têm um
+     problema diferente (ver regras de .btn-gray mais abaixo). */
+  .card-destaque .btn:not(table .btn) {
+    background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+  }
+  .card-destaque .btn:not(table .btn):hover:not(:disabled) {
+    background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
+  }
 
   /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
      guia-migracao-contraste-theme-colors.md, Parte 2). Checado antes de
@@ -93,6 +114,10 @@
      (ex.: explicação de card inteiro) não precisam ficar espremidos em
      260px só porque o padrão da maioria das dicas é curto. */
   .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+  /* Variante alinhada à direita: pra ícone perto da borda direita do card/
+     tabela (ex.: última coluna), abrir pra esquerda em vez de pra direita
+     evita o balão estourar pra fora do card. */
+  .info-tip-bubble.align-right{ left:auto; right:0; }
 
   h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
   h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
@@ -126,15 +151,44 @@
 
   /* ── Botões ── */
   .btn-gray{background:var(--brand-faded,rgba(124,58,237,0.12));border:1px solid var(--brand,#7c3aed);color:var(--brand,#7c3aed);}
-  html[data-theme="dark"] .btn-gray{background:var(--brand-faded-d,rgba(124,58,237,0.28));border-color:var(--brand-border-d,#7c3aed);color:var(--brand-text-d,#c4b5fd);}
+  /* Tema escuro: antes usava --brand-faded-d (ainda roxo/azulado), que
+     quase some em cima do fundo azul de um card de destaque na mesma
+     família de cor. Troca pro mesmo tom neutro escuro que os inputs desta
+     página já usam (#0a1426) — aí o botão continua claramente separado do
+     fundo, tema claro ou escuro, dentro ou fora de card de destaque. */
+  html[data-theme="dark"] .btn-gray{background:#0a1426;border-color:var(--brand-d,#a78bfa);color:var(--brand-text-d,#c4b5fd);}
   .btn-gray:hover{background:var(--brand-faded,#f5f3ff);border-color:var(--brand-border,#ddd6fe);color:var(--brand-text,#6d28d9);}
   html[data-theme="dark"] .btn-gray:hover{background:var(--brand-d,#a78bfa);border-color:var(--brand-d,#a78bfa);color:#ffffff;}
 
-  /* ── Tabela ── */
-  table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; overflow: hidden; border-radius: 10px; border: 1px solid var(--border, #ddd6fe); }
+  /* ── Tabela ──
+     Sem overflow:hidden no <table>: isso cortava o balão do tooltip de
+     "Ações" (guia-migracao-contraste-theme-colors.md, novo item na 2.1.1 —
+     overflow:hidden em qualquer ancestral corta um .info-tip-bubble
+     absoluto lá dentro, mesmo que o ícone esteja "positioned"). Os cantos
+     arredondados agora são feitos célula a célula, não pelo clip do table. */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border-radius: 10px; border: 1px solid var(--border, #ddd6fe); }
+  thead tr:first-child th:first-child { border-top-left-radius: 9px; }
+  thead tr:first-child th:last-child  { border-top-right-radius: 9px; }
+  tbody tr:last-child td:first-child  { border-bottom-left-radius: 9px; }
+  tbody tr:last-child td:last-child   { border-bottom-right-radius: 9px; }
   th, td { padding: 10px; border-bottom: 1px solid var(--border, #ddd6fe); text-align: center; font-size: 13px; }
   th { background: var(--chip); font-weight: 800; font-size: 12px; color: var(--muted, #6b7280); }
   tr:last-child td { border-bottom: none; }
+
+  /* ── Tabela dentro de card de destaque ──
+     Pedido: só o FUNDO DO CARD vira cor de marca; a tabela deve continuar
+     "neutra" igual sempre foi — células no tom de fundo de página (não no
+     tom do card), cabeçalho na MESMA cor de marca do card só que com um
+     filtro claro/escuro por cima pra se diferenciar (sem trocar de cor
+     entre os temas, só clareando/escurecendo). --dest-panel-bg e
+     --table-cell-bg seguem o mesmo padrão de --dest-fg/--dest-btn-bg:
+     um valor no card normal, outro em .contraste-claro. */
+  .card-destaque td { background: var(--table-cell-bg); }
+  .card-destaque th {
+    background: var(--dest-panel-bg);
+    color: var(--dest-fg);
+    font-weight: 900; font-size: 14px;
+  }
 </style>
 
 <title>Admin - Edição de Ata e Schema</title>
@@ -286,7 +340,7 @@
           <th>Ações
             <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
               i
-              <span class="info-tip-bubble">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" exclui a matéria da tabela do schema. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
+              <span class="info-tip-bubble align-right">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" exclui a matéria da tabela do schema. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
             </span>
           </th>
         </tr>
