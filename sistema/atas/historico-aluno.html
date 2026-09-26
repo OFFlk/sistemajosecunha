@@ -344,6 +344,27 @@ html[data-theme="dark"] .badge.info{ color:#93c5fd; }
       </div>
     </div>
   </div>
+
+  <!-- "Ver turma" inline — revelado ao clicar em "Ver turma" na timeline
+       (ver abrirTurmaTabela). Renderiza o objeto `turma` que já está em
+       memória (vindo de montarAlunoComOcorrencias), sem navegar pra
+       outra página e sem leitura adicional. Só visualização: esta
+       página não tem permissão de edição de turma (ver pendência de
+       RBAC no handoff — cadastro-atas.html é gestor/admin-only). -->
+  <div id="cardTurmaAberta" class="card" style="display:none; margin-top:16px;">
+    <div class="details-title">
+      <h3 id="turmaAbertaTitulo">Turma</h3>
+      <button class="btn btn-gray" type="button" onclick="fecharTurmaAberta()">✕ Fechar</button>
+    </div>
+    <div class="muted" id="turmaAbertaMeta" style="margin-top:6px;"></div>
+    <div class="muted" style="margin-top:4px;">Somente visualização — nada aqui é editado ou salvo.</div>
+    <div class="table-scroll" style="margin-top:10px;">
+      <table>
+        <thead><tr id="theadTurmaAberta"></tr></thead>
+        <tbody id="tbodyTurmaAberta"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
@@ -633,6 +654,7 @@ function limpar(){
   _alunoSelecionado = null;
   $("detalhes").innerHTML = `<span class="muted">Selecione um aluno na lista para ver o histórico.</span>`;
   $("btnExportarSel").disabled = true;
+  fecharTurmaAberta();
 }
 
 // Regex bem permissiva pro padrão de alunoId usado no sistema (ex.: ALU-000123)
@@ -703,6 +725,7 @@ async function selecionarAluno(alunoId){
 
   $("detalhes").innerHTML = `<span class="muted">Carregando histórico…</span>`;
   $("btnExportarSel").disabled = true;
+  fecharTurmaAberta();
 
   let aluno;
   try{
@@ -802,16 +825,80 @@ async function selecionarAluno(alunoId){
         }).join("")}
       </div>
       <div class="muted" style="margin-top:10px;">
-        “Ver turma” abre a tabela completa da turma no <b>Cadastro de Turma</b>.
+        “Ver turma” abre a tabela completa da turma aqui mesmo, sem sair desta página.
       </div>
     </div>
   `;
 }
 
 
-function abrirTurmaTabela(id){
-  // abre a turma no cadastro (tabela completa)
-  window.location.href = `cadastro-turma.html?edit=${encodeURIComponent(id)}`;
+// Colunas da turma (schema real, com o mesmo fallback de 8 matérias já
+// usado no resto do arquivo) — reaproveita mergeSchemaColumns passando
+// uma "lista de ocorrências" de 1 item só, pra não duplicar a lógica de
+// ler schemaSnapshot/fallback que já existe pra exportação.
+function _colunasDaTurmaAberta(t){
+  return mergeSchemaColumns([{ turma: t }]);
+}
+
+function fecharTurmaAberta(){
+  const card = $("cardTurmaAberta");
+  if (card) card.style.display = "none";
+}
+
+// "Ver turma": não navega (cadastro-turma.html não existe — era
+// cadastro-turmas.html — e cadastro-atas.html, a página certa, é
+// gestor/admin-only enquanto esta página é acessível a user comum).
+// Em vez disso, abre um card na própria página com a tabela completa
+// da turma, usando o `turma` que já está em memória em
+// _alunoSelecionado.ocorrencias (zero leitura adicional). Só leitura:
+// esta página não grava nada em turma nenhuma.
+function abrirTurmaTabela(turmaId){
+  const o = (_alunoSelecionado?.ocorrencias || []).find(x => String(x.turmaId) === String(turmaId));
+  if (!o || !o.turma){
+    setMsg("Não foi possível abrir essa turma — dados não encontrados em memória.", "err");
+    return;
+  }
+  const t = o.turma;
+  const schema = t.schemaSnapshot || null;
+  const serieAtiva = schema ? (schema.serieAtiva !== false) : true;
+  const resultadoAtivo = schema ? (schema.resultadoAtivo !== false) : true;
+  const cols = _colunasDaTurmaAberta(t);
+  const alunos = Array.isArray(t.alunos) ? t.alunos : [];
+
+  const tt = tituloTurma(t);
+  $("turmaAbertaTitulo").textContent = tt.base + (tt.extras ? " — " + tt.extras : "");
+  $("turmaAbertaMeta").innerHTML =
+    `ID: ${escapeHtml(t.id || turmaId)}` +
+    (t.origemArquivo ? ` • Arquivo: ${escapeHtml(t.origemArquivo)}` : "") +
+    ` • ${alunos.length} aluno(s)`;
+
+  let headHtml = `<th>Nº</th><th>Nome</th>`;
+  if (serieAtiva) headHtml += `<th>Série</th>`;
+  cols.forEach(c => { headHtml += `<th>${escapeHtml(c.label || c.key)}</th>`; });
+  if (resultadoAtivo) headHtml += `<th>Resultado</th>`;
+  $("theadTurmaAberta").innerHTML = headHtml;
+
+  // destaca a linha do aluno cujo histórico está aberto, mesmo critério
+  // de match em 2 níveis usado em _construirHeadBodyHistorico (alunoId
+  // exato, senão nome normalizado exato).
+  const keyNome = o.nomeKey || normNome(o.nomeRaw);
+  const tbody = $("tbodyTurmaAberta");
+  tbody.innerHTML = "";
+  alunos.forEach((a, idx) => {
+    const isAlvo = (o.alunoId && String(a?.alunoId||"").trim() === String(o.alunoId||"").trim())
+      || (keyNome && normNome(a?.nome) === keyNome);
+    const tr = document.createElement("tr");
+    if (isAlvo) tr.style.fontWeight = "800";
+    let html = `<td>${idx+1}</td><td>${escapeHtml(a?.nome || "")}</td>`;
+    if (serieAtiva) html += `<td>${escapeHtml(a?.serie || "")}</td>`;
+    cols.forEach(c => { html += `<td>${escapeHtml(a?.[c.key] ?? "--")}</td>`; });
+    if (resultadoAtivo) html += `<td>${escapeHtml(a?.resultado ?? "Não informado")}</td>`;
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+
+  $("cardTurmaAberta").style.display = "block";
+  $("cardTurmaAberta").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* =========================
