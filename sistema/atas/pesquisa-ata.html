@@ -222,6 +222,27 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
 html[data-theme="dark"] .card-destaque .btn { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
 html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
 
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
+   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
+   próprio .info-tip-bubble, junto de onde é usado. Bloco pensado pra ser
+   copiado igual em outras páginas do módulo quando entrarem na fila. ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); padding:10px 12px; border-radius:10px;
+  background:var(--card); border:1.5px solid var(--border); color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+
 /* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
 @keyframes toastSubir {
   from { opacity: 0; transform: translateX(-50%) translateY(16px); }
@@ -280,12 +301,12 @@ html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: v
       </div>
     </div>
 
-    <div class="filter-actions">
+    <div class="filter-actions" style="display:flex; align-items:center; gap:2px;">
       <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
-      <span class="muted">Ou pesquise vazio para ver todas as turmas.</span>
-    </div>
-    <div class="muted" style="margin-top:10px;">
-      DB local: <b id="dbInfo">carregando...</b>
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble" id="dbInfoTip">carregando...</span>
+      </span>
     </div>
   </div>
 
@@ -447,22 +468,6 @@ function setMsg(text, kind){
     _toastAviso(t);
   }
 }
-// Card de destaque: decide texto claro/escuro pela luminância real da cor
-// escolhida em perfil.html (mesmo cálculo usado em gestão-atas), e reajusta
-// sozinho quando a pessoa troca de cor sem recarregar a página.
-function ajustarContrasteDestaque(){
-  const el = document.querySelector('.card-destaque');
-  if(!el) return;
-  const bg = getComputedStyle(el).backgroundColor;
-  const m = bg.match(/\d+(\.\d+)?/g);
-  if(!m || m.length < 3) return;
-  const [r,g,b] = m.map(Number);
-  const lin = (c) => { c/=255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
-  const luminancia = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
-  el.classList.toggle('contraste-claro', luminancia > 0.5);
-}
-document.addEventListener('colorchange', ajustarContrasteDestaque);
-
 window.addEventListener('unhandledrejection', (ev) => {
   const t = document.getElementById('_toastGlobal');
   if(t && t.dataset.loading === '1'){
@@ -1253,8 +1258,8 @@ async function carregar() {
 
   recomputarTurmasBase();
 
-  document.getElementById("dbInfo").textContent =
-    `${turmas.length} turma(s) — clique em Pesquisar para exibir`;
+  document.getElementById("dbInfoTip").textContent =
+    `${turmas.length} turma(s) — aperte em "Pesquisar" para exibir todas ou selecione um filtro.`;
 
   preencherFiltroAno(turmas);
 
@@ -1275,7 +1280,13 @@ async function carregar() {
 
   if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
 
-  ajustarContrasteDestaque();
+  if (window.ThemeColors) ThemeColors.ajustarContraste();
+
+  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+  document.addEventListener("click", ()=>{
+    document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+  });
+
   Loading.esconder();
 }
 
