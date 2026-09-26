@@ -11,7 +11,21 @@ páginas do sistema, duas mudanças já feitas e testadas em
 
 Sempre que possível, compare com os arquivos reais já migrados
 (`historico-aluno.html` + `theme-colors.js`) em vez de confiar só neste
-guia de memória.
+guia de memória. `gestao-atas.html` também já foi migrado (Parte 1 e 2) e
+serve de segunda referência — inclusive pro ponto do aviso abaixo, porque
+foi a página onde ele foi checado preventivamente.
+
+> ⚠️ **Antes de colar qualquer CSS deste guia**: os nomes de variável
+> (`--card`, `--border`, `--text` etc.) **não são os mesmos em todas as
+> páginas**. `historico-aluno.html` tem um design system próprio, mais
+> antigo, que define `--card`/`--border`/`--text` no seu `:root`. Páginas
+> mais novas (`gestao-atas.html`, `pesquisa-ata.html`) usam outros nomes
+> (`--card-bg`, `--line`, etc.) vindos de `base.css`. Colar o CSS do guia
+> ao pé da letra numa página que não tem essas três variáveis **não dá
+> erro nenhum** — o navegador simplesmente ignora a declaração e cai em
+> transparente/herdado, então o bug só aparece visualmente (balão
+> invisível, ícone com cor errada), não no console. Ver seção 2.1.1 antes
+> de copiar o CSS da Parte 2.
 
 ---
 
@@ -142,6 +156,64 @@ rótulo "Nome do aluno". Mecanismo **inline por página** (copiado, não
 centralizado num arquivo à parte) — decisão consciente, porque texto e
 posição da dica mudam a cada uso.
 
+## 2.1.1 Antes de copiar — checar se os tokens da página batem com o guia
+
+O CSS da seção 2.1 foi escrito em cima dos tokens de `historico-aluno.html`:
+`--card` (fundo do balão), `--border` (borda do balão), `--text` (texto do
+balão). **Esses três nomes só existem de verdade nessa página.** O resto do
+sistema herda de `base.css`, que usa outros nomes.
+
+Antes de colar o CSS da 2.1 em qualquer página nova:
+
+1. Rodar um grep na própria página por `--card`, `--border` e `--text`
+   (ex.: `grep -n -- "--card\b\|--border\b\|--text\b" pagina.html`).
+2. Se os três aparecerem definidos (ou usados sem `var(..., fallback)`,
+   sinal de que já são tokens estáveis do sistema) → colar o CSS da 2.1
+   sem alterar nada.
+3. Se **não** aparecerem (ou só aparecerem com fallback defensivo, tipo
+   `var(--card-bg, #fff)`) → **não colar cego**. Mapear pros tokens reais
+   que a própria página já usa pra fundo de card / borda / texto — eles
+   quase sempre existem sob outro nome, só grepar `--card-bg`, `--line`,
+   `--chip-bg`, `--muted` etc. e ver qual cobre cada papel.
+
+Dois casos reais já vistos:
+
+- **`pesquisa-ata.html`** (bug, corrigido depois de já publicado): o CSS
+  do guia foi colado sem checar. Resultado: fundo do balão ficou
+  transparente (`var(--card)` não existe ali → cai em transparente) e o
+  ícone trocava de cor sozinho ao mudar de tema (estava dentro de
+  `.filter-actions`, que nenhuma regra de `--dest-fg` cobre — problema de
+  *onde* o ícone foi colocado, não só de token). Corrigido mapeando pra
+  `--card-bg`/`--card-border` (tokens reais dessa página) + cor de texto
+  fixa por tema via `html[data-theme="dark"]`.
+- **`gestao-atas.html`** (feito certo direto): grep confirmou que a
+  página usa `--card-bg` (com fallback `#fff`, já usado em outros pontos
+  do próprio arquivo) e `--line`, não `--card`/`--border`. O CSS foi colado
+  já com `var(--card-bg, #fff)` / `var(--line)` / `var(--text, #1e293b)`
+  no lugar de `var(--card)` / `var(--border)` / `var(--text)`, sem
+  precisar de correção depois.
+
+**Sobre o ícone especificamente** (a parte `color:inherit` / `currentColor`
+da 2.1): isso funciona sozinho *desde que* o ícone fique dentro de um
+elemento que já tem a cor certa aplicada — normalmente o `<h3>` do card
+(que already recebe `color:var(--dest-fg)` dentro de `.card-destaque`) ou
+um `label`/`.muted` comum. Se o ícone for colocado dentro de outro
+container (uma barra de ações, um footer, etc.) que nenhuma regra de
+contraste cobre, ele herda a cor de texto ambiente da página — que muda
+com o tema — em vez da cor fixa do card. Antes de colar o ícone em um
+lugar novo, checar rapidamente se aquele container já tem uma cor de texto
+resolvida pro card de destaque; se não tiver, ou mover o ícone pra dentro
+do `<h3>`/label mais próximo, ou adicionar uma regra específica tipo
+`.card-destaque .info-tip{ color: var(--dest-fg); }`.
+
+**Sobre o balão ficar grande** (o próprio texto da dica, não o CSS): se o
+texto da dica for longo (parágrafo técnico completo, por exemplo), vale
+adicionar `max-height` + `overflow-y:auto` no `.info-tip-bubble` — não
+tinha isso na primeira versão da 2.1 porque a dica de exemplo
+(`historico-aluno.html`) era curta. Adicionado no bloco de CSS abaixo como
+padrão novo, mesmo quando a dica é curta (não atrapalha, só entra em ação
+se o texto passar do espaço).
+
 ## 2.1 CSS (copiar dentro do `<style>` da página)
 
 ```css
@@ -159,13 +231,22 @@ posição da dica mudam a cada uso.
 .info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
 .info-tip-bubble{
   display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); padding:10px 12px; border-radius:10px;
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
   background:var(--card); border:1.5px solid var(--border); color:var(--text);
   box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
   white-space:normal; cursor:default;
 }
 .info-tip.open .info-tip-bubble{ display:block; }
 ```
+
+> `--card`/`--border`/`--text` acima são os nomes usados em
+> `historico-aluno.html`. **Não copiar esses três nomes literalmente sem
+> checar a seção 2.1.1 antes** — na maioria das páginas do sistema eles
+> vão precisar virar os equivalentes reais daquela página (ex.:
+> `--card-bg`/`--line`/`--text` com fallback, como em `gestao-atas.html`).
+> `max-height`+`overflow-y:auto` é novo nesta versão do guia (não existia
+> quando `historico-aluno.html` foi feito) — mantém o balão utilizável
+> mesmo se o texto da dica for longo, sem precisar decidir caso a caso.
 
 **Por que não é emoji (ⓘ) nem cor fixa:**
 - O emoji ⓘ já vem com um círculo desenhado dentro do próprio glifo, e
@@ -220,6 +301,13 @@ estiverem abertos.
 
 ## 2.4 Checklist rápido — Parte 2
 
+- [ ] Antes de colar: grep na página por `--card`/`--border`/`--text` (seção
+      2.1.1). Se não existirem (ou só com fallback defensivo), o CSS foi
+      colado com os tokens reais da página no lugar desses três?
+- [ ] O ícone `.info-tip` ficou dentro de um elemento que já tem a cor de
+      texto certa resolvida pro contexto (h3 do card, label, `.muted`)? Se
+      for um container sem cor resolvida (barra de ações, footer), foi
+      adicionada uma regra específica de cor ou o ícone foi movido?
 - [ ] CSS de `.info-tip`/`.info-tip-bubble` copiado pro `<style>` da
       página (sem alterar as regras, só colar)?
 - [ ] Ícone `<span class="info-tip">` com o `onclick` de toggle, texto
@@ -245,7 +333,13 @@ estiverem abertos.
    exceção, sem seletor customizado.
 
 **Parte 2 — tooltip ⓘ:**
-1. Cola o bloco de CSS (`.info-tip`/`.info-tip-bubble`) sem alterar.
-2. Cola o HTML do ícone ao lado do campo/rótulo certo, troca só o texto
-   da dica.
-3. Garante o listener de "fechar ao clicar fora" uma vez por página.
+1. Antes de colar o CSS: grep na página por `--card`/`--border`/`--text`
+   (seção 2.1.1). Se não existirem do jeito que `historico-aluno.html`
+   define, troca esses três nomes pelos tokens reais da página de destino
+   (ex.: `--card-bg`/`--line`/`--text` com fallback) antes de colar.
+2. Cola o bloco de CSS (`.info-tip`/`.info-tip-bubble`) — regras iguais,
+   só os três nomes de variável do balão ajustados se necessário.
+3. Cola o HTML do ícone ao lado do campo/rótulo certo (de preferência
+   dentro de um elemento que já tem cor de texto resolvida pro card),
+   troca só o texto da dica.
+4. Garante o listener de "fechar ao clicar fora" uma vez por página.
