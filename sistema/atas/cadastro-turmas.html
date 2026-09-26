@@ -148,7 +148,7 @@ html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); bord
   background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
 }
 html[data-theme="dark"] .btn.ghost:hover, html[data-theme="dark"] .btn.secondary:hover {
-  background: rgba(124,58,237,0.18); border-color: var(--brand-d, #7c3aed); color: #c4b5fd;
+  background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd);
 }
 .btn.outline { background: var(--brand-faded, #f5f3ff); border-color: var(--brand-border, #ddd6fe); color: var(--brand-text, #6d28d9); }
 .btn.outline:hover { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
@@ -180,34 +180,8 @@ html[data-theme="dark"] .btn.outline:hover { background: var(--brand-d, #7c3aed)
 .detalhes-toggle:hover { text-decoration: underline; }
 html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); }
 
-/* Botão "Editar" de cada item da lista: .btn.outline usa var(--brand) na
-   borda/texto sem fundo — em paletas bem claras (ex. "Branco", onde
-   --brand é #fff) isso ficava quase invisível contra o fundo neutro do
-   .item. Aqui ganha um preenchimento fixo com os mesmos tokens usados
-   pelos chips/badges de marca no resto do sistema — contraste garantido
-   em qualquer paleta, sem depender de o quão clara/escura a cor escolhida
-   é. Escopado só aqui: não muda o botão "Adicionar" (também .btn.outline),
-   que fica em outro card. */
-.item .btns .btn.outline {
-  background: var(--brand-faded, #f5f3ff);
-  border-color: var(--brand-border, #ddd6fe);
-  color: var(--brand-text, #6d28d9);
-}
-.item .btns .btn.outline:hover {
-  background: var(--brand, #7c3aed);
-  border-color: var(--brand, #7c3aed);
-  color: #fff;
-}
-html[data-theme="dark"] .item .btns .btn.outline {
-  background: var(--brand-faded-d, rgba(124,58,237,0.28));
-  border-color: var(--brand-border-d, #7c3aed);
-  color: var(--brand-text-d, #c4b5fd);
-}
-html[data-theme="dark"] .item .btns .btn.outline:hover {
-  background: var(--brand-d, #7c3aed);
-  border-color: var(--brand-d, #7c3aed);
-  color: #fff;
-}
+/* Botão "Editar" cai aqui pela regra base .btn.outline acima (mesmo
+   tratamento do "Adicionar" — contraste garantido em qualquer paleta). */
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
 
