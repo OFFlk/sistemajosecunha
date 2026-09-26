@@ -60,6 +60,26 @@ html[data-theme="dark"] {
   margin-bottom: 16px;
   transition: background 0.3s, border-color 0.3s;
 }
+
+/* Card de destaque na cor do usuário (mesmo mecanismo de historico-aluno /
+   gestão-atas / pesquisa-ata.html). Nesta página o destaque é o card
+   "Turmas cadastradas" (os dois cards ficam lado a lado, .split-grid).
+   Sem override de .btn: o único botão daqui dentro ("Editar") vive dentro
+   de .item, que tem fundo neutro (var(--card)) próprio — não fica
+   diretamente sobre o fundo colorido, então não precisa (e não deve)
+   herdar o estilo translúcido do dest-fg. */
+.card.card-destaque {
+  background: var(--btn-home-bg);
+  border-color: var(--btn-home-border);
+  --dest-fg: #ffffff;
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #1e293b;
+}
+.card-destaque h2 { color: var(--dest-fg); }
+.card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+.card-destaque .info-tip { color: var(--dest-fg); }
 .card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
 h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
@@ -171,6 +191,27 @@ html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
 }
 .info-note strong { color: var(--text); }
 
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
+   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
+   próprio .info-tip-bubble, junto de onde é usado. Bloco copiado do padrão
+   já aprovado em historico-aluno.html / gestao-atas.html. ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card); border:1.5px solid var(--border); color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+
 .warn {
   padding: 12px 14px; border-radius: 10px; background: rgba(245,158,11,.10);
   border: 1px solid rgba(245,158,11,.30); font-size: 13px; margin-top: 12px;
@@ -200,7 +241,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 
     <div class="card">
       <h2 style="margin:0 0 10px">Cadastrar / editar turma (Atas)</h2>
-      <div class="sub" style="margin-bottom:10px;">Aqui só os dados da turma. Alunos, notas e situação são lançados em <b>cadastro-atas.html</b>, depois de escolher a turma pelos dois seletores (ano → turma).</div>
 
       <div class="form-section">
         <div class="form-section-label">Dados da turma</div>
@@ -208,7 +248,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           <div>
             <label class="label">Ano letivo</label>
             <input type="number" id="anoSelect" class="input" inputmode="numeric" step="1" min="2000" max="2100">
-            <div class="help">Preenchido com o ano mais recente já cadastrado (ou o ano atual, se não houver nenhuma turma ainda).</div>
           </div>
           <div>
             <label class="label">Turno</label>
@@ -218,14 +257,18 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
               <option value="NOTURNO">Noturno</option>
               <option value="INTEGRAL">Integral</option>
             </select>
-            <div class="help">Usado para montar o ID e o nome automático.</div>
           </div>
         </div>
       </div>
 
       <div class="form-section">
         <div class="form-section-label">Séries</div>
-        <label class="label">Adicionar série</label>
+        <label class="label">Adicionar série
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+          </span>
+        </label>
         <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
           <select id="serieSelect" class="input">
             <option value="">(selecione)</option>
@@ -238,9 +281,13 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 
       <div class="form-section">
         <div class="form-section-label">Notas</div>
-        <label class="label">Schema de notas</label>
+        <label class="label">Schema de notas
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Define as matérias que vão aparecer no cadastro de atas pra essa turma. Você pode configurar os schemas indo em: <b>Gestão de dados → Gerenciar schemas</b>.</span>
+          </span>
+        </label>
         <select id="schemaSelect" class="input"></select>
-        <div class="help">Define as matérias/colunas que vão aparecer em cadastro-atas.html pra essa turma. Configurado em <span class="mono">admin → Edição de ata e schema</span>.</div>
         <div id="avisoSchemaBloqueado" class="warn" style="display:none;">
           🔒 O schema não pode ser alterado depois que a turma é criada. Ao salvar, a turma continua com o schema original.
         </div>
@@ -249,17 +296,25 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       <div class="form-section">
         <div class="form-section-label">Identificação</div>
         <div>
-          <label class="label">Nome da turma</label>
+          <label class="label">Nome da turma
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+              i
+              <span class="info-tip-bubble">Preenchido automaticamente usando os dados anteriores! O nome da turma pode ser alterado manualmente de acordo com sua preferência.</span>
+            </span>
+          </label>
           <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO 2026 (MATUTINO)">
-          <div class="help">Preenche automaticamente com séries + ano + turno (você pode editar).</div>
         </div>
 
         <input id="turmaId" class="input readonly" readonly style="display:none">
         <div class="id-badge-row">
-          <span class="label-inline">ID da turma:</span>
+          <span class="label-inline">ID da turma:
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+              i
+              <span class="info-tip-bubble">O ID da turma é gerado automaticamente usando os dados anteriores — não é possível editá-lo manualmente. Caso haja um ID idêntico, uma letra (A, B, C...) é adicionada ao final pra torná-lo único.<br><br>Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+            </span>
+          </span>
           <span class="id-badge" id="turmaIdBadge">—</span>
         </div>
-        <div class="help">Formato: <span class="mono">ATUR-ATAS|ANO|TURNO|SÉRIES</span> (+ sufixo A/B/C se repetir).</div>
         <div id="avisoMudancaId" class="warn" style="display:none;"></div>
       </div>
 
@@ -272,17 +327,25 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       </div>
 
       <div class="info-note">
-        <strong>Fluxo:</strong> crie a turma aqui (vazia). Ela aparece imediatamente em <span class="mono">cadastro-atas.html</span>, no 2º seletor, assim que você escolher o ano letivo dela no 1º.
+        <strong>Fluxo:</strong> ao criar uma turma nessa página, ela irá aparecer no cadastro de atas. Se tiver dúvidas, clique nas indicações de dicas (ⓘ) na página em questão.
       </div>
     </div>
 
-    <div class="card">
+    <div class="card card-destaque">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-        <h2 style="margin:0">Turmas cadastradas</h2>
+        <h2 style="margin:0">Turmas cadastradas
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Selecione um ano no seletor ao lado — ele vai listar automaticamente todas as turmas encontradas para aquele filtro.</span>
+          </span>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma salva no banco voltam para o formulário e você poderá alterar alguns dados. Em nenhuma circunstância altere o schema. Siga também as dicas em Séries e ID da turma.</span>
+          </span>
+        </h2>
         <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
         <span id="countTurmasLista" class="help" style="margin:0"></span>
       </div>
-      <div class="help" style="margin-bottom:10px">Clique em <b>Editar</b> pra carregar no formulário. Não há exclusão nem inativação aqui — turma vazia sem uso pode ser apagada na página de gestão de dados.</div>
       <div id="listaTurmas" class="list"></div>
     </div>
 
@@ -1013,6 +1076,13 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       resetForm();
       renderListaTurmas();
       updateDbInfo();
+      if (window.ThemeColors) ThemeColors.ajustarContraste();
+
+      // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+      document.addEventListener("click", ()=>{
+        document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+      });
+
       // Erro de leitura ≠ "schema padrão não existe" — antes os dois casos
       // caíam na mesma mensagem (falha silenciosa também zerava SCHEMAS_CACHE).
       const msgPosReload = lerMsgPosReload(); // confirmação de uma edição que acabou de recarregar a página
