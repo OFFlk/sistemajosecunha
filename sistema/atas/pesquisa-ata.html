@@ -237,11 +237,17 @@ html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: v
 .info-tip-bubble{
   display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
   width:min(260px, 70vw); padding:10px 12px; border-radius:10px;
-  background:var(--card); border:1.5px solid var(--border); color:var(--text);
+  background:var(--card-bg); border:1.5px solid var(--card-border); color:#1e293b;
   box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
   white-space:normal; cursor:default;
 }
+html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
 .info-tip.open .info-tip-bubble{ display:block; }
+/* Dentro de um card de destaque, o ícone acompanha o texto do card
+   (var(--dest-fg), já ajustado por ThemeColors.ajustarContraste()) — igual
+   aos outros elementos do card. O balão NÃO herda isso (cor fixa acima),
+   pra continuar legível em qualquer fundo. */
+.card-destaque .info-tip{ color: var(--dest-fg); }
 
 /* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
 @keyframes toastSubir {
