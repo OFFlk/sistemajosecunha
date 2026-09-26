@@ -493,21 +493,10 @@ const DB = (() => {
 
 
 // Card de destaque: decide texto claro/escuro pela luminância real da cor
-// escolhida em perfil.html (mesmo cálculo usado em gestão-atas e
-// pesquisa-ata.html), e reajusta sozinho quando a pessoa troca de cor sem
-// recarregar a página.
-function ajustarContrasteDestaque(){
-  const el = document.querySelector('.card-destaque');
-  if(!el) return;
-  const bg = getComputedStyle(el).backgroundColor;
-  const m = bg.match(/\d+(\.\d+)?/g);
-  if(!m || m.length < 3) return;
-  const [r,g,b] = m.map(Number);
-  const lin = (c) => { c/=255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
-  const luminancia = 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
-  el.classList.toggle('contraste-claro', luminancia > 0.5);
-}
-document.addEventListener('colorchange', ajustarContrasteDestaque);
+// escolhida em perfil.html. Cálculo e o reajuste automático em troca de cor
+// (evento "colorchange") agora vivem centralizados em theme-colors.js —
+// ver ThemeColors.ajustarContraste() — não precisa mais duplicar a função
+// nem registrar o listener aqui.
 
 function normNome(s){
   return String(s || "")
@@ -1218,7 +1207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const nomeEscola = (_escolaCache.displayName || _escolaCache.name || _escolaCache.nome || DB.getActiveSchoolId()).toString().trim();
     $("dbInfo").textContent = `Escola: ${nomeEscola} • busca em tempo real, sem cache local`;
 
-    ajustarContrasteDestaque();
+    if (window.ThemeColors) ThemeColors.ajustarContraste();
 
     // Enter no input dispara busca
     $("q").addEventListener("keydown", (ev)=>{
