@@ -171,6 +171,32 @@ a.btn.btn-primary:hover {
   margin: 0; border: 0; border-radius: 0; box-shadow: none;
   overflow: auto; max-height: calc(55vh - 44px);
 }
+
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
+   guia-migracao-contraste-theme-colors.md, Parte 2). Copiado do guia com
+   UM ajuste: esta página não define --card/--border como o
+   historico-aluno.html (design system próprio, mais antigo) — aqui os
+   tokens reais são --card-bg/--line (--text já é usado com fallback em
+   outros pontos deste mesmo arquivo, ver .log-floating-close:hover acima).
+   Mapeando pros tokens certos evita o bug já visto em pesquisa-ata.html:
+   balão com fundo transparente por causa de uma variável que não existe
+   nesta página. */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card-bg, #fff); border:1.5px solid var(--line); color:var(--text, #1e293b);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
 </style>
 </head>
 <body>
@@ -195,13 +221,13 @@ a.btn.btn-primary:hover {
 
   <!-- ── SCHEMAS DE ATA ── -->
   <div class="card">
-    <h3 style="margin-top:0;">🧩 Schemas de ata</h3>
-    <p class="muted">
-      O schema define as matérias de uma ata e como as colunas da planilha são lidas na importação.
-      Toda escola tem um schema padrão, que pode ser editado mas não excluído. Se uma turma tem
-      matérias diferentes, crie, duplique ou edite outros schemas e escolha qual deles a turma usa
-      ao cadastrá-la.
-    </p>
+    <h3 style="margin-top:0;">🧩 Schemas de ata
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble">"Schema" é a lista de matérias de uma ata e como as colunas da planilha são lidas na importação. Se uma turma tiver matérias diferentes das demais, crie, duplique ou edite outro schema e escolha qual deles ela vai usar ao ser cadastrada.</span>
+      </span>
+    </h3>
+    <p class="muted">Gerenciamento de schema — crie, edite ou apague schemas de atas!</p>
     <div class="row-btns">
       <a class="btn btn-primary" href="../atas/schema_ata.html">🧩 Gerenciar schemas</a>
     </div>
@@ -214,12 +240,7 @@ a.btn.btn-primary:hover {
       <span class="sec-toggle" id="togSecJSON">▼</span>
     </div>
     <div class="sec-body" id="secJSON">
-      <p class="muted">
-        Importe um JSON gerado por esta página. O sistema conserva o que for idêntico,
-        adiciona o que for novo e avisa turmas suspeitas (mesma série e ano) e schemas em
-        conflito (mesmo ID, conteúdo diferente) — schemas em conflito vêm desmarcados por
-        padrão e nunca são sobrescritos sem confirmação.
-      </p>
+      <p class="muted">Envie um arquivo de backup JSON para restaurar turmas e schemas. O sistema mantém o que já existe e sempre avisa antes de sobrescrever qualquer coisa.</p>
       <div class="row-btns">
         <label class="btn btn-outline" id="lblJSON" style="cursor:pointer;">
           📂 Carregar JSON de backup
@@ -250,7 +271,7 @@ a.btn.btn-primary:hover {
       <span class="sec-toggle" id="togSecExport">▼</span>
     </div>
     <div class="sec-body" id="secExport">
-      <p class="muted">Exporta turmasDB + alunos-atas + schemas de ata do módulo. Faça backup antes de qualquer limpeza.</p>
+      <p class="muted">Exporta e salva uma cópia de segurança de todos os dados do módulo de atas.</p>
       <div class="row-btns">
         <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
         <button class="btn btn-outline" id="btnExportCSV"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
@@ -261,11 +282,16 @@ a.btn.btn-primary:hover {
   <!-- ── APAGAR TURMAS ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secApagar')">
-      <h3 style="margin-top:0;">🗑️ Apagar turmas</h3>
+      <h3 style="margin-top:0;">🗑️ Apagar turmas
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          i
+          <span class="info-tip-bubble">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
+        </span>
+      </h3>
       <span class="sec-toggle" id="togSecApagar">▼</span>
     </div>
     <div class="sec-body" id="secApagar">
-      <p class="muted">Selecione as turmas a remover. Os bancos auxiliares (atasDB, matriculasDB, turmasMetaDB) são reconstruídos automaticamente. Turmas marcadas com <span class="badge warn">⚠️ suspeita/legado</span> não têm arquivo de origem/aba reconhecidos — geralmente são resquícios antigos e não devem existir aqui.</p>
+      <p class="muted">Selecione as turmas que deseja apagar do banco de dados e aperte em "Apagar selecionadas".</p>
       <div class="row-btns" style="margin-bottom:10px;">
         <button class="btn btn-gray"   onclick="selecionarTodasTurmas(true)">Marcar todas</button>
         <button class="btn btn-gray"   onclick="selecionarTodasTurmas(false)">Desmarcar todas</button>
@@ -310,6 +336,13 @@ a.btn.btn-primary:hover {
    qualquer dado ser carregado ou exibido.
 ============================================= */
 let IS_ADMIN = false;
+
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora
+// (ver guia-migracao-contraste-theme-colors.md, Parte 2.3). Um só listener
+// pro página inteira, mesmo com vários ícones.
+document.addEventListener("click", ()=>{
+  document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+});
 
 document.addEventListener('auth:ready', function () {
   const session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
@@ -526,6 +559,11 @@ async function inicializar() {
 
   atualizarStats();
   renderTabelaTurmas();
+  // Contraste do card de destaque agora é centralizado em theme-colors.js
+  // (ver guia-migracao-contraste-theme-colors.md, Parte 1). O próprio
+  // theme-colors.js já reage sozinho ao evento 'colorchange'; esta chamada
+  // aqui é só a inicialização única, depois que o card já existe no DOM.
+  if (window.ThemeColors) ThemeColors.ajustarContraste();
   // Esconde a tela de loading só depois que stats/tabela já estão prontas —
   // evita o placeholder "Carregando..." aparecer por baixo quando o overlay
   // some. Roda tanto no caminho de sucesso quanto no de erro de conexão
@@ -1000,33 +1038,6 @@ function exportarCSV() {
   _baixar('\uFEFF'+csv, `turmas-atas-${_hoje()}.csv`, 'text/csv;charset=utf-8;');
   setMsg('CSV exportado.', 'ok');
 }
-
-/* =============================================
-   CARD DE DESTAQUE — contraste do texto
-   Lê a cor real do botão "Início" (--btn-home-bg, já resolvida pro tema
-   atual) e escolhe texto branco ou escuro, o que tiver mais contraste.
-   Relê quando o tema/cor muda (evento 'colorchange' do theme-colors.js).
-============================================= */
-function ajustarContrasteDestaque() {
-  const el = document.querySelector('.card-destaque');
-  if (!el) return;
-  const raw = getComputedStyle(document.documentElement).getPropertyValue('--btn-home-bg').trim();
-  let rgb = null, m;
-  if ((m = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i))) {
-    let h = m[1]; if (h.length === 3) h = h.split('').map(c => c + c).join('');
-    rgb = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
-  } else if ((m = raw.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i))) {
-    rgb = [Number(m[1]), Number(m[2]), Number(m[3])];
-  }
-  if (!rgb) return;   // formato inesperado: mantém o padrão (texto branco)
-  const lin = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-  const L = 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
-  const contrasteBranco = 1.05 / (L + 0.05);
-  const contrasteEscuro = (L + 0.05) / 0.0583;   // #0f172a ≈ luminância 0.0083
-  el.classList.toggle('contraste-claro', contrasteEscuro > contrasteBranco);
-}
-ajustarContrasteDestaque();
-document.addEventListener('colorchange', ajustarContrasteDestaque);
 
 /* =============================================
    IMPORTAR JSON — MERGE
