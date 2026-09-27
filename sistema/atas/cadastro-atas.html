@@ -147,7 +147,7 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 .hidden{ display:none !important; }
 
 
-/* ── Scans do Livro de Atas ── */
+/* ── Scans de documentos ── */
 .scans-wrap { display:none; margin-bottom:16px; }
 .scans-drop {
   border:2px dashed var(--brand-border,#ddd6fe);
@@ -212,6 +212,55 @@ html[data-theme="dark"] .scans-badge-pagina{
 
 .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
 
+/* ===== Card de destaque — fundo ligado à cor de marca, contraste
+   calculado por ThemeColors.ajustarContraste() (theme-colors.js). ===== */
+.card.card-destaque {
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,.18);
+  --dest-btn-bd: rgba(255,255,255,.40);
+  --dest-btn-hover: rgba(255,255,255,.28);
+  --dest-panel-bg: rgba(255,255,255,.10);
+  background: var(--btn-home-bg); border-color: var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #0f172a;
+  --dest-btn-bg: rgba(0,0,0,.08);
+  --dest-btn-bd: rgba(0,0,0,.25);
+  --dest-btn-hover: rgba(0,0,0,.16);
+  --dest-panel-bg: rgba(0,0,0,.06);
+  border-color: var(--card-border);
+}
+/* Texto solto direto no fundo colorido (sem caixa própria) precisa da cor de contraste explícita. */
+.card-destaque h2,
+.card-destaque p,
+.card-destaque strong,
+.card-destaque label { color: var(--dest-fg); }
+
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
+   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
+   próprio .info-tip-bubble, junto de onde é usado. ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card-bg,#fff); border:1.5px solid var(--card-border,#ddd6fe); color:var(--ink);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+/* Variante larga: dicas mais longas em cards com espaço sobrando. */
+.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+/* Variante alinhada à direita: ícone perto da borda direita do container. */
+.info-tip-bubble.align-right{ left:auto; right:0; }
+
 </style>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -223,7 +272,7 @@ html[data-theme="dark"] .scans-badge-pagina{
 
 <div class="container">
 
-  <div class="card">
+  <div class="card card-destaque">
     <div id="avisoEscola" class="aviso-warn" style="display:none">
       ⚠️ Nenhuma escola cadastrada. Vá em <b>Editar escola</b> para configurar o cabeçalho.
     </div>
@@ -243,10 +292,14 @@ html[data-theme="dark"] .scans-badge-pagina{
         <select id="anoLetivoSelect" onchange="onAnoLetivoSelectChange()">
           <option value="">Selecione...</option>
         </select>
-        <div class="help" style="font-size:12px;color:var(--muted);margin-top:4px;">Só aparecem anos com turma cadastrada em cadastro-turmas.html.</div>
       </div>
       <div class="campo">
-        <label>Turma</label>
+        <label>Turma
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">As turmas apresentadas aqui foram criadas no cadastro de turmas. Caso não encontre a turma que procura, volte até lá e confira todas as informações, principalmente o ano letivo.</span>
+          </span>
+        </label>
         <select id="turmaSelect" onchange="onTurmaSelectChange()" disabled>
           <option value="">Selecione o ano primeiro...</option>
         </select>
@@ -270,7 +323,12 @@ html[data-theme="dark"] .scans-badge-pagina{
   ═══════════════════════════════════════ -->
   <div class="card scans-wrap" id="scansWrap">
     <h3 style="margin-top:0; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-      <span>📄 Scans do Livro de Atas <span style="font-size:13px;font-weight:400;color:var(--muted);">— opcional</span></span>
+      <span>📄 Scans de documentos
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          i
+          <span class="info-tip-bubble wide">Os documentos referentes a esta ata devem ser escaneados e adicionados na área abaixo. Imagens (JPG, PNG, WEBP...) são importadas normalmente; arquivos em PDF são convertidos automaticamente em imagens (JPG), uma para cada página. O limite é de 8 arquivos no total: cada página de um PDF conta como 1 arquivo e, se o PDF for importado depois de imagens já enviadas, o espaço disponível será o que faltar para completar 8.</span>
+        </span>
+        <span style="font-size:13px;font-weight:400;color:var(--muted);">— opcional</span></span>
       <button type="button" onclick="esconderScans()" title="Fechar" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;">✕</button>
     </h3>
     <div class="scans-status" id="scansStatus"></div>
@@ -291,7 +349,12 @@ html[data-theme="dark"] .scans-badge-pagina{
   </div>
 
   <div class="card" id="cardAlunos">
-    <h3 style="margin-top:0;">Alunos</h3>
+    <h3 style="margin-top:0;">Alunos
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble wide"><b>Adicionar/Atualizar:</b> guarda os dados do aluno (nome e notas) na tabela abaixo — ainda não salva no banco de dados.<br><br><b>Scans:</b> abre a área para anexar os documentos referentes a esta ata.<br><br><b>Salvar no banco:</b> grava todas as informações no banco de dados. Não feche a página antes da confirmação de salvamento, exibida na parte inferior.<br><br><b>Importar:</b> importa os dados da turma a partir de um arquivo .xlsx (Excel), desde que estejam na disposição esperada — há um exemplar do padrão em Gestão de Atas.<br><br><b>Descartar alterações:</b> cancela o que foi adicionado/alterado e ainda não foi salvo no banco. Só funciona antes de salvar; depois de salvo, é preciso refazer as alterações ou importar um backup exportado previamente em Gestão de Atas.</span>
+      </span>
+    </h3>
 
     <!-- ✅ Agora o form é dinâmico -->
     <div class="form-grid" id="formGridDinamico"></div>
@@ -542,7 +605,12 @@ function renderFormularioDinamico() {
   let html = `
     <div class="linha-topo-cadastro" style="grid-column:1/-1; display:flex; gap:14px; flex-wrap:wrap;">
       <div class="campo" style="flex:3 1 320px; min-width:260px;">
-        <label>Nome do aluno *</label>
+        <label>Nome do aluno *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble wide">Digite ao menos 4 letras do início do nome do aluno e clique em Buscar. O sistema mostra todos os alunos cadastrados que começam com essas letras. Ao selecionar um resultado, é criado um vínculo com esse aluno — o que facilita a exportação de documentos, a conferência de dados e buscas futuras. Se nenhum resultado for selecionado, o aluno recebe um ID único, que poderá ser vinculado em cadastros futuros.</span>
+          </span>
+        </label>
         <div style="display:flex; gap:6px;">
           <input id="nome" oninput="_limparVinculoCandidato()"
                  onkeydown="if(event.key==='Enter'){event.preventDefault(); buscarCandidatosAluno();}">
@@ -2492,9 +2560,17 @@ function _importConfirmarImportacao() {
    Boot
 ========================= */
 document.addEventListener("DOMContentLoaded", () => {
+  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+  document.addEventListener("click", ()=>{
+    document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+  });
+
   // Usa Auth.onReady — compatível com requireRole('admin')
   window.Auth.onReady(async () => {
     try {
+      // contraste do card de destaque, calculado a partir da cor de marca ativa
+      if (window.ThemeColors) ThemeColors.ajustarContraste();
+
       // dados da escola (cabeçalho)
       await carregarDadosEscola();
 
