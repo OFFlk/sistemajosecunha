@@ -332,27 +332,12 @@ footer { max-width: 720px; margin: 0 auto; padding: 14px 28px 28px; border-top: 
 <!-- SCRIPT — Seletor de cor (exclusivo desta página) -->
 <script>
 (function(){
-  const swatchColors = {
-    violet:   '#7c3aed',
-    rose:     '#be185d',
-    wine:     '#b91c1c',
-    amber:    '#b45309',
-    gold:     '#a16207',
-    forest:   '#166534',
-    teal:     '#0f766e',
-    cyan:     '#155e75',
-    navy:     '#120a8f',
-    deepblue: '#1e3a5f',
-    slate:    '#374151',
-    white:    '#ffffff',
-  };
-
   function updateHeader(key) {
     const palette = window.ThemeColors && ThemeColors.palettes[key];
     if (!palette) return;
     const swatch = document.getElementById('colorActiveSwatch');
     const label  = document.getElementById('colorActiveLabel');
-    if (swatch) swatch.style.background = swatchColors[key] || '#7c3aed';
+    if (swatch) swatch.style.background = palette['--brand'] || '#7c3aed';
     if (label)  label.textContent = palette.label;
   }
 
@@ -369,7 +354,7 @@ footer { max-width: 720px; margin: 0 auto; padding: 14px 28px 28px; border-top: 
       opt.className = 'color-option' + (key === current ? ' active' : '');
       opt.dataset.key = key;
       opt.innerHTML = `
-        <div class="color-swatch" style="background:${swatchColors[key] || '#7c3aed'};"></div>
+        <div class="color-swatch" style="background:${palette['--brand'] || '#7c3aed'};"></div>
         <div class="color-label">${palette.label}</div>
       `;
       opt.addEventListener('click', function(){
