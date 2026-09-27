@@ -159,18 +159,18 @@
       '--brand-border-d': '#6b7280',
       '--brand-text-d':   '#d1d5db',
     },
-    white: {
-      label: 'Branco',
-      '--brand':        '#ffffff',
-      '--brand-hover':  '#f0f0f0',
-      '--brand-faded':  '#fafafa',
-      '--brand-border': '#d4d4d4',
-      '--brand-text':   '#525252',
-      '--brand-d':        '#ffffff',
-      '--brand-hover-d':  '#f0f0f0',
-      '--brand-faded-d':  'rgba(255,255,255,0.12)',
-      '--brand-border-d': '#a3a3a3',
-      '--brand-text-d':   '#ffffff',
+    tan: {
+      label: 'Tan',
+      '--brand':        '#dbc09c',
+      '--brand-hover':  '#c9a97e',
+      '--brand-faded':  '#faf3e8',
+      '--brand-border': '#e3d1b4',
+      '--brand-text':   '#6b4a2b',
+      '--brand-d':        '#dbc09c',
+      '--brand-hover-d':  '#c9a97e',
+      '--brand-faded-d':  'rgba(219,192,156,0.28)',
+      '--brand-border-d': '#cc9966',
+      '--brand-text-d':   '#f0dfc0',
     },
   };
 
@@ -187,7 +187,14 @@
   // define o CSS de ".card-destaque.contraste-claro" — isso não muda, só a
   // função que decide QUANDO aplicar a classe é que sai da página).
   function calcularLuminancia(corCss) {
-    const m = String(corCss || '').match(/\d+(\.\d+)?/g);
+    const hex = String(corCss || '').trim().match(/^#([0-9a-f]{6})$/i);
+    let m;
+    if (hex) {
+      const int = parseInt(hex[1], 16);
+      m = [(int >> 16) & 255, (int >> 8) & 255, int & 255].map(String);
+    } else {
+      m = String(corCss || '').match(/\d+(\.\d+)?/g);
+    }
     if (!m || m.length < 3) return null;
     const [r, g, b] = m.map(Number);
     const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
@@ -227,6 +234,19 @@
     root.style.setProperty('--brand-faded-d',  palette['--brand-faded-d']);
     root.style.setProperty('--brand-border-d', palette['--brand-border-d']);
     root.style.setProperty('--brand-text-d',   palette['--brand-text-d']);
+
+    // Texto de contraste pra qualquer botão com preenchimento SÓLIDO de
+    // marca (mesmo cálculo do --dest-fg do .card-destaque, só que aqui sai
+    // pronto no apply(), porque já conhecemos o valor cru da paleta — não
+    // precisa ler background computado de nenhum elemento específico).
+    // Páginas com botão sólido (ex.: .btn.primary { background: var(--brand);
+    // color:#fff; }) devem trocar o "color:#fff" fixo por
+    // "color: var(--brand-fg, #fff)" — sem isso, paletas genuinamente
+    // claras (ex.: Tan) continuam com texto branco ilegível em cima.
+    const temaEscuro = document.documentElement.getAttribute('data-theme') === 'dark';
+    const brandAtivo = temaEscuro ? (palette['--brand-d'] || palette['--brand']) : palette['--brand'];
+    const luminanciaBrand = calcularLuminancia(brandAtivo);
+    root.style.setProperty('--brand-fg', (luminanciaBrand !== null && luminanciaBrand > 0.5) ? '#1e293b' : '#ffffff');
 
     try { localStorage.setItem(STORAGE_KEY, key); } catch {}
     document.dispatchEvent(new CustomEvent('colorchange', { detail: { key, palette } }));
