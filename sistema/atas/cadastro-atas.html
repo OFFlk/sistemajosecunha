@@ -135,7 +135,8 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 .preview-serie{ font-size:13px; color:var(--muted); margin-top:6px; }
 
 /* Avisos */
-.aviso-warn{ background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
+.aviso-warn{ background:var(--chip-bg,#f5f3ff); border:1px solid var(--chip-border,#ddd6fe); border-left:4px solid #d97706; padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
+.aviso-warn a{ color:inherit; font-weight:700; text-decoration:underline; }
 
 /* Cabeçalho da ata (pré-visualização) */
 .cabecalho{ display:flex; align-items:center; gap:15px; margin-bottom:10px; }
@@ -163,6 +164,10 @@ html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border
 .scans-drop:hover,.scans-drop.drag-over{
   border-color:var(--brand,#7c3aed);
   background:var(--brand-faded,#f5f3ff);
+}
+html[data-theme="dark"] .scans-drop:hover, html[data-theme="dark"] .scans-drop.drag-over{
+  border-color:var(--brand-d,#7c3aed);
+  background:var(--brand-faded-d,rgba(124,58,237,0.2));
 }
 .scans-drop input[type=file]{
   position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
@@ -236,6 +241,12 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
 .card-destaque p,
 .card-destaque strong,
 .card-destaque label { color: var(--dest-fg); }
+/* Aviso dentro do card de destaque: painel translúcido derivado do próprio card
+   (mesmo mecanismo dos botões), sem fundo amarelo. */
+.card-destaque .aviso-warn {
+  background: var(--dest-panel-bg); border-color: var(--dest-btn-bd);
+  border-left-color: var(--dest-fg); color: var(--dest-fg);
+}
 
 /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
    desktop e mobile (sem depender de hover). Texto mora inline, dentro do
