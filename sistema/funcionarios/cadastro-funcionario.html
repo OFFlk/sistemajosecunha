@@ -41,11 +41,13 @@
   --pf-brand:var(--brand,#7c3aed);
   --pf-brand-text:var(--brand-text,#6d28d9);
   --pf-brand-faded:var(--brand-faded,#f5f3ff);
+  --pf-body-bg:var(--bg,#ffffff);   /* fundo do body — ajustar se o token real tiver outro nome */
 }
 html[data-theme="dark"]{
   --pf-brand:var(--brand-d,#8b5cf6);
   --pf-brand-text:var(--brand-text-d,#c4b5fd);
   --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
+  --pf-body-bg:var(--bg,#0b1220);
 }
 
 /* ── Card de destaque (guia, Parte 1.3b) — contraste vem de ThemeColors.ajustarContraste() ── */
@@ -103,27 +105,40 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
 .info-tip-bubble.align-right{ left:auto; right:0; }
 
-/* ── Card do topo: ano letivo + etapas ── */
-.topo-destaque{ display:flex; align-items:flex-end; gap:28px; flex-wrap:wrap; }
-.topo-destaque .field{ width:160px; margin:0; flex-shrink:0; }
-@media(max-width:700px){
-  .topo-destaque{ align-items:stretch; gap:16px; }
-  .topo-destaque .field{ width:100%; }
-}
+/* ── Card do topo: linha 1 = ano letivo, linha 2 = etapas ── */
+.topo-destaque{ display:flex; flex-direction:column; align-items:flex-start; gap:18px; }
+.topo-destaque .field{ width:160px; margin:0; }
+@media(max-width:700px){ .topo-destaque .field{ width:100%; } }
 
-/* ── Stepper (agora dentro do card de destaque, sem caixa própria) ── */
-.stepper{display:flex;align-items:center;flex:1;min-width:280px;}
-@media(max-width:700px){.stepper{flex-basis:100%;}}
-.step{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;}
+/* ── Stepper (dentro do card de destaque) ──
+   Etapa ativa = "square" arredondado na cor do body (neutro, muda com o tema);
+   o mesmo square, translúcido, faz o hover das demais. Sem linha entre etapas. */
+.stepper{display:flex;align-items:center;flex-wrap:wrap;gap:10px;align-self:stretch;}
+@media(max-width:700px){.step{flex:1 1 100%;}}
+.step{display:flex;align-items:center;gap:10px;flex:0 1 auto;cursor:pointer;padding:8px 18px 8px 10px;border-radius:12px;transition:background .15s;}
+.step:hover{background:var(--dest-btn-hover);}
+.step.active, .step.active:hover{background:var(--pf-body-bg);}
 .step-num{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--dest-btn-bd);background:var(--dest-panel-bg);color:var(--dest-fg);transition:all .25s;}
-.step.active .step-num{background:var(--dest-fg);border-color:var(--dest-fg);color:var(--btn-home-bg);}
+.step.active .step-num{background:var(--pf-brand);border-color:var(--pf-brand);color:var(--brand-fg,#fff);}
 .step.done .step-num{background:var(--dest-btn-bg);border-color:var(--dest-fg);color:var(--dest-fg);}
-/* Aviso (etapa 1 incompleta): sem amarelo sobre a cor de marca (guia 1.9) — sinal é o ⚠️ + borda tracejada */
-.step-num.aviso{background:var(--dest-btn-bg) !important;border:2px dashed var(--dest-fg) !important;color:var(--dest-fg) !important;}
+/* Aviso (etapa 1 incompleta): sem amarelo sobre a cor de marca (guia 1.9) — ⚠️ + borda tracejada.
+   :not(.active) porque, ao voltar pra etapa 1, a classe .aviso continua no número. */
+.step:not(.active) .step-num.aviso{background:var(--dest-btn-bg) !important;border:2px dashed var(--dest-fg) !important;color:var(--dest-fg) !important;}
 .step-label{font-size:11px;font-weight:700;color:var(--dest-fg);opacity:.75;text-transform:uppercase;letter-spacing:.05em;}
 .step-title{font-size:14px;font-weight:800;color:var(--dest-fg);}
-.step-sep{width:40px;height:2px;background:var(--dest-btn-bd);flex-shrink:0;margin:0 6px;border-radius:2px;transition:background .3s;}
-.step-sep.done{background:var(--dest-fg);}
+.step.active .step-label{color:var(--muted);opacity:1;}
+.step.active .step-title{color:var(--text);}
+.step-sep{display:none;} /* substituída pelo square; o elemento fica porque o JS ainda mexe na classe dele */
+
+/* ── Foto do funcionário: hover de marca na caixa e nos botões ── */
+.foto-box{display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:14px;border:1.5px dashed var(--border,#ddd6fe);border-radius:14px;background:var(--card);transition:border-color .15s,background .15s;}
+.foto-box:hover{border-color:var(--pf-brand);background:var(--pf-brand-faded);}
+.foto-box .btn.small{transition:background .15s,border-color .15s,color .15s;}
+.foto-box .btn.small:hover:not(:disabled){background:var(--pf-brand-faded);border-color:var(--pf-brand);color:var(--text);}
+
+/* ── "É profissional de apoio?" alinhado ao select de Função (a legenda que empurrava saiu) ── */
+.apoio-field .apoio-row{display:flex;align-items:center;min-height:44px;}
+@media(max-width:600px){ .apoio-field .apoio-spacer{display:none;} .apoio-field .apoio-row{min-height:0;} }
 
 /* ── Toast fixo — visível em qualquer etapa/scroll (substitui os spans msgForm/msgOk/erroSalvar) ── */
 @keyframes toastSubir {
@@ -356,8 +371,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       <div id="msgOk" class="ok-msg" style="display:none;"></div>
 
       <!-- Foto do funcionário -->
-      <div id="fotoFuncionarioBox" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;padding:14px;
-        border:1.5px dashed var(--border,#ddd6fe);border-radius:14px;background:var(--card);">
+      <div id="fotoFuncionarioBox" class="foto-box">
         <div id="fotoFuncionarioPreviewWrap" style="width:88px;height:88px;border-radius:50%;overflow:hidden;
           background:var(--chip-bg,#f3f0ff);display:flex;align-items:center;justify-content:center;flex-shrink:0;
           border:2px solid var(--border,#ddd6fe);">
@@ -495,9 +509,11 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
             <small class="help">Preencha a função não listada.</small>
           </div>
         </div>
-        <div class="field">
+        <div class="field apoio-field">
+          <!-- spacer invisível: ocupa a altura do rótulo "Função" pra alinhar com o select ao lado -->
+          <label class="apoio-spacer" aria-hidden="true" style="visibility:hidden;">&nbsp;</label>
           <!-- ícone fora do label: dentro dele, o clique no ⓘ marcaria/desmarcaria o checkbox -->
-          <div style="display:flex;align-items:center;">
+          <div class="apoio-row">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
               <input type="checkbox" id="profissionalApoio" style="width:17px;height:17px;cursor:pointer;"/>
               <span>🤝 É profissional de apoio?</span>
