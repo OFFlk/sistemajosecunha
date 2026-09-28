@@ -13,9 +13,15 @@ e refinadas nas páginas seguintes:
   **tabela** dentro (fundo de célula, cabeçalho, botões de ação, e um
   bug de `overflow`/`display:flex` que só aparece depois de mexer no
   contraste).
+- **Parte 4** — card de destaque com uma **lista de sub-cards** dentro.
+- **Seções 1.8 → 1.11** — o que veio depois: botões de preenchimento sólido
+  de marca (`--brand-fg`, com o catálogo de onde cada página redeclara o
+  botão), avisos de card sem fundo amarelo e hover com `--brand-faded` que
+  precisa de par escuro, e mapa de hex de paleta copiado à mão no JS de uma
+  página (que quebra quando uma paleta nova entra).
 
 Sempre que possível, compare com os arquivos reais já migrados em vez de
-confiar só neste guia de memória. Três referências, cada uma mostrando um
+confiar só neste guia de memória. Quatro referências, cada uma mostrando um
 cenário diferente:
 - `historico-aluno.html` — o original, card de destaque simples, sem tabela.
 - `gestao-atas.html` — card de destaque já existia (só religou o contraste),
@@ -23,6 +29,14 @@ cenário diferente:
 - `schema_ata.html` — **dois** cards de destaque **criados do zero** (a
   página não tinha nada disso), um deles com uma tabela inteira dentro —
   é a referência mais completa pra casos parecidos, incluindo a Parte 3.
+- `cadastro-turmas.html` — dois cards **lado a lado** (não um em cima do
+  outro), e o card escolhido como destaque tem uma **lista de sub-cards**
+  dentro (um mini-card por turma, cada um com seu próprio fundo neutro) —
+  motivou a Parte 4 e a seção 1.6.
+- `cadastro-atas.html` — card de destaque **criado do zero** (o 1º card da
+  página, com dados da escola + selects), nenhum botão declarado
+  localmente (herda tudo do `components.css`), tooltips inclusive em rótulo
+  gerado por JS, e a referência das seções 1.9 (aviso) e 1.10 (hover escuro).
 
 > ⚠️ **Antes de colar qualquer CSS deste guia**: os nomes de variável
 > (`--card`, `--border`, `--text` etc.) **não são os mesmos em todas as
@@ -38,6 +52,27 @@ cenário diferente:
 > precisar trocar** — em `schema_ata.html`, por exemplo, os três tokens já
 > batiam certinho com o guia, sem remapear nada; o passo existe pra
 > confirmar, não assume que vai sempre dar diferente.
+
+> ⚠️ **Cor de marca escrita na mão, escondida em CSS legado que ninguém
+> mexeu**: em `cadastro-turmas.html`, o hover de `.btn.ghost`/`.btn.secondary`
+> no tema escuro tinha `rgba(124,58,237,.18)` (roxo) e `#c4b5fd` escritos
+> direto no CSS, em vez de `var(--brand-faded-d)`/`var(--brand-text-d)` —
+> bug **pré-existente**, sem relação com a migração, que só aparece quando
+> alguém troca pra uma paleta diferente de roxo (nesse caso só ficava
+> visível no tema escuro, porque a versão clara da mesma regra já usava
+> `var()` corretamente). Isso é fácil de confundir com "bug que a migração
+> causou" quando na verdade já estava lá. Antes de mexer numa página nova,
+> rodar um grep pelos valores de roxo padrão do sistema **fora** de
+> `var(...)`:
+> ```
+> grep -n "124,58,237\|#7c3aed\|#6d28d9\|#c4b5fd" pagina.html
+> ```
+> Toda ocorrência **dentro** de `var(--algo, #7c3aed)` (fallback) é normal
+> e não precisa mexer. Ocorrência **fora** de `var()`, sozinha, é o mesmo
+> bug — troca pelo token de marca equivalente (`--brand`/`--brand-d` pra
+> preenchimento sólido, `--brand-faded`/`--brand-faded-d` pra fundo leve,
+> `--brand-text`/`--brand-text-d` pra texto — ver 1.7 abaixo sobre qual
+> usar em cada caso).
 
 ---
 
@@ -241,6 +276,247 @@ precisarem desse comportamento também levam a classe `.card-destaque` —
 - [ ] Função antiga de cálculo (se havia) foi removida por completo, junto
       com o `addEventListener('colorchange', ...)` dela?
 
+## 1.6 Cards lado a lado — qual vira `.card-destaque`?
+
+Até `cadastro-turmas.html`, todo card de destaque era o único protagonista
+da página (um card no topo, o resto embaixo). Numa página com dois cards
+**lado a lado** (`.split-grid`/`.grid2`, um formulário de um lado e uma
+lista do outro, por exemplo) isso deixa de ser óbvio — os dois têm o mesmo
+peso visual. Não tem regra fixa, é decisão de produto, mas a pergunta que
+ajuda é: **qual dos dois a pessoa olha primeiro/mais vezes?** Em
+`cadastro-turmas.html` foi o card de **listagem** ("Turmas cadastradas"),
+não o formulário — o card de destaque não precisa ser sempre o de
+ação/filtro, como tinha sido em todas as páginas anteriores.
+
+**Se o card escolhido tiver uma lista de sub-cards dentro** (um mini-card
+por item, cada um com fundo próprio, tipo `.item` em `cadastro-turmas.html`)
+— isso tem cuidados específicos, próprios, que não são os mesmos de uma
+tabela. Ver **Parte 4**.
+
+## 1.7 Cor de marca em TEXTO solto (fora de badge/botão) — nunca `--brand`/`--brand-d` puro
+
+Regra nova, de aplicação geral (não só dentro de `.card-destaque`): sempre
+que for colorir um **texto** (não um fundo) com a cor de marca — um link,
+um "Detalhes ▾" clicável, um `<span>` de destaque — usar
+`--brand-text`/`--brand-text-d`, **nunca** `--brand`/`--brand-d` puro.
+
+O motivo: `--brand`/`--brand-d` são pensados pra **preenchimento sólido**
+(fundo de botão primário, por exemplo), onde o texto por cima é branco. Em
+paletas escuras — Verde, Vermelho, Azul Escuro — o próprio valor de
+`--brand-d` já é uma cor escura de propósito (pra combinar com texto
+branco em cima). Usado direto como cor de **texto** sobre um fundo neutro
+(um card branco/escuro comum, não a própria cor de marca), esse mesmo tom
+escuro fica com contraste ruim — texto escurinho sobre card também escuro
+no tema escuro. `--brand-text`/`--brand-text-d` são as variantes desenhadas
+exatamente pra essa função (é o mesmo par que os badges/chips do sistema
+já usam) e existem em toda paleta, então é só trocar o nome da variável,
+sem criar nada novo.
+
+Bug real visto em `cadastro-turmas.html`: o link "Detalhes ▾" (JS novo,
+não vinha do guia) foi colorido com `var(--brand-d)` — ficou ilegível nas
+paletas Verde/Vermelho/Azul Escuro no tema escuro, ok nas outras. Corrigido
+trocando pra `var(--brand-text-d)`.
+
+## 1.8 `theme-colors.js`: paleta "Branco" virou "Tan", e `--brand-fg` é novo
+
+Mudança feita direto em `theme-colors.js` (não é sobre uma página
+específica, afeta o sistema inteiro que usa o seletor de cor):
+
+- **Paleta `white` foi removida, `tan` entrou no lugar.** Motivo: com o
+  texto do card de destaque calculado dinamicamente (`ajustarContraste`),
+  branco parou de ser a única cor "segura" pra card claro — e branco em si
+  é redundante (tema claro já dá branco+cinza via a paleta "Cinza", tema
+  escuro já dá preto+cinza do mesmo jeito). `tan` (`#dbc09c`) é a primeira
+  paleta **genuinamente clara e colorida** do sistema (todas as outras,
+  mesmo as de nome "claro" tipo "gold"/Amarelo, são na real tons escuros —
+  `gold` é um mostarda escuro, não amarelo de verdade — escolhidos assim
+  de propósito pra combinar com texto branco fixo nos lugares que ainda não
+  calculam contraste).
+- **Cuidado ao escolher o tom exato de uma paleta genuinamente clara**: o
+  corte de `ajustarContraste`/`calcularLuminancia` é `> 0.5`. O tom
+  "tan" clássico (`#d2b48c`) dá luminância `0.482` — **abaixo** do corte,
+  então o cálculo escolheria texto branco bem na cor que devia provar que
+  dá pra usar texto escuro. Foi clareado um pouco (`#dbc09c`, luminância
+  `0.552`) pra ficar com folga segura acima do corte. Ao criar qualquer
+  paleta nova nessa faixa (clara o bastante pra precisar de texto escuro),
+  computar a luminância do `--brand` escolhido **antes** de fechar o valor
+  final, não só olhar a cor "no olho".
+- **`calcularLuminancia()` agora aceita hex além de `rgb(...)`** — antes só
+  lia `getComputedStyle(...).backgroundColor` (sempre vem em `rgb()`/
+  `rgba()` do navegador); precisava também funcionar direto com uma string
+  de paleta tipo `'#dbc09c'`, sem precisar montar um elemento no DOM só
+  pra ler o computed style de volta.
+- **Nova custom property `--brand-fg`, calculada dentro do próprio
+  `apply()`**: mesmo cálculo do `--dest-fg` do card de destaque, mas pra
+  **qualquer botão com preenchimento sólido de marca**, não só o card.
+  `apply()` já sabe o valor cru do `--brand`/`--brand-d` da paleta ativa
+  (e o tema claro/escuro atual), então calcula a luminância ali mesmo e
+  seta `--brand-fg` pra `#1e293b` (escuro) ou `#ffffff` (claro) — sem
+  precisar ler nenhum elemento do DOM, ao contrário do `ajustarContraste`
+  original (que existe porque o fundo real de um elemento específico pode,
+  em teoria, não bater 100% com o valor cru da variável).
+
+**Pendência que isso abre pra quem for migrar páginas daqui pra frente**:
+qualquer botão que hoje faz preenchimento sólido de marca com texto fixo —
+o padrão mais comum é algo como
+`.btn.primary { background: var(--brand); color: #fff; }` — precisa trocar
+`color: #fff` por `color: var(--brand-fg, #fff)`. Sem essa troca, a paleta
+Tan (ou qualquer paleta clara futura) vai deixar esse botão com texto
+branco ilegível em cima de um fundo já claro, em qualquer página que ainda
+não tiver sido corrigida — isso **não é** um bug da migração
+tooltip/contraste em si, é uma dívida nova que a introdução do Tan cria em
+todo o sistema, não só no módulo de atas. Ao entrar numa página nova,
+grepar por `background:\s*var(--brand)` (ou `--btn-home-bg`) combinado com
+um `color:#fff`/`color: #ffffff` fixo na mesma regra, e trocar por
+`var(--brand-fg, #fff)`.
+
+**Status**: aplicado em `components.css` e nas páginas do módulo de atas —
+ver 1.8.1 logo abaixo. Falta conferir o resto do sistema (única pendência
+aberta; ver tabela de status no fim). Ao adicionar/remover uma paleta, ver
+também 1.11 (mapa de hex duplicado em `perfil.html`).
+
+## 1.8.1 Correção aplicada — por que o fix global sozinho não bastou
+
+**O que foi trocado em `components.css`** (`color:#fff` → `color: var(--brand-fg, #fff)`):
+- `.btn.primary`
+- `.btn-primary`
+- `[data-theme="dark"] .btn-gray:hover` (no hover escuro o `.btn-gray` vira
+  preenchimento sólido `--brand-d`, então cai na mesma regra)
+
+`.btn-danger` **não** foi tocado: é vermelho sólido fixo, não usa `--brand`,
+então não sofre com a paleta. O mesmo vale pras cores fixas de toast
+(verde/vermelho/âmbar) e pros botões de confirmação com cor de sistema.
+
+**Sintoma que revelou o problema**: depois do deploy, só a
+`cadastro-atas.html` ficou certa; as outras páginas continuaram com o texto
+do botão na cor errada, inclusive as já adequadas pelas Partes 1–4. Causa: o
+`<style>` da página carrega **depois** do `components.css` e, com
+especificidade igual ou maior, a cópia local de `color:#fff` vence o fix
+global. A `cadastro-atas.html` só funcionou porque não redeclara botão nenhum.
+
+**Receita por página** (rodar antes de mexer):
+```
+grep -n "btn-primary\|btn\.primary\|color:\s*#fff\|color:\s*#ffffff" pagina.html
+```
+1. Achar toda regra local com preenchimento sólido de marca
+   (`var(--brand)`, `var(--brand-d)`, `var(--btn-home-bg)`) + `color:#fff` fixo.
+2. Trocar **só o valor** por `var(--brand-fg, #fff)`. Não remover a regra: ela
+   pode existir por outro motivo (ex.: vencer uma regra mais específica).
+3. Ver se o override dark redeclara `color`. Se não redeclara, uma troca na
+   regra base já cobre os dois temas (é o caso mais comum).
+4. Ignorar: `.btn-danger`, toasts, botões dentro de `.card-destaque` que já usam
+   `--dest-fg`, e itens de dropdown que são `.btn` puro (sem preenchimento de marca).
+
+**Os quatro padrões encontrados** (um por página do módulo):
+
+| Página | Como declara botão de marca | Onde estava o bug | Botões afetados |
+|---|---|---|---|
+| `cadastro-atas.html` | Não redeclara nada, herda 100% do `components.css` | Nenhum local | Adicionar/Atualizar, Salvar no banco |
+| `pesquisa-ata.html` | `.btn.primary` (2 classes), sem override claro, com override **dark** local | `html[data-theme="dark"] .btn.primary { color:#fff }` | Pesquisar (card de pesquisa por aluno), Abrir, Exportar ▾ |
+| `gestao-atas.html` | `.btn.btn-primary` em `<button>` sem override; só o `<a>` tem override de especificidade | `a.btn.btn-primary, a.btn.btn-primary:hover { color:#fff }` | Gerenciar schemas (`<a>`); Exportar JSON e Aplicar merge já herdavam certo |
+| `cadastro-turmas.html` | `.btn.primary` redeclarado inteiro; o dark só troca `background`/`border-color` | `.btn.primary { color:#fff }` (uma linha cobre os dois temas) | Salvar turma |
+| `historico-aluno.html` | `.btn.btn-primary` com seletores reforçados (tipo + 2 classes); dark só troca fundo/borda | `color:#fff` no bloco base | Exportar ▾, Exportar ano (o botão "Pesquisar" fica no `.card-destaque` e já usa `--dest-fg`) |
+
+**Cuidado com `<a class="btn btn-primary">`**: `base.css` tem
+`html[data-theme="dark"] a { color: var(--brand-d) }`, mais específico que
+`.btn-primary`. Por isso o override `a.btn.btn-primary` existe e **precisa
+continuar existindo** — só o valor muda pra `var(--brand-fg, #fff)`.
+
+## 1.9 Avisos de card (não toast): nunca fundo amarelo
+
+`.aviso-warn` com `background: rgba(251,191,36,.12)` empilha o âmbar
+translúcido sobre a cor de marca do card e o texto (e o link) some — visto na
+paleta Tan, dentro do `.card-destaque`. Toasts **não** entram nesta regra
+(seguem com cor fixa de sistema).
+
+Regra: o aviso deixa de ter cor própria e herda o contexto. O sinal de
+"atenção" fica no ⚠️ do texto e numa faixa esquerda de 4px.
+
+```css
+/* fora do destaque: fundo neutro da página */
+.aviso-warn { background: var(--chip-bg); border: 1px solid var(--chip-border);
+              border-left: 4px solid #d97706; color: var(--ink);
+              padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 13px; }
+.aviso-warn a,
+html[data-theme="dark"] .aviso-warn a,
+html[data-theme="dark"] .aviso-warn a:hover { color: inherit; font-weight: 700; text-decoration: underline; }
+
+/* dentro do card de destaque: painel derivado do próprio card (colocar DEPOIS
+   do bloco .card-destaque, com a mesma lógica dos botões) */
+.card-destaque .aviso-warn { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd);
+                             border-left-color: var(--dest-fg); color: var(--dest-fg); }
+```
+
+- **Link dentro do aviso, tema escuro**: o `html[data-theme="dark"] a` do
+  `base.css` pinta o link com `--brand-d`, quase igual ao fundo do aviso. Por
+  isso as duas linhas com `html[data-theme="dark"]` (incluindo `:hover`) são
+  obrigatórias, não redundância.
+- A faixa esquerda é o único ponto de cor fixa. No destaque ela usa
+  `--dest-fg` porque âmbar sobre tan praticamente não aparece.
+- Tokens `--chip-bg`/`--chip-border` são os de `cadastro-atas.html`; nas outras
+  páginas conferir o equivalente (mesma checagem da seção 2.1.1).
+- Onde procurar: `grep -n "251,191,36\|aviso-warn" pagina.html`.
+
+## 1.10 Hover/drag com `--brand-faded` precisa de par escuro
+
+Achado na área de scans da `cadastro-atas.html`: o hover da drop-zone usava
+`background: var(--brand-faded)` **sem** regra para o tema escuro. Esse token é
+o tom claro (pensado para ficar sobre fundo branco); em paletas claras ou
+cinza ele vira quase branco puro no escuro.
+
+```css
+.scans-drop:hover, .scans-drop.drag-over { border-color: var(--brand); background: var(--brand-faded); }
+html[data-theme="dark"] .scans-drop:hover,
+html[data-theme="dark"] .scans-drop.drag-over { border-color: var(--brand-d); background: var(--brand-faded-d); }
+```
+
+Checagem: `grep -n "brand-faded" pagina.html` e ver se **cada** uso em
+`:hover`/`.drag-over`/`:focus` tem uma regra `html[data-theme="dark"]` com
+`--brand-faded-d` (fundo) e `--brand-d` (borda). Regra sem par escuro é o
+mesmo tipo de bug da cor de roxo escrita na mão (aviso no topo deste guia).
+
+---
+
+## 1.11 Mapa de cor/hex copiado à mão no JS da página (visto em `perfil.html`)
+
+Achado ao trocar `white` por `tan`: depois do deploy do `theme-colors.js`, o
+nome "Tan" já aparecia certo no seletor e a cor já funcionava em todas as
+outras páginas, mas a bolinha de pré-visualização em `perfil.html` ficava
+**roxa** (a cor default).
+
+**Causa**: `perfil.html` mantinha um objeto `swatchColors` próprio, dentro do
+JS da página, com o hex de cada paleta copiado à mão (`{ violet: '#7c3aed',
+... white: '#ffffff' }`). É o mesmo padrão da função de contraste duplicada
+(1.2), só que pra cor em vez de contraste. `tan` só existia em
+`theme-colors.js`, então `swatchColors['tan']` vinha `undefined` e caía no
+fallback `|| '#7c3aed'`. Nada quebrava no console — só a cor errada na tela.
+
+**Correção**: remover o mapa local e ler o hex da fonte real, que já existe:
+
+```js
+// antes
+swatch.style.background = swatchColors[key] || '#7c3aed';
+// depois
+swatch.style.background = palette['--brand'] || '#7c3aed';   // palette = ThemeColors.palettes[key]
+```
+
+No `buildColorGrid()` o `palette` já vem de
+`Object.entries(ThemeColors.palettes)`; em `updateHeader(key)` vem de
+`ThemeColors.palettes[key]`. Com isso `perfil.html` não precisa mais ser
+tocada quando uma paleta entra ou sai de `theme-colors.js` (o `white` que
+sobrou no mapa antigo era letra morta, mas o `tan` ausente era o bug).
+
+**Checagem preventiva** em qualquer página que mostre a cor escolhida ou
+liste paletas (seletores, previews, legendas):
+
+```
+grep -n "violet\|deepblue\|#7c3aed" pagina.html
+```
+
+Objeto com nomes de paleta como chave e hex como valor, dentro do JS da
+página = mesmo bug esperando a próxima paleta nova. Trocar por leitura de
+`ThemeColors.palettes`.
+
 ---
 
 # PARTE 2 — Ícone de dica (ⓘ) inline, com tooltip por toque/clique
@@ -438,6 +714,20 @@ estiverem abertos.
 - [ ] Testado com o card/fundo real da página (a cor do ícone deve
       acompanhar a cor do texto ao redor automaticamente, sem CSS extra)?
 
+## 2.5 Casos vistos em `cadastro-atas.html`
+
+- **Rótulo gerado por JS** (template literal): o mesmo HTML da seção 2.2 funciona
+  dentro do template; só cuidar pra não usar crases dentro do texto da dica.
+- **Dica que explica vários botões**: quando o card tem uma fila de botões e a
+  dica é sobre todos, colocar o ícone no `<h3>` do card (ex.: "Alunos"), não em
+  um botão específico. Usa `.wide` e `<b>`/`<br>` pra virar mini-lista.
+- **Legenda `.help` que vira tooltip**: remover o `.help` antigo ao mover o texto
+  pro balão, senão a informação fica duplicada.
+- **Ícone dentro de `.card-destaque`**: como usa `currentColor`, herda o
+  `--dest-fg` do `<label>` sem regra extra.
+- **Tokens do balão nessa página**: `--card-bg`/`--card-border`/`--ink` (com
+  fallback), no lugar de `--card`/`--border`/`--text`.
+
 ---
 
 # PARTE 3 — Card de destaque com uma tabela dentro
@@ -562,7 +852,83 @@ com o card).
       conferidos no tema escuro, procurando cor de marca translúcida que
       possa "sumir" contra o fundo ao redor (3.4)?
 
+---
 
+# PARTE 4 — Card de destaque com uma lista de sub-cards (itens) dentro
+
+Visto pela primeira vez em `cadastro-turmas.html` (card "Turmas
+cadastradas"). Diferente da Parte 3 (uma **tabela**, `<td>`/`<th>`), aqui
+o conteúdo é uma lista de **mini-cards** — cada item tem o próprio fundo
+neutro (`var(--card)` ou equivalente), border-radius e padding próprios,
+sentado em cima do fundo colorido do `.card-destaque`. O problema é o
+mesmo em espírito (regras genéricas do card de destaque vazando pra dentro
+de uma área que já resolveu a própria cor sozinha), mas a correção é
+diferente da tabela.
+
+## 4.1 Não aplicar override de `.btn` genérico nos botões de dentro dos itens
+
+Um botão que mora dentro de um item da lista (ex.: "Editar") **já está**
+sobre um fundo neutro, não direto sobre a cor de marca — diferente de um
+botão solto no card (Parte 1.3b), que precisa do tratamento translúcido
+(`--dest-btn-bg`/`--dest-btn-bd`) pra não sumir contra a própria cor de
+marca. Se o `.card-destaque .btn` genérico (ou qualquer variante dele)
+alcançar também os botões de dentro dos itens, o resultado é um botão
+translúcido-sobre-marca só que aplicado num fundo que já é neutro/branco —
+em paletas claras isso pode ficar quase invisível (branco translúcido
+sobre um card já branco). **Antes de escrever a regra, checar se ela
+alcançaria também os botões de dentro dos itens** — se sim, não escrever
+um `.btn` genérico pro card inteiro; ou escopar o override só pros botões
+que realmente ficam soltos direto no fundo (ex.: `.card-destaque >
+.actions .btn`, não `.card-destaque .btn`).
+
+## 4.2 Regras de `--dest-fg` (h3/label/.muted/.help) vazam pra dentro dos itens — precisa de exceção
+
+O mesmo raciocínio da 4.1 vale pro texto: uma regra tipo
+`.card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%,
+transparent); }` (pensada pro texto que fica **direto** sobre a cor de
+marca, tipo um contador no cabeçalho do card) alcança **qualquer**
+descendente com aquela classe — inclusive um `.help`/`.muted` que esteja
+dentro de um item da lista, num fundo neutro. Como `--dest-fg` depende da
+luminância da **cor de marca** (não do tema claro/escuro da página), o bug
+resultante é sutil: o texto fica com a cor certa só quando a paleta
+escolhida "combina" por acaso com o tema ativo, e ilegível no caso
+contrário — mais difícil de notar em teste rápido do que um erro que
+sempre aparece igual.
+
+Bug real visto em `cadastro-turmas.html`: o texto dentro do painel
+"Detalhes" (expansível, dentro de cada item) usava `.help`, e a regra do
+parágrafo acima o deixava branco fixo (porque a marca escolhida era
+escura) — legível por coincidência no tema escuro da página, invisível no
+tema claro (o item, nesse caso, é branco).
+
+**Correção**: adicionar uma exceção, mais específica, que reseta a cor pra
+dentro do container do item:
+
+```css
+.card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+/* Exceção: dentro de um item da lista (fundo neutro próprio, não a cor de
+   marca), o texto volta a ser o --muted normal da página. */
+.card-destaque .item .help { color: var(--muted); }
+```
+
+Mesma lógica vale pra qualquer outra regra de `--dest-fg` que a página
+tenha (h3, label, etc.) — se o seletor genérico `.card-destaque X` puder
+alcançar algo dentro do item, precisa da mesma exceção `.card-destaque
+.item X { color: var(--normal-da-página); }`.
+
+## 4.3 Checklist rápido — Parte 4
+
+- [ ] Os botões de dentro dos itens da lista foram conferidos — o
+      override de botão do card de destaque (4.1) não está alcançando eles
+      por engano?
+- [ ] Toda regra `.card-destaque X { color: var(--dest-fg) ... }` foi
+      conferida contra o conteúdo de dentro dos itens — precisa de uma
+      exceção `.card-destaque .item X { color: var(--normal); }` (4.2)?
+- [ ] Testado nos dois temas (claro/escuro) **e** com pelo menos uma
+      paleta clara e uma escura — o bug da 4.2 só aparece em combinações
+      específicas de tema × paleta, não em todas.
+
+---
 
 **Parte 1 — contraste:**
 1. Página com função duplicada → apaga a função e o `addEventListener`
@@ -602,16 +968,53 @@ com o card).
 4. Botões que já vivem na tabela (setas, remover) ficam de fora das regras
    de botão da Parte 1 — só confere o tema escuro deles à parte.
 
+**Parte 4 — lista de sub-cards dentro de card de destaque:**
+1. Antes de escrever `.card-destaque .btn`/qualquer override de botão
+   genérico, confere se ele alcançaria também os botões de dentro dos
+   itens da lista (já sobre fundo neutro próprio) — se sim, escopa pra
+   fora deles.
+2. Toda regra `.card-destaque X { color: var(--dest-fg) ... }` precisa de
+   uma exceção `.card-destaque .item X { color: var(--normal-da-página); }`
+   pro mesmo seletor, senão o texto de dentro dos itens fica com a cor do
+   fundo colorido (certo só por coincidência de tema × paleta).
+3. Testar com paleta clara **e** escura, nos dois temas — o bug da Parte 4
+   é combinatório, não aparece igual em todo mundo.
+
 ---
 
 # Páginas já adequadas (status)
 
-| Página | Parte 1 (contraste) | Parte 2 (tooltip) | Parte 3 (tabela) | Observação |
-|---|---|---|---|---|
-| `historico-aluno.html` | ✅ original | ✅ original | — | Referência-base do guia inteiro. |
-| `gestao-atas.html` | ✅ religado ao central | ✅ | — | Card de destaque já existia, só a função de contraste era duplicada. |
-| `pesquisa-ata.html` | ✅ | ✅ (corrigido) | — | Bug de tokens do balão (fundo transparente) corrigido depois de já publicado — motivou a seção 2.1.1. |
-| `schema_ata.html` | ✅ **criado do zero** (2 cards) | ✅ (10 ícones) | ✅ **novo, motivou a Parte 3** | Página mais completa como referência: cards de destaque inéditos, botões por variante, tabela inteira dentro de um deles. |
+| Página | Parte 1 (contraste) | Parte 2 (tooltip) | Parte 3 (tabela) | Parte 4 (lista de sub-cards) | Observação |
+|---|---|---|---|---|---|
+| `historico-aluno.html` | ✅ original | ✅ original | — | — | Referência-base do guia inteiro. |
+| `gestao-atas.html` | ✅ religado ao central | ✅ | — | — | Card de destaque já existia, só a função de contraste era duplicada. |
+| `pesquisa-ata.html` | ✅ | ✅ (corrigido) | — | — | Bug de tokens do balão (fundo transparente) corrigido depois de já publicado — motivou a seção 2.1.1. |
+| `schema_ata.html` | ✅ **criado do zero** (2 cards) | ✅ (10 ícones) | ✅ **novo, motivou a Parte 3** | — | Página mais completa como referência: cards de destaque inéditos, botões por variante, tabela inteira dentro de um deles. |
+| `cadastro-turmas.html` | ✅ **criado do zero**, card escolhido é o de listagem, não o de ação (ver 1.6) | ✅ (6 ícones + legendas antigas removidas) | — | ✅ **novo, motivou a Parte 4** | Dois cards lado a lado; bug de `--brand-d` puro em texto (1.7) e de `--dest-fg` vazando pra lista de itens (4.2); achado à parte, sem relação com a migração: roxo fixo herdado em `.btn.ghost/.secondary` hover no tema escuro. |
+| `cadastro-atas.html` | ✅ **criado do zero** (1º card: dados da escola + selects) | ✅ (4 ícones: Turma, Nome do aluno, Scans de documentos, título Alunos; legenda `.help` removida) | — | — | Card "Scans" renomeado para "Scans de documentos"; aviso sem amarelo (1.9); hover escuro da drop-zone (1.10). |
 
-**Pendente no módulo de atas:** `cadastro-turmas.html` — ainda não
-adequada (nem Parte 1 nem Parte 2/3), é a próxima da fila.
+## Status das seções 1.8 → 1.11, por página
+
+| Página | 1.8 `--brand-fg` | 1.9 aviso sem amarelo | 1.10 hover com par escuro | 1.11 mapa de hex duplicado | Observação |
+|---|---|---|---|---|---|
+| `components.css` (global) | ✅ 3 regras | — | — | — | `.btn.primary`, `.btn-primary`, `[data-theme=dark] .btn-gray:hover`. |
+| `cadastro-atas.html` | ✅ herda do global | ✅ | ✅ `.scans-drop` | — | Referência das seções 1.9 e 1.10. |
+| `pesquisa-ata.html` | ✅ override dark | — não se aplica | ✅ verificado pelo usuário | — | Sem aviso dentro de card (usa toast). |
+| `gestao-atas.html` | ✅ `a.btn.btn-primary` | — não se aplica | ✅ verificado pelo usuário | — | Sem aviso dentro de card (usa toast). |
+| `cadastro-turmas.html` | ✅ `.btn.primary` base | — não se aplica | ✅ verificado pelo usuário | — | Botões `.btn.outline` (Adicionar/Editar) conferidos pelo usuário: ok. |
+| `historico-aluno.html` | ✅ bloco reforçado | — não se aplica | ✅ verificado pelo usuário | — | Sem aviso dentro de card (usa toast). |
+| `schema_ata.html` | — fora | — não recebe a adequação | — | — | Única página com aviso dentro de card em vez de toast; por decisão do usuário não recebe a 1.9. Não usa botão com fundo de marca. |
+| `perfil.html` | — | — | — | ✅ corrigido | `swatchColors` local removido; lê `ThemeColors.palettes[key]['--brand']`. Achado ao trocar Branco→Tan. |
+
+**Decisões do usuário que fecharam pendências antigas:**
+- `.btn.outline:hover` em `cadastro-turmas.html` e `.btn-gray:hover` local em
+  `cadastro-atas.html`: **não precisam de correção** — botões conferidos e ok.
+- Seções 1.9 e 1.10 nas outras páginas do módulo: **não se aplicam**. A única
+  página com aviso dentro de card (em vez de toast) é `schema_ata.html`, que
+  justamente não recebe essa adequação; os hovers com `--brand-faded` foram
+  conferidos pelo usuário.
+
+**Pendência aberta (única):**
+- Rodar a receita da 1.8.1 (`--brand-fg`) — e o grep da 1.11 — nas páginas
+  **fora** do módulo de atas antes de considerar o Tan seguro em produção.
+  Nenhuma página fora do módulo foi identificada/verificada ainda.
