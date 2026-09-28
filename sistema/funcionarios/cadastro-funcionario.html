@@ -33,20 +33,97 @@
 <link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/cadastro-funcionario.css">
 <style>
-/* ── Stepper ── */
-.stepper{display:flex;align-items:center;margin-bottom:20px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius, 14px);padding:16px 20px;box-shadow:var(--shadow);}
+/* ── Aliases de marca (par claro/escuro) ──
+   Tudo que era var(--primary, #7c3aed) passa a ler a paleta escolhida em
+   perfil.html (--brand / --brand-text / --brand-faded e seus pares -d),
+   respeitando o tema. Uma linha por token, sem regra dark espalhada. */
+:root{
+  --pf-brand:var(--brand,#7c3aed);
+  --pf-brand-text:var(--brand-text,#6d28d9);
+  --pf-brand-faded:var(--brand-faded,#f5f3ff);
+}
+html[data-theme="dark"]{
+  --pf-brand:var(--brand-d,#8b5cf6);
+  --pf-brand-text:var(--brand-text-d,#c4b5fd);
+  --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
+}
+
+/* ── Card de destaque (guia, Parte 1.3b) — contraste vem de ThemeColors.ajustarContraste() ── */
+.card.card-destaque{
+  --dest-fg:#ffffff;
+  --dest-btn-bg:rgba(255,255,255,.18);
+  --dest-btn-bd:rgba(255,255,255,.40);
+  --dest-btn-hover:rgba(255,255,255,.28);
+  --dest-panel-bg:rgba(255,255,255,.10);
+  background:var(--btn-home-bg); border-color:var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); border-color:var(--btn-home-border); }
+.card.card-destaque.contraste-claro{
+  --dest-fg:#0f172a;
+  --dest-btn-bg:rgba(0,0,0,.08);
+  --dest-btn-bd:rgba(0,0,0,.25);
+  --dest-btn-hover:rgba(0,0,0,.16);
+  --dest-panel-bg:rgba(0,0,0,.06);
+  border-color:var(--border);
+}
+.card-destaque h3, .card-destaque label{ color:var(--dest-fg); }
+/* Botões soltos no fundo do card, por variante (guia 1.3b): o primário (Próximo/Salvar)
+   é preenchido com o "filtro" claro/escuro + borda cheia; secundário/ghost (Limpar/Voltar/
+   Cancelar) ficam só com contorno. Sem preenchimento --brand: sumiria contra o próprio card. */
+.card.card-destaque .btn.primary{
+  background:var(--dest-btn-bg); border:1.5px solid var(--dest-fg); color:var(--dest-fg); font-weight:800;
+}
+.card.card-destaque .btn.primary:hover:not(:disabled){
+  background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg);
+}
+.card.card-destaque .btn.secondary, .card.card-destaque .btn.ghost{
+  background:transparent; border:1.5px solid var(--dest-btn-bd); color:var(--dest-fg);
+}
+.card.card-destaque .btn.secondary:hover:not(:disabled), .card.card-destaque .btn.ghost:hover:not(:disabled){
+  background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg);
+}
+
+/* ── Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2) ── */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card); border:1.5px solid var(--border); color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal; line-height:1.4;
+  white-space:normal; cursor:default; text-align:left; text-transform:none; letter-spacing:normal;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+.info-tip-bubble.align-right{ left:auto; right:0; }
+
+/* ── Card do topo: ano letivo + etapas ── */
+.topo-destaque{ display:flex; align-items:flex-end; gap:28px; flex-wrap:wrap; }
+.topo-destaque .field{ width:160px; margin:0; flex-shrink:0; }
+@media(max-width:700px){
+  .topo-destaque{ align-items:stretch; gap:16px; }
+  .topo-destaque .field{ width:100%; }
+}
+
+/* ── Stepper (agora dentro do card de destaque, sem caixa própria) ── */
+.stepper{display:flex;align-items:center;flex:1;min-width:280px;}
+@media(max-width:700px){.stepper{flex-basis:100%;}}
 .step{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;}
-.step-num{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--border);background:var(--card);color:var(--muted);transition:all .25s;}
-.step.active .step-num{background:var(--primary, #7c3aed);border-color:var(--primary, #7c3aed);color:#fff;}
-.step.done .step-num{background:var(--ok-bg, rgba(22,163,74,0.10));border-color:var(--ok-border, rgba(22,163,74,0.30));color:var(--ok-text, #166534);}
-.step-num.aviso{background:rgba(234,179,8,0.15) !important;border-color:rgba(234,179,8,0.60) !important;color:#854d0e !important;}
-html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
-.step-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
-.step-title{font-size:14px;font-weight:800;}
-.step.active .step-title{color:var(--primary, #7c3aed);}
-.step.done .step-title{color:var(--ok-text, #166534);}
-.step-sep{width:40px;height:2px;background:var(--border);flex-shrink:0;margin:0 6px;border-radius:2px;transition:background .3s;}
-.step-sep.done{background:var(--ok-border, rgba(22,163,74,0.30));}
+.step-num{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--dest-btn-bd);background:var(--dest-panel-bg);color:var(--dest-fg);transition:all .25s;}
+.step.active .step-num{background:var(--dest-fg);border-color:var(--dest-fg);color:var(--btn-home-bg);}
+.step.done .step-num{background:var(--dest-btn-bg);border-color:var(--dest-fg);color:var(--dest-fg);}
+/* Aviso (etapa 1 incompleta): sem amarelo sobre a cor de marca (guia 1.9) — sinal é o ⚠️ + borda tracejada */
+.step-num.aviso{background:var(--dest-btn-bg) !important;border:2px dashed var(--dest-fg) !important;color:var(--dest-fg) !important;}
+.step-label{font-size:11px;font-weight:700;color:var(--dest-fg);opacity:.75;text-transform:uppercase;letter-spacing:.05em;}
+.step-title{font-size:14px;font-weight:800;color:var(--dest-fg);}
+.step-sep{width:40px;height:2px;background:var(--dest-btn-bd);flex-shrink:0;margin:0 6px;border-radius:2px;transition:background .3s;}
+.step-sep.done{background:var(--dest-fg);}
 
 /* ── Toast fixo — visível em qualquer etapa/scroll (substitui os spans msgForm/msgOk/erroSalvar) ── */
 @keyframes toastSubir {
@@ -63,9 +140,11 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
 .nee-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:var(--chip-bg, #f5f3ff);flex-wrap:wrap;}
 .nee-header-label{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .nee-toggle{display:flex;gap:6px;}
-.nee-btn{padding:6px 18px;border-radius:999px;font-size:12px;font-weight:800;border:1.5px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;font-family:'Nunito',sans-serif;transition:background .15s,border-color .15s,color .15s;}
-.nee-btn.sim{background:var(--chip-bg, #f5f3ff);border-color:var(--primary, #7c3aed);color:var(--primary, #7c3aed);}
-.nee-btn.nao{background:var(--chip-bg, #f5f3ff);border-color:var(--border);color:var(--muted);}
+.nee-btn{padding:6px 18px;border-radius:999px;font-size:12px;font-weight:800;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:'Nunito',sans-serif;transition:background .15s,border-color .15s,color .15s,filter .15s;}
+.nee-btn:hover{background:var(--pf-brand-faded);border-color:var(--pf-brand);color:var(--text);}
+/* Selecionado (Sim OU Não — mesmo visual): preenchimento de marca + texto calculado (--brand-fg) */
+.nee-btn.sim,.nee-btn.nao{background:var(--pf-brand);border-color:var(--pf-brand);color:var(--brand-fg,#fff);}
+.nee-btn.sim:hover,.nee-btn.nao:hover{background:var(--pf-brand);border-color:var(--pf-brand);color:var(--brand-fg,#fff);filter:brightness(.92);}
 .nee-panel{display:none;padding:16px;border-top:1px solid var(--border);}
 .nee-panel.open{display:block;animation:fadeSlide .18s ease;}
 @keyframes fadeSlide{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
@@ -73,33 +152,35 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
 .nee-simple-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
 @media(max-width:540px){.nee-simple-grid{grid-template-columns:1fr;}}
 .nee-simple-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;border:1.5px solid var(--border);background:var(--card);font-size:13px;font-weight:700;color:var(--text);transition:background .15s,border-color .15s;user-select:none;}
-.nee-simple-item:hover{border-color:var(--primary, #7c3aed);background:var(--chip-bg, #f5f3ff);}
-.nee-simple-item.checked{background:var(--chip-bg, #f5f3ff);border-color:var(--primary, #7c3aed);color:var(--primary, #7c3aed);}
-.nee-simple-item input[type="checkbox"]{width:16px;height:16px;flex-shrink:0;accent-color:var(--primary, #7c3aed);cursor:pointer;margin:0;}
+.nee-simple-item:hover{border-color:var(--pf-brand);background:var(--pf-brand-faded);}
+.nee-simple-item.checked{background:var(--pf-brand);border-color:var(--pf-brand);color:var(--brand-fg,#fff);}
+.nee-simple-item input[type="checkbox"]{width:16px;height:16px;flex-shrink:0;accent-color:var(--pf-brand);cursor:pointer;margin:0;}
+.nee-simple-item.checked input[type="checkbox"]{accent-color:var(--brand-fg,#fff);}
 .nee-category{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;}
 .nee-category:last-child{margin-bottom:0;}
 .nee-cat-header{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;background:var(--card);transition:background .15s;user-select:none;}
 .nee-cat-header:hover{background:var(--chip-bg, #f5f3ff);}
-.nee-check{width:18px;height:18px;flex-shrink:0;accent-color:var(--primary, #7c3aed);cursor:pointer;}
+.nee-check{width:18px;height:18px;flex-shrink:0;accent-color:var(--pf-brand);cursor:pointer;}
 .nee-cat-name{font-size:13px;font-weight:800;flex:1;}
-.nee-cat-badge{display:none;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--chip-bg, #f5f3ff);border:1px solid var(--primary, #7c3aed);color:var(--primary, #7c3aed);}
+.nee-cat-badge{display:none;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--pf-brand);border:1px solid var(--pf-brand);color:var(--brand-fg,#fff);}
 .nee-cat-badge.visible{display:inline-flex;align-items:center;gap:4px;}
 .nee-sub{display:none;padding:10px 14px 12px 42px;border-top:1px solid var(--border);background:var(--field-bg);gap:6px;flex-direction:column;}
 .nee-sub.open{display:flex;animation:fadeSlide .15s ease;}
 .nee-radio-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;cursor:pointer;transition:background .12s;user-select:none;}
-.nee-radio-item:hover{background:var(--chip-bg, #f5f3ff);}
-.nee-radio-item.selected{background:var(--chip-bg, #f5f3ff);color:var(--primary, #7c3aed);}
-.nee-radio-item input[type="radio"]{width:15px;height:15px;flex-shrink:0;accent-color:var(--primary, #7c3aed);cursor:pointer;margin:0;}
+.nee-radio-item:hover{background:var(--pf-brand-faded);}
+.nee-radio-item.selected{background:var(--pf-brand);color:var(--brand-fg,#fff);}
+.nee-radio-item input[type="radio"]{width:15px;height:15px;flex-shrink:0;accent-color:var(--pf-brand);cursor:pointer;margin:0;}
+.nee-radio-item.selected input[type="radio"]{accent-color:var(--brand-fg,#fff);}
 
 /* ── CEP status ── */
 .cep-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin-top:5px;padding:3px 10px;border-radius:999px;}
-.cep-status.loading{background:var(--chip-bg, #f5f3ff);color:var(--primary, #7c3aed);border:1px solid var(--primary, #7c3aed);}
+.cep-status.loading{background:var(--chip-bg, #f5f3ff);color:var(--pf-brand-text);border:1px solid var(--pf-brand);}
 .cep-status.ok{background:var(--ok-bg, rgba(22,163,74,0.10));color:var(--ok-text, #166534);border:1px solid var(--ok-border, rgba(22,163,74,0.30));}
 .cep-status.err{background:var(--warn-bg, rgba(239,68,68,0.08));color:var(--warn-text, #b91c1c);border:1px solid var(--warn-border, rgba(239,68,68,0.30));}
 
 /* ── Seção colapsável ── */
 .secao-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;background:var(--chip-bg, #f5f3ff);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;user-select:none;transition:background .15s;}
-.secao-toggle:hover{background:var(--brand-faded, #f5f3ff);border-color:var(--primary, #7c3aed);}
+.secao-toggle:hover{background:var(--pf-brand-faded);border-color:var(--pf-brand);}
 .secao-toggle-label{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;}
 .secao-toggle-arrow{font-size:12px;color:var(--muted);transition:transform .2s;}
 .secao-toggle.open .secao-toggle-arrow{transform:rotate(180deg);}
@@ -108,7 +189,7 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
 
 /* ── Listas de cursos ── */
 .lista-itens{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
-.lista-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--chip-bg, #f5f3ff);border:1px solid var(--primary, #7c3aed);border-radius:10px;font-size:13px;}
+.lista-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--chip-bg, #f5f3ff);border:1px solid var(--pf-brand);border-radius:10px;font-size:13px;}
 .lista-item-info{flex:1;min-width:0;}
 .lista-item-info strong{display:block;font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lista-item-info span{font-size:11px;color:var(--muted);}
@@ -123,25 +204,25 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
 .outros-add-row{display:flex;gap:8px;align-items:flex-end;}
 .outros-add-row .field{flex:1;margin:0;}
 .outros-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--chip-bg, #f5f3ff);border:1px solid var(--primary, #7c3aed);color:var(--primary, #7c3aed);}
-.chip button{background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1;color:var(--primary, #7c3aed);opacity:.7;}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--chip-bg, #f5f3ff);border:1px solid var(--pf-brand);color:var(--pf-brand-text);}
+.chip button{background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1;color:var(--pf-brand-text);opacity:.7;}
 .chip button:hover{opacity:1;}
 
 /* ── Complementação pedagógica ── */
 .comp-check-label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;user-select:none;}
-.comp-check-label input{width:16px;height:16px;accent-color:var(--primary, #7c3aed);cursor:pointer;margin:0;}
+.comp-check-label input{width:16px;height:16px;accent-color:var(--pf-brand);cursor:pointer;margin:0;}
 
 /* ── Naturalidade autocomplete ── */
 .nat-wrap{position:relative;}
 .nat-ghost-layer{position:absolute;inset:0;padding:11px 12px;border:1px solid transparent;border-radius:10px;font-size:14px;font-family:'Nunito',inherit;pointer-events:none;white-space:nowrap;overflow:hidden;color:transparent;}
 .nat-ghost-layer .ghost-tail{color:#adb5bd;}
 .nat-input-real{position:relative;width:100%;padding:11px 12px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--text);outline:none;font-size:14px;font-family:'Nunito',sans-serif;transition:border-color .15s,box-shadow .15s;}
-.nat-input-real:focus{border-color:var(--primary, #7c3aed);box-shadow:0 0 0 3px rgba(124,58,237,.10);}
+.nat-input-real:focus{border-color:var(--pf-brand);box-shadow:0 0 0 3px color-mix(in srgb, var(--pf-brand) 22%, transparent);}
 .nat-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.10);max-height:200px;overflow-y:auto;display:none;}
 .nat-dropdown.open{display:block;}
 .nat-opt{padding:10px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .nat-opt:hover,.nat-opt.active{background:var(--chip-bg, #f5f3ff);}
-.nat-opt .nat-uf{font-size:11px;font-weight:800;color:var(--primary, #7c3aed);background:var(--chip-bg, #f5f3ff);border-radius:999px;padding:2px 7px;flex-shrink:0;}
+.nat-opt .nat-uf{font-size:11px;font-weight:800;color:var(--pf-brand-text);background:var(--chip-bg, #f5f3ff);border-radius:999px;padding:2px 7px;flex-shrink:0;}
 
 /* ── Resumo final ── */
 .resumo-card{display:none;background:var(--ok-bg, rgba(22,163,74,0.10));border:1px solid var(--ok-border, rgba(22,163,74,0.30));border-radius:14px;padding:20px;margin-bottom:14px;}
@@ -171,12 +252,12 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
   transition: border-color .2s, background .2s; background: var(--field-bg);
 }
 .docs-drop-area:hover, .docs-drop-area.over {
-  border-color: var(--brand, #7c3aed); background: var(--chip-bg);
+  border-color: var(--pf-brand); background: var(--chip-bg);
 }
 .docs-drop-area input[type="file"] { display: none; }
 .docs-drop-icon { font-size: 26px; margin-bottom: 4px; }
 .docs-drop-text { font-size: 13px; font-weight: 700; color: var(--muted); }
-.docs-drop-text span { color: var(--brand-text, #6d28d9); cursor: pointer; text-decoration: underline; }
+.docs-drop-text span { color: var(--pf-brand-text); cursor: pointer; text-decoration: underline; }
 
 /* ── Fila de arquivos pendentes ── */
 .docs-fila-sep-fixo {
@@ -198,7 +279,7 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
   background: var(--field-bg); color: var(--text);
   font-size: 12px; font-family: 'Nunito', sans-serif; outline: none;
 }
-.docs-fila-label:focus { border-color: var(--brand, #7c3aed); }
+.docs-fila-label:focus { border-color: var(--pf-brand); }
 .docs-fila-size { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 .docs-fila-rm {
   background: none; border: none; cursor: pointer;
@@ -215,14 +296,14 @@ html[data-theme="dark"] .step-num.aviso{color:#fde047 !important;}
 .docs-status.show   { display: block; }
 .docs-status.ok     { background: rgba(22,163,74,.10); color: #166534; border: 1px solid rgba(22,163,74,.30); }
 .docs-status.err    { background: rgba(239,68,68,.08); color: #b91c1c; border: 1px solid rgba(239,68,68,.30); }
-.docs-status.loading{ background: var(--chip-bg); color: var(--brand-text,#6d28d9); border: 1px solid var(--border); }
+.docs-status.loading{ background: var(--chip-bg); color: var(--pf-brand-text); border: 1px solid var(--border); }
 html[data-theme="dark"] .docs-status.ok  { color: #4ade80; }
 html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
 /* ── Barra de progresso por arquivo ── */
 .docs-prog-wrap { height: 3px; border-radius: 999px; background: var(--border); margin-top: 4px; overflow: hidden; display: none; }
 .docs-prog-wrap.show { display: block; }
-.docs-prog-bar  { height: 100%; border-radius: 999px; background: var(--brand,#7c3aed); width: 0%; transition: width .3s; }
+.docs-prog-bar  { height: 100%; border-radius: 999px; background: var(--pf-brand); width: 0%; transition: width .3s; }
 </style>
 </head>
 
@@ -232,33 +313,32 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
 <main class="wrap">
 
-  <!-- Ano letivo — editável, permite cadastrar em anos passados (padrão do aluno) -->
-  <div style="margin-bottom:16px;">
-    <div class="field" style="width:160px;margin:0;">
-      <label for="anoLetivo">Ano letivo</label>
+  <!-- Card de destaque do topo: ano letivo (editável, permite cadastrar em anos passados/futuros) + etapas do cadastro -->
+  <section class="card card-destaque topo-destaque">
+    <div class="field">
+      <label for="anoLetivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ano letivo é preenchido automaticamente com o ano atual selecionado pelo administrador. Caso queira fazer um cadastro de anos anteriores ou futuros, selecione manualmente o ano em questão!</span></span></label>
       <input id="anoLetivo" type="number" min="2000" max="2100"/>
-      <small class="help" id="anoAtivoMsg">Preenchido automaticamente a partir do ano ativo.</small>
     </div>
-  </div>
 
-  <!-- STEPPER -->
-  <div class="stepper">
-    <div class="step active" id="step1">
-      <div class="step-num" id="stepNum1">1</div>
-      <div>
-        <div class="step-label">Etapa 1 de 2</div>
-        <div class="step-title">Identificação</div>
+    <!-- STEPPER -->
+    <div class="stepper">
+      <div class="step active" id="step1">
+        <div class="step-num" id="stepNum1">1</div>
+        <div>
+          <div class="step-label">Etapa 1 de 2</div>
+          <div class="step-title">Identificação</div>
+        </div>
+      </div>
+      <div class="step-sep" id="stepSep"></div>
+      <div class="step" id="step2">
+        <div class="step-num" id="stepNum2">2</div>
+        <div>
+          <div class="step-label">Etapa 2 de 2</div>
+          <div class="step-title">Dados pessoais e formação</div>
+        </div>
       </div>
     </div>
-    <div class="step-sep" id="stepSep"></div>
-    <div class="step" id="step2">
-      <div class="step-num" id="stepNum2">2</div>
-      <div>
-        <div class="step-label">Etapa 2 de 2</div>
-        <div class="step-title">Dados pessoais e formação</div>
-      </div>
-    </div>
-  </div>
+  </section>
 
   <!-- Banner de edição -->
   <div id="editBanner" class="edit-banner" style="display:none;"></div>
@@ -269,11 +349,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <!-- Identificação -->
     <section class="card">
       <div class="card-head">
-        <div>
-          <h2>Identificação</h2>
-          <p class="muted">Dados pessoais e de filiação do profissional</p>
-        </div>
-        <div class="pill" id="pillCount">Banco: —</div>
+        <h2>Identificação</h2>
       </div>
 
       <div id="msgForm" class="warn" style="display:none;"></div>
@@ -289,10 +365,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
           <span id="fotoFuncionarioPlaceholder" style="font-size:30px;">🧑</span>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:13px;margin-bottom:4px;">Foto do funcionário (opcional)</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
-            Aparece na ficha individual (PDF) e na visualização na pesquisa. Comprimida automaticamente antes de enviar.
-          </div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Foto do funcionário (opcional) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">A foto deverá representar o funcionário. Ela será utilizada na exibição no sistema e na exportação da ficha individual!</span></span></div>
           <input type="file" id="inpFotoFuncionario" accept="image/*" style="display:none;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn small" id="btnEscolherFotoFuncionario" onclick="document.getElementById('inpFotoFuncionario').click()">📷 Escolher foto</button>
@@ -397,7 +470,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <section class="card">
       <div class="card-head">
         <h2>Dados funcionais</h2>
-        <p class="muted">Função, vínculo e turnos de atuação</p>
       </div>
       <div class="form-grid">
         <div class="field">
@@ -424,11 +496,14 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
           </div>
         </div>
         <div class="field">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" id="profissionalApoio" style="width:17px;height:17px;cursor:pointer;"/>
-            <span>🤝 É profissional de apoio?</span>
-          </label>
-          <small class="help">Marque se este(a) funcionário(a) atua dando apoio a algum(a) aluno(a) com NEE — independente da função (professor, mediador, cuidador, auxiliar etc.). A própria função selecionada acima será usada como especificação.</small>
+          <!-- ícone fora do label: dentro dele, o clique no ⓘ marcaria/desmarcaria o checkbox -->
+          <div style="display:flex;align-items:center;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="profissionalApoio" style="width:17px;height:17px;cursor:pointer;"/>
+              <span>🤝 É profissional de apoio?</span>
+            </label>
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Marque se este(a) funcionário(a) atua dando apoio a algum(a) aluno(a) com NEE — independente da função (professor, mediador, cuidador, auxiliar etc.). A própria função selecionada acima será usada como especificação.</span></span>
+          </div>
         </div>
         <div class="field">
           <label for="cargaHoraria">Carga horária</label>
@@ -446,7 +521,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
           </select>
         </div>
         <div class="field col-full">
-          <label>Turno(s) de atuação</label>
+          <label>Turno(s) de atuação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Poderá ser selecionado mais de um turno, mas é obrigatório selecionar ao menos um! Observe que a carga horária deve ser condizente com os turnos, mas isso não é obrigatório!</span></span></label>
           <div class="turnos-group">
             <label class="turno-check" id="lblMatutino">
               <input type="checkbox" id="chkMatutino" value="MAT"/>
@@ -461,7 +536,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
               🌙 Noturno
             </label>
           </div>
-          <small class="help">Pode selecionar mais de um turno.</small>
         </div>
       </div>
     </section>
@@ -470,7 +544,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <section class="card">
       <div class="card-head">
         <h2>Necessidades especiais</h2>
-        <p class="muted">Profissional com deficiência, TEA e altas habilidades ou superdotação</p>
       </div>
       <div class="nee-block">
         <div class="nee-header">
@@ -518,8 +591,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       </div>
     </section>
 
-    <!-- Ações etapa 1 -->
-    <section class="card">
+    <!-- Ações etapa 1 (card de destaque) -->
+    <section class="card card-destaque">
       <div class="actions">
         <div class="actions-left">
           <button class="btn secondary" id="btnLimpar" type="button">Limpar campos</button>
@@ -538,7 +611,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <section class="card">
       <div class="card-head">
         <h2>Endereço</h2>
-        <p class="muted">Localização de residência do profissional</p>
       </div>
       <div class="form-grid">
         <div class="field">
@@ -583,7 +655,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <section class="card">
       <div class="card-head">
         <h2>Escolaridade</h2>
-        <p class="muted">Nível e tipo de ensino cursado</p>
       </div>
       <div class="form-grid">
         <div class="field">
@@ -789,7 +860,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     <section class="card">
       <div class="card-head">
         <h2>Outros cursos</h2>
-        <p class="muted">Formações complementares e capacitações — Educacenso</p>
       </div>
       <div class="outros-add-row">
         <div class="field">
@@ -829,7 +899,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
     <!-- Documentos — fila de arquivos, upload junto ao salvar -->
     <section class="card">
-      <h3 style="margin:0 0 10px;">📎 Documentos <span style="font-size:12px;font-weight:600;color:var(--muted);">(opcional)</span></h3>
+      <h3 style="margin:0 0 10px;">📎 Documentos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Escaneie ou fotografe os documentos do funcionário e adicione na área abaixo. Imagens (JPG, PNG, WEBP) são importadas normalmente; PDFs são convertidos automaticamente em imagens, uma para cada página. Os arquivos ficam em uma fila e só são enviados quando você salvar o cadastro.</span></span> <span style="font-size:12px;font-weight:600;color:var(--muted);">(opcional)</span></h3>
 
       <div class="docs-drop-area" id="docsDropArea">
         <input type="file" id="docsFileInput" multiple
@@ -865,8 +935,8 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
       <div id="excluirStatus" style="display:none;font-size:12px;font-weight:700;margin-top:10px;padding:8px 12px;border-radius:8px;"></div>
     </section>
 
-    <!-- Ações etapa 2 -->
-    <section class="card">
+    <!-- Ações etapa 2 (card de destaque) -->
+    <section class="card card-destaque">
       <div id="erroSalvar" class="erro-salvar" style="display:none;"></div>
       <div class="actions">
         <div class="actions-left">
@@ -976,7 +1046,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
      Ano Ativo / Ano letivo (editável — permite cadastro em anos passados)
   ════════════════════════════════════════ */
   const anoLetivoInput = document.getElementById('anoLetivo');
-  const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
   let anoAtivoReal = new Date().getFullYear(); // ano ativo real do sistema (fixo, só leitura)
   let anoAtivo     = new Date().getFullYear(); // ano em que o cadastro será salvo (editável)
 
@@ -1000,7 +1069,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   anoLetivoInput.addEventListener('change', function(){
     const v = parseInt(anoLetivoInput.value, 10);
     anoAtivo = !isNaN(v) ? v : anoAtivoReal;
-    atualizarPill();
   });
 
   /* ════════════════════════════════════════
@@ -1021,7 +1089,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     }
     console.log('[DEBUG] funcionarios carregados:', funcionarios.length, '| anoAtivo:', anoAtivo);
     popularFuncaoSelect();
-    atualizarPill();
   }
 
   // Salva UM funcionário — merge parcial no doc dele (coleção `funcionarios`),
@@ -1054,14 +1121,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         await window.DB.escola.save({ funcoesCadastradas: _funcoesExtras });
       }
     } catch(e){ console.error('salvarFuncoesExtras:', e); }
-  }
-
-  /* ════════════════════════════════════════
-     Pill
-  ════════════════════════════════════════ */
-  function atualizarPill(){
-    const total = funcionarios.filter(f => String(f.anoLetivo || f.ano) === String(anoAtivo)).length;
-    document.getElementById('pillCount').textContent = `Banco ${anoAtivo}: ${total} func.`;
   }
 
   /* ════════════════════════════════════════
@@ -1117,6 +1176,11 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   }
 
   document.getElementById('btnVoltar').addEventListener('click', voltarEtapa1);
+
+  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+  document.addEventListener("click", ()=>{
+    document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+  });
 
   // Navegação livre clicando no número/nome da etapa no stepper — trocar de
   // etapa é sempre permitido, só o Salvar é que bloqueia com dados ausentes.
@@ -2036,7 +2100,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
         _editandoId = funcId;
       }
       if(typeof window._natCacheInvalidate === 'function') window._natCacheInvalidate();
-      atualizarPill();
 
       // Envia a foto que ficou esperando o funcId ser confirmado (cadastro
       // novo) — não faz nada se não houver foto pendente.
@@ -2102,7 +2165,6 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
     const anoDoRegistro = parseInt(f.anoLetivo, 10);
     anoAtivo = !isNaN(anoDoRegistro) ? anoDoRegistro : anoAtivoReal;
     anoLetivoInput.value = anoAtivo;
-    atualizarPill();
 
     // Etapa 1
     document.getElementById('cpf').value = f.cpf||''; document.getElementById('cpf').dispatchEvent(new Event('input'));
@@ -2282,6 +2344,9 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   ════════════════════════════════════════ */
   (async function(){
     try{
+      // Contraste do texto dos cards de destaque (cálculo centralizado em theme-colors.js)
+      if (window.ThemeColors) ThemeColors.ajustarContraste();
+
       // Aguarda auth UMA única vez — o evento dispara uma única vez e seria consumido
       // pela primeira função, deixando carregarDB travado para sempre
       await new Promise(res => {
