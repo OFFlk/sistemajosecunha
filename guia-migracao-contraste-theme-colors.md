@@ -19,6 +19,14 @@ e refinadas nas páginas seguintes:
   botão), avisos de card sem fundo amarelo e hover com `--brand-faded` que
   precisa de par escuro, e mapa de hex de paleta copiado à mão no JS de uma
   página (que quebra quando uma paleta nova entra).
+- **Parte 5** — lições do módulo de funcionários (cadastro + pesquisa):
+  páginas **nunca repaginadas**, com CSS externo próprio e JS que desenha a
+  lista. Quase tudo é caso novo das partes anteriores; ali ficam só as
+  diferenças e as armadilhas (remover elemento que o JS usa, `--primary`
+  inexistente, estados "marcado" dentro do destaque, stepper, tooltip dentro
+  de `<label>`, variável do header sobrescrita por CSS de página).
+- **Parte 6** — hubs: o badge de acesso restrito mora no `hub.css`
+  compartilhado; cada hub só troca o texto.
 
 Sempre que possível, compare com os arquivos reais já migrados em vez de
 confiar só neste guia de memória. Quatro referências, cada uma mostrando um
@@ -37,6 +45,13 @@ cenário diferente:
   página, com dados da escola + selects), nenhum botão declarado
   localmente (herda tudo do `components.css`), tooltips inclusive em rótulo
   gerado por JS, e a referência das seções 1.9 (aviso) e 1.10 (hover escuro).
+- `cadastro-funcionario.html` (+ `.css`) — **dois** cards de destaque criados
+  do zero (topo: ano letivo + etapas do cadastro; rodapé: botões de ação),
+  sem tabela. Referência das seções 5.4 a 5.7.
+- `pesquisa-funcionario.html/.js/.css` — destaque nos filtros e lista de
+  sub-cards **desenhada pelo JS**. Referência das seções 5.1, 5.8 e 5.9.
+- `funcionarios.html` + `hub.css` — hub com badge de acesso restrito
+  (Parte 6).
 
 > ⚠️ **Antes de colar qualquer CSS deste guia**: os nomes de variável
 > (`--card`, `--border`, `--text` etc.) **não são os mesmos em todas as
@@ -406,6 +421,11 @@ grep -n "btn-primary\|btn\.primary\|color:\s*#fff\|color:\s*#ffffff" pagina.html
    regra base já cobre os dois temas (é o caso mais comum).
 4. Ignorar: `.btn-danger`, toasts, botões dentro de `.card-destaque` que já usam
    `--dest-fg`, e itens de dropdown que são `.btn` puro (sem preenchimento de marca).
+5. **Rodar o mesmo grep no `.css` externo da página**, não só no `<style>`
+   inline. Em `cadastro-funcionario.css` e `pesquisa-funcionario.css` o
+   `.btn.primary { color:#fff }` estava no arquivo externo, que carrega depois
+   do `components.css` e desfaz o fix global (mesmo mecanismo descrito acima).
+   Ver 5.3.
 
 **Os quatro padrões encontrados** (um por página do módulo):
 
@@ -416,6 +436,9 @@ grep -n "btn-primary\|btn\.primary\|color:\s*#fff\|color:\s*#ffffff" pagina.html
 | `gestao-atas.html` | `.btn.btn-primary` em `<button>` sem override; só o `<a>` tem override de especificidade | `a.btn.btn-primary, a.btn.btn-primary:hover { color:#fff }` | Gerenciar schemas (`<a>`); Exportar JSON e Aplicar merge já herdavam certo |
 | `cadastro-turmas.html` | `.btn.primary` redeclarado inteiro; o dark só troca `background`/`border-color` | `.btn.primary { color:#fff }` (uma linha cobre os dois temas) | Salvar turma |
 | `historico-aluno.html` | `.btn.btn-primary` com seletores reforçados (tipo + 2 classes); dark só troca fundo/borda | `color:#fff` no bloco base | Exportar ▾, Exportar ano (o botão "Pesquisar" fica no `.card-destaque` e já usa `--dest-fg`) |
+| `cadastro-funcionario.css` | `.btn.primary` redeclarado inteiro no **CSS externo**; dark só troca fundo/borda | `color:#fff` no bloco base (uma linha cobre os dois temas) | "✓ Adicionar" (graduação, complementar, pós). Próximo/Salvar ficam no `.card-destaque` e usam `--dest-fg` |
+| `pesquisa-funcionario.css` | idem (cópia do mesmo padrão, no CSS externo) | `color:#fff` no bloco base | Exportar ▾ (único `primary` da página) |
+| `hub.css` | `.card-badge` com fundo `--brand-faded` e texto `--brand` (não é `.btn`) | texto em cor de marca sobre fundo tingido de marca | Badge de acesso restrito, de todos os hubs (ver Parte 6) |
 
 **Cuidado com `<a class="btn btn-primary">`**: `base.css` tem
 `html[data-theme="dark"] a { color: var(--brand-d) }`, mais específico que
@@ -662,7 +685,7 @@ se o texto passar do espaço).
 
 ```html
 <label>Nome do aluno
-  <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+  <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
     i
     <span class="info-tip-bubble">TEXTO DA DICA AQUI.</span>
   </span>
@@ -674,6 +697,11 @@ se o texto passar do espaço).
   dica;
 - o ícone pode ir ao lado de qualquer rótulo, campo ou título — não
   precisa ser sempre dentro de um `<label>`;
+- ⚠️ o `event.preventDefault()` do `onclick` **não é enfeite**: dentro de um
+  `<label for="campo">`, sem ele o clique no ⓘ é repassado ao campo (o cursor
+  de texto aparece no input) e esse clique repassado sobe até o listener de
+  "fechar ao clicar fora", que **fecha o balão na hora**. Se o ⓘ acompanha um
+  `<label>` de checkbox, prefira colocá-lo **fora** do label (ver 5.7);
 - `tabindex="0"` mantém o ícone acessível por teclado (Tab + Enter/Espaço
   também abre, já que é um elemento focável — navegadores ativam `click`
   em elementos focáveis com Enter/Espaço por padrão).
@@ -709,6 +737,9 @@ estiverem abertos.
       real da dica dentro do `.info-tip-bubble`?
 - [ ] Listener de "fechar ao clicar fora" adicionado no boot da página
       (uma vez só, mesmo com vários ícones)?
+- [ ] O ícone está dentro de um `<label for>`? O `onclick` tem
+      `event.preventDefault()` (5.7)? Se o label é de checkbox, o ícone foi
+      colocado fora dele?
 - [ ] Testado em desktop (clique) e mobile (toque) — não depende de
       hover?
 - [ ] Testado com o card/fundo real da página (a cor do ícone deve
@@ -930,6 +961,330 @@ alcançar algo dentro do item, precisa da mesma exceção `.card-destaque
 
 ---
 
+# PARTE 5 — Lições do módulo de funcionários (cadastro + pesquisa)
+
+Visto em `cadastro-funcionario.html` e `pesquisa-funcionario.*`. Eram duas
+páginas que **nunca tinham sido repaginadas**: design system antigo, CSS
+externo próprio (`cadastro-funcionario.css`, `pesquisa-funcionario.css`) e, na
+pesquisa, uma lista desenhada por JS. Quase tudo que apareceu é caso novo das
+partes anteriores; aqui ficam só as diferenças e as armadilhas.
+
+## 5.1 Antes de remover um elemento do HTML: quem escreve nele?
+
+Tirar do HTML um badge, uma legenda, uma linha de contagem ou um log de
+resultado **sem olhar o JS** dá `TypeError: Cannot set properties of null` e a
+página fica em branco (a lista nem chega a ser desenhada, porque o erro
+acontece antes). Casos reais: `pillCount`, `lblAnoAtivo`, `statsRow`/`statExib`,
+`subResultados`.
+
+Receita: para cada `id` que sai do HTML, achar quem o usa e remover **também**
+a função e as chamadas dela. Conferência automática dos ids que o JS procura:
+
+```
+grep -o "getElementById('[^']*')" pagina.js | sort -u | sed "s/.*('\(.*\)')/\1/" \
+  | while read id; do grep -q "id=\"$id\"" pagina.html || echo "FALTA no HTML: $id"; done
+```
+
+- Mensagem de erro que sobra num elemento removido (ex.: `anoAtivoMsg`): **não
+  apague**, mantenha oculto (`display:none`) e mostre só quando o erro
+  acontecer. Não use a classe `.help` para isso: o `min-height` dela deixa um
+  vão em branco.
+- **HTML, JS e CSS sobem juntos.** JS antigo com HTML novo dá o mesmo
+  `TypeError`. Como o navegador guarda cache, coloque `?v=N` no `<script src>`
+  e no `<link>` da página e suba o N a cada entrega.
+- `ThemeColors.ajustarContraste()` vai **isolado em `try/catch`**, nunca no
+  caminho de carga dos dados. Se ela falhar (ou ainda não existir), a página
+  inteira deixa de carregar por causa de um detalhe visual:
+```js
+try{
+  if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+}catch(e){ console.warn('ajustarContraste:', e); }
+```
+- Sem navegador à mão, dá para reproduzir erro de JS montando o HTML num
+  `jsdom` (`npm i jsdom`), com `Auth`/`DB` falsos e dados de mentira, e contando
+  os itens desenhados. Serve para comparar "arquivos antigos x novos" e
+  achar a combinação que quebra.
+
+## 5.2 `--primary` não existe no sistema
+
+O CSS antigo dessas páginas usava `var(--primary, #7c3aed)` em dezenas de
+lugares. **`--primary` não é definido em nenhum arquivo do sistema**, então o
+fallback roxo valia **sempre**, em qualquer paleta. É a mesma família do bug
+de "roxo escrito à mão" da introdução, mas o grep pelo hex não pega, porque o
+roxo está dentro de `var()`. Rodar também:
+
+```
+grep -n -- "--primary" pagina.html pagina.css
+```
+
+Correção: um bloco de **aliases** por página (ou por módulo) com o par
+claro/escuro resolvido em uma linha por token, e trocar todo `--primary` por eles.
+Assim não se espalham regras `html[data-theme="dark"]` pelo CSS:
+
+```css
+:root{
+  --pf-brand:var(--brand,#7c3aed);
+  --pf-brand-text:var(--brand-text,#6d28d9);
+  --pf-brand-faded:var(--brand-faded,#f5f3ff);
+  --pf-brand-border:var(--brand-border,#ddd6fe);
+}
+html[data-theme="dark"]{
+  --pf-brand:var(--brand-d,#8b5cf6);
+  --pf-brand-text:var(--brand-text-d,#c4b5fd);
+  --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
+  --pf-brand-border:var(--brand-border-d,#7c3aed);
+}
+```
+
+Usos: `--pf-brand` em preenchimento e borda, `--pf-brand-text` em **texto** (1.7),
+`--pf-brand-faded` em hover leve (1.10). As duas páginas do módulo usam o
+mesmo prefixo `--pf-*`. O fallback roxo aqui dentro de `var()` é normal.
+
+## 5.3 CSS externo: `.btn.primary`, hover roxo e hover do ghost
+
+No `.css` externo de cada página (`cadastro-funcionario.css`, `pesquisa-funcionario.css`):
+
+1. `.btn.primary { color:#fff }` → `color: var(--brand-fg, #fff)` (receita 1.8.1).
+2. O hover era `var(--brand-hover, #6d28d9)`. `--brand-hover` e `--brand-hover-d`
+   **existem** nas paletas (o header usa os dois em `--btn-home-hover`), então
+   o correto é manter o token e trocar só o **fallback** roxo por algo derivado
+   da própria marca. No tema escuro o hover nem existia (a regra dark de fundo
+   vencia a do hover por especificidade):
+```css
+.btn.primary:hover{ background:var(--brand-hover, color-mix(in srgb, var(--brand,#7c3aed) 88%, #000)); border-color:var(--brand-hover, color-mix(in srgb, var(--brand,#7c3aed) 88%, #000)); }
+html[data-theme="dark"] .btn.primary:hover{ background:var(--brand-hover-d, color-mix(in srgb, var(--brand-d,#7c3aed) 88%, #000)); border-color:var(--brand-hover-d, color-mix(in srgb, var(--brand-d,#7c3aed) 88%, #000)); }
+```
+   (Nos dois CSS já entregues, o dark usa só o `color-mix`, visualmente
+   equivalente; o token `--brand-hover-d` é a forma exata.)
+3. `.btn.ghost:hover`/`.btn.secondary:hover` só tinham o par claro
+   (`--brand-faded`, `--brand`, `--brand-text`). Adicionar o par escuro
+   (`--brand-faded-d`, `--brand-d`, `--brand-text-d`) — é a 1.10.
+4. Roxo fixo fora de `var()` que o grep da introdução acha: sombra de foco
+   `rgba(124,58,237,.1)` → `color-mix(in srgb, var(--brand) 18%, transparent)`;
+   destaque de busca `<mark>` no escuro → `--brand-faded-d`/`--brand-text-d`.
+
+## 5.4 Estados "selecionado" fora do destaque: preenchimento sólido + `--brand-fg`
+
+Botões Sim/Não, itens de checkbox/radio marcados, badge de categoria: o antigo
+"marcado" era **texto em cor de marca sobre fundo tingido de marca** — some em
+paleta clara (1.7). Padrão: desmarcado = contorno neutro; marcado = fundo de
+marca + texto calculado; hover leve com par escuro.
+
+```css
+.opcao{ background:transparent; border:1.5px solid var(--border); color:var(--muted); }
+.opcao:hover{ background:var(--pf-brand-faded); border-color:var(--pf-brand); color:var(--text); }
+.opcao.marcada{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
+.opcao.marcada input[type="checkbox"],
+.opcao.marcada input[type="radio"]{ accent-color:var(--brand-fg,#fff); }
+```
+
+- Declarar o **hover antes** do `.marcada` (mesma especificidade: o último
+  ganha, e o marcado não pode virar "faded" ao passar o mouse).
+- `accent-color` do checkbox/radio **dentro** do item marcado precisa ser
+  `--brand-fg`; com `--brand` o controle some contra o próprio fundo.
+- Sim e Não devem ter **exatamente** o mesmo visual quando marcados (a versão
+  antiga só diferenciava um dos dois).
+
+## 5.5 Botões e chips **dentro** do `.card-destaque`
+
+Fundo de marca contra fundo de marca não existe. Dentro do destaque:
+
+```css
+/* primário (Próximo/Salvar): véu translúcido + borda cheia + texto calculado */
+.card.card-destaque .btn.primary{ background:var(--dest-btn-bg); border:1.5px solid var(--dest-fg); color:var(--dest-fg); font-weight:800; }
+.card.card-destaque .btn.primary:hover:not(:disabled){ background:var(--dest-btn-hover); }
+/* secundário/ghost (Limpar/Voltar/Cancelar): só contorno */
+.card.card-destaque .btn.secondary,.card.card-destaque .btn.ghost{ background:transparent; border:1.5px solid var(--dest-btn-bd); color:var(--dest-fg); }
+.card.card-destaque .btn.secondary:hover:not(:disabled),.card.card-destaque .btn.ghost:hover:not(:disabled){ background:var(--dest-btn-hover); border-color:var(--dest-fg); }
+/* desabilitado: cinza fixo, igual nos dois temas, sem hover */
+.card.card-destaque .btn:disabled,.card.card-destaque .btn:disabled:hover{ background:rgba(128,128,128,.28); border:1.5px solid rgba(128,128,128,.5); color:#6b7280; opacity:1; cursor:not-allowed; filter:none; box-shadow:none; }
+```
+- O prefixo `.card.card-destaque` (3–4 classes) é o que vence os overrides
+  `html[data-theme="dark"] .btn.primary` do CSS da página.
+- Um botão que era `.danger` (ex.: "Limpar filtros") e passa a viver no
+  destaque vira `.ghost`: o vermelho sólido também briga com a cor de marca.
+
+**Chips marcáveis** (ex.: turnos, que eram `--field-bg` com borda `--brand` no
+marcado): dentro do destaque a borda `--brand` **some contra o próprio card**.
+Padrão: desmarcado = contorno translúcido; marcado = **preenchimento sólido
+`--dest-fg` com o texto na cor do card** (`--btn-home-bg` é a cor do card, e o
+par `--dest-fg` × `--btn-home-bg` já tem o contraste calculado):
+
+```css
+.card.card-destaque .chip{ background:transparent; border-color:var(--dest-btn-bd); color:var(--dest-fg); }
+.card.card-destaque .chip:hover{ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
+.card.card-destaque .chip.checked{ background:var(--dest-fg); border-color:var(--dest-fg); color:var(--btn-home-bg); }
+.card.card-destaque .chip.checked input[type="checkbox"]{ accent-color:var(--btn-home-bg); }
+```
+- `.checked` **depois** de `:hover` (empate de especificidade).
+- **Chip de aviso** ("Sem filtro de turno aplicado."): `--chip-bg` parecia a cor
+  do body no claro e a cor do card no escuro. Dentro do destaque usar o véu:
+  `background:var(--dest-panel-bg); border:1px solid var(--dest-btn-bd); color:var(--dest-fg);`
+- **Escopo do rótulo**: use `.card-destaque .field > label`, não
+  `.card-destaque label`. O seletor amplo alcança também os `<label>` **dentro
+  dos chips**, que precisam herdar a cor do chip (mesma família do vazamento da 4.2).
+- Um `<label>` solto com `style="color:var(--muted)"` no HTML: trocar o valor
+  inline por `var(--dest-fg)` (a variável resolve dentro do card).
+
+## 5.6 Stepper / controle segmentado dentro do destaque
+
+Quando o destaque leva um stepper (etapas 1/2), ele perde a caixa própria e
+usa o véu. Desenho aprovado:
+
+- **Duas colunas iguais que preenchem o card**: `display:grid; grid-template-columns:1fr 1fr; gap:12px` — o `gap` é a separação, centralizada. Sem linha
+  entre etapas (o quadrado já separa). Se o JS mexe na classe do separador
+  (`stepSep.classList...`), **mantenha o elemento** com `display:none` em vez
+  de apagá-lo (5.1).
+- **Etapa ativa** = "square" arredondado na cor do **body** (`--pf-body-bg`),
+  com texto normal (`--text`/`--muted`) e o número em `--pf-brand` + `--brand-fg`.
+  **Hover** das demais = o mesmo square, translúcido (`--dest-btn-hover`).
+```css
+:root{ --pf-body-bg:var(--bg,#ffffff); }
+html[data-theme="dark"]{ --pf-body-bg:var(--bg,#0a0e1a); }
+.step{ padding:8px 18px 8px 10px; border-radius:12px; cursor:pointer; }
+.step:hover{ background:var(--dest-btn-hover); }
+.step.active,.step.active:hover{ background:var(--pf-body-bg); }
+.step.active .step-num{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
+.step.active .step-title{ color:var(--text); } .step.active .step-label{ color:var(--muted); opacity:1; }
+```
+  `--bg` é o fundo do body (`#f4f3ff` no claro, `#0a0e1a` no escuro).
+- **Aviso** de etapa incompleta: sem amarelo (1.9): borda tracejada + ⚠️.
+  Escopar como `.step:not(.active) .step-num.aviso`: ao voltar para a etapa 1 a
+  classe `.aviso` continua no número, e sem o `:not(.active)` ela vence o
+  estilo de ativo (número branco sobre square branco = invisível).
+
+## 5.7 Tooltip (ⓘ) dentro de `<label>`
+
+Dois casos, ambos vistos no cadastro:
+- `<label for="anoLetivo">Ano letivo <ⓘ></label>`: sem `event.preventDefault()`
+  no `onclick`, o clique focava o campo e o balão fechava na hora (ver 2.2).
+- `<label>` de **checkbox**: o clique no ⓘ marcaria/desmarcaria a caixa. Colocar
+  o ícone **fora** do label, num `<div style="display:flex;align-items:center">`
+  que agrupa `label` + ícone.
+- Legenda `.help` que vira tooltip: remover a legenda antiga (2.5). Se o campo
+  ficava desalinhado **por causa** da legenda (ex.: checkbox ao lado de um
+  select), o alinhamento passa a ser possível: usar um `<label style="visibility:hidden">&nbsp;</label>` de espaçador (esconder no mobile) + `min-height`
+  igual à altura do input.
+
+## 5.8 CSS de página que redeclara variável do header
+
+**Sintoma**: o logo do header ("IM") ficou roxo **só numa página e só no tema
+escuro**. **Causa**: o `.mark` do header usa `--mark-bg`; o CSS da página
+redeclarava `--mark-bg` no `:root` (para o destaque de busca `<mark>`, que nem
+usava a variável). O CSS da página carrega **depois** do `header.css` e vence.
+No claro o valor coincidia com o do header; no escuro era um roxo fixo.
+
+- Regra: CSS de página **não redeclara variável de header** (`--mark-*`,
+  `--btn-home-*`, e qualquer outra que o `header.css`/`header.html` defina).
+  Variável própria da página leva prefixo próprio.
+- Achar: `grep -n -- "--mark-\|--btn-home" *.css`. Bug que aparece só numa
+  página e só num tema quase sempre é colisão de variável. No DevTools, clicar
+  no elemento e ler no painel *Styles* qual declaração de `--variável` vence.
+- Referência de camadas: o header tem `z-index: 99` (barra de gradiente: 100).
+  Modal com `position:fixed` precisa de `z-index` acima disso (usamos `1000`),
+  senão o topo dele fica por baixo do header.
+
+## 5.9 Lista de sub-cards desenhada por JS (`pesquisa-funcionario`)
+
+A Parte 4 vale igual; o que muda é que o HTML do item está **num template do JS**:
+- **Botões do item** são `.btn small` do sistema (não classes próprias como
+  `.btn-edit`/`.btn-view`, que tinham roxo escrito à mão): "Editar" =
+  `.btn.secondary`, "Visualizar" = `.btn.neutral` (contorno neutro com hover de
+  marca), empilhados com a mesma largura. Botão dentro do item **não** recebe
+  o override do destaque (4.1).
+- **Badges**: um tingido de marca (cargo) e outro **neutro** para se destacar
+  dele (`background: color-mix(in srgb, var(--text) 8%, transparent)`).
+  O resto do resumo vira texto separado por `•`, com `white-space:nowrap` em
+  cada item para não quebrar no meio.
+- Campos secundários (sexo, cor/raça, naturalidade) saem do resumo e ficam só
+  na ficha (modal).
+- **Contador de resultados**: em vez de badge + log repetindo o número, um
+  só badge maior, com fundo `--pf-brand` e texto `--brand-fg`.
+- **Estado vazio que explica o motivo**: em vez de "Nenhum resultado", diga
+  *por que* (falha de leitura, banco sem funcionários para a escola ativa,
+  modo `ADMIN` sem escola escolhida, ano sem cadastros + anos existentes).
+  Nesse módulo, "todas as escolas" (`getActiveSchoolId() === 'ADMIN'`) faz
+  `DB.*.list()` devolver vazio **sem erro**; a mensagem evita horas de
+  diagnóstico. O filtro de ano deve aceitar o campo legado
+  (`f.anoLetivo || f.ano`), como o cadastro já fazia.
+- Espere a escola ativa existir antes de ler (`Auth.getActiveSchoolId()`) e
+  tente uma segunda leitura se a primeira falhar.
+
+## 5.10 Checklist rápido — Parte 5
+
+- [ ] Todo `id` removido do HTML foi conferido contra o JS (5.1), e a página
+      sobe HTML + JS + CSS juntos, com `?v=N` atualizado?
+- [ ] `ThemeColors.ajustarContraste()` está num `try/catch` isolado (5.1)?
+- [ ] `grep -- "--primary"` e o grep de roxo fixo rodados no HTML **e** no `.css` (5.2, 5.3)?
+- [ ] `.btn.primary` do CSS externo usa `--brand-fg`; hover sem roxo fixo; hover do ghost com par escuro (5.3)?
+- [ ] Estados "marcado" fora do destaque: sólido + `--brand-fg`, `accent-color` ajustado (5.4)?
+- [ ] Dentro do destaque: primário translúcido, secundário só contorno, desabilitado cinza, chips marcáveis com `--dest-fg` (5.5)?
+- [ ] ⓘ dentro de `<label>` com `preventDefault`, ou fora do label de checkbox (5.7)?
+- [ ] `grep -- "--mark-\|--btn-home"` nos CSS de página: nenhuma redeclaração (5.8)?
+- [ ] Modal acima do header (`z-index` > 100) (5.8)?
+
+---
+
+# PARTE 6 — Hubs (páginas de menu com cards de navegação)
+
+Visto em `funcionarios.html` (hub do módulo) e no `hub.css`, **compartilhado por
+todos os hubs**. Aqui não há card de destaque, tooltip nem tabela.
+
+## 6.1 Badge de acesso restrito mora no `hub.css`
+
+Cards que levam a páginas com restrição de papel (RBAC) ganham
+`<span class="card-badge">…</span>`. O estilo é único, no `hub.css`; **cada hub
+só troca o texto** (ex.: "Admin", "Admin/Gestor"). O visual antigo era fundo
+`--brand-faded` + texto `--brand` (baixo contraste em paletas claras). Agora:
+
+```css
+.card-badge{ background:var(--brand); color:var(--brand-fg,#fff); /* …resto igual */ }
+html[data-theme="dark"] .card-badge{ background:var(--brand-d); color:var(--brand-fg,#fff); }
+```
+
+Como o arquivo é compartilhado, a mudança vale para **todos** os hubs de uma vez.
+
+## 6.2 Bloqueio por papel no hub (só interface)
+
+O hub esconde o link e mostra "Sem acesso" para quem não pode. Isso é **apenas
+interface**: a barreira real precisa estar nas regras do servidor/Firestore
+(nas páginas do módulo não há checagem de papel no cliente).
+
+```js
+var ROLES_PERMITIDOS = ['admin', 'gestor'];   // só o usuário comum fica de fora
+['cardCadastroFunc', 'cardPesquisaFunc'].forEach(function (id) {
+  var card = document.getElementById(id);
+  if (card && ROLES_PERMITIDOS.indexOf(role) === -1) {
+    card.removeAttribute('href'); card.classList.add('disabled');
+    card.setAttribute('data-tooltip', 'Sem acesso');
+  }
+});
+```
+O texto do badge deve refletir a lista real de papéis; conferir o valor exato
+do papel gravado na sessão (aqui assumido `gestor`, minúsculo).
+
+## 6.3 Outros pontos do `hub.css` e do bloco de tooltip "Sem acesso"
+
+- `.card:hover .card-title` usava `--brand` como cor de **texto** (1.7):
+  agora `--brand-text` (claro) e `--brand-text-d` (escuro).
+- O bloco de script que cria o balão "Sem acesso" (repetido no HTML de cada
+  hub) pintava o texto com `#fff` fixo sobre `--brand`. Corrigido em
+  `funcionarios.html` lendo `--brand-fg`, com o valor antigo como fallback:
+```js
+var fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
+b.style.color = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
+```
+  **Replicar nos demais hubs** que tenham esse bloco (idealmente, extrair
+  para um arquivo compartilhado).
+
+## 6.4 Checklist rápido — Parte 6
+
+- [ ] Hub com página restrita tem o `<span class="card-badge">` no card, com o texto certo?
+- [ ] A lista de papéis do script bate com o texto do badge?
+- [ ] O balão "Sem acesso" do hub usa `--brand-fg`?
+
+---
+
 **Parte 1 — contraste:**
 1. Página com função duplicada → apaga a função e o `addEventListener`
    dela; troca a chamada por `if (window.ThemeColors) ThemeColors.ajustarContraste();`.
@@ -980,6 +1335,19 @@ alcançar algo dentro do item, precisa da mesma exceção `.card-destaque
 3. Testar com paleta clara **e** escura, nos dois temas — o bug da Parte 4
    é combinatório, não aparece igual em todo mundo.
 
+**Parte 5 — páginas antigas com CSS/JS próprio:**
+1. Conferir os `id`s removidos contra o JS; subir HTML + JS + CSS juntos com `?v=N`;
+   `ajustarContraste()` sempre em `try/catch` isolado.
+2. `grep -- "--primary"` (não existe no sistema) e trocar pelos aliases
+   `--pf-*`; receita 1.8.1 também no `.css` externo.
+3. "Marcado" fora do destaque = sólido + `--brand-fg`; dentro do destaque =
+   `--dest-fg` sólido com texto `--btn-home-bg`; ⓘ em `<label>` com `preventDefault`.
+4. CSS de página **nunca** redeclara variável do header (`--mark-*`, `--btn-home-*`).
+
+**Parte 6 — hubs:**
+1. Badge de acesso restrito é estilo do `hub.css`; o hub só troca o texto.
+2. Lista de papéis do script e texto do badge precisam bater; o bloqueio real é no servidor.
+
 ---
 
 # Páginas já adequadas (status)
@@ -991,6 +1359,9 @@ alcançar algo dentro do item, precisa da mesma exceção `.card-destaque
 | `pesquisa-ata.html` | ✅ | ✅ (corrigido) | — | — | Bug de tokens do balão (fundo transparente) corrigido depois de já publicado — motivou a seção 2.1.1. |
 | `schema_ata.html` | ✅ **criado do zero** (2 cards) | ✅ (10 ícones) | ✅ **novo, motivou a Parte 3** | — | Página mais completa como referência: cards de destaque inéditos, botões por variante, tabela inteira dentro de um deles. |
 | `cadastro-turmas.html` | ✅ **criado do zero**, card escolhido é o de listagem, não o de ação (ver 1.6) | ✅ (6 ícones + legendas antigas removidas) | — | ✅ **novo, motivou a Parte 4** | Dois cards lado a lado; bug de `--brand-d` puro em texto (1.7) e de `--dest-fg` vazando pra lista de itens (4.2); achado à parte, sem relação com a migração: roxo fixo herdado em `.btn.ghost/.secondary` hover no tema escuro. |
+| `cadastro-funcionario.html` | ✅ **criado do zero** (2 cards: topo com ano letivo + stepper; rodapé com as ações) | ✅ (5 ícones; legendas `.help` removidas) | — | — | Página nunca repaginada (Parte 5). Stepper no destaque (5.6), chips e botões dentro do destaque (5.5), estados marcados (5.4), ⓘ em label (5.7). |
+| `pesquisa-funcionario.html/.js/.css` | ✅ **criado do zero** (card de filtros) | ✅ (1 ícone, texto adaptado à pesquisa) | — | ✅ lista de sub-cards desenhada por JS (5.9) | Colisão de `--mark-bg` com o logo do header (5.8). Elementos removidos que o JS usava (5.1). Estado vazio com diagnóstico. |
+| `funcionarios.html` (hub) | — não se aplica | — | — | — | Badge "Admin/Gestor" nos dois cards; papéis `admin` e `gestor` (Parte 6). |
 | `cadastro-atas.html` | ✅ **criado do zero** (1º card: dados da escola + selects) | ✅ (4 ícones: Turma, Nome do aluno, Scans de documentos, título Alunos; legenda `.help` removida) | — | — | Card "Scans" renomeado para "Scans de documentos"; aviso sem amarelo (1.9); hover escuro da drop-zone (1.10). |
 
 ## Status das seções 1.8 → 1.11, por página
@@ -1004,6 +1375,10 @@ alcançar algo dentro do item, precisa da mesma exceção `.card-destaque
 | `cadastro-turmas.html` | ✅ `.btn.primary` base | — não se aplica | ✅ verificado pelo usuário | — | Botões `.btn.outline` (Adicionar/Editar) conferidos pelo usuário: ok. |
 | `historico-aluno.html` | ✅ bloco reforçado | — não se aplica | ✅ verificado pelo usuário | — | Sem aviso dentro de card (usa toast). |
 | `schema_ata.html` | — fora | — não recebe a adequação | — | — | Única página com aviso dentro de card em vez de toast; por decisão do usuário não recebe a 1.9. Não usa botão com fundo de marca. |
+| `cadastro-funcionario.html/.css` | ✅ `.btn.primary` no CSS externo; Próximo/Salvar no destaque via `--dest-fg` | ✅ aviso do stepper sem amarelo | ✅ hover do ghost com par escuro | — | `--primary` (inexistente) trocado por `--pf-*` (5.2). |
+| `pesquisa-funcionario.html/.css` | ✅ `.btn.primary`, `.selo-selecionado`, hover do `.sort-control` | — não tem aviso em card | ✅ hover do ghost e `.btn.neutral` | — | `--mark-bg` removido do `:root` (5.8); `<mark>` no escuro sem roxo fixo. |
+| `hub.css` (global dos hubs) | ✅ `.card-badge` com `--brand-fg` | — | ✅ título do card no hover com `--brand-text`/`-d` | — | Vale para todos os hubs (Parte 6). |
+| `funcionarios.html` (hub) | ✅ balão "Sem acesso" com `--brand-fg` | — | — | — | Replicar o balão nos outros hubs. |
 | `perfil.html` | — | — | — | ✅ corrigido | `swatchColors` local removido; lê `ThemeColors.palettes[key]['--brand']`. Achado ao trocar Branco→Tan. |
 
 **Decisões do usuário que fecharam pendências antigas:**
@@ -1014,7 +1389,16 @@ alcançar algo dentro do item, precisa da mesma exceção `.card-destaque
   justamente não recebe essa adequação; os hovers com `--brand-faded` foram
   conferidos pelo usuário.
 
-**Pendência aberta (única):**
-- Rodar a receita da 1.8.1 (`--brand-fg`) — e o grep da 1.11 — nas páginas
-  **fora** do módulo de atas antes de considerar o Tan seguro em produção.
-  Nenhuma página fora do módulo foi identificada/verificada ainda.
+**Pendências abertas:**
+- **Fora do módulo de atas**, a receita da 1.8.1 (`--brand-fg`) e o grep da 1.11
+  foram feitos apenas nas duas páginas do módulo de funcionários, no hub dele e
+  no `hub.css`. Falta rodar nas demais páginas antes de considerar o Tan seguro
+  em produção.
+- **Greps novos, em todas as páginas e CSS do sistema:**
+  `grep -n -- "--primary"` (5.2) e `grep -n -- "--mark-\|--btn-home" *.css` (5.8).
+- **Bloco do balão "Sem acesso"** dos demais hubs: aplicar a leitura de
+  `--brand-fg` (6.3) ou extrair para um arquivo compartilhado.
+- `exportacao-funcionarios.js`: conferir se ele lê algum elemento removido da
+  pesquisa (`lblAnoAtivo`, `statExib`, `subResultados`, `statsRow`); não foi enviado.
+- Os dois CSS do módulo usam `color-mix` no hover **escuro** do `.btn.primary`;
+  o token exato é `--brand-hover-d` (5.3).
