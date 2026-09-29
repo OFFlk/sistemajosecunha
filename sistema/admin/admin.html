@@ -35,16 +35,11 @@
 
 <title>Admin • Hub</title>
 <style>
-/* Tokens do balão/modal — mesmos valores padrão do módulo. */
-:root { --pop-bg: #ffffff; --pop-border: var(--brand-border); }
-html[data-theme="dark"] { --pop-bg: #131c2e; --pop-border: #2a3a5c; }
+/* Tokens do balão/modal = tokens de card do hub.css (já têm tema claro/escuro). */
+:root { --pop-bg: var(--card-bg); --pop-border: var(--card-border); }
 
 /* Sem overflow:hidden nos cards com ⓘ (cortaria o balão). */
 .config-card, .status-card { overflow: visible; }
-
-/* Grid dos módulos: 2x2 (schema_ata saiu do módulo). */
-.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
 
 /* ── Card de destaque (guia 1.3b) ── */
 .config-card.card-destaque {
@@ -109,7 +104,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
 
 <div class="container">
 
-  <div class="grid" style="margin-bottom: 28px;">
+  <div class="grid grid-atas" style="margin-bottom: 28px;">
 
     <a class="card" id="cardBackup" href="admin_backup.html">
       <div class="card-icon">💾</div>
