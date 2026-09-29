@@ -93,6 +93,12 @@
   .warn-box { background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.30); padding: 12px 16px; border-radius: 10px; font-size: 13px; color: var(--ink); margin-bottom: 14px; line-height: 1.5; }
   .danger-box { background: var(--danger-bg); border: 1px solid var(--danger-border); padding: 12px 16px; border-radius: 10px; font-size: 13px; color: var(--danger-color); margin-bottom: 14px; line-height: 1.5; }
 
+  /* ── Toast (guia-toasts.md) ── */
+  @keyframes toastSubir {
+    from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
   /* ── Output / preview ── */
   .summary { font-family: ui-monospace, monospace; font-size: 12px; background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--ink); padding: 14px; border-radius: 10px; white-space: pre-wrap; line-height: 1.6; margin-top: 12px; }
   code { font-family: ui-monospace, monospace; font-size: 12px; background: var(--chip-bg); padding: 1px 5px; border-radius: 4px; color: var(--chip-color); }
@@ -130,10 +136,12 @@
   /* Aviso inline dentro do destaque: painel derivado do próprio card (guia 1.9),
      sem vermelho/âmbar de fundo — o sinal é o ⛔ do texto + faixa esquerda. */
   .card-destaque .danger-box { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd); border-left: 4px solid var(--dest-fg); color: var(--dest-fg); }
-  /* Botões de limpeza continuam vermelhos de propósito: vermelho sólido +
-     borda na cor de contraste, pra não sumir em paleta vermelha. */
-  .card-destaque .btn-danger { background: #dc2626; border-color: var(--dest-fg); color: #fff; }
-  .card-destaque .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+  /* Botões de limpeza: continuam .btn-danger translúcido (nunca vermelho sólido).
+     Sobre o fundo de marca o --danger-bg original ficaria fraco demais, então o
+     tom translúcido é um vermelho-escuro que escurece qualquer cor de marca
+     (inclusive a paleta Vermelho) e o texto acompanha o contraste do card. */
+  .card-destaque .btn-danger { background: rgba(153,27,27,.38); border-color: rgba(153,27,27,.65); color: var(--dest-fg); }
+  .card-destaque .btn-danger:hover:not(:disabled) { background: rgba(153,27,27,.52); }
   .card-destaque .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (padrão do guia, Parte 2).
@@ -191,7 +199,7 @@
 
   <div class="grid">
     <div class="card">
-      <div class="card-title">⬇️ Exportar backup <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><span id="exportDesc">Gera um arquivo .json com os dados do sistema.</span></span></span></div>
+      <div class="card-title">⬇️ Exportar backup <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Baixa um arquivo .json de backup. O conteúdo segue o escopo escolhido acima: apenas a escola selecionada ou todas as escolas do sistema.</span></span></div>
       <div class="row" style="margin-top:0;">
         <button class="btn-action" onclick="exportarBackup()" type="button">Baixar backup</button>
         <span style="font-size:12px;color:var(--muted);">Inclui turmas, alunos, schemas e auxiliares.</span>
@@ -222,7 +230,6 @@
       <button class="btn-danger" id="btnLimparAlunos" onclick="limparAlunosIds()" type="button">Limpar alunos / IDs</button>
       <button class="btn-danger" id="btnApagarFuncionarios" onclick="apagarFuncionarios()" type="button">Apagar funcionários</button>
     </div>
-    <div class="summary" id="saida">Aguardando ação…</div>
   </div>
 
 </div>
@@ -395,8 +402,60 @@
     return data;
   }
 
-  function setOut(msg){
-    document.getElementById("saida").textContent = msg;
+  // ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+  function _showToast(msg, bg, shadow, duration){
+    const existing = document.getElementById('_toastGlobal');
+    if(existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_toastGlobal';
+    toast.style.cssText =
+      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
+      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
+    document.body.appendChild(toast);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+
+  function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+  function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+  function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+  function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+
+  // Ponto de entrada único — setMsg(texto, kind): "ok" | "warn" | "loading" | "err".
+  function setMsg(text, kind){
+    const t = (text||"").toString();
+    if(!t) return;
+    if(kind === "err") _toastErro('⚠️ ' + t);
+    else if(kind === "ok") _toastSucesso('✅ ' + t);
+    else if(kind === "warn") _toastAviso('⚠️ ' + t);
+    else if(kind === "loading") _toastCarregando('⏳ ' + t);
+    else {
+      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+      _toastAviso(t);
+    }
+  }
+
+  // Resultado final de uma ação (sucesso/erro): mostra o toast e atualiza o
+  // card de Status (o antigo setOut já fazia esse refresh).
+  function _done(text, kind){
+    setMsg(text, kind);
     renderMeta();
   }
 
@@ -416,8 +475,8 @@
     const scope = getScope();
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola antes de exportar.'); return; }
-      setOut("⏳ Lendo dados da escola no Firestore…");
+      if (!schoolId){ setMsg('Selecione uma escola antes de exportar.', "err"); return; }
+      setMsg("Lendo dados da escola no Firestore…", "loading");
       try{
         const [dataCols, escolaDoc] = await Promise.all([
           _readAllCollections(schoolId),
@@ -430,13 +489,13 @@
         };
         const stamp = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
         downloadText(`backup_${schoolId}_${stamp}.json`, JSON.stringify(payload, null, 2));
-        setOut("✅ Backup da escola gerado e baixado.");
+        _done("Backup da escola gerado e baixado.", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao exportar: " + e.message);
+        _done("Erro ao exportar: " + e.message, "err");
       }
     } else {
-      setOut("⏳ Lendo dados de TODAS as escolas no Firestore…");
+      setMsg("Lendo dados de TODAS as escolas no Firestore…", "loading");
       try{
         const schoolIds = await listAllRealSchoolIds();
         const bySchool = {};
@@ -453,10 +512,10 @@
         };
         const stamp = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
         downloadText(`backup_todas_escolas_${stamp}.json`, JSON.stringify(payload, null, 2));
-        setOut(`✅ Backup de ${schoolIds.length} escola(s) gerado e baixado.`);
+        _done(`Backup de ${schoolIds.length} escola(s) gerado e baixado.`, "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao exportar: " + e.message);
+        _done("Erro ao exportar: " + e.message, "err");
       }
     }
   }
@@ -521,7 +580,7 @@
      RESTAURAR — grava no Firestore
   ══════════════════════════════════════════ */
   async function restaurarBackup(){
-    if (!_backupParsed){ alert("Selecione um backup válido."); return; }
+    if (!_backupParsed){ setMsg("Selecione um backup válido.", "err"); return; }
     const originBk = String(_backupParsed?.meta?.origin || "");
     if (originBk && originBk !== location.origin){
       const ok = confirm("Este backup foi gerado em outro domínio:\n" + originBk + "\n\nDeseja restaurar mesmo assim?");
@@ -530,15 +589,15 @@
     const scope = getScope();
 
     if (scope === 'escola'){
-      if (!_backupParsed.data){ alert("Este arquivo não é um backup de escola única."); return; }
+      if (!_backupParsed.data){ setMsg("Este arquivo não é um backup de escola única.", "err"); return; }
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de restaurar.'); return; }
+      if (!schoolId){ setMsg('Selecione uma escola no card de escopo antes de restaurar.', "err"); return; }
       const keys = Object.keys(_backupParsed.data || {});
-      if (!keys.length){ alert("Backup vazio."); return; }
+      if (!keys.length){ setMsg("Backup vazio.", "err"); return; }
       const ok = confirm(`Restaurar substituirá os dados existentes da escola "${schoolId}" no Firestore.\n\nChaves: ${keys.join(", ")}\n\nContinuar?`);
       if (!ok) return;
 
-      setOut("⏳ Restaurando no Firestore…");
+      setMsg("Restaurando no Firestore…", "loading");
       try{
         for (const k of keys){
           const col = FS_MAP[k]; if (!col) continue;
@@ -549,22 +608,22 @@
           }
           if (Array.isArray(val)) await _saveAllFS(schoolId, col, val);
         }
-        setOut("✅ Backup restaurado com sucesso no Firestore.");
+        _done("Backup restaurado com sucesso no Firestore.", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao restaurar: " + e.message);
+        _done("Erro ao restaurar: " + e.message, "err");
       }
       cancelarRestore();
     } else {
-      if (!_backupParsed.bySchool){ alert("Este arquivo não é um backup de todas as escolas."); return; }
+      if (!_backupParsed.bySchool){ setMsg("Este arquivo não é um backup de todas as escolas.", "err"); return; }
       const schoolIds = Object.keys(_backupParsed.bySchool);
-      if (!schoolIds.length){ alert("Backup vazio."); return; }
+      if (!schoolIds.length){ setMsg("Backup vazio.", "err"); return; }
       const ok = confirm(`Restaurar substituirá os dados existentes de ${schoolIds.length} escola(s) no Firestore:\n\n${schoolIds.join(", ")}\n\nContinuar?`);
       if (!ok) return;
       const ok2 = prompt(`Ação de alto risco — digita RESTAURAR TUDO pra confirmar que quer sobrescrever ${schoolIds.length} escola(s):`);
-      if (ok2 !== 'RESTAURAR TUDO'){ setOut("Restauração cancelada (confirmação não bateu)."); return; }
+      if (ok2 !== 'RESTAURAR TUDO'){ setMsg("Restauração cancelada (confirmação não bateu).", "warn"); return; }
 
-      setOut(`⏳ Restaurando ${schoolIds.length} escola(s) no Firestore…`);
+      setMsg(`Restaurando ${schoolIds.length} escola(s) no Firestore…`, "loading");
       try{
         for (const schoolId of schoolIds){
           const schoolData = _backupParsed.bySchool[schoolId] || {};
@@ -579,10 +638,10 @@
             if (Array.isArray(val)) await _saveAllFS(schoolId, col, val);
           }
         }
-        setOut(`✅ ${schoolIds.length} escola(s) restaurada(s) com sucesso no Firestore.`);
+        _done(`${schoolIds.length} escola(s) restaurada(s) com sucesso no Firestore.`, "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao restaurar: " + e.message);
+        _done("Erro ao restaurar: " + e.message, "err");
       }
       cancelarRestore();
     }
@@ -596,33 +655,33 @@
     const allColNames = Object.keys(ALL_COLS);
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola antes de limpar.'); return; }
+      if (!schoolId){ setMsg('Selecione uma escola antes de limpar.', "err"); return; }
       const ok = confirm(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de CH e funcionários.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`);
       if (!ok) return;
-      setOut(`⏳ Apagando todos os dados da escola "${schoolId}"…`);
+      setMsg(`Apagando todos os dados da escola "${schoolId}"…`, "loading");
       for (const k of SYSTEM_KEYS) localStorage.removeItem(scopedKey(k));
       try{
         await Promise.all(allColNames.map(col => _clearFSColFor(schoolId, col)));
-        setOut(`🧹 Reset da escola "${schoolId}" concluído.`);
+        _done(`Reset da escola "${schoolId}" concluído.`, "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar Firestore: " + e.message);
+        _done("Erro ao apagar Firestore: " + e.message, "err");
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
       const ok = confirm(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de CH e funcionários.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
       const ok2 = prompt('Ação de altíssimo risco — digita APAGAR TUDO pra confirmar:');
-      if (ok2 !== 'APAGAR TUDO'){ setOut("Limpeza cancelada (confirmação não bateu)."); return; }
-      setOut(`⏳ Apagando todos os dados de ${schoolIds.length} escola(s)…`);
+      if (ok2 !== 'APAGAR TUDO'){ setMsg("Limpeza cancelada (confirmação não bateu).", "warn"); return; }
+      setMsg(`Apagando todos os dados de ${schoolIds.length} escola(s)…`, "loading");
       try{
         for (const schoolId of schoolIds){
           await Promise.all(allColNames.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut(`🧹 Reset total concluído. Todos os dados de ${schoolIds.length} escola(s) foram apagados do Firestore.`);
+        _done(`Reset total concluído. Todos os dados de ${schoolIds.length} escola(s) foram apagados do Firestore.`, "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar Firestore: " + e.message);
+        _done("Erro ao apagar Firestore: " + e.message, "err");
       }
     }
   }
@@ -634,31 +693,31 @@
     const scope = getScope();
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola antes de apagar.'); return; }
+      if (!schoolId){ setMsg('Selecione uma escola antes de apagar.', "err"); return; }
       const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.`);
       if (!ok) return;
-      setOut("⏳ Apagando turmas do Firestore…");
+      setMsg("Apagando turmas do Firestore…", "loading");
       ["turmasDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoTurmasDB","anoAtivoMatriculasDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
         await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
-        setOut("🧹 Turmas, atas e matrículas apagadas do Firestore (ano ativo + histórico).");
+        _done("Turmas, atas e matrículas apagadas do Firestore (ano ativo + histórico).", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar turmas: " + e.message);
+        _done("Erro ao apagar turmas: " + e.message, "err");
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
       const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
-      setOut(`⏳ Apagando turmas de ${schoolIds.length} escola(s)…`);
+      setMsg(`Apagando turmas de ${schoolIds.length} escola(s)…`, "loading");
       try{
         for (const schoolId of schoolIds){
           await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut("🧹 Turmas, atas e matrículas apagadas de todas as escolas (ano ativo + histórico).");
+        _done("Turmas, atas e matrículas apagadas de todas as escolas (ano ativo + histórico).", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar turmas: " + e.message);
+        _done("Erro ao apagar turmas: " + e.message, "err");
       }
     }
   }
@@ -670,31 +729,31 @@
     const scope = getScope();
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola real no cabeçalho antes de limpar.'); return; }
+      if (!schoolId){ setMsg('Selecione uma escola no card de escopo antes de limpar.', "err"); return; }
       const ok = confirm(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas e atas do Firestore.\nTurmas e funcionários permanecem.`);
       if (!ok) return;
-      setOut("⏳ Apagando alunos do Firestore…");
+      setMsg("Apagando alunos do Firestore…", "loading");
       ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoAlunosDB","anoAtivoMatriculasDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
         await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
-        setOut("🧹 Alunos, matrículas e atas apagados do Firestore (ano ativo + histórico).");
+        _done("Alunos, matrículas e atas apagados do Firestore (ano ativo + histórico).", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar alunos: " + e.message);
+        _done("Erro ao apagar alunos: " + e.message, "err");
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
       const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico) no Firestore.\nTurmas e funcionários permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
-      setOut(`⏳ Apagando alunos de ${schoolIds.length} escola(s)…`);
+      setMsg(`Apagando alunos de ${schoolIds.length} escola(s)…`, "loading");
       try{
         for (const schoolId of schoolIds){
           await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
         }
-        setOut("🧹 Alunos, matrículas e atas apagados de todas as escolas (ano ativo + histórico).");
+        _done("Alunos, matrículas e atas apagados de todas as escolas (ano ativo + histórico).", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar alunos: " + e.message);
+        _done("Erro ao apagar alunos: " + e.message, "err");
       }
     }
   }
@@ -706,31 +765,31 @@
     const scope = getScope();
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
-      if (!schoolId){ alert('Selecione uma escola antes de apagar.'); return; }
+      if (!schoolId){ setMsg('Selecione uma escola antes de apagar.', "err"); return; }
       const ok = confirm(`Apagar os funcionários da escola "${schoolId}" no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.`);
       if (!ok) return;
-      setOut("⏳ Apagando funcionários do Firestore…");
+      setMsg("Apagando funcionários do Firestore…", "loading");
       localStorage.removeItem(scopedKey("funcionariosDB"));
       try{
         await _clearFSColFor(schoolId, 'funcionarios');
-        setOut("🧹 Funcionários apagados do Firestore.");
+        _done("Funcionários apagados do Firestore.", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar funcionários: " + e.message);
+        _done("Erro ao apagar funcionários: " + e.message, "err");
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
       const ok = confirm(`Apagar os funcionários de TODAS as ${schoolIds.length} escola(s) no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.\n\nEscolas: ${schoolIds.join(", ")}`);
       if (!ok) return;
-      setOut(`⏳ Apagando funcionários de ${schoolIds.length} escola(s)…`);
+      setMsg(`Apagando funcionários de ${schoolIds.length} escola(s)…`, "loading");
       try{
         for (const schoolId of schoolIds){
           await _clearFSColFor(schoolId, 'funcionarios');
         }
-        setOut("🧹 Funcionários apagados de todas as escolas.");
+        _done("Funcionários apagados de todas as escolas.", "ok");
       } catch(e){
         console.error(e);
-        setOut("❌ Erro ao apagar funcionários: " + e.message);
+        _done("Erro ao apagar funcionários: " + e.message, "err");
       }
     }
   }
@@ -838,9 +897,6 @@
       info.textContent = "Vai afetar TODAS as escolas cadastradas no sistema, uma por uma.";
     }
 
-    document.getElementById("exportDesc").textContent = scope === 'escola'
-      ? `Gera um .json com os dados da escola${schoolId ? ' "' + _schoolLabel(schoolId) + '"' : ' selecionada'}.`
-      : "Gera um .json com os dados de TODAS as escolas do sistema.";
     document.getElementById("restoreWarn").textContent = scope === 'escola'
       ? "⚠️ Restaura substituindo os dados da escola selecionada. Faça backup antes se não tiver certeza."
       : "⚠️ Restaura substituindo os dados de TODAS as escolas do arquivo. Faça backup antes se não tiver certeza.";
