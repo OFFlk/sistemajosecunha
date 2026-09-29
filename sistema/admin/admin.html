@@ -34,17 +34,78 @@
 <link rel="stylesheet" href="/css/admin.css">
 
 <title>Admin • Hub</title>
+<style>
+/* Tokens do balão/modal — mesmos valores padrão do módulo. */
+:root { --pop-bg: #ffffff; --pop-border: var(--brand-border); }
+html[data-theme="dark"] { --pop-bg: #131c2e; --pop-border: #2a3a5c; }
+
+/* Sem overflow:hidden nos cards com ⓘ (cortaria o balão). */
+.config-card, .status-card { overflow: visible; }
+
+/* Grid dos módulos: 2x2 (schema_ata saiu do módulo). */
+.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+/* ── Card de destaque (guia 1.3b) ── */
+.config-card.card-destaque {
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,.18);
+  --dest-btn-bd: rgba(255,255,255,.40);
+  --dest-btn-hover: rgba(255,255,255,.28);
+  --dest-panel-bg: rgba(255,255,255,.10);
+  background: var(--btn-home-bg); border-color: var(--btn-home-border);
+}
+html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.config-card.card-destaque.contraste-claro {
+  --dest-fg: #0f172a;
+  --dest-btn-bg: rgba(0,0,0,.08);
+  --dest-btn-bd: rgba(0,0,0,.25);
+  --dest-btn-hover: rgba(0,0,0,.16);
+  --dest-panel-bg: rgba(0,0,0,.06);
+  border-color: var(--pop-border);
+}
+.card-destaque h3, .card-destaque label, .card-destaque b { color: var(--dest-fg); }
+/* Único botão da página (primário) — filtro claro/escuro do card. */
+.card-destaque .btn-save { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+.card-destaque .btn-save:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+.card-destaque .btn-save:disabled { opacity: .6; cursor: not-allowed; }
+
+.btn-neutral { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 10px; background: var(--pop-bg); border: 1px solid var(--pop-border); color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; }
+.btn-neutral:hover { background: var(--chip-bg); }
+
+/* ── Toast e modal de confirmação (guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }
+
+/* ===== Ícone de dica (ⓘ) — guia, Parte 2 ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--pop-bg); border:1.5px solid var(--pop-border); color:var(--ink);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default; text-transform:none; letter-spacing:normal;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+.info-tip-bubble.align-right{ left:auto; right:0; }
+</style>
 </head>
 <body>
 
 <div id="header-placeholder"></div>
 
 <div class="container">
-
-  <div class="l-section">
-    <div class="l-slabel">// módulos</div>
-    <div class="l-sline"></div>
-  </div>
 
   <div class="grid" style="margin-bottom: 28px;">
 
@@ -72,14 +133,6 @@
       </div>
     </a>
 
-    <a class="card" href="../admin/schema_ata.html">
-      <div class="card-icon">🧩</div>
-      <div class="card-title">Edição de ata e schema</div>
-      <div class="card-footer">
-        <div class="card-desc">Configure colunas, regras e o schema padrão para cadastro de novas turmas.</div>
-      </div>
-    </a>
-
     <a class="card" href="../admin/idaluno.html">
       <div class="card-icon">🆔</div>
       <div class="card-title">Configuração de IDs</div>
@@ -90,17 +143,11 @@
 
   </div>
 
-  <div class="l-section">
-    <div class="l-slabel">// configurações</div>
-    <div class="l-sline"></div>
-  </div>
-
   <div style="display: flex; flex-direction: column; gap: 18px;">
 
     <!-- Ano letivo ativo -->
-    <div class="config-card" id="cardAnoAtivo">
-      <h3>📅 Ano letivo ativo</h3>
-      <p class="desc">Define o ano letivo padrão para o módulo de Ano Ativo. Salvo no banco da escola e sincronizado entre todos os dispositivos.</p>
+    <div class="config-card card-destaque" id="cardAnoAtivo">
+      <h3>📅 Ano letivo ativo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Define o ano letivo padrão para todos os módulos. Salvo no banco da escola e sincronizado entre todos os dispositivos.</span></span></h3>
       <div class="field-inline">
         <div>
           <label>Ano ativo atual</label>
@@ -113,20 +160,13 @@
             <button type="button" id="btnSetAnoAtivo" class="btn-save">✔ Definir</button>
           </div>
         </div>
-        <div id="msgAnoAtivo" style="font-size:13px;color:#16a34a;display:none;align-self:flex-end;padding-bottom:4px;"></div>
       </div>
     </div>
 
     <!-- Status do banco -->
     <div class="status-card">
-      <h3>📊 Status do banco</h3>
+      <h3>📊 Status do banco <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Estes números só mostram os dados do domínio <code id="origin"></code>.</span></span></h3>
       <div id="dbMeta" class="meta-line">Carregando…</div>
-      <div id="dbWarn" class="warn-box" style="display:none;">
-        <b>Atenção:</b> parece que você ainda não gerou os <b>IDs do sistema</b>. Vá em <b>"Configuração de IDs"</b> e clique em <b>"Gerar IDs do sistema"</b>.
-      </div>
-      <div class="meta-line" style="margin-top:12px;">
-        <b>Dica:</b> abra estas ferramentas pelo mesmo domínio onde você usa o sistema para acessar o mesmo banco.
-      </div>
     </div>
 
   </div>
@@ -152,7 +192,100 @@
   if(!isGlobal&&cardBackup) cardBackup.style.display='none';
 })();
 
-// Ano Ativo
+// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+
+// Ponto de entrada único — setMsg(texto, kind): "ok" | "warn" | "loading" | "err".
+function setMsg(text, kind){
+  const t = (text||'').toString();
+  if(!t) return;
+  if(kind === 'err') _toastErro('⚠️ ' + t);
+  else if(kind === 'ok') _toastSucesso('✅ ' + t);
+  else if(kind === 'warn') _toastAviso('⚠️ ' + t);
+  else if(kind === 'loading') _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
+// ── Modal de confirmação (substitui confirm() nativo) ─────────────────
+// Igual ao do guia, mais Esc pra cancelar; foco em Cancelar (lado seguro).
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.setAttribute('role','dialog');
+    backdrop.setAttribute('aria-modal','true');
+    backdrop.innerHTML =
+      `<div style="background:var(--pop-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<div style="overflow-y:auto;margin:0 0 18px;"><p style="margin:0;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p></div>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn-neutral" id="_confirmModalCancelar">${escapeHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">${escapeHtml(textoConfirmar || 'Continuar')}</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    const btnCancel = backdrop.querySelector('#_confirmModalCancelar');
+    btnCancel.addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    document.addEventListener('keydown', onKey);
+    btnCancel.focus();
+  });
+}
+
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+document.addEventListener('click', () => {
+  document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open'));
+});
+
+// Contraste do card de destaque — nunca deixa uma falha aqui travar a página.
+function ajustarDestaque(){
+  try{ if(window.ThemeColors) ThemeColors.ajustarContraste(); }
+  catch(e){ console.warn('[admin] ajustarContraste falhou:', e); }
+}
+
+// ── Ano Ativo ─────────────────────────────────────────────────────────
 async function _lerAnoAtivo(){
   try{
     await new Promise(res=>{ if(window.Auth&&window.Auth.getSession&&window.Auth.getSession()) return res(); document.addEventListener('auth:ready',res,{once:true}); });
@@ -160,51 +293,95 @@ async function _lerAnoAtivo(){
     return (dados.dadosEscola?.configAnoAtivo||'').toString().replace(/"/g,'').trim();
   }catch(e){ console.warn('_lerAnoAtivo Firestore:',e); return ''; }
 }
+// Devolve a Promise (antes era "dispara e esquece"): o toast agora reflete o resultado real.
 function _salvarAnoAtivo(val){
-  if(window.DB&&window.DB.escola&&window.DB.escola.save)
-    window.DB.escola.save({configAnoAtivo:val}).catch(function(e){ console.warn('Firestore configAnoAtivo:',e); });
+  if(!(window.DB && window.DB.escola && window.DB.escola.save)) return Promise.reject(new Error('Banco indisponível.'));
+  return window.DB.escola.save({configAnoAtivo:val});
 }
 
 async function initAnoAtivo(){
-  const lbl=document.getElementById('lblAnoAtivoAdmin'), inp=document.getElementById('inpAnoAtivoAdmin'), btn=document.getElementById('btnSetAnoAtivo'), msg=document.getElementById('msgAnoAtivo');
+  const lbl=document.getElementById('lblAnoAtivoAdmin'), inp=document.getElementById('inpAnoAtivoAdmin'), btn=document.getElementById('btnSetAnoAtivo');
   if(!lbl||!inp||!btn) return;
-  const atual=await _lerAnoAtivo(); lbl.textContent=atual||'(não definido)'; if(atual) inp.value=atual;
-  btn.addEventListener('click',function(){
+  let atual=await _lerAnoAtivo(); lbl.textContent=atual||'(não definido)'; if(atual) inp.value=atual;
+  btn.addEventListener('click', async function(){
     const val=String(inp.value||'').trim();
-    if(!val||val.length!==4||isNaN(Number(val))){ alert('Informe um ano com 4 dígitos (ex: 2026).'); return; }
-    _salvarAnoAtivo(val); lbl.textContent=val;
-    if(msg){ msg.textContent='✅ Ano ativo definido como '+val+'.'; msg.style.display='block'; setTimeout(function(){ msg.style.display='none'; },5000); }
-    btn.textContent='✔ Salvo!'; setTimeout(function(){ btn.textContent='✔ Definir'; },2000);
+    if(!val||val.length!==4||isNaN(Number(val))){ setMsg('Informe um ano com 4 dígitos (ex: 2026).','err'); return; }
+    if(val===atual){ setMsg('O ano letivo ativo já é '+val+'.','warn'); return; }
+    const ok = await _confirmModal({
+      titulo: 'Definir ano letivo ativo',
+      corpo: escapeHtml('Definir '+val+' como o ano letivo ativo para todos os módulos?'+(atual ? '\n\nAtual: '+atual+'. A mudança vale para todos os dispositivos.' : '')),
+      textoConfirmar: 'Definir'
+    });
+    if(!ok) return;
+    btn.disabled = true;
+    setMsg('Salvando ano letivo ativo…','loading');
+    try{
+      await _salvarAnoAtivo(val);
+      atual = val; lbl.textContent = val;
+      setMsg('Ano letivo ativo definido como '+val+'.','ok');
+      btn.textContent='✔ Salvo!'; setTimeout(function(){ btn.textContent='✔ Definir'; },2000);
+    }catch(e){
+      console.error('[admin] salvar ano ativo falhou:', e);
+      setMsg('Erro ao salvar o ano letivo: '+(e && e.message || e),'err');
+    }finally{
+      btn.disabled = false;
+    }
   });
 }
 
-// Status do banco
+// ── Status do banco ───────────────────────────────────────────────────
+// Lê as coleções REAIS da escola ativa (schools/{id}/{coleção}), a mesma lista
+// das Rules e do db.firebase.js. Notas trimestrais ficam de fora de propósito
+// (módulo próprio e coleção grande: cada visita ao hub pagaria a leitura toda).
 function normNome(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' '); }
 function contarAlunosUnicosEmTurmas(turmas){ const set=new Set(); for(const t of(Array.isArray(turmas)?turmas:[])){ if(!Array.isArray(t?.alunos)) continue; for(const al of t.alunos){ const id=String(al?.alunoId||'').trim(); if(id) set.add('id:'+id); else{ const n=normNome(al?.nome); if(n) set.add('nome:'+n); } } } return set.size; }
-function safeParseLS(key,fallback){ try{ const raw=localStorage.getItem(key); if(!raw) return fallback; return JSON.parse(raw); }catch(e){ return fallback; } }
+
+const STATUS_COLS = ['turmas','alunos-atas','matriculas','atas','atasSchemas','schemasCH',
+                     'anoAtivoTurmas','anoAtivoAlunos','anoAtivoMatriculas','funcionarios','alunos'];
+
+function _escolaAtiva(){
+  let id = '';
+  try{ if(window.Auth && typeof Auth.getActiveSchoolId === 'function') id = Auth.getActiveSchoolId(); }catch(_){}
+  if(!id){ try{ id = (Auth.getSession()||{}).schoolId || ''; }catch(_){} }
+  return String(id||'').trim();
+}
 
 async function renderMeta(){
-  let turmas=[],alunosDB=[],aliasesDB={},schemas=[],atasDB=[],matriculasDB=[],turmasMetaDB=[];
+  const metaEl=document.getElementById('dbMeta');
+  const originEl=document.getElementById('origin'); if(originEl) originEl.textContent=location.origin;
   try{
     await new Promise(res=>{ if(window.Auth&&window.Auth.getSession&&window.Auth.getSession()) return res(); document.addEventListener('auth:ready',res,{once:true}); });
-    const dados=await window.DB.loadAll();
-    turmas=dados.turmasDB||safeParseLS('turmasDB',[]); alunosDB=dados.alunosDB||safeParseLS('alunosDB',[]); aliasesDB=dados.matriculas||safeParseLS('alunosAliasesDB',{}); schemas=dados.schemas||safeParseLS('turmasSchemas_v1',[]); atasDB=dados.atasDB||safeParseLS('atasDB',[]); matriculasDB=dados.matriculas||safeParseLS('matriculasDB',[]);
-  }catch(e){ turmas=safeParseLS('turmasDB',[]); alunosDB=safeParseLS('alunosDB',[]); aliasesDB=safeParseLS('alunosAliasesDB',{}); schemas=safeParseLS('turmasSchemas_v1',[]); atasDB=safeParseLS('atasDB',[]); matriculasDB=safeParseLS('matriculasDB',[]); turmasMetaDB=safeParseLS('turmasMetaDB',[]); }
-
-  const metaEl=document.getElementById('dbMeta');
-  metaEl.innerHTML=`
-    <div class="meta-line"><b>Domínio:</b> ${location.origin}</div>
-    <div class="meta-line"><b>Turmas:</b> ${Array.isArray(turmas)?turmas.length:0} &nbsp;•&nbsp; <b>Alunos nas turmas:</b> ${contarAlunosUnicosEmTurmas(turmas)} &nbsp;•&nbsp; <b>Alunos no catálogo:</b> ${Array.isArray(alunosDB)?alunosDB.length:0}</div>
-    <div class="meta-line"><b>Aliases:</b> ${(aliasesDB&&typeof aliasesDB==='object'&&!Array.isArray(aliasesDB))?Object.keys(aliasesDB).length:(Array.isArray(aliasesDB)?aliasesDB.length:0)} &nbsp;•&nbsp; <b>Schemas:</b> ${Array.isArray(schemas)?schemas.length:0} <span style="font-size:12px;color:var(--muted);">(chave <code>turmasSchemas_v1</code>)</span></div>
-    <div class="meta-line"><b>Atas (aux):</b> ${Array.isArray(atasDB)?atasDB.length:0} &nbsp;•&nbsp; <b>Matrículas (aux):</b> ${Array.isArray(matriculasDB)?matriculasDB.length:0}</div>
-  `;
-  const gerouAux=(atasDB.length>0||matriculasDB.length>0||turmasMetaDB.length>0);
-  document.getElementById('dbWarn').style.display=gerouAux?'none':'block';
+    const sid=_escolaAtiva();
+    // Admin global sem escola escolhida: 'ADMIN' é um marcador, não uma escola — não há o que contar.
+    if(!sid || sid.toUpperCase()==='ADMIN'){
+      metaEl.innerHTML='<div class="meta-line">Selecione uma escola no seletor do header para ver os números.</div>';
+      return;
+    }
+    const base = window.Auth.db.collection('schools').doc(sid);
+    const res = await Promise.allSettled(STATUS_COLS.map(c => base.collection(c).get()));
+    const docs = {}, n = {};
+    STATUS_COLS.forEach((c,i)=>{
+      if(res[i].status==='fulfilled'){ docs[c]=res[i].value.docs.map(d=>d.data()); n[c]=docs[c].length; }
+      else{ console.warn('[admin] status: falha ao ler', c, res[i].reason); n[c]='—'; }
+    });
+    metaEl.innerHTML=`
+      <div class="meta-line"><b>Ano ativo —</b> Turmas: ${n.anoAtivoTurmas} &nbsp;•&nbsp; Alunos: ${n.anoAtivoAlunos} &nbsp;•&nbsp; Matrículas: ${n.anoAtivoMatriculas}</div>
+      <div class="meta-line"><b>Atas (histórico) —</b> Turmas: ${n.turmas} &nbsp;•&nbsp; Alunos nas turmas: ${docs.turmas?contarAlunosUnicosEmTurmas(docs.turmas):'—'} &nbsp;•&nbsp; Alunos no catálogo: ${n['alunos-atas']} &nbsp;•&nbsp; Matrículas: ${n.matriculas} &nbsp;•&nbsp; Atas: ${n.atas} &nbsp;•&nbsp; Schemas de ata: ${n.atasSchemas}</div>
+      <div class="meta-line"><b>Outros —</b> Schemas CH: ${n.schemasCH} &nbsp;•&nbsp; Funcionários: ${n.funcionarios} &nbsp;•&nbsp; Vínculos de aluno: ${n.alunos}</div>
+    `;
+  }catch(e){
+    console.error('[admin] renderMeta falhou:', e);
+    metaEl.innerHTML='<div class="meta-line">⚠️ Não foi possível ler o Firestore. Verifique o login.</div>';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async function(){
-  await Promise.all([renderMeta(), initAnoAtivo()]);
-  Loading.esconder(); // ← linha adicionada
+  try{
+    await Promise.all([renderMeta(), initAnoAtivo()]);
+  } finally {
+    ajustarDestaque();
+    try{ Loading.esconder(); }catch(_){}
+  }
 });
 </script>
 
