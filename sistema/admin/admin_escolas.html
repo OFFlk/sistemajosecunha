@@ -408,7 +408,9 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
       try{
         const session = Auth.getSession();
         payload = {
-          schoolId: sid, requestedBy: session?.email||session?.uid||'',
+          // uid (não e-mail): mesmo identificador que cadastro_admin.html grava em
+          // changeRequests — é o que as Rules costumam comparar com request.auth.uid.
+          schoolId: sid, requestedBy: session?.uid||'',
           requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
           status: 'pending', changes
         };
@@ -663,6 +665,15 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
     }
 
     $reqCount.textContent = String(pending.length);
+    // "Solicitado por" agora é um uid; tenta resolver nome/e-mail (admin global pode
+    // listar usuários). Pedidos antigos guardaram o e-mail direto — caem no fallback.
+    const byUid = {};
+    try{
+      if(pending.length && typeof Auth.listUsers === 'function'){
+        (await Auth.listUsers() || []).forEach(u => { if(u && u.uid) byUid[u.uid] = u; });
+      }
+    }catch(e){ console.warn('[admin_escolas] listUsers p/ "solicitado por":', e); }
+    const quem = r => { const u = byUid[r.requestedBy]; return u ? (u.name || u.email || r.requestedBy) : (r.requestedBy || ''); };
     if(!pending.length){
       $tbodyReq.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Nenhuma solicitação pendente.</td></tr>';
       return;
@@ -671,7 +682,7 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
     $tbodyReq.innerHTML = pending.map(r => `
       <tr>
         <td><span class="pill">${escapeHtml(r.schoolId||'')}</span></td>
-        <td>${escapeHtml(r.requestedBy||'')}</td>
+        <td>${escapeHtml(quem(r))}</td>
         <td>${escapeHtml(Object.entries(r.changes||{}).map(([k,v])=>k+': '+v).join(' | ')||'—')}</td>
         <td>
           <div class="row-actions">
