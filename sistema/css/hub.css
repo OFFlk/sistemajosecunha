@@ -143,12 +143,15 @@ html[data-theme="dark"] .card:hover {
   color: var(--card-desc);
 }
 
+/* Badge de acesso restrito (ex.: "Admin/Gestor"): preenchimento de marca + texto calculado.
+   Antes era fundo --brand-faded com texto --brand, o que perdia contraste em várias paletas.
+   --brand-fg vem do theme-colors.js (preto ou branco, conforme a cor de fundo). */
 .card-badge {
   position: absolute;
   top: 12px;
   right: 12px;
-  background: var(--brand-faded);
-  color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-fg, #fff);
   font-size: 10px;
   font-weight: 700;
   padding: 4px 10px;
@@ -159,8 +162,8 @@ html[data-theme="dark"] .card:hover {
 }
 
 html[data-theme="dark"] .card-badge {
-  background: var(--brand-faded-d);
-  color: var(--brand-d);
+  background: var(--brand-d);
+  color: var(--brand-fg, #fff);
 }
 
 .card:active {
