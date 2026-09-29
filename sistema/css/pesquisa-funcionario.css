@@ -160,17 +160,23 @@ html[data-theme="dark"] {
 .btn.primary {
   background: var(--brand, #7c3aed);
   border-color: var(--brand, #7c3aed);
-  color: #fff;
+  color: var(--brand-fg, #fff);
 }
 
+/* hover: se a paleta não tiver --brand-hover, escurece a própria marca (antes caía num roxo fixo) */
 .btn.primary:hover {
-  background: var(--brand-hover, #6d28d9);
-  border-color: var(--brand-hover, #6d28d9);
+  background: var(--brand-hover, color-mix(in srgb, var(--brand, #7c3aed) 88%, #000));
+  border-color: var(--brand-hover, color-mix(in srgb, var(--brand, #7c3aed) 88%, #000));
 }
 
 html[data-theme="dark"] .btn.primary {
   background: var(--brand-d, #7c3aed);
   border-color: var(--brand-d, #7c3aed);
+}
+
+html[data-theme="dark"] .btn.primary:hover {
+  background: color-mix(in srgb, var(--brand-d, #7c3aed) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-d, #7c3aed) 88%, #000);
 }
 
 .btn.danger {
@@ -195,6 +201,13 @@ html[data-theme="dark"] .btn.primary {
   background: var(--brand-faded, #f5f3ff);
   border-color: var(--brand, #7c3aed);
   color: var(--brand-text, #6d28d9);
+}
+
+html[data-theme="dark"] .btn.ghost:hover,
+html[data-theme="dark"] .btn.secondary:hover {
+  background: var(--brand-faded-d, rgba(124, 58, 237, 0.18));
+  border-color: var(--brand-d, #7c3aed);
+  color: var(--brand-text-d, #c4b5fd);
 }
 
 .btn.small {
@@ -261,7 +274,7 @@ html[data-theme="dark"] .btn.primary {
 .field input:focus,
 .field select:focus {
   border-color: var(--brand, #7c3aed);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand, #7c3aed) 18%, transparent);
 }
 
 html[data-theme="dark"] .field input,
@@ -682,8 +695,8 @@ mark {
 }
 
 html[data-theme="dark"] mark {
-  background: rgba(124, 58, 237, 0.35);
-  color: #c4b5fd;
+  background: var(--brand-faded-d, rgba(124, 58, 237, 0.35));
+  color: var(--brand-text-d, #c4b5fd);
 }
 
 
