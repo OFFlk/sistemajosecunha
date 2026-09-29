@@ -97,6 +97,12 @@
   const selectAnoAtivo = document.getElementById('selectAnoAtivo');
   const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
   let anoAtivoReal = ''; // ano ativo real, configurado no sistema
+  let erroCarga    = ''; // mensagem se a leitura do banco falhar (mostrada no estado vazio)
+
+  // Ano do cadastro: `anoLetivo`, com fallback pro campo legado `ano` (mesma regra do cadastro-funcionario).
+  function anoDoFuncionario(f){
+    return String((f && (f.anoLetivo || f.ano)) || '').trim();
+  }
 
   function atualizarAnoEfetivo(){
     _anoAtivo = selectAnoAtivo.value || anoAtivoReal;
@@ -114,19 +120,24 @@
       // Monta as opções do select só com anos que realmente têm dados
       // (mesma lógica de pesquisa-ano-ativo: nada de intervalo fixo)
       const anosSet = new Set();
-      funcionarios.forEach(f => { if(f.anoLetivo) anosSet.add(String(f.anoLetivo).trim()); });
+      funcionarios.forEach(f => { const a = anoDoFuncionario(f); if(a) anosSet.add(a); });
       if(anoAtivoReal) anosSet.add(anoAtivoReal);
       const anos = Array.from(anosSet).filter(Boolean).sort((a,b) => Number(a) - Number(b));
 
       selectAnoAtivo.innerHTML = '';
+      // Sem ano ativo configurado não há o que pré-selecionar: mantém o comportamento antigo (sem filtro de ano).
+      if(!anoAtivoReal){
+        const oTodos = document.createElement('option');
+        oTodos.value = ''; oTodos.textContent = 'Todos os anos';
+        selectAnoAtivo.appendChild(oTodos);
+      }
       anos.forEach(y => {
         const o = document.createElement('option');
         o.value = y; o.textContent = y;
         selectAnoAtivo.appendChild(o);
       });
-      // Abre já no ano ativo (não existe mais a opção "(usar ano ativo)");
-      // sem ano ativo configurado, cai no mais recente.
-      selectAnoAtivo.value = anos.includes(anoAtivoReal) ? anoAtivoReal : (anos[anos.length - 1] || '');
+      // Abre já no ano ativo (não existe mais a opção "(usar ano ativo)").
+      selectAnoAtivo.value = anoAtivoReal || '';
 
       atualizarAnoEfetivo();
       popularSelects();
@@ -146,15 +157,38 @@
   /* ══════════════════════════════════════════
      Firestore - Carregar Dados
   ══════════════════════════════════════════ */
+  // Espera a escola ativa existir (col() do db_firebase.js lança "Nenhuma escola ativa" antes disso).
+  async function esperarEscolaAtiva(maxMs){
+    const t0 = Date.now();
+    while(Date.now() - t0 < maxMs){
+      try{
+        const A = window.Auth;
+        if(!A || typeof A.getActiveSchoolId !== 'function') return true;
+        if(A.db && A.getActiveSchoolId()) return true;
+      }catch(_){}
+      await new Promise(r => setTimeout(r, 150));
+    }
+    return false;
+  }
+
   async function carregarDB(){
+    erroCarga = '';
     try{
       await new Promise(res=>{
         if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
         document.addEventListener('auth:ready', res, {once:true});
       });
-      funcionarios = await window.DB.funcionarios.list();
+      await esperarEscolaAtiva(6000);
+      try{
+        funcionarios = await window.DB.funcionarios.list();
+      }catch(e1){
+        console.warn('carregarDB pesquisa funcionarios (1ª tentativa):', e1);
+        await new Promise(r => setTimeout(r, 800));
+        funcionarios = await window.DB.funcionarios.list();
+      }
     }catch(e){
-      console.warn('carregarDB pesquisa funcionarios:', e);
+      console.error('carregarDB pesquisa funcionarios:', e);
+      erroCarga = (e && e.message) ? e.message : String(e);
       funcionarios = [];
     }
   }
@@ -164,7 +198,7 @@
   ══════════════════════════════════════════ */
   function getFuncionariosDoAno(){
     if(!_anoAtivo) return funcionarios;
-    return funcionarios.filter(f => String(f.anoLetivo || '') === _anoAtivo);
+    return funcionarios.filter(f => anoDoFuncionario(f) === _anoAtivo);
   }
 
   function popularSelects(){
@@ -332,13 +366,29 @@
      Render lista (cards) — padrão do sistema, sem paginação
      (lista sempre exibe todos os filtrados, igual ao módulo de aluno)
   ══════════════════════════════════════════ */
+  // Diz POR QUE a lista está vazia (falha de leitura, escola não selecionada, ano sem cadastros...).
+  function mensagemVazio(){
+    if(erroCarga) return '⚠️ Não foi possível carregar os funcionários: ' + escapeHtml(erroCarga);
+    let escola = '';
+    try{ escola = (window.Auth && window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) || ''; }catch(_){}
+    if(!funcionarios.length){
+      if(escola === 'ADMIN') return 'Nenhuma escola selecionada. Escolha uma escola no cabeçalho para ver os funcionários.';
+      return 'O banco não retornou nenhum funcionário para a escola ativa' + (escola ? ' (' + escapeHtml(escola) + ')' : '') + '.';
+    }
+    if(!getFuncionariosDoAno().length){
+      const anos = Array.from(new Set(funcionarios.map(anoDoFuncionario))).map(a => a || '(sem ano)').join(', ');
+      return 'Há ' + funcionarios.length + ' funcionário(s) cadastrado(s), mas nenhum no ano letivo ' + escapeHtml(_anoAtivo || '—') + '. Anos encontrados nos cadastros: ' + escapeHtml(anos) + '.';
+    }
+    return 'Nenhum funcionário encontrado para os filtros aplicados.';
+  }
+
   function renderLista(){
     const query = elBusca.value.trim();
 
     countEl.textContent = filtrados.length;
 
     if(!filtrados.length){
-      lista.innerHTML = '<div class="muted" style="grid-column:1/-1;">Nenhum funcionário encontrado para os filtros aplicados.</div>';
+      lista.innerHTML = '<div class="muted" style="grid-column:1/-1;">' + mensagemVazio() + '</div>';
       syncCheckAllFuncionarios();
       atualizarContadorSelecionados();
       return;

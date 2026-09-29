@@ -28,7 +28,7 @@
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/components.css">
-<link rel="stylesheet" href="/css/pesquisa-funcionario.css?v=2">
+<link rel="stylesheet" href="/css/pesquisa-funcionario.css?v=3">
 
 <style>
 /* ── Aliases de marca (par claro/escuro) — mesmos nomes do cadastro-funcionario ──
@@ -80,6 +80,8 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .card.card-destaque .turno-checkbox-wrap:hover{ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
 .card.card-destaque .turno-checkbox-wrap.checked{ background:var(--dest-fg); border-color:var(--dest-fg); color:var(--btn-home-bg); }
 .card.card-destaque .turno-checkbox-wrap.checked input[type="checkbox"]{ accent-color:var(--btn-home-bg); }
+/* Chip de aviso dos turnos: o padrão (--chip-bg) ficava da cor do body no claro e da cor do card no escuro */
+.card.card-destaque #turnoHint{ background:var(--dest-panel-bg); border:1px solid var(--dest-btn-bd); color:var(--dest-fg); }
 .ano-erro{ margin-top:6px; font-size:12px; font-weight:700; color:var(--dest-fg); }
 
 /* ── Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2) ── */
@@ -217,7 +219,7 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     <!-- Ano Ativo -->
     <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
       <div class="field" style="width:220px;flex:0 0 220px;margin:0;">
-        <label for="selectAnoAtivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ano letivo é preenchido automaticamente com o ano atual selecionado pelo administrador. Caso queira fazer um cadastro de anos anteriores ou futuros, selecione manualmente o ano em questão!</span></span></label>
+        <label for="selectAnoAtivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Mostra os funcionários cadastrados no ano letivo escolhido. Ao abrir a página, o ano ativo definido pelo administrador já vem selecionado. Para consultar outro ano, escolha-o na lista, que traz os anos que possuem funcionários cadastrados.</span></span></label>
         <select id="selectAnoAtivo" style="width:100%;"></select>
         <div class="ano-erro" id="anoAtivoMsg" style="display:none;"></div>
       </div>
@@ -347,7 +349,7 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
 <!-- ══════════════════════════════════════════
      JAVASCRIPT PRINCIPAL
 ══════════════════════════════════════════ -->
-<script src="pesquisa-funcionario.js?v=2"></script>
+<script src="pesquisa-funcionario.js?v=3"></script>
 
 <!-- ══════════════════════════════════════════
      JAVASCRIPT DE EXPORTAÇÃO
