@@ -99,6 +99,13 @@
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
 
+  /* ── Modal de confirmação (guia-toasts.md) ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(15,23,42,.55);
+    display: none; align-items: center; justify-content: center;
+    padding: 18px; z-index: 1000;
+  }
+
   /* ── Output / preview ── */
   .summary { font-family: ui-monospace, monospace; font-size: 12px; background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--ink); padding: 14px; border-radius: 10px; white-space: pre-wrap; line-height: 1.6; margin-top: 12px; }
   code { font-family: ui-monospace, monospace; font-size: 12px; background: var(--chip-bg); padding: 1px 5px; border-radius: 4px; color: var(--chip-color); }
@@ -373,22 +380,26 @@
 
   let _backupParsed = null;
 
-  // Mapa COMPLETO de coleções por escola → chave usada no arquivo de backup.
-  // Cobre os 3 módulos que existem hoje: atas (histórico), ano ativo, e os
-  // um auxiliar (funcionários). Se um novo módulo
-  // surgir depois, é só adicionar aqui — export, restore, status e limpeza
-  // usam este mapa, não listam coleção por coleção.
-  const ATAS_MODULE_COLS = { turmas:'turmasDB', alunos:'alunosDB', matriculas:'matriculasDB', atas:'atasDB', schemasCH:'turmasSchemas_v1' };
+  // Mapa COMPLETO de coleções por escola (schools/{id}/{coleção}) → chave usada
+  // no arquivo de backup. Espelha window.DB em db.firebase.js. Se surgir
+  // coleção nova lá, é só adicionar aqui — export, restore, status e "Apagar
+  // TODOS" usam este mapa, não listam coleção por coleção.
+  //  · 'alunos'  = elo de identidade cross-módulo (NÃO é mais o catálogo);
+  //    mantém a chave de backup 'alunosDB' por compatibilidade com backups antigos.
+  //  · 'alunos-atas' = catálogo legível do módulo de atas.
+  //  · 'atasSchemas' = schema de colunas da ata; 'schemasCH' = regras de carga horária.
+  const ATAS_MODULE_COLS = { turmas:'turmasDB', 'alunos-atas':'alunosAtasDB', alunos:'alunosDB', matriculas:'matriculasDB', atas:'atasDB', atasSchemas:'atasSchemasDB', schemasCH:'turmasSchemas_v1' };
   const ANO_ATIVO_COLS   = { anoAtivoTurmas:'anoAtivoTurmasDB', anoAtivoAlunos:'anoAtivoAlunosDB', anoAtivoMatriculas:'anoAtivoMatriculasDB' };
   const FUNCIONARIOS_COLS = { funcionarios:'funcionariosDB' };
-  const ALL_COLS = Object.assign({}, ATAS_MODULE_COLS, ANO_ATIVO_COLS, FUNCIONARIOS_COLS);
+  const NOTAS_COLS = { notasTrimestrais:'notasTrimestraisDB', notasSchemas:'notasSchemasDB' };
+  const ALL_COLS = Object.assign({}, ATAS_MODULE_COLS, ANO_ATIVO_COLS, FUNCIONARIOS_COLS, NOTAS_COLS);
   // "Apagar somente turmas": turmas + o que só existe em função de uma turma
   // (atas, matrículas), nos dois módulos. Funcionários NÃO entram aqui —
   // têm botão próprio ("Apagar funcionários").
   const TURMAS_RELATED_COLS  = ['turmas', 'atas', 'matriculas', 'anoAtivoTurmas', 'anoAtivoMatriculas'];
   // "Limpar alunos/IDs": alunos/catálogo + o que só existe em função de um
   // aluno (atas, matrículas), nos dois módulos. Funcionários ficam de fora (idem).
-  const ALUNOS_RELATED_COLS  = ['alunos', 'atas', 'matriculas', 'anoAtivoAlunos', 'anoAtivoMatriculas'];
+  const ALUNOS_RELATED_COLS  = ['alunos', 'alunos-atas', 'atas', 'matriculas', 'anoAtivoAlunos', 'anoAtivoMatriculas'];
   // Inverso (chave do backup → nome da coleção), usado na restauração.
   const FS_MAP = Object.fromEntries(Object.entries(ALL_COLS).map(([col, key]) => [key, col]));
 
@@ -450,6 +461,90 @@
       console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
       _toastAviso(t);
     }
+  }
+
+
+  // ── Modal de confirmação (substitui confirm()/prompt() nativos) ───────
+  function _escHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // Igual ao do guia, mais 2 extras: `digitar` (exige digitar a frase exata
+  // pra liberar o botão — substitui o prompt() de "APAGAR TUDO") e rolagem do
+  // corpo quando a lista de escolas é grande. Esc cancela.
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
+    return new Promise((resolve) => {
+      const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.style.display = 'flex';
+      backdrop.setAttribute('role', 'dialog');
+      backdrop.setAttribute('aria-modal', 'true');
+      backdrop.innerHTML =
+        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<div style="overflow-y:auto;margin:0 0 ${digitar ? '12px' : '18px'};">`+
+            `<p style="margin:0;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+          `</div>`+
+          (digitar
+            ? `<div style="margin:0 0 18px;">`+
+                `<label for="_confirmModalInput" style="display:block;font-size:13px;color:var(--ink);margin-bottom:6px;">Para confirmar, digite <b>${_escHtml(digitar)}</b>:</label>`+
+                `<input id="_confirmModalInput" type="text" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;background:var(--field-bg,#fff);border:1px solid var(--field-border,#ccc);color:var(--ink);font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;">`+
+              `</div>`
+            : '')+
+          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+            `<button type="button" class="btn-neutral" id="_confirmModalCancelar" style="padding:9px 16px;">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+              `${_escHtml(textoConfirmar || 'Continuar')}`+
+            `</button>`+
+          `</div>`+
+        `</div>`;
+      document.body.appendChild(backdrop);
+
+      const btnOk = backdrop.querySelector('#_confirmModalOk');
+      const btnCancel = backdrop.querySelector('#_confirmModalCancelar');
+      const input = backdrop.querySelector('#_confirmModalInput');
+
+      function onKey(ev){
+        if (ev.key === 'Escape') fechar(false);
+        else if (ev.key === 'Enter' && input && !btnOk.disabled) fechar(true);
+      }
+      function fechar(resultado){
+        document.removeEventListener('keydown', onKey);
+        backdrop.remove();
+        resolve(resultado);
+      }
+
+      if (digitar){
+        const liberar = () => {
+          const ok = input.value === digitar;
+          btnOk.disabled = !ok;
+          btnOk.style.opacity = ok ? '1' : '.5';
+          btnOk.style.cursor = ok ? 'pointer' : 'not-allowed';
+        };
+        liberar();
+        input.addEventListener('input', liberar);
+      }
+
+      btnOk.addEventListener('click', () => fechar(true));
+      btnCancel.addEventListener('click', () => fechar(false));
+      backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) fechar(false); });
+      document.addEventListener('keydown', onKey);
+      (input || btnCancel).focus(); // foco no lado seguro (Cancelar) em ação destrutiva
+    });
+  }
+
+  // Atalho desta página: texto simples (já escapado aqui) + variante de perigo.
+  // perigo=true → vermelho escuro; false → âmbar (aviso).
+  function _confirmar(texto, { titulo, perigo, textoConfirmar, digitar } = {}){
+    return _confirmModal({
+      titulo,
+      corpo: _escHtml(texto),
+      corDestaque: perigo ? '#991b1b' : '#b45309',
+      textoConfirmar,
+      digitar,
+    });
   }
 
   // Resultado final de uma ação (sucesso/erro): mostra o toast e atualiza o
@@ -583,7 +678,7 @@
     if (!_backupParsed){ setMsg("Selecione um backup válido.", "err"); return; }
     const originBk = String(_backupParsed?.meta?.origin || "");
     if (originBk && originBk !== location.origin){
-      const ok = confirm("Este backup foi gerado em outro domínio:\n" + originBk + "\n\nDeseja restaurar mesmo assim?");
+      const ok = await _confirmar("Este backup foi gerado em outro domínio:\n" + originBk + "\n\nDeseja restaurar mesmo assim?", { titulo: "Backup de outro domínio", textoConfirmar: "Restaurar mesmo assim" });
       if (!ok) return;
     }
     const scope = getScope();
@@ -594,7 +689,7 @@
       if (!schoolId){ setMsg('Selecione uma escola no card de escopo antes de restaurar.', "err"); return; }
       const keys = Object.keys(_backupParsed.data || {});
       if (!keys.length){ setMsg("Backup vazio.", "err"); return; }
-      const ok = confirm(`Restaurar substituirá os dados existentes da escola "${schoolId}" no Firestore.\n\nChaves: ${keys.join(", ")}\n\nContinuar?`);
+      const ok = await _confirmar(`Restaurar substituirá os dados existentes da escola "${schoolId}" no Firestore.\n\nChaves: ${keys.join(", ")}\n\nContinuar?`, { titulo: "Restaurar backup", textoConfirmar: "Restaurar" });
       if (!ok) return;
 
       setMsg("Restaurando no Firestore…", "loading");
@@ -618,10 +713,8 @@
       if (!_backupParsed.bySchool){ setMsg("Este arquivo não é um backup de todas as escolas.", "err"); return; }
       const schoolIds = Object.keys(_backupParsed.bySchool);
       if (!schoolIds.length){ setMsg("Backup vazio.", "err"); return; }
-      const ok = confirm(`Restaurar substituirá os dados existentes de ${schoolIds.length} escola(s) no Firestore:\n\n${schoolIds.join(", ")}\n\nContinuar?`);
-      if (!ok) return;
-      const ok2 = prompt(`Ação de alto risco — digita RESTAURAR TUDO pra confirmar que quer sobrescrever ${schoolIds.length} escola(s):`);
-      if (ok2 !== 'RESTAURAR TUDO'){ setMsg("Restauração cancelada (confirmação não bateu).", "warn"); return; }
+      const ok = await _confirmar(`Ação de alto risco. Restaurar substituirá os dados existentes de ${schoolIds.length} escola(s) no Firestore:\n\n${schoolIds.join(", ")}`, { titulo: "Restaurar TODAS as escolas", perigo: true, textoConfirmar: "Restaurar tudo", digitar: "RESTAURAR TUDO" });
+      if (!ok){ setMsg("Restauração cancelada.", "warn"); return; }
 
       setMsg(`Restaurando ${schoolIds.length} escola(s) no Firestore…`, "loading");
       try{
@@ -656,7 +749,7 @@
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
       if (!schoolId){ setMsg('Selecione uma escola antes de limpar.', "err"); return; }
-      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de CH e funcionários.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`);
+      const ok = await _confirmar(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de ata, schemas de CH, funcionários e notas trimestrais.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`, { titulo: "Apagar TODOS os dados", perigo: true, textoConfirmar: "Apagar tudo" });
       if (!ok) return;
       setMsg(`Apagando todos os dados da escola "${schoolId}"…`, "loading");
       for (const k of SYSTEM_KEYS) localStorage.removeItem(scopedKey(k));
@@ -669,10 +762,8 @@
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de CH e funcionários.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`);
-      if (!ok) return;
-      const ok2 = prompt('Ação de altíssimo risco — digita APAGAR TUDO pra confirmar:');
-      if (ok2 !== 'APAGAR TUDO'){ setMsg("Limpeza cancelada (confirmação não bateu).", "warn"); return; }
+      const ok = await _confirmar(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de ata, schemas de CH, funcionários e notas trimestrais.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Apagar TODOS os dados de TODAS as escolas", perigo: true, textoConfirmar: "Apagar tudo", digitar: "APAGAR TUDO" });
+      if (!ok){ setMsg("Limpeza cancelada.", "warn"); return; }
       setMsg(`Apagando todos os dados de ${schoolIds.length} escola(s)…`, "loading");
       try{
         for (const schoolId of schoolIds){
@@ -694,7 +785,7 @@
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
       if (!schoolId){ setMsg('Selecione uma escola antes de apagar.', "err"); return; }
-      const ok = confirm(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.`);
+      const ok = await _confirmar(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.`, { titulo: "Apagar turmas", perigo: true, textoConfirmar: "Apagar turmas" });
       if (!ok) return;
       setMsg("Apagando turmas do Firestore…", "loading");
       ["turmasDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoTurmasDB","anoAtivoMatriculasDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
@@ -707,7 +798,7 @@
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = await _confirmar(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Apagar turmas de todas as escolas", perigo: true, textoConfirmar: "Apagar turmas" });
       if (!ok) return;
       setMsg(`Apagando turmas de ${schoolIds.length} escola(s)…`, "loading");
       try{
@@ -730,7 +821,7 @@
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
       if (!schoolId){ setMsg('Selecione uma escola no card de escopo antes de limpar.', "err"); return; }
-      const ok = confirm(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas e atas do Firestore.\nTurmas e funcionários permanecem.`);
+      const ok = await _confirmar(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas e atas do Firestore.\nTurmas e funcionários permanecem.`, { titulo: "Limpar alunos / IDs", perigo: true, textoConfirmar: "Limpar alunos" });
       if (!ok) return;
       setMsg("Apagando alunos do Firestore…", "loading");
       ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoAlunosDB","anoAtivoMatriculasDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
@@ -743,7 +834,7 @@
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico) no Firestore.\nTurmas e funcionários permanecem.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = await _confirmar(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico) no Firestore.\nTurmas e funcionários permanecem.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Limpar alunos / IDs de todas as escolas", perigo: true, textoConfirmar: "Limpar alunos" });
       if (!ok) return;
       setMsg(`Apagando alunos de ${schoolIds.length} escola(s)…`, "loading");
       try{
@@ -766,7 +857,7 @@
     if (scope === 'escola'){
       const schoolId = getRealActiveSchoolId();
       if (!schoolId){ setMsg('Selecione uma escola antes de apagar.', "err"); return; }
-      const ok = confirm(`Apagar os funcionários da escola "${schoolId}" no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.`);
+      const ok = await _confirmar(`Apagar os funcionários da escola "${schoolId}" no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.`, { titulo: "Apagar funcionários", perigo: true, textoConfirmar: "Apagar funcionários" });
       if (!ok) return;
       setMsg("Apagando funcionários do Firestore…", "loading");
       localStorage.removeItem(scopedKey("funcionariosDB"));
@@ -779,7 +870,7 @@
       }
     } else {
       const schoolIds = await listAllRealSchoolIds();
-      const ok = confirm(`Apagar os funcionários de TODAS as ${schoolIds.length} escola(s) no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.\n\nEscolas: ${schoolIds.join(", ")}`);
+      const ok = await _confirmar(`Apagar os funcionários de TODAS as ${schoolIds.length} escola(s) no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Apagar funcionários de todas as escolas", perigo: true, textoConfirmar: "Apagar funcionários" });
       if (!ok) return;
       setMsg(`Apagando funcionários de ${schoolIds.length} escola(s)…`, "loading");
       try{
@@ -839,8 +930,8 @@
     return `
       ${headerLine}
       <div><b>Ano ativo —</b> Turmas: ${c.anoAtivoTurmasDB} &nbsp;•&nbsp; Matrículas ativas: ${c.matriculasAtivasAnoAtivo} &nbsp;•&nbsp; Alunos no catálogo: ${c.anoAtivoAlunosDB} &nbsp;•&nbsp; Matrículas (total): ${c.anoAtivoMatriculasDB}</div>
-      <div><b>Atas (histórico) —</b> Turmas: ${c.turmasDB} &nbsp;•&nbsp; Alunos nas turmas: ${c.alunosUnicosTurmasHist} &nbsp;•&nbsp; Alunos no catálogo: ${c.alunosDB} &nbsp;•&nbsp; Matrículas: ${c.matriculasDB} &nbsp;•&nbsp; Atas: ${c.atasDB}</div>
-      <div><b>Outros —</b> Schemas CH: ${c.turmasSchemas_v1} &nbsp;•&nbsp; Funcionários: ${c.funcionariosDB}</div>
+      <div><b>Atas (histórico) —</b> Turmas: ${c.turmasDB} &nbsp;•&nbsp; Alunos nas turmas: ${c.alunosUnicosTurmasHist} &nbsp;•&nbsp; Alunos no catálogo: ${c.alunosAtasDB} &nbsp;•&nbsp; Matrículas: ${c.matriculasDB} &nbsp;•&nbsp; Atas: ${c.atasDB} &nbsp;•&nbsp; Schemas de ata: ${c.atasSchemasDB}</div>
+      <div><b>Outros —</b> Schemas CH: ${c.turmasSchemas_v1} &nbsp;•&nbsp; Funcionários: ${c.funcionariosDB} &nbsp;•&nbsp; Vínculos de aluno: ${c.alunosDB} &nbsp;•&nbsp; Notas trimestrais: ${c.notasTrimestraisDB} &nbsp;•&nbsp; Schemas de notas: ${c.notasSchemasDB}</div>
     `;
   }
 
