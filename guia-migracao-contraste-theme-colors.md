@@ -27,6 +27,12 @@ e refinadas nas páginas seguintes:
   de `<label>`, variável do header sobrescrita por CSS de página).
 - **Parte 6** — hubs: o badge de acesso restrito mora no `hub.css`
   compartilhado; cada hub só troca o texto.
+- **Parte 7** — lições do módulo `admin` (hub, backup, usuários, escolas):
+  destaque em elemento que não é `.card`, botões de tabela e de perigo,
+  toasts + modal de confirmação (complemento do `guia-toasts.md`), leitura do
+  Firestore no Status (`Auth.onReady`), regras de `changeRequests`, grid de 4
+  cards (`.grid-atas`) e o que os carimbos de data de uma escrita em lote
+  significam.
 
 Sempre que possível, compare com os arquivos reais já migrados em vez de
 confiar só neste guia de memória. Quatro referências, cada uma mostrando um
@@ -52,6 +58,17 @@ cenário diferente:
   sub-cards **desenhada pelo JS**. Referência das seções 5.1, 5.8 e 5.9.
 - `funcionarios.html` + `hub.css` — hub com badge de acesso restrito
   (Parte 6).
+- `admin.html` (hub) — **um** destaque num elemento que não é `.card`
+  (`.config-card`), grid de 4 cards, Status do banco reescrito. Referência
+  das seções 7.1, 7.3, 7.7 e 7.8.
+- `admin_backup.html` — dois destaques (Status e Limpeza), botões de perigo
+  que **continuam** vermelhos dentro do destaque, modal com campo de
+  digitação. Referência das seções 7.4, 7.5 e 7.6.
+- `cadastro_admin.html` — sem destaque, mas com abas e botões primários, aprovar/
+  reprovar/excluir e o hover do tema escuro. Referência das seções 7.4 e 7.6.
+- `admin_escolas.html` — duas telas no mesmo arquivo (admin global e gestor),
+  destaque **criado por JS** na tela do gestor, `changeRequests`. Referência
+  das seções 7.1, 7.10 e 7.11.
 
 > ⚠️ **Antes de colar qualquer CSS deste guia**: os nomes de variável
 > (`--card`, `--border`, `--text` etc.) **não são os mesmos em todas as
@@ -1228,7 +1245,9 @@ A Parte 4 vale igual; o que muda é que o HTML do item está **num template do J
 # PARTE 6 — Hubs (páginas de menu com cards de navegação)
 
 Visto em `funcionarios.html` (hub do módulo) e no `hub.css`, **compartilhado por
-todos os hubs**. Aqui não há card de destaque, tooltip nem tabela.
+todos os hubs**. Aqui não há card de destaque, tooltip nem tabela — **exceto**
+no hub do módulo `admin`, que tem uma área de configuração com destaque e
+Status do banco (Parte 7).
 
 ## 6.1 Badge de acesso restrito mora no `hub.css`
 
@@ -1263,6 +1282,12 @@ var ROLES_PERMITIDOS = ['admin', 'gestor'];   // só o usuário comum fica de fo
 O texto do badge deve refletir a lista real de papéis; conferir o valor exato
 do papel gravado na sessão (aqui assumido `gestor`, minúsculo).
 
+> ⚠️ **Nas Firestore Rules o gestor de escola é `role:'admin'` com o `schoolId` da
+> própria escola** (o admin global é `role:'admin'` + `schoolId:'ADMIN'`); não existe
+> `role:'gestor'` (ver 7.10). Se o papel gravado na sessão for sempre `admin`, `'gestor'`
+> na lista é inofensivo mas inútil, e o hub da raiz (`index.html`) já testa só `admin`.
+> Confirmar no `users/{uid}` de um gestor real antes de manter os dois nomes.
+
 ## 6.3 Outros pontos do `hub.css` e do bloco de tooltip "Sem acesso"
 
 - `.card:hover .card-title` usava `--brand` como cor de **texto** (1.7):
@@ -1282,6 +1307,309 @@ b.style.color = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
 - [ ] Hub com página restrita tem o `<span class="card-badge">` no card, com o texto certo?
 - [ ] A lista de papéis do script bate com o texto do badge?
 - [ ] O balão "Sem acesso" do hub usa `--brand-fg`?
+
+---
+
+# PARTE 7 — Lições do módulo `admin` (hub, backup, usuários, escolas)
+
+Visto em `admin.html` (hub), `admin_backup.html`, `cadastro_admin.html` e
+`admin_escolas.html`. São páginas de **operação** (apagar, restaurar, aprovar),
+então além do visual apareceram três assuntos novos: **feedback ao usuário**
+(toasts e modal), **leitura do Firestore** e **regras**. Só ficam aqui as
+diferenças e as armadilhas; o que é caso das partes anteriores só é apontado.
+
+## 7.1 Destaque em elemento que não é `.card`, e destaque criado por JS
+
+- **A classe é sempre `.card-destaque` (1.4)**, mesmo quando o elemento base é
+  outro. No hub `admin.html` o bloco de configuração é `.config-card`; o CSS
+  vira `.config-card.card-destaque { … }` (mesmos tokens `--dest-*` da 1.3) e
+  o `ajustarContraste()` acha o elemento pela classe, sem mudança.
+- **Card montado por JS** (o formulário de solicitação do gestor em
+  `admin_escolas.html`): `ajustarContraste()` **depois** de inserir o card no
+  DOM. O `colorchange` global só cobre os `.card-destaque` que já existem.
+- **Card escondido por papel** (o de cadastro some para o gestor): pode ficar
+  no DOM com `display:none`, o contraste é calculado do mesmo jeito.
+- **Boot**: além do `try/catch` da 5.1, o `Loading.esconder()` vai num
+  `finally`, para uma exceção no carregamento não deixar a tela de loading
+  eterna. A cadeia inteira fica assim:
+```js
+try{
+  await Promise.all([renderMeta(), initAnoAtivo()]);
+} finally {
+  ajustarDestaque();                    // try/catch por dentro (5.1)
+  try{ Loading.esconder(); }catch(_){}
+}
+```
+  Sintoma clássico de falta disso: loading infinito **sem nada no console**,
+  porque o `catch` original só escrevia o erro num elemento da tela.
+- **Fonte esticada dentro do destaque**: números que ganharam `font-size:22px`
+  "para dar destaque" (ano ativo) distorcem o card. Destaque por **caixa**, não
+  por tamanho: um badge com o véu do card e a fonte padrão (14px):
+```css
+.ano-badge{ display:inline-flex; align-items:center; justify-content:center; min-width:76px;
+  padding:9px 16px; border-radius:10px; font-size:14px; font-weight:800;
+  background:var(--dest-btn-bg); border:1px solid var(--dest-btn-bd); color:var(--dest-fg); }
+```
+- **Espaço entre o título e os campos** do destaque: `.card-destaque > h2 { margin:0 0 18px; }`
+  (o `<h2>` solto não tinha margem inferior).
+- **Título de card no tamanho padrão do módulo**: 15px / 800 / `--title-color`.
+  Uma página com CSS externo que deixa o `<h2>` grande resolve com
+  `.card h2 { font-size:15px; font-weight:800; color:var(--title-color); }` inline.
+
+## 7.2 `.card{overflow:hidden}` e o balão do ⓘ
+
+Mesmo caso da 3.2, agora em páginas **sem tabela**: `cadastro_admin.html` e o
+hub tinham `overflow:hidden` só para arredondar o cabeçalho do card, e o balão
+sairia cortado. Trocar por `overflow:visible` e arredondar o topo à mão:
+
+```css
+.card{ overflow:visible; }
+.card-head{ border-radius:13px 13px 0 0; }   /* raio do card (14px) − 1px de borda */
+```
+Conferir o **topo do card** depois: é onde aparece a diferença.
+
+## 7.3 Página com CSS externo que você não vê
+
+`admin_escolas.html` depende de um `.css` próprio que não foi enviado. Sem
+ele, não adivinhe: escreva um `<style>` **inline no fim do `<head>`** (carrega
+depois dos `<link>` e vence os empates) usando só tokens globais e definindo o
+que falta.
+
+- **Tokens do balão/modal.** Se a página carrega `hub.css`, ele já define
+  `--card-bg`/`--card-border` (claro e escuro): `:root{--pop-bg:var(--card-bg);--pop-border:var(--card-border)}`.
+  Sem `hub.css`, definir os valores padrão do módulo com par escuro:
+```css
+:root{ --pop-bg:#ffffff; --pop-border:var(--brand-border); }
+html[data-theme="dark"]{ --pop-bg:#131c2e; --pop-border:#2a3a5c; }
+```
+  Nomes próprios (`--pop-*`) evitam sobrescrever o que o CSS externo defina.
+- **Nunca invente uma classe que já existe no CSS externo com outro visual.** Use
+  nomes novos (`.btn-brand-sm`, `.btn-neutral`) e troque a classe no HTML/JS.
+
+## 7.4 Botões de tabela e de ação (fora do destaque)
+
+Botões de ação que eram todos "contorno sem preenchimento" viram três papéis,
+copiados do `cadastro_admin.html` e reaproveitados nas outras páginas:
+
+```css
+.btn-brand-sm{ background:var(--brand); border:1px solid var(--brand); color:var(--brand-fg,#fff); }
+.btn-brand-sm:hover:not(:disabled){ background:var(--brand-hover); border-color:var(--brand-hover); }
+.btn-danger-sm{ background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger-color); }
+.btn-danger-sm:hover:not(:disabled){ background:rgba(185,28,28,.20); }
+html[data-theme="dark"] .btn-danger-sm:hover:not(:disabled){ background:rgba(248,113,113,.34); border-color:rgba(248,113,113,.70); color:#fecaca; }
+.btn-approve{ background:rgba(22,163,74,.12); border:1px solid rgba(22,163,74,.30); color:#16a34a; }
+.btn-approve:hover:not(:disabled){ background:rgba(22,163,74,.22); }
+html[data-theme="dark"] .btn-approve{ color:#4ade80; border-color:rgba(74,222,128,.30); }
+```
+- **Hover do danger no tema escuro**: o fundo base já é vermelho translúcido, então
+  o hover de 20% **não muda nada** de ver. No escuro sobe a opacidade **e** clareia
+  borda e texto. Sempre `:not(:disabled)`, senão o botão reage ao mouse depois de clicado.
+- **Vermelho vibrante cega**: botão de perigo nunca é vermelho sólido. É translúcido,
+  e é o **único** uso de vermelho translúcido do sistema (é o que o separa do
+  primário no tema Vermelho).
+- **Disposição das ações numa linha de tabela**: grade de 2 colunas, os dois
+  principais lado a lado e o terceiro embaixo ocupando a largura toda:
+```css
+.row-actions{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.row-actions .full{ grid-column:1 / -1; }
+```
+  Um botão sozinho (o "Solicitar edição" do gestor) leva `.full`.
+
+## 7.5 Botão de perigo **dentro** do destaque (exceção à 5.5)
+
+A 5.5 manda transformar `.danger` em `.ghost` dentro do destaque. Isso vale para
+"Limpar filtros". **Não vale** para ação destrutiva de verdade (a Limpeza
+controlada de `admin_backup.html`): ali o botão continua vermelho, mas nunca sólido
+nem só `--danger-bg` (some no fundo de marca). Vermelho-escuro translúcido, que
+escurece qualquer cor de marca, inclusive a paleta Vermelho, e texto pelo contraste do card:
+
+```css
+.card-destaque .btn-danger{ background:rgba(153,27,27,.38); border-color:rgba(153,27,27,.65); color:var(--dest-fg); }
+.card-destaque .btn-danger:hover:not(:disabled){ background:rgba(153,27,27,.52); }
+.card-destaque .btn-danger:disabled{ opacity:.5; cursor:not-allowed; }
+```
+- **Aviso inline dentro do destaque** (o "⛔ apagam dados…"): 1.9 aplicada — painel
+  `--dest-panel-bg`, faixa esquerda `4px solid var(--dest-fg)`, texto `--dest-fg`. O sinal é
+  o ⛔ do texto, não a cor de fundo.
+- **Primário do destaque** (Salvar / Definir / Enviar), variante aprovada aqui:
+  `background:var(--dest-btn-bg); border-color:var(--dest-btn-bd); color:var(--dest-fg)`,
+  hover com `--dest-btn-hover` e borda `--dest-fg`. **Cancelar** = contorno
+  (`transparent` + borda `--dest-fg`), declarado **depois** do primário.
+
+## 7.6 Abas e botões primários de marca fora do destaque
+
+`.tab.active` e `.btn-primary` (fundo `--brand`) usam `color:var(--brand-fg,#fff)`. A aba
+**não selecionada** já usa `--muted`, que segue o tema claro/escuro: não mexer. Vale
+também para o hover de "escolher arquivo" (`.btn-file:hover` era `#fff` fixo sobre
+`--brand`). Os greps da 1.8.1 e da 1.11 rodam sempre, mesmo que o botão pareça "de outra cor".
+
+## 7.7 O que sai da página, decidido no módulo `admin`
+
+- **Nomes de seção com linha** (`// módulos`, `// configurações`, `.l-section`) saem de
+  **todas** as páginas do módulo `admin`, hub incluído (o `index.html` da raiz mantém).
+  Remover também o CSS de `.l-*` que ficou sem uso, **menos** `.l-fdot` (é do rodapé).
+- **Sub-título que só repete o título** (`Solicitações → Aprovar/Reprovar • Usuários • Admins`).
+- **Legenda descritiva de card** (`.card-desc`, `<p class="desc">`) vira tooltip no **título** do
+  card; **"Dica: …"** vira tooltip com o mesmo estilo. Se o tooltip carrega um valor dinâmico
+  (o domínio), põe um `<code id="origin">` dentro do balão e preenche por JS.
+- **Frase que o tooltip herda** ("você pode editar antes de salvar"): sai do HTML. Se o
+  texto do tooltip diz "não pode ser editado", o campo tem que ser `readonly` **de verdade**
+  (`schoolId` gerado automaticamente): o tooltip não pode contradizer o comportamento.
+- **Nome de escola/elemento no título** quando a tela só mostra uma escola (gestor):
+  "Solicitar edição — ESCOLA" vira "Solicitar edição".
+
+## 7.8 Toasts e modal de confirmação (complemento do `guia-toasts.md`)
+
+O `guia-toasts.md` continua sendo a fonte dos 4 `kind`, do `setMsg` e do
+`_confirmModal`. O que apareceu migrando o módulo `admin`:
+
+- **Toda página do módulo migra junto**: inline `#msg`/`#saida`/`.msg` viram toast;
+  `confirm()` vira `_confirmModal`; `alert()` de validação vira toast `err`.
+  Conferência: `grep -n "confirm(\|prompt(\|alert(" pagina.html`. **Exceção legítima:** um
+  `alert()` antes de um redirecionamento (acesso negado), porque o código do toast ainda
+  nem carregou.
+- **Mapeamento usado**: `⏳` antes do `await` → `loading`; sucesso → `ok`; falha → `err`
+  (com a mensagem do Firestore); cancelou uma ação confirmada → `warn`; validação de
+  campo → `err` (é o exemplo do próprio guia); resultado neutro ("já tem o schema
+  padrão — nada foi alterado", "o ano já é X") → `warn`.
+- **Sem emoji no texto**: o `setMsg` já acrescenta ✅/⚠️/⏳.
+- **O toast é único** (`#_toastGlobal`, o próximo substitui o anterior) e `setMsg('')` **não
+  limpa nada**. Duas consequências:
+  1. `refresh()`/`renderMeta()` **não** dispara toast de "Carregando…": ele trocaria o toast de
+     sucesso que acabou de aparecer. A tabela já tem o seu placeholder. Toast só no erro.
+  2. Onde o antigo `setOut()` atualizava a tela ao mostrar a mensagem, crie um
+     `_done(texto, kind){ setMsg(texto, kind); renderMeta(); }` e use no **resultado final**
+     (não no `loading`).
+- **Modal — extensões que valem para todas as páginas** (o `admin_backup.html` tem a versão completa):
+  - `Esc` cancela; o foco inicial vai para **Cancelar** (lado seguro numa ação destrutiva);
+  - o corpo rola (`overflow-y:auto`) para listas grandes de escolas;
+  - `corpo` é **HTML**: escape tudo que for dinâmico (`escapeHtml`) e passe `\n` no texto
+    (o `<p>` usa `white-space:pre-line`);
+  - **`digitar: 'APAGAR TUDO'`** troca o `prompt()` de "digite X para confirmar": o modal
+    ganha um campo e o botão só libera com a frase **exata** (maiúsculas incluídas).
+    Funde o `confirm()` + `prompt()` num diálogo só; cancelar mostra toast `warn`.
+- **Botão de cancelar do modal**: se a página não tem `.btn.ghost`, defina um
+  `.btn-neutral` local (fundo `--pop-bg`, borda `--pop-border`, texto `--muted`).
+- **`console.error` em todo `catch` de ação**, com o que ajuda a depurar (`e.code`, o payload
+  enviado, papel/escola da sessão). O erro só aparecer numa mensagem da tela deixa o console
+  limpo e o problema invisível (foi assim com o `permission-denied` do gestor).
+
+## 7.9 Leitura do Firestore no Status do banco
+
+- **Espere o `Auth.onReady`, não o `getSession()`.** `Auth.getSession()` responde na hora,
+  lendo o `localStorage`; `Auth.db` é um *getter* que é `undefined` até o `init()` terminar de
+  carregar os SDKs. Ler `Auth.db.collection(…)` logo no `DOMContentLoaded` dá
+  `TypeError` na **primeira** carga e funciona nas seguintes (SDK já em cache). Padrão:
+```js
+function _authPronto(){
+  return new Promise(res=>{
+    let feito=false; const ok=()=>{ if(!feito){ feito=true; res(); } };
+    if(window.Auth && typeof Auth.onReady==='function'){ Auth.onReady(ok); return; }
+    if(window.Auth && Auth.getSession && Auth.getSession()) return ok();
+    document.addEventListener('auth:ready', ok, {once:true});
+  });
+}
+```
+  Some com até 2 novas tentativas (1,2 s) e, se ainda falhar, **mostre o motivo** (`e.code || e.message`)
+  em vez de "Verifique o login".
+- **`Promise.allSettled`** por coleção: uma negada mostra "—" e o resto continua; se **todas**
+  falharem, lance o erro (é falha geral, não coleção negada).
+- **`getActiveSchoolId() === 'ADMIN'`** (admin global sem escola escolhida): não é uma escola,
+  é um marcador; consultar `schools/ADMIN/…` devolve zeros sem erro. Mostrar
+  "Selecione uma escola no seletor do header". Mesma armadilha da 5.9.
+- **Contagem barata não existe aqui**: o SDK compat 10.12 usado no sistema não expõe
+  `count()` (procurado no pacote `@firebase/firestore-compat` 0.3.32). Contar = ler a coleção.
+  Por isso o Status do hub **não inclui** `notasTrimestrais` (módulo próprio, coleção grande).
+- **Coleções reais por escola** (`schools/{id}/…`, espelham `db.firebase.js` e as Rules; o
+  mapa único de backup/restaurar/status/"Apagar TODOS" precisa listar todas):
+  `turmas`, `alunos-atas` (catálogo do módulo de atas), `alunos` (**elo** entre módulos: quase
+  vazio por desenho), `matriculas`, `atas`, `atasSchemas` (colunas da ata), `schemasCH`
+  (carga horária — não entra em log de dados), `anoAtivoTurmas`, `anoAtivoAlunos`,
+  `anoAtivoMatriculas`, `funcionarios`, `notasTrimestrais`, `notasSchemas`.
+  Coleção nova no `db.firebase.js` = adicionar no mapa **e** nas Rules.
+- **A linha "Vínculos entre módulos" é um detector.** A coleção `alunos` só recebe documento
+  depois de uma fusão confirmada em `idaluno.html`. Se o Status mostrar centenas, alguém
+  gravou em lote indevidamente.
+- **O carimbo de data de uma escrita em lote não é a data de criação.** `DB.saveAll()` e a
+  restauração do backup usam **um** `serverTimestamp()` para o lote inteiro e gravam com
+  `merge:true`, o que **reescreve o `updatedAt` de documentos que já existiam**. Só o
+  `save()` sem `_id` grava `createdAt`. Logo, "todos os docs no mesmo minuto" quer dizer "uma
+  escrita em lote" (restauração, `DB.migrate.fromDump/fromLocalStorage`, um `saveAll`), não
+  "criados naquele dia". Deploy no GitHub não escreve no Firestore: procure a **ação** que
+  alguém executou, não o horário do deploy.
+- **Risco aberto no backup**: a chave `alunosDB` do arquivo aponta para a coleção `alunos`.
+  Em backups **antigos** essa chave era o catálogo, e restaurá-lo enche o elo de lixo. Solução
+  proposta (ainda não aplicada): marcar os backups novos com uma versão e ignorar `alunosDB`
+  de backups sem ela, com aviso.
+- **"Limpar alunos / IDs"** apaga `alunos`, `alunos-atas`, `atas`, `matriculas` **e
+  `anoAtivoAlunos`/`anoAtivoMatriculas`**. Para limpar só o elo, use o Console do Firebase.
+
+## 7.10 `changeRequests` — o que as Rules exigem
+
+Vale para `admin_escolas.html` (edição de escola) e `cadastro_admin.html` (exclusão de
+usuário), que gravam na **mesma** coleção `schools/{id}/changeRequests`:
+
+- **Criar**: `canWriteSchoolData(schoolId)` **e** `requestedBy == request.auth.uid` **e**
+  `hasAll(['schoolId','requestedBy','requestedAt','status','changes'])` **e** `status == 'pending'`.
+  `hasAll` (e não `hasOnly`) aceita campos extras, como o `type: 'delete_user'`.
+- **`requestedBy` é o uid, nunca o e-mail.** Gravar `session.email` dá `permission-denied` no
+  `add()`. Na tabela, resolva o uid para nome/e-mail (`Auth.listUsers()` — só admin global);
+  pedidos antigos, gravados com e-mail, caem no fallback e continuam aparecendo.
+- **Quem é quem**: admin global = `role:'admin'` **e** `schoolId:'ADMIN'`; **gestor** =
+  `role:'admin'` com o `schoolId` da própria escola. Não existe `role:'gestor'` nas Rules.
+- **Ler/aprovar/reprovar/apagar**: só admin global (`update`/`delete`; a leitura entre escolas
+  usa a regra de *collection group* `/{path=**}/changeRequests/{id}`).
+- **A coleção é compartilhada**: `admin_escolas.html` precisa **filtrar** `type === 'delete_user'`,
+  senão aprovar "uma alteração de escola" só marca o pedido de exclusão como aprovado sem excluir
+  ninguém. E `Auth.listUsers()` **sem `schoolId` é proibido para gestor** (as Rules exigem a query já filtrada).
+- **Depuração de `permission-denied`**: o erro é do `add()`, não da leitura. Compare o payload do
+  `console.error` (7.8) com a regra, ou use o **Simulador de regras** do Firebase Console
+  (create em `/schools/ID/changeRequests/teste`, autenticado com o uid do log, payload colado).
+  Ele aponta a linha que nega, sem criar documento.
+
+## 7.11 Duas telas no mesmo arquivo (admin global x gestor)
+
+- O JS decide o papel (`isMaster`) e **esconde** o que não vale: o card de cadastro some para o
+  gestor, que ganha o formulário de solicitação (destaque criado por JS, 7.1).
+- Cuidado com o que cada tela **chama**: o gestor não pode disparar `listUsers()` sem escopo
+  (7.10). Chamadas exclusivas do global ficam **depois** do retorno antecipado do gestor.
+- Botões diferentes por papel, mesma estrutura: Editar / Excluir / Schema padrão (global) ou
+  um "Solicitar edição" `.full` (gestor), todos com as classes da 7.4.
+
+## 7.12 Grid de 4 cards no hub
+
+`hub.css` já traz a classe **`.grid-atas`** (2x2, `gap:18px`, `max-width:712px`, centralizada).
+Usar `class="grid grid-atas"` — o `grid` junto é o que faz virar 1 coluna no celular (a
+media query é escrita em cima de `.grid`). **Não** sobrescrever `grid-template-columns` na
+página: `repeat(2,1fr)` estica cada card para metade do container em vez de manter a largura
+dos hubs. Card escondido por papel (`display:none`) não conta na grade: com 3 visíveis sobra
+uma linha com 1 card à esquerda.
+
+## 7.13 Testar sem navegador (jsdom)
+
+Estende a 5.1 com o que valeu a pena neste módulo: `Auth`/`Loading`/`DB` falsos; simular a
+**corrida** (o `Auth.db` só existe 400 ms depois); um toast de cada `kind`; o modal (cancelar,
+confirmar, Esc, clique no fundo, `digitar` com a frase errada/certa); filtros de `type`;
+coleção negada; admin global sem escola. **O jsdom não reproduz o repasse de clique do
+`<label>`**: o bug do ⓘ dentro de `label for` só se confirma no navegador de verdade.
+
+## 7.14 Checklist rápido — Parte 7
+
+- [ ] Destaque em elemento que não é `.card` (`.x.card-destaque`) e/ou criado por JS: `ajustarContraste()` depois de inserir (7.1)?
+- [ ] Boot com `finally { ajustarDestaque(); Loading.esconder(); }` (7.1)?
+- [ ] Nenhuma fonte esticada dentro do destaque; número em badge (7.1)?
+- [ ] `.card`/`.config-card` sem `overflow:hidden` onde há ⓘ; cantos do topo à mão (7.2)?
+- [ ] Tokens do balão conferidos (7.3); `<style>` inline no fim do `<head>` se há CSS externo que não foi enviado?
+- [ ] Botões de tabela: `--brand-fg`, danger com hover visível no **escuro** e `:not(:disabled)` (7.4)?
+- [ ] Perigo dentro do destaque em vermelho translúcido escuro, nunca sólido (7.5)?
+- [ ] `.tab.active` / `.btn-primary` / `.btn-file:hover` com `--brand-fg` (7.6)?
+- [ ] Seções `// x`, sub-títulos repetidos, `.card-desc` e "Dica:" removidos/viraram tooltip; tooltip não contradiz o campo (7.7)?
+- [ ] Nenhum `confirm()`/`prompt()`/`alert()` restante (exceto antes de redirect); `refresh()` sem toast de loading (7.8)?
+- [ ] Todo `catch` de ação tem `console.error` com contexto (7.8)?
+- [ ] Leitura do Firestore espera `Auth.onReady`, usa `allSettled`, trata `ADMIN` sem escola (7.9)?
+- [ ] Coleção nova listada no mapa único **e** nas Rules (7.9)?
+- [ ] `requestedBy` = uid; `type` filtrado; `listUsers` só do global (7.10)?
+- [ ] Hub com 4 cards usa `grid grid-atas` (7.12)?
 
 ---
 
@@ -1348,6 +1676,15 @@ b.style.color = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
 1. Badge de acesso restrito é estilo do `hub.css`; o hub só troca o texto.
 2. Lista de papéis do script e texto do badge precisam bater; o bloqueio real é no servidor.
 
+**Parte 7 — módulo `admin`:**
+1. Destaque em qualquer elemento vira `.card-destaque`; card criado por JS chama `ajustarContraste()` depois de inserido; `Loading.esconder()` num `finally`.
+2. `overflow:hidden` no card corta o ⓘ: `overflow:visible` + cantos do topo à mão. Sem ver o CSS externo, `<style>` inline no fim do `<head>`.
+3. Botões de tabela: marca + `--brand-fg`, danger translúcido com hover visível no escuro, approve verde translúcido. Perigo dentro do destaque: vermelho-escuro translúcido, nunca sólido.
+4. Toda página migra `confirm/prompt/alert` e mensagens inline para `setMsg` + `_confirmModal` (com `digitar`, Esc, foco em Cancelar). `refresh()` sem toast; `_done()` no resultado final; `console.error` em todo `catch`.
+5. Ler o Firestore só depois do `Auth.onReady` (nunca só do `getSession()`); `allSettled`; `ADMIN` sem escola não é escola.
+6. `changeRequests`: `requestedBy` é o **uid**; coleção compartilhada, filtrar `type`; `listUsers` sem escopo só para o global.
+7. Hub de 4 cards: `grid grid-atas`, sem sobrescrever colunas.
+
 ---
 
 # Páginas já adequadas (status)
@@ -1363,6 +1700,10 @@ b.style.color = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
 | `pesquisa-funcionario.html/.js/.css` | ✅ **criado do zero** (card de filtros) | ✅ (1 ícone, texto adaptado à pesquisa) | — | ✅ lista de sub-cards desenhada por JS (5.9) | Colisão de `--mark-bg` com o logo do header (5.8). Elementos removidos que o JS usava (5.1). Estado vazio com diagnóstico. |
 | `funcionarios.html` (hub) | — não se aplica | — | — | — | Badge "Admin/Gestor" nos dois cards; papéis `admin` e `gestor` (Parte 6). |
 | `cadastro-atas.html` | ✅ **criado do zero** (1º card: dados da escola + selects) | ✅ (4 ícones: Turma, Nome do aluno, Scans de documentos, título Alunos; legenda `.help` removida) | — | — | Card "Scans" renomeado para "Scans de documentos"; aviso sem amarelo (1.9); hover escuro da drop-zone (1.10). |
+| `admin.html` (hub) | ✅ **criado do zero** (card "Ano letivo ativo", elemento `.config-card`) | ✅ (2 ícones: card e Status do banco) | — | — | Ano ativo em badge (7.1); grid `.grid-atas` (7.12); Status reescrito com as coleções reais (7.9); toasts + modal. |
+| `admin_backup.html` | ✅ **criado do zero** (2 cards: Status e Limpeza controlada) | ✅ (4 ícones: Status, Escopo, Exportar, Limpeza) | — | — | Perigo dentro do destaque (7.5); modal com `digitar` (7.8); `alunos-atas`/`atasSchemas`/notas no mapa de coleções (7.9); botão isolado "Apagar funcionários". |
+| `cadastro_admin.html` | — sem destaque | ✅ (2 ícones: Solicitações de exclusão e Criar admin) | — | — | Abas e botões com `--brand-fg` (7.6); hover do danger no escuro (7.4); `.card{overflow:hidden}` (7.2); toasts + modal. |
+| `admin_escolas.html` | ✅ **criado do zero** (cadastro) + criado **por JS** (solicitação do gestor) | ✅ (3 ícones no HTML + 3 no formulário do gestor) | — | — | Botões em grade 2 colunas (7.4); `requestedBy` = uid e filtro de `type` (7.10); duas telas no mesmo arquivo (7.11); `schoolId` readonly. |
 
 ## Status das seções 1.8 → 1.11, por página
 
@@ -1380,6 +1721,10 @@ b.style.color = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
 | `hub.css` (global dos hubs) | ✅ `.card-badge` com `--brand-fg` | — | ✅ título do card no hover com `--brand-text`/`-d` | — | Vale para todos os hubs (Parte 6). |
 | `funcionarios.html` (hub) | ✅ balão "Sem acesso" com `--brand-fg` | — | — | — | Replicar o balão nos outros hubs. |
 | `perfil.html` | — | — | — | ✅ corrigido | `swatchColors` local removido; lê `ThemeColors.palettes[key]['--brand']`. Achado ao trocar Branco→Tan. |
+| `admin.html` (hub) | ✅ `btn-save` do destaque via `--dest-*` (sem botão sólido de marca) | — não tem aviso em card | — | ✅ grep feito, sem roxo fixo | Só carrega `hub.css`: usa `--card-bg`/`--card-border` do próprio hub (7.3). |
+| `admin_backup.html` | ✅ `.btn-action` e `.btn-file:hover` com `--brand-fg` | ✅ aviso do destaque com painel `--dest-panel-bg` (7.5) | — | ✅ grep feito, sem roxo fixo | `warn-box` do card de restauração (fora do destaque) **não** foi mexido. |
+| `cadastro_admin.html` | ✅ `.tab.active`, `.btn-primary` | — não tem aviso em card | ✅ hover do danger com par escuro (7.4) | ✅ grep feito, sem roxo fixo | `/css/cadastro_admin.css` não foi visto. |
+| `admin_escolas.html` | ✅ `.btn-brand-sm`; `.btn-save` no destaque via `--dest-*` | — não tem aviso em card | ✅ hover do danger e do approve | ✅ grep feito, sem roxo fixo | `/css/admin_escolas.css` não foi visto; estilos novos ficaram inline (7.3). |
 
 **Decisões do usuário que fecharam pendências antigas:**
 - `.btn.outline:hover` em `cadastro-turmas.html` e `.btn-gray:hover` local em
@@ -1391,14 +1736,34 @@ b.style.color = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
 
 **Pendências abertas:**
 - **Fora do módulo de atas**, a receita da 1.8.1 (`--brand-fg`) e o grep da 1.11
-  foram feitos apenas nas duas páginas do módulo de funcionários, no hub dele e
-  no `hub.css`. Falta rodar nas demais páginas antes de considerar o Tan seguro
-  em produção.
+  foram feitos nas duas páginas do módulo de funcionários, no hub dele, no
+  `hub.css` **e nas quatro páginas do módulo `admin`** (`admin.html`, `admin_backup.html`,
+  `cadastro_admin.html`, `admin_escolas.html`). Falta rodar nas demais páginas antes
+  de considerar o Tan seguro em produção — **`idaluno.html`** é a última do módulo `admin`
+  (visual + backend juntos, num chat só).
 - **Greps novos, em todas as páginas e CSS do sistema:**
   `grep -n -- "--primary"` (5.2) e `grep -n -- "--mark-\|--btn-home" *.css` (5.8).
+  Já rodados (zero ocorrências) nas quatro páginas HTML do módulo `admin`; os CSS externos
+  dessas páginas não foram vistos.
 - **Bloco do balão "Sem acesso"** dos demais hubs: aplicar a leitura de
   `--brand-fg` (6.3) ou extrair para um arquivo compartilhado.
 - `exportacao-funcionarios.js`: conferir se ele lê algum elemento removido da
   pesquisa (`lblAnoAtivo`, `statExib`, `subResultados`, `statsRow`); não foi enviado.
 - Os dois CSS do módulo usam `color-mix` no hover **escuro** do `.btn.primary`;
   o token exato é `--brand-hover-d` (5.3).
+- **`idaluno.html`** (módulo `admin`, ainda não migrada): antes de mexer, conferir quem grava na
+  coleção `alunos` e se o antigo "Gerar IDs do sistema" ainda existe (o hub deixou de avisar sobre
+  isso). Mandar junto os scripts que a lógica de identidade usa (o comentário do contador cita
+  `identidade-aluno.js`).
+- **Backup versionado** (7.9): marcar os backups novos e ignorar `alunosDB` de backups sem marca,
+  para uma restauração antiga não encher a coleção `alunos` (elo) de lixo. Não aplicado.
+- **Decisões do módulo `admin` ainda abertas**: "Apagar TODOS os dados" inclui notas trimestrais e
+  os schemas (ata e notas); "Apagar turmas" **não** apaga `atasSchemas` (o schema não depende de turma).
+- **Otimização possível do hub** (`admin.html`): `_lerAnoAtivo()` ainda usa `DB.loadAll()`, que lê várias
+  coleções só para pegar `configAnoAtivo`; e o carregamento do `admin_backup.html` em "Todas as
+  escolas" lê 13 coleções por escola em sequência (lento). Liberar o overlay antes do Status e
+  ler em paralelo (`Promise.all`) resolve; não aplicado.
+- **CSS externos não vistos**: `/css/cadastro_admin.css`, `/css/admin_escolas.css`, `/css/admin.css`. Se algo
+  não bater, mandar o arquivo.
+- `guia-toasts.md`: incorporar as extensões do `_confirmModal` da 7.8 (`digitar`, Esc, foco em Cancelar,
+  rolagem) e a regra "`refresh()` sem toast de loading".
