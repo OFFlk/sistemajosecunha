@@ -339,7 +339,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   <!-- Card de destaque do topo: ano letivo (editável, permite cadastrar em anos passados/futuros) + etapas do cadastro -->
   <section class="card card-destaque topo-destaque">
     <div class="field">
-      <label for="anoLetivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ano letivo é preenchido automaticamente com o ano atual selecionado pelo administrador. Caso queira fazer um cadastro de anos anteriores ou futuros, selecione manualmente o ano em questão!</span></span></label>
+      <label for="anoLetivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ano letivo é preenchido automaticamente com o ano atual selecionado pelo administrador. Caso queira fazer um cadastro de anos anteriores ou futuros, selecione manualmente o ano em questão!</span></span></label>
       <input id="anoLetivo" type="number" min="2000" max="2100"/>
     </div>
 
@@ -387,7 +387,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
           <span id="fotoFuncionarioPlaceholder" style="font-size:30px;">🧑</span>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Foto do funcionário (opcional) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">A foto deverá representar o funcionário. Ela será utilizada na exibição no sistema e na exportação da ficha individual!</span></span></div>
+          <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Foto do funcionário (opcional) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">A foto deverá representar o funcionário. Ela será utilizada na exibição no sistema e na exportação da ficha individual!</span></span></div>
           <input type="file" id="inpFotoFuncionario" accept="image/*" style="display:none;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn small" id="btnEscolherFotoFuncionario" onclick="document.getElementById('inpFotoFuncionario').click()">📷 Escolher foto</button>
@@ -526,7 +526,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
               <input type="checkbox" id="profissionalApoio" style="width:17px;height:17px;cursor:pointer;"/>
               <span>🤝 É profissional de apoio?</span>
             </label>
-            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Marque se este(a) funcionário(a) atua dando apoio a algum(a) aluno(a) com NEE — independente da função (professor, mediador, cuidador, auxiliar etc.). A própria função selecionada acima será usada como especificação.</span></span>
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Marque se este(a) funcionário(a) atua dando apoio a algum(a) aluno(a) com NEE — independente da função (professor, mediador, cuidador, auxiliar etc.). A própria função selecionada acima será usada como especificação.</span></span>
           </div>
         </div>
         <div class="field">
@@ -545,7 +545,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
           </select>
         </div>
         <div class="field col-full">
-          <label>Turno(s) de atuação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Poderá ser selecionado mais de um turno, mas é obrigatório selecionar ao menos um! Observe que a carga horária deve ser condizente com os turnos, mas isso não é obrigatório!</span></span></label>
+          <label>Turno(s) de atuação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Poderá ser selecionado mais de um turno, mas é obrigatório selecionar ao menos um! Observe que a carga horária deve ser condizente com os turnos, mas isso não é obrigatório!</span></span></label>
           <div class="turnos-group">
             <label class="turno-check" id="lblMatutino">
               <input type="checkbox" id="chkMatutino" value="MAT"/>
@@ -923,7 +923,7 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
 
     <!-- Documentos — fila de arquivos, upload junto ao salvar -->
     <section class="card">
-      <h3 style="margin:0 0 10px;">📎 Documentos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Escaneie ou fotografe os documentos do funcionário e adicione na área abaixo. Imagens (JPG, PNG, WEBP) são importadas normalmente; PDFs são convertidos automaticamente em imagens, uma para cada página. Os arquivos ficam em uma fila e só são enviados quando você salvar o cadastro.</span></span> <span style="font-size:12px;font-weight:600;color:var(--muted);">(opcional)</span></h3>
+      <h3 style="margin:0 0 10px;">📎 Documentos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Escaneie ou fotografe os documentos do funcionário e adicione na área abaixo. Imagens (JPG, PNG, WEBP) são importadas normalmente; PDFs são convertidos automaticamente em imagens, uma para cada página. Os arquivos ficam em uma fila e só são enviados quando você salvar o cadastro.</span></span> <span style="font-size:12px;font-weight:600;color:var(--muted);">(opcional)</span></h3>
 
       <div class="docs-drop-area" id="docsDropArea">
         <input type="file" id="docsFileInput" multiple
