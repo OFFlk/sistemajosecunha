@@ -55,6 +55,8 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
 .card-destaque .field label { color: var(--dest-fg); }
 .card-destaque .field-hint,
 .card-destaque .field-hint > span:not(.warn):not(.full) { color: var(--dest-fg); }
+/* Respiro entre o título do card e a primeira linha de campos. */
+.card-destaque > h2 { margin: 0 0 18px; }
 /* Primário (Salvar / Enviar): preenchido com o filtro claro/escuro do card. */
 .card-destaque .btn-save { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
 .card-destaque .btn-save:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
@@ -134,11 +136,11 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
             <input id="schoolName" autocomplete="off" placeholder="Ex.: Escola Municipal José Cunha"/>
           </div>
           <div class="field">
-            <label for="schoolId">schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
+            <label for="schoolId">schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
             <input id="schoolId" autocomplete="off" placeholder="Ex.: ESCOLA_JOSE_CUNHA" readonly/>
           </div>
           <div class="field">
-            <label for="displayName">Nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
+            <label for="displayName">Nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
             <input id="displayName" autocomplete="off" placeholder="Ex.: E.M. José Cunha" maxlength="20"/>
           </div>
           <button class="btn-save" type="submit">💾 Salvar</button>
@@ -175,7 +177,7 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
     <!-- Card: solicitações de alteração -->
     <div class="card" id="cardApprovals" style="display:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
-        <h2 style="margin:0;">Solicitações de alteração <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As solicitações de alteração feitas por gestores de escola aparecem aqui, aguardando sua aprovação ou reprovação.</span></span></h2>
+        <h2 style="margin:0;">Solicitações de alteração <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As solicitações de alteração feitas por gestores de escola aparecem aqui, aguardando sua aprovação ou reprovação.</span></span></h2>
         <span class="pill" id="reqCount">0</span>
       </div>
       <div class="table-wrap">
@@ -348,19 +350,19 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
     card.className = 'card card-destaque';
     card.id = 'reqFormCard';
     card.innerHTML = `
-      <h2>✏️ Solicitar edição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Sua solicitação será enviada para aprovação do ADMIN global. Caso aprovada, a escola será atualizada instantaneamente!</span></span></h2>
+      <h2>✏️ Solicitar edição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Sua solicitação será enviada para aprovação do ADMIN global. Caso aprovada, a escola será atualizada instantaneamente!</span></span></h2>
       <div class="form">
         <div class="field">
           <label>Novo nome da escola</label>
           <input id="reqNewName" value="${escapeHtml(currentName)}" placeholder="Nome da escola" autocomplete="off"/>
         </div>
         <div class="field">
-          <label>Novo nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
+          <label>Novo nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
           <input id="reqNewDisplay" value="${escapeHtml(currentDisplay)}" placeholder="Ex.: E.M. José Cunha" maxlength="20" autocomplete="off"/>
           <div class="field-hint"><span>Máx. 20 caracteres</span><span class="counter" id="reqDisplayCounter">${escapeHtml(currentDisplay)?.length||0}/20</span></div>
         </div>
         <div class="field">
-          <label>schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
+          <label>schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
           <input value="${escapeHtml(sid)}" readonly/>
         </div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
