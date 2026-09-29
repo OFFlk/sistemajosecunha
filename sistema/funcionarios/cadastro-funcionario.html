@@ -113,11 +113,11 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 /* ── Stepper (dentro do card de destaque) ──
    Etapa ativa = "square" arredondado na cor do body (neutro, muda com o tema);
    o mesmo square, translúcido, faz o hover das demais. Sem linha entre etapas. */
-/* Duas colunas iguais: etapa 1 na margem esquerda, etapa 2 começando no centro do card.
-   O quadrado continua ajustado ao texto (justify-self:start); pra ele ocupar a metade toda, use stretch. */
-.stepper{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-self:stretch;}
+/* Duas colunas iguais que preenchem o card: o quadrado de cada etapa vai de uma borda até o vão central.
+   O gap é a separação, centralizada no card (mesma distância de cada lado). */
+.stepper{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-self:stretch;}
 @media(max-width:700px){.stepper{grid-template-columns:1fr;}}
-.step{display:flex;align-items:center;gap:10px;justify-self:start;min-width:0;cursor:pointer;padding:8px 18px 8px 10px;border-radius:12px;transition:background .15s;}
+.step{display:flex;align-items:center;gap:10px;justify-self:stretch;min-width:0;cursor:pointer;padding:8px 18px 8px 10px;border-radius:12px;transition:background .15s;}
 .step:hover{background:var(--dest-btn-hover);}
 .step.active, .step.active:hover{background:var(--pf-body-bg);}
 .step-num{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--dest-btn-bd);background:var(--dest-panel-bg);color:var(--dest-fg);transition:all .25s;}
