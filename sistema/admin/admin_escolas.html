@@ -22,6 +22,93 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<style>
+/* Tokens do balão/modal — mesmos valores padrão do módulo (a página não definia). */
+:root { --pop-bg: #ffffff; --pop-border: var(--brand-border); }
+html[data-theme="dark"] { --pop-bg: #131c2e; --pop-border: #2a3a5c; }
+
+/* Sem overflow:hidden: cortaria o balão do ⓘ (guia, Parte 2). */
+.card { overflow: visible; }
+/* Título de card no tamanho padrão do módulo. */
+.card h2 { font-size: 15px; font-weight: 800; color: var(--title-color); }
+
+/* ── Card de destaque (guia 1.3b) ── */
+.card.card-destaque {
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,.18);
+  --dest-btn-bd: rgba(255,255,255,.40);
+  --dest-btn-hover: rgba(255,255,255,.28);
+  --dest-panel-bg: rgba(255,255,255,.10);
+  background: var(--btn-home-bg); border-color: var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #0f172a;
+  --dest-btn-bg: rgba(0,0,0,.08);
+  --dest-btn-bd: rgba(0,0,0,.25);
+  --dest-btn-hover: rgba(0,0,0,.16);
+  --dest-panel-bg: rgba(0,0,0,.06);
+  border-color: var(--pop-border);
+}
+.card-destaque h2,
+.card-destaque label,
+.card-destaque .field label { color: var(--dest-fg); }
+.card-destaque .field-hint,
+.card-destaque .field-hint > span:not(.warn):not(.full) { color: var(--dest-fg); }
+/* Primário (Salvar / Enviar): preenchido com o filtro claro/escuro do card. */
+.card-destaque .btn-save { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+.card-destaque .btn-save:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+/* Outline (Cancelar) — declarado depois do primário de propósito. */
+.card-destaque .btn-outline { background: transparent; border-color: var(--dest-fg); color: var(--dest-fg); }
+.card-destaque .btn-outline:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+
+/* ── Botões das tabelas ── */
+.row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.row-actions .full { grid-column: 1 / -1; }
+.btn-brand-sm, .btn-danger-sm, .btn-approve { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; transition: background 0.18s; }
+.btn-brand-sm:disabled, .btn-danger-sm:disabled, .btn-approve:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Marca + contraste calculado (--brand-fg) nos dois temas. */
+.btn-brand-sm { background: var(--brand); border: 1px solid var(--brand); color: var(--brand-fg, #fff); }
+.btn-brand-sm:hover:not(:disabled) { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn-danger-sm { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-color); }
+.btn-danger-sm:hover:not(:disabled) { background: rgba(185,28,28,0.20); }
+/* tema escuro: o fundo base já é vermelho translúcido, então o hover precisa
+   de mais opacidade + borda/texto mais claros pra ser perceptível */
+html[data-theme="dark"] .btn-danger-sm:hover:not(:disabled) { background: rgba(248,113,113,0.34); border-color: rgba(248,113,113,0.70); color: #fecaca; }
+.btn-approve { background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.30); color: #16a34a; }
+.btn-approve:hover:not(:disabled) { background: rgba(22,163,74,0.22); }
+html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222,128,0.30); }
+
+.btn-neutral { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 10px; background: var(--pop-bg); border: 1px solid var(--pop-border); color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; }
+.btn-neutral:hover { background: var(--chip-bg); }
+
+/* ── Toast e modal de confirmação (guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }
+
+/* ===== Ícone de dica (ⓘ) — guia, Parte 2 ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--pop-bg); border:1.5px solid var(--pop-border); color:var(--ink);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default; text-transform:none; letter-spacing:normal;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+.info-tip-bubble.align-right{ left:auto; right:0; }
+</style>
 </head>
 
 <body>
@@ -34,17 +121,11 @@
 
 
 <div class="wrap">
-  <div class="l-section">
-    <div class="l-slabel">// gerenciar escolas</div>
-    <div class="l-sline"></div>
-  </div>
-
   <div class="grid">
 
     <!-- Card: cadastrar escola -->
-    <div class="card">
+    <div class="card card-destaque">
       <h2>Cadastrar escola</h2>
-      <p>O <strong>schoolId</strong> é gerado automaticamente pelo nome, mas você pode editar antes de salvar.</p>
 
       <form id="frm">
         <div class="form">
@@ -53,22 +134,19 @@
             <input id="schoolName" autocomplete="off" placeholder="Ex.: Escola Municipal José Cunha"/>
           </div>
           <div class="field">
-            <label for="schoolId">schoolId</label>
-            <input id="schoolId" autocomplete="off" placeholder="Ex.: ESCOLA_JOSE_CUNHA"/>
+            <label for="schoolId">schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
+            <input id="schoolId" autocomplete="off" placeholder="Ex.: ESCOLA_JOSE_CUNHA" readonly/>
           </div>
           <div class="field">
-            <label for="displayName">Nome de exibição <span style="font-weight:400;color:var(--muted);">— header</span></label>
+            <label for="displayName">Nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
             <input id="displayName" autocomplete="off" placeholder="Ex.: E.M. José Cunha" maxlength="20"/>
           </div>
           <button class="btn-save" type="submit">💾 Salvar</button>
         </div>
-        <div class="field-hint" style="margin-top:8px;">
-          <span>O nome de exibição aparece no chip do header — máx. 20 caracteres</span>
+        <div class="field-hint" style="margin-top:8px; justify-content:flex-end;">
           <span class="counter" id="displayNameCounter">0/20</span>
         </div>
       </form>
-
-      <div id="msg" class="msg"></div>
     </div>
 
     <!-- Card: lista de escolas -->
@@ -97,7 +175,7 @@
     <!-- Card: solicitações de alteração -->
     <div class="card" id="cardApprovals" style="display:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
-        <h2 style="margin:0;">Solicitações de alteração</h2>
+        <h2 style="margin:0;">Solicitações de alteração <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As solicitações de alteração feitas por gestores de escola aparecem aqui, aguardando sua aprovação ou reprovação.</span></span></h2>
         <span class="pill" id="reqCount">0</span>
       </div>
       <div class="table-wrap">
@@ -115,7 +193,6 @@
           </tbody>
         </table>
       </div>
-      <div id="reqMsg" class="msg"></div>
     </div>
 
   </div>
@@ -128,6 +205,99 @@
   Auth.requireRole('admin', '/login.html');
 
   function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+  function _showToast(msg, bg, shadow, duration){
+    const existing = document.getElementById('_toastGlobal');
+    if(existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = '_toastGlobal';
+    toast.style.cssText =
+      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+      `display:flex;align-items:center;gap:12px;`+
+      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    const span = document.createElement('span');
+    span.textContent = msg;
+    span.style.cssText = 'flex:1;line-height:1.4;';
+    toast.appendChild(span);
+    const btnClose = document.createElement('button');
+    btnClose.type = 'button';
+    btnClose.textContent = '✕';
+    btnClose.setAttribute('aria-label','Fechar aviso');
+    btnClose.style.cssText =
+      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+    btnClose.onclick = () => toast.remove();
+    toast.appendChild(btnClose);
+    document.body.appendChild(toast);
+    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  }
+  function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+  function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+  function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+  function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+
+  // Ponto de entrada único — setMsg(texto, kind): "ok" | "warn" | "loading" | "err".
+  function setMsg(text, kind){
+    const t = (text||'').toString();
+    if(!t) return;
+    if(kind === 'err') _toastErro('⚠️ ' + t);
+    else if(kind === 'ok') _toastSucesso('✅ ' + t);
+    else if(kind === 'warn') _toastAviso('⚠️ ' + t);
+    else if(kind === 'loading') _toastCarregando('⏳ ' + t);
+    else {
+      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+      _toastAviso(t);
+    }
+  }
+
+  // ── Modal de confirmação (substitui confirm() nativo) ─────────────────
+  // Igual ao do guia, mais Esc pra cancelar e rolagem do corpo. Foco em
+  // Cancelar (lado seguro). `corpo` é HTML — escape o que for dinâmico.
+  const COR_PERIGO = '#991b1b';
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+    return new Promise((resolve) => {
+      const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.style.display = 'flex';
+      backdrop.setAttribute('role','dialog');
+      backdrop.setAttribute('aria-modal','true');
+      backdrop.innerHTML =
+        `<div style="background:var(--pop-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<div style="overflow-y:auto;margin:0 0 18px;"><p style="margin:0;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p></div>`+
+          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+            `<button type="button" class="btn-neutral" id="_confirmModalCancelar">${escapeHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">${escapeHtml(textoConfirmar || 'Continuar')}</button>`+
+          `</div>`+
+        `</div>`;
+      document.body.appendChild(backdrop);
+      function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+      function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+      const btnCancel = backdrop.querySelector('#_confirmModalCancelar');
+      btnCancel.addEventListener('click', () => fechar(false));
+      backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+      document.addEventListener('keydown', onKey);
+      btnCancel.focus();
+    });
+  }
+
+  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open'));
+  });
+
+  // Contraste dos cards de destaque — nunca deixa uma falha aqui travar a página.
+  function ajustarDestaque(){
+    try{ if(window.ThemeColors) ThemeColors.ajustarContraste(); }
+    catch(e){ console.warn('[admin_escolas] ajustarContraste falhou:', e); }
+  }
+
   function slugifySchoolId(name){
     return String(name||'')
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -141,7 +311,6 @@
   const $id          = document.getElementById('schoolId');
   const $display     = document.getElementById('displayName');
   const $counter     = document.getElementById('displayNameCounter');
-  const $msg         = document.getElementById('msg');
   const $tbody       = document.getElementById('tbody');
   const $count       = document.getElementById('count');
   const $cardApprovals = document.getElementById('cardApprovals');
@@ -157,18 +326,6 @@
     $counter.textContent = len + '/20';
     $counter.className = 'counter' + (len >= 20 ? ' full' : len >= 16 ? ' warn' : '');
   });
-
-  function setMsg(text, kind){
-    $msg.className = 'msg' + (kind ? ' '+kind : '');
-    $msg.textContent = text || '';
-  }
-
-  function setReqMsg(text, kind){
-    const el = document.getElementById('reqMsg');
-    if(!el) return;
-    el.className = 'msg' + (kind ? ' '+kind : '');
-    el.textContent = text || '';
-  }
 
   async function fetchSchools(){
     await new Promise(res => {
@@ -188,35 +345,34 @@
     if(existing) existing.remove();
 
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card card-destaque';
     card.id = 'reqFormCard';
     card.innerHTML = `
-      <h2>✏️ Solicitar edição — <span class="pill">${escapeHtml(sid)}</span></h2>
-      <p>Sua solicitação será enviada para aprovação do ADMIN global.</p>
+      <h2>✏️ Solicitar edição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Sua solicitação será enviada para aprovação do ADMIN global. Caso aprovada, a escola será atualizada instantaneamente!</span></span></h2>
       <div class="form">
         <div class="field">
           <label>Novo nome da escola</label>
           <input id="reqNewName" value="${escapeHtml(currentName)}" placeholder="Nome da escola" autocomplete="off"/>
         </div>
         <div class="field">
-          <label>Novo nome de exibição</label>
+          <label>Novo nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
           <input id="reqNewDisplay" value="${escapeHtml(currentDisplay)}" placeholder="Ex.: E.M. José Cunha" maxlength="20" autocomplete="off"/>
           <div class="field-hint"><span>Máx. 20 caracteres</span><span class="counter" id="reqDisplayCounter">${escapeHtml(currentDisplay)?.length||0}/20</span></div>
         </div>
         <div class="field">
-          <label>schoolId</label>
+          <label>schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
           <input value="${escapeHtml(sid)}" readonly/>
         </div>
         <div style="display:flex;gap:8px;align-items:flex-end;">
           <button class="btn-save" id="btnSendReq" type="button">📨 Enviar</button>
-          <button class="mini" id="btnCancelReq" type="button">Cancelar</button>
+          <button class="btn-save btn-outline" id="btnCancelReq" type="button">Cancelar</button>
         </div>
       </div>
-      <div id="reqFormMsg" class="msg" style="margin-top:10px;"></div>
     `;
 
     const grid = document.querySelector('.grid');
     grid.insertBefore(card, grid.firstElementChild);
+    ajustarDestaque();
     window.scrollTo({top: card.offsetTop - 90, behavior:'smooth'});
 
     card.querySelector('#reqNewDisplay').addEventListener('input', function(){
@@ -230,8 +386,7 @@
     document.getElementById('btnSendReq').addEventListener('click', async () => {
       const newName    = document.getElementById('reqNewName').value.trim();
       const newDisplay = document.getElementById('reqNewDisplay').value.trim();
-      const msgEl      = document.getElementById('reqFormMsg');
-      if(!newName){ msgEl.textContent='Informe o novo nome.'; msgEl.className='msg err'; return; }
+      if(!newName){ setMsg('Informe o novo nome.', 'err'); return; }
 
       // Só entra em 'changes' o que de fato mudou em relação ao valor atual —
       // antes os dois campos eram enviados sempre, porque o formulário já vem
@@ -240,13 +395,13 @@
       if(newName !== (currentName||''))       changes.name = newName;
       if(newDisplay !== (currentDisplay||'')) changes.displayName = newDisplay;
       if(!Object.keys(changes).length){
-        msgEl.textContent = 'Nenhuma alteração para enviar.';
-        msgEl.className = 'msg err';
+        setMsg('Nenhuma alteração para enviar.', 'warn');
         return;
       }
 
       const btn = document.getElementById('btnSendReq');
       btn.disabled = true; btn.textContent = 'Enviando...';
+      setMsg('Enviando solicitação…', 'loading');
       try{
         const session = Auth.getSession();
         await Auth.db.collection('schools').doc(sid).collection('changeRequests').add({
@@ -254,12 +409,10 @@
           requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
           status: 'pending', changes
         });
-        msgEl.textContent = 'Solicitação enviada! Aguarde aprovação do ADMIN.';
-        msgEl.className = 'msg ok';
+        setMsg('Solicitação enviada! Aguarde aprovação do ADMIN.', 'ok');
         btn.textContent = '✅ Enviado';
       }catch(e){
-        msgEl.textContent = 'Erro: '+(e.message||e);
-        msgEl.className = 'msg err';
+        setMsg('Erro: '+(e.message||e), 'err');
         btn.disabled = false; btn.textContent = '📨 Enviar';
       }
     });
@@ -300,10 +453,10 @@
           <td>
             <div class="row-actions">
               ${isMaster ? `
-                <button class="mini" type="button" data-edit="${escapeHtml(sid)}" data-name="${escapeHtml(nm)}" data-display="${escapeHtml(disp)}">Editar</button>
-                <button class="mini" type="button" data-schema-padrao="${escapeHtml(sid)}" title="Cria o schema padrão de Atas se a escola não tiver">Schema padrão</button>
-                <button class="mini danger" type="button" data-del="${escapeHtml(sid)}">Excluir</button>
-              ` : `<button class="mini" type="button" data-req-edit="${escapeHtml(sid)}" data-req-name="${escapeHtml(nm)}" data-req-display="${escapeHtml(disp)}">✏️ Solicitar edição</button>`}
+                <button class="btn-brand-sm" type="button" data-edit="${escapeHtml(sid)}" data-name="${escapeHtml(nm)}" data-display="${escapeHtml(disp)}">Editar</button>
+                <button class="btn-danger-sm" type="button" data-del="${escapeHtml(sid)}">Excluir</button>
+                <button class="btn-brand-sm full" type="button" data-schema-padrao="${escapeHtml(sid)}" title="Cria o schema padrão de Atas se a escola não tiver">Schema padrão</button>
+              ` : `<button class="btn-brand-sm full" type="button" data-req-edit="${escapeHtml(sid)}" data-req-name="${escapeHtml(nm)}" data-req-display="${escapeHtml(disp)}">✏️ Solicitar edição</button>`}
             </div>
           </td>
         `;
@@ -320,8 +473,7 @@
           const len = $display.value.length;
           $counter.textContent = len+'/20';
           $counter.className = 'counter'+(len>=20?' full':len>=16?' warn':'');
-          $id.setAttribute('readonly','readonly');
-          setMsg('Editando '+editingId+'. Ajuste os campos e clique em Salvar.');
+          setMsg('Editando '+editingId+'. Ajuste os campos e clique em Salvar.', 'warn');
           window.scrollTo({top:0, behavior:'smooth'});
         });
       });
@@ -330,11 +482,11 @@
         btn.addEventListener('click', async () => {
           const sid = btn.dataset.schemaPadrao;
           btn.disabled = true;
+          setMsg('Verificando schema padrão…', 'loading');
           try{
             const r = await garantirSchemaPadrao(sid);
-            setMsg(r === 'existia'
-              ? 'A escola '+sid+' já tem o schema padrão de Atas — nada foi alterado.'
-              : 'Schema padrão de Atas criado para '+sid+'.', 'ok');
+            if(r === 'existia') setMsg('A escola '+sid+' já tem o schema padrão de Atas — nada foi alterado.', 'warn');
+            else setMsg('Schema padrão de Atas criado para '+sid+'.', 'ok');
           }catch(e){
             console.error('[admin_escolas] schema padrão:', e);
             setMsg('Falha ao criar o schema padrão: '+(e.message||e), 'err');
@@ -345,8 +497,10 @@
       $tbody.querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const sid = btn.dataset.del;
-          if(!confirm('Excluir a escola '+sid+'?')) return;
+          const okDel = await _confirmModal({ titulo: 'Excluir escola', corpo: escapeHtml('Excluir a escola '+sid+'?'), corDestaque: COR_PERIGO, textoConfirmar: 'Excluir' });
+          if(!okDel) return;
           btn.disabled = true;
+          setMsg('Excluindo escola…', 'loading');
           try{
             await Auth.deleteSchool(sid);
             setMsg('Escola '+sid+' excluída.', 'ok');
@@ -422,11 +576,10 @@
     if(!nm){ $id.value=''; return; }
     $id.value = await makeUniqueSchoolId(slugifySchoolId(nm));
   });
-  $id.addEventListener('input', () => { idDirty = true; });
+  // schoolId é sempre gerado pela página — o campo é readonly (sem edição manual).
 
   $frm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    setMsg('');
     const session  = Auth.getSession();
     const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
     if(!isMaster){ setMsg('Apenas o ADMIN global pode cadastrar escolas.', 'err'); return; }
@@ -454,7 +607,6 @@
       if(schemaOk) setMsg(criando ? 'Escola cadastrada!' : 'Escola atualizada!', 'ok');
       else setMsg('Escola cadastrada, mas o schema padrão de Atas NÃO foi criado. Use o botão "Schema padrão" na lista.', 'err');
       editingId = null; idDirty = false;
-      $id.removeAttribute('readonly');
       $name.value = ''; $id.value = ''; $display.value = '';
       $counter.textContent = '0/20'; $counter.className = 'counter';
       await renderSchoolRows();
@@ -487,10 +639,15 @@
       const snap = await Auth.db.collectionGroup('changeRequests')
         .where('status', '==', 'pending')
         .get();
-      pending = snap.docs.map(d => ({ id: d.id, ref: d.ref, ...d.data() }));
+      pending = snap.docs
+        .map(d => ({ id: d.id, ref: d.ref, ...d.data() }))
+        // 'delete_user' é tratado na aba "Exclusões" de cadastro_admin.html; aqui
+        // aprovar só marcaria como aprovada sem excluir ninguém.
+        .filter(r => r.type !== 'delete_user');
     }catch(e){
       console.error('[admin_escolas] refreshApprovals:', e);
       $tbodyReq.innerHTML = '<tr><td colspan="4" style="color:var(--muted);">Erro ao carregar solicitações.</td></tr>';
+      setMsg('Erro ao carregar solicitações: '+(e.message||e), 'err');
       return;
     }
 
@@ -507,8 +664,8 @@
         <td>${escapeHtml(Object.entries(r.changes||{}).map(([k,v])=>k+': '+v).join(' | ')||'—')}</td>
         <td>
           <div class="row-actions">
-            <button class="mini" type="button" data-approve="${escapeHtml(r.id)}">Aprovar</button>
-            <button class="mini danger" type="button" data-reject="${escapeHtml(r.id)}">Reprovar</button>
+            <button class="btn-approve" type="button" data-approve="${escapeHtml(r.id)}">Aprovar</button>
+            <button class="btn-danger-sm" type="button" data-reject="${escapeHtml(r.id)}">Reprovar</button>
           </div>
         </td>
       </tr>
@@ -526,7 +683,7 @@
         const req = findReq(btn.dataset.approve);
         if(!req) return;
         const rowBtns = lockRow(btn);
-        setReqMsg('');
+        setMsg('Aprovando solicitação…', 'loading');
         try{
           const changes = req.changes || {};
           const update = {};
@@ -540,12 +697,12 @@
             resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
             resolvedBy: session?.email || session?.uid || ''
           });
-          setReqMsg('Solicitação aprovada e escola atualizada.', 'ok');
+          setMsg('Solicitação aprovada e escola atualizada.', 'ok');
           await renderSchoolRows();
           await refreshApprovals();
         }catch(e){
           console.error('[admin_escolas] approve:', e);
-          setReqMsg('Erro ao aprovar: '+(e.message||e), 'err');
+          setMsg('Erro ao aprovar: '+(e.message||e), 'err');
           rowBtns.forEach(b => b.disabled = false);
         }
       });
@@ -555,20 +712,21 @@
       btn.addEventListener('click', async () => {
         const req = findReq(btn.dataset.reject);
         if(!req) return;
-        if(!confirm('Reprovar esta solicitação?')) return;
+        const okRej = await _confirmModal({ titulo: 'Reprovar solicitação', corpo: escapeHtml('Reprovar esta solicitação?'), textoConfirmar: 'Reprovar' });
+        if(!okRej) return;
         const rowBtns = lockRow(btn);
-        setReqMsg('');
+        setMsg('Reprovando solicitação…', 'loading');
         try{
           await req.ref.update({
             status: 'rejected',
             resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
             resolvedBy: session?.email || session?.uid || ''
           });
-          setReqMsg('Solicitação reprovada.', 'ok');
+          setMsg('Solicitação reprovada.', 'ok');
           await refreshApprovals();
         }catch(e){
           console.error('[admin_escolas] reject:', e);
-          setReqMsg('Erro ao reprovar: '+(e.message||e), 'err');
+          setMsg('Erro ao reprovar: '+(e.message||e), 'err');
           rowBtns.forEach(b => b.disabled = false);
         }
       });
@@ -582,10 +740,13 @@
       const card = $frm?.closest('.card');
       if(card) card.style.display = 'none';
     }
-    await renderSchoolRows();
-    await refreshApprovals();
-
-    Loading.esconder(); // ← linha adicionada
+    try{
+      await renderSchoolRows();
+      await refreshApprovals();
+    } finally {
+      ajustarDestaque();
+      try{ Loading.esconder(); }catch(_){}
+    }
   }, { once: true });
 
   document.addEventListener('auth:sessionChanged', renderSchoolRows);
