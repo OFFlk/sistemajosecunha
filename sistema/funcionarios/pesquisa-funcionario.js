@@ -346,6 +346,7 @@
 
     lista.innerHTML = '';
     filtrados.forEach(f => {
+      try{
       const nasc  = formatDate(f.dataNascimento) || '—';
       const idade = calcAge(f.dataNascimento) || '—';
       const ch    = f.cargaHoraria ? escapeHtml(f.cargaHoraria) + 'H' : '—';
@@ -383,6 +384,7 @@
         </div>
       `;
       lista.appendChild(el);
+      }catch(err){ console.error('renderLista: erro no registro', f && f.funcId, err); }
     });
 
     bindFuncionarioSelectionHandlers();
@@ -635,11 +637,14 @@
     document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open'));
   });
 
+  // Contraste do texto do card de destaque (cálculo centralizado em theme-colors.js).
+  // Isolado em try/catch: um problema visual nunca pode impedir o carregamento da lista.
+  try{
+    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+  }catch(e){ console.warn('ajustarContraste:', e); }
+
   (async function init(){
     try{
-      // Contraste do texto do card de destaque (cálculo centralizado em theme-colors.js)
-      if(window.ThemeColors) ThemeColors.ajustarContraste();
-
       await carregarDB();
       await carregarAnoAtivo();
       // garantia: aplicarFiltros depois de ambos estarem prontos
