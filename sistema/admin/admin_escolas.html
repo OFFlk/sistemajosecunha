@@ -404,16 +404,25 @@ html[data-theme="dark"] .btn-approve { color: #4ade80; border-color: rgba(74,222
       const btn = document.getElementById('btnSendReq');
       btn.disabled = true; btn.textContent = 'Enviando...';
       setMsg('Enviando solicitação…', 'loading');
+      let payload = null;
       try{
         const session = Auth.getSession();
-        await Auth.db.collection('schools').doc(sid).collection('changeRequests').add({
+        payload = {
           schoolId: sid, requestedBy: session?.email||session?.uid||'',
           requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
           status: 'pending', changes
-        });
+        };
+        await Auth.db.collection('schools').doc(sid).collection('changeRequests').add(payload);
         setMsg('Solicitação enviada! Aguarde aprovação do ADMIN.', 'ok');
         btn.textContent = '✅ Enviado';
       }catch(e){
+        // Diagnóstico: mostra código do erro + exatamente o que foi enviado,
+        // pra comparar com o que as Rules de changeRequests aceitam.
+        console.error('[admin_escolas] solicitar edição falhou:', {
+          code: e && e.code, message: e && e.message,
+          path: 'schools/'+sid+'/changeRequests', payload,
+          sessao: (function(){ const x = Auth.getSession() || {}; return { uid: x.uid, role: x.role, schoolId: x.schoolId }; })()
+        });
         setMsg('Erro: '+(e.message||e), 'err');
         btn.disabled = false; btn.textContent = '📨 Enviar';
       }
