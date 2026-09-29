@@ -28,6 +28,14 @@
 <link rel="stylesheet" href="/css/hub.css">
 
 <title>Funcionários • Menu</title>
+
+<style>
+/* Badge de acesso restrito: preenchimento de marca + texto calculado (--brand-fg).
+   Antes: fundo = variação de --brand e texto = --brand, o que perdia contraste em várias cores.
+   (Se outros hubs usam o mesmo .card-badge, o lugar certo dessa regra é o hub.css.) */
+.card .card-badge{ background:var(--brand); border-color:var(--brand); color:var(--brand-fg,#fff); }
+html[data-theme="dark"] .card .card-badge{ background:var(--brand-d); border-color:var(--brand-d); color:var(--brand-fg,#fff); }
+</style>
 </head>
 <body>
 
@@ -41,7 +49,7 @@
   <div class="grid grid-config">
 
     <a class="card" id="cardCadastroFunc" href="cadastro-funcionario.html">
-      <span class="card-badge">Admin</span>
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">📋</div>
       <div class="card-title">Cadastro de funcionários</div>
       <div class="card-footer">
@@ -49,7 +57,8 @@
       </div>
     </a>
 
-    <a class="card" href="pesquisa-funcionario.html">
+    <a class="card" id="cardPesquisaFunc" href="pesquisa-funcionario.html">
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🔎</div>
       <div class="card-title">Pesquisa / Lista</div>
       <div class="card-footer">
@@ -74,14 +83,17 @@ document.addEventListener('auth:ready', function () {
     : null;
   var role = session ? String(session.role || '').trim().toLowerCase() : '';
 
-  ['cardCadastroFunc'].forEach(function (id) {
+  // Admin e gestor acessam; só o usuário comum fica de fora.
+  var ROLES_PERMITIDOS = ['admin', 'gestor'];
+
+  ['cardCadastroFunc', 'cardPesquisaFunc'].forEach(function (id) {
     var card = document.getElementById(id);
     if (!card) return;
-    if (role !== 'admin') {
+    if (ROLES_PERMITIDOS.indexOf(role) === -1) {
       card.removeAttribute('href');
       card.classList.add('disabled');
       card.setAttribute('data-tooltip', 'Sem acesso');
-      card.title = 'Acesso restrito a administradores';
+      card.title = 'Acesso restrito a administradores e gestores';
     }
   });
 
@@ -107,7 +119,8 @@ document.addEventListener('auth:ready', function () {
   function stylesBubble(b) {
     var bc = getBrandColor();
     b.style.background = bc.color;
-    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+    var fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
+    b.style.color      = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
   }
 
   function initBubble(b) {
