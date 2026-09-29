@@ -107,6 +107,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
   <div class="grid grid-atas" style="margin-bottom: 28px;">
 
     <a class="card" id="cardBackup" href="admin_backup.html">
+      <span class="card-badge">Admin</span>
       <div class="card-icon">💾</div>
       <div class="card-title">Backup e restaurar</div>
       <div class="card-footer">
@@ -115,6 +116,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
     </a>
 
     <a class="card" href="cadastro_admin.html">
+      <span class="card-badge">Admin</span>
       <div class="card-icon">👥</div>
       <div class="card-title">Usuários e permissões</div>
       <div class="card-footer">
@@ -123,6 +125,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
     </a>
 
     <a class="card" href="admin_escolas.html">
+      <span class="card-badge">Admin</span>
       <div class="card-icon">🏫</div>
       <div class="card-title">Cadastro de escolas</div>
       <div class="card-footer">
@@ -131,6 +134,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
     </a>
 
     <a class="card" href="../admin/idaluno.html">
+      <span class="card-badge">Admin</span>
       <div class="card-icon">🆔</div>
       <div class="card-title">Configuração de IDs</div>
       <div class="card-footer">
@@ -333,7 +337,7 @@ async function initAnoAtivo(){
 function normNome(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' '); }
 function contarAlunosUnicosEmTurmas(turmas){ const set=new Set(); for(const t of(Array.isArray(turmas)?turmas:[])){ if(!Array.isArray(t?.alunos)) continue; for(const al of t.alunos){ const id=String(al?.alunoId||'').trim(); if(id) set.add('id:'+id); else{ const n=normNome(al?.nome); if(n) set.add('nome:'+n); } } } return set.size; }
 
-const STATUS_COLS = ['turmas','alunos-atas','matriculas','atas','atasSchemas','schemasCH',
+const STATUS_COLS = ['turmas','alunos-atas','matriculas','atas','atasSchemas',
                      'anoAtivoTurmas','anoAtivoAlunos','anoAtivoMatriculas','funcionarios','alunos'];
 
 function _escolaAtiva(){
@@ -378,7 +382,7 @@ async function renderMeta(tentativa){
     metaEl.innerHTML=`
       <div class="meta-line"><b>Ano ativo —</b> Turmas: ${n.anoAtivoTurmas} &nbsp;•&nbsp; Alunos: ${n.anoAtivoAlunos} &nbsp;•&nbsp; Matrículas: ${n.anoAtivoMatriculas}</div>
       <div class="meta-line"><b>Atas (histórico) —</b> Turmas: ${n.turmas} &nbsp;•&nbsp; Alunos nas turmas: ${docs.turmas?contarAlunosUnicosEmTurmas(docs.turmas):'—'} &nbsp;•&nbsp; Alunos no catálogo: ${n['alunos-atas']} &nbsp;•&nbsp; Matrículas: ${n.matriculas} &nbsp;•&nbsp; Atas: ${n.atas} &nbsp;•&nbsp; Schemas de ata: ${n.atasSchemas}</div>
-      <div class="meta-line"><b>Outros —</b> Schemas CH: ${n.schemasCH} &nbsp;•&nbsp; Funcionários: ${n.funcionarios} &nbsp;•&nbsp; Vínculos de aluno: ${n.alunos}</div>
+      <div class="meta-line"><b>Outros —</b> Funcionários: ${n.funcionarios} &nbsp;•&nbsp; Vínculos entre módulos: ${n.alunos}</div>
     `;
   }catch(e){
     console.error('[admin] renderMeta falhou (tentativa '+(tentativa+1)+'):', e);
