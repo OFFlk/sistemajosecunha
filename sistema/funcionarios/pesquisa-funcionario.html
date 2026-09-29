@@ -31,6 +31,81 @@
 <link rel="stylesheet" href="/css/pesquisa-funcionario.css">
 
 <style>
+/* ── Aliases de marca (par claro/escuro) — mesmos nomes do cadastro-funcionario ──
+   var(--primary, #7c3aed) não existe no sistema (caía sempre no roxo fixo). */
+:root{
+  --pf-brand:var(--brand,#7c3aed);
+  --pf-brand-text:var(--brand-text,#6d28d9);
+  --pf-brand-faded:var(--brand-faded,#f5f3ff);
+  --pf-brand-border:var(--brand-border,#ddd6fe);
+}
+html[data-theme="dark"]{
+  --pf-brand:var(--brand-d,#8b5cf6);
+  --pf-brand-text:var(--brand-text-d,#c4b5fd);
+  --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
+  --pf-brand-border:var(--brand-border-d,#7c3aed);
+}
+
+/* ── Card de destaque (guia, Parte 1.3b) — contraste vem de ThemeColors.ajustarContraste() ── */
+.card.card-destaque{
+  --dest-fg:#ffffff;
+  --dest-btn-bg:rgba(255,255,255,.18);
+  --dest-btn-bd:rgba(255,255,255,.40);
+  --dest-btn-hover:rgba(255,255,255,.28);
+  --dest-panel-bg:rgba(255,255,255,.10);
+  background:var(--btn-home-bg); border-color:var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); border-color:var(--btn-home-border); }
+.card.card-destaque.contraste-claro{
+  --dest-fg:#0f172a;
+  --dest-btn-bg:rgba(0,0,0,.08);
+  --dest-btn-bd:rgba(0,0,0,.25);
+  --dest-btn-hover:rgba(0,0,0,.16);
+  --dest-panel-bg:rgba(0,0,0,.06);
+  border-color:var(--border);
+}
+.card.card-destaque h2{ color:var(--dest-fg); }
+/* só o rótulo direto do campo: os <label> dentro dos chips de turno herdam a cor do chip */
+.card-destaque .field > label{ color:var(--dest-fg); }
+.card.card-destaque .btn.primary{ background:var(--dest-btn-bg); border:1.5px solid var(--dest-fg); color:var(--dest-fg); font-weight:800; }
+.card.card-destaque .btn.primary:hover:not(:disabled){ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
+.card.card-destaque .btn.secondary, .card.card-destaque .btn.ghost{ background:transparent; border:1.5px solid var(--dest-btn-bd); color:var(--dest-fg); }
+.card.card-destaque .btn.secondary:hover:not(:disabled), .card.card-destaque .btn.ghost:hover:not(:disabled){ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
+.card.card-destaque .btn:disabled, .card.card-destaque .btn:disabled:hover{
+  background:rgba(128,128,128,.28); border:1.5px solid rgba(128,128,128,.5); color:#6b7280; opacity:1; cursor:not-allowed; filter:none; box-shadow:none;
+}
+/* Chips de turno dentro do destaque: o "marcado" antes era só uma borda --brand (some contra o próprio card).
+   Agora: contorno translúcido; marcado = preenchimento sólido com o texto na cor do card (par calculado). */
+.card.card-destaque .turno-checkbox-wrap{ background:transparent; border-color:var(--dest-btn-bd); color:var(--dest-fg); }
+.card.card-destaque .turno-checkbox-wrap:hover{ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
+.card.card-destaque .turno-checkbox-wrap.checked{ background:var(--dest-fg); border-color:var(--dest-fg); color:var(--btn-home-bg); }
+.card.card-destaque .turno-checkbox-wrap.checked input[type="checkbox"]{ accent-color:var(--btn-home-bg); }
+.ano-erro{ margin-top:6px; font-size:12px; font-weight:700; color:var(--dest-fg); }
+
+/* ── Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2) ── */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card); border:1.5px solid var(--border); color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal; line-height:1.4;
+  white-space:normal; cursor:default; text-align:left; text-transform:none; letter-spacing:normal;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+
+/* ── Contador de resultados: badge com destaque (substitui o log "X funcionário(s) encontrado(s)") ── */
+#countFuncionarios{
+  font-size:14px; font-weight:800; padding:5px 14px;
+  background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff);
+}
+
 /* ══ Padrão de exibição do sistema — adaptado de pesquisa-ano-ativo ══ */
 
 /* ── Painel único (sem "turma", diferente do aluno) ── */
@@ -50,7 +125,15 @@
 /* Sempre 3 blocos empilhados: nome / badges / meta-dados — não depende da largura */
 .item .title    { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 14px; }
 .item .nome     { font-weight: 800; }
-.item .badges   { display: flex; flex-wrap: wrap; gap: 6px; }
+.item .badges   { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.item .badges .badge { margin: 0; }
+/* CPF: neutro (cinza do tema), pra se distinguir do badge de cargo, que é tingido de marca */
+.item .badge.badge-cpf { background: color-mix(in srgb, var(--text) 8%, transparent); border-color: color-mix(in srgb, var(--text) 24%, transparent); color: var(--text); }
+.item .meta-i { white-space: nowrap; }
+/* Botões do card: mesma largura, empilhados */
+.item .right { align-items: stretch; min-width: 112px; }
+.item .right .btn { justify-content: center; }
+.item .right .check { justify-content: center; }
 .item .meta  { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 
 /* ── Seleção do card inteiro (checkbox oculto) — mesmo padrão do módulo de aluno ── */
@@ -68,68 +151,39 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
   display: none;
   position: absolute; bottom: 10px; right: 10px;
   width: 22px; height: 22px; border-radius: 50%;
-  background: var(--brand, #6d28d9); color: #fff;
+  background: var(--pf-brand); color: var(--brand-fg, #fff);
   align-items: center; justify-content: center;
   font-size: 12px; font-weight: 900; line-height: 1;
 }
 .item.selecionavel:has(.chkFuncionario:checked) .selo-selecionado { display: flex; }
 .check           { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
-.check input     { cursor: pointer; accent-color: var(--brand); width: 18px; height: 18px; margin: 0; }
+.check input     { cursor: pointer; accent-color: var(--pf-brand); width: 18px; height: 18px; margin: 0; }
 .check-all       { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 700; cursor: pointer; }
-.check-all input { cursor: pointer; accent-color: var(--brand); }
-.count-selecionados { background: var(--brand-faded); border: 1px solid var(--brand-border, #ddd6fe); color: var(--brand-text, var(--brand)); }
+.check-all input { cursor: pointer; accent-color: var(--pf-brand); }
+.count-selecionados { background: var(--pf-brand-faded); border: 1px solid var(--pf-brand-border); color: var(--pf-brand-text); }
 
 /* ── Ordenação ── */
 .sort-control        { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--chip-bg); border: 1px solid var(--card-border, var(--border)); border-radius: 10px; }
 .sort-control label  { font-size: 13px; font-weight: 700; color: var(--chip-color, var(--text)); white-space: nowrap; }
 .sort-control select { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--field-border, var(--border)); background: var(--field-bg, var(--card)); color: var(--text); font-size: 13px; font-family: 'Nunito', sans-serif; cursor: pointer; outline: none; }
-.sort-control select:focus { border-color: var(--primary, #7c3aed); }
+.sort-control select:focus { border-color: var(--pf-brand); }
 .sort-control button { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border, var(--border)); background: var(--chip-bg); color: var(--chip-color, var(--text)); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; transition: all .18s; }
-.sort-control button:hover { background: var(--primary, #7c3aed); border-color: var(--primary, #7c3aed); color: #fff; }
+.sort-control button:hover { background: var(--pf-brand); border-color: var(--pf-brand); color: var(--brand-fg, #fff); }
 
-/* ── Botão editar — mesmo estilo do módulo de aluno (.btn-edit) ── */
-.btn-edit {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: 10px;
-  border: 1.5px solid var(--primary, #7c3aed);
-  background: rgba(124,58,237,.12);
-  color: var(--primary, #7c3aed);
-  cursor: pointer; font-weight: 700; font-size: 12px;
-  font-family: 'Nunito', sans-serif; white-space: nowrap; text-decoration: none;
-  transition: background .18s, border-color .18s, color .18s;
-}
-.btn-edit:hover { background: var(--primary, #7c3aed); color: #fff; }
-
-/* ── Botão visualizar (ficha) ── */
-.btn-view {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: 10px;
-  border: 1.5px solid var(--card-border, var(--border));
-  background: var(--chip-bg);
-  color: var(--chip-color, var(--text));
-  cursor: pointer; font-weight: 700; font-size: 12px;
-  font-family: 'Nunito', sans-serif; white-space: nowrap;
-  transition: background .18s, border-color .18s, color .18s;
-}
-.btn-view:hover { background: var(--primary, #7c3aed); border-color: var(--primary, #7c3aed); color: #fff; }
+/* ── Botões do card de funcionário: agora são .btn.small do sistema.
+   Editar = .btn.secondary (tingido de marca, hover já tem par escuro); Visualizar = .btn.neutral ── */
+.btn.neutral { background: transparent; border-color: var(--border); color: var(--text); }
+.btn.neutral:hover { background: var(--pf-brand-faded); border-color: var(--pf-brand); color: var(--pf-brand-text); }
+.link-doc-ver { font-size: 12px; font-weight: 800; color: var(--pf-brand-text); text-decoration: none; }
+.link-doc-ver:hover { text-decoration: underline; }
 
 /* ── Badge de vínculo — cores por status ── */
 .badge-status.ce { background: rgba(234,179,8,.10);  border-color: rgba(234,179,8,.35);  color: #854d0e; }
 .badge-status.ps { background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.35); color: #1d4ed8; }
 .badge-status.ef { background: rgba(22,163,74,.10);  border-color: rgba(22,163,74,.30);  color: #166534; }
 
-/* ── Ano ativo (badge + help) ── */
-.help { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 14px; }
-.pill-ano-ativo {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(124,58,237,.10); border: 1.5px solid rgba(124,58,237,.30);
-  color: var(--primary, #7c3aed); padding: 8px 16px; border-radius: 999px;
-  font-size: 13px; font-weight: 800; white-space: nowrap;
-}
-.pill-ano-ativo b { font-weight: 900; }
-
 /* ── Modal (ficha do funcionário) ── */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 1000; /* acima do header */ }
 .modal-backdrop.open { display: flex; }
 .modal          { width: min(900px, 96vw); max-height: 86vh; overflow: auto; background: var(--card-bg, var(--card)); border-radius: 14px; border: 1px solid var(--card-border, var(--border)); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
 .modal-head     { position: sticky; top: 0; background: var(--card-bg, var(--card)); display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border, var(--border)); }
@@ -155,23 +209,17 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
   <!-- ══════════════════════════════════════════
        CARD: Filtros de Pesquisa
   ══════════════════════════════════════════ -->
-  <section class="card" id="cardFiltros">
+  <section class="card card-destaque" id="cardFiltros">
     <div class="card-head">
-      <div>
-        <h2>Filtros de pesquisa</h2>
-        <p class="sub">Busque por nome, CPF, função ou filtre por status e turno</p>
-      </div>
-      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <div class="pill pill-ano-ativo">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
-      </div>
+      <h2>Filtros de pesquisa</h2>
     </div>
 
     <!-- Ano Ativo -->
     <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
       <div class="field" style="width:220px;flex:0 0 220px;margin:0;">
-        <label for="selectAnoAtivo">Ano letivo</label>
+        <label for="selectAnoAtivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ano letivo é preenchido automaticamente com o ano atual selecionado pelo administrador. Caso queira fazer um cadastro de anos anteriores ou futuros, selecione manualmente o ano em questão!</span></span></label>
         <select id="selectAnoAtivo" style="width:100%;"></select>
-        <div class="help" id="anoAtivoMsg">Por padrão, usa o ano ativo detectado.</div>
+        <div class="ano-erro" id="anoAtivoMsg" style="display:none;"></div>
       </div>
     </div>
 
@@ -209,7 +257,7 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
 
     <!-- Filtro de Turnos -->
     <div style="margin-top:16px;">
-      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;">Turno</label>
+      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:8px;color:var(--dest-fg);opacity:.85;text-transform:uppercase;letter-spacing:0.4px;">Turno</label>
       <div class="turnos-row">
         <label class="turno-checkbox-wrap" id="lblFMat">
           <input type="checkbox" id="fMat" value="MAT"/>
@@ -227,20 +275,9 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
       </div>
     </div>
 
-    <!-- Stats Pills -->
-    <div class="stats-row" id="statsRow" style="display:none;margin-top:14px;">
-      <div class="badge">Exibindo: <strong id="statExib">0</strong></div>
-      <div class="badge">Matutino: <strong id="statMat">0</strong></div>
-      <div class="badge">Vespertino: <strong id="statVes">0</strong></div>
-      <div class="badge">Noturno: <strong id="statNot">0</strong></div>
-      <div class="badge">CE: <strong id="statCE">0</strong></div>
-      <div class="badge">PS: <strong id="statPS">0</strong></div>
-      <div class="badge">EF: <strong id="statEF">0</strong></div>
-    </div>
-
     <!-- Ação: Limpar Filtros -->
     <div class="filter-actions" style="margin-top:16px;">
-      <button class="btn danger" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
+      <button class="btn ghost" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
     </div>
   </section>
 
@@ -270,8 +307,6 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
         </div>
       </div>
     </div>
-
-    <p class="sub" id="subResultados" style="margin:-4px 0 12px;">Carregando funcionários...</p>
 
     <div class="sort-control">
       <label>Ordenar por:</label>

@@ -96,7 +96,6 @@
   ══════════════════════════════════════════ */
   const selectAnoAtivo = document.getElementById('selectAnoAtivo');
   const anoAtivoMsg    = document.getElementById('anoAtivoMsg');
-  const lblAnoAtivo    = document.getElementById('lblAnoAtivo');
   let anoAtivoReal = ''; // ano ativo real, configurado no sistema
 
   function atualizarAnoEfetivo(){
@@ -111,7 +110,6 @@
       });
       const dados = await window.DB.loadAll();
       anoAtivoReal = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
-      lblAnoAtivo.textContent = anoAtivoReal || '—';
 
       // Monta as opções do select só com anos que realmente têm dados
       // (mesma lógica de pesquisa-ano-ativo: nada de intervalo fixo)
@@ -121,21 +119,21 @@
       const anos = Array.from(anosSet).filter(Boolean).sort((a,b) => Number(a) - Number(b));
 
       selectAnoAtivo.innerHTML = '';
-      const optAuto = document.createElement('option');
-      optAuto.value = ''; optAuto.textContent = '(usar ano ativo)';
-      selectAnoAtivo.appendChild(optAuto);
       anos.forEach(y => {
         const o = document.createElement('option');
         o.value = y; o.textContent = y;
         selectAnoAtivo.appendChild(o);
       });
-      selectAnoAtivo.value = '';
+      // Abre já no ano ativo (não existe mais a opção "(usar ano ativo)");
+      // sem ano ativo configurado, cai no mais recente.
+      selectAnoAtivo.value = anos.includes(anoAtivoReal) ? anoAtivoReal : (anos[anos.length - 1] || '');
 
       atualizarAnoEfetivo();
       popularSelects();
     }catch(e){
       console.warn('carregarAnoAtivo:', e);
-      anoAtivoMsg.textContent = 'Não foi possível carregar o ano ativo.';
+      anoAtivoMsg.textContent = '⚠️ Não foi possível carregar o ano ativo.';
+      anoAtivoMsg.style.display = 'block';
     }
   }
 
@@ -211,8 +209,6 @@
   const turnoHint  = document.getElementById('turnoHint');
   const lista      = document.getElementById('listaFuncionarios');
   const countEl    = document.getElementById('countFuncionarios');
-  const subRes     = document.getElementById('subResultados');
-  const statsRow   = document.getElementById('statsRow');
   const sortFieldEl = document.getElementById('sortField');
   const btnToggleSort = document.getElementById('btnToggleSort');
   const chkAllFuncionarios  = document.getElementById('chkAllFuncionarios');
@@ -291,7 +287,6 @@
     });
 
     aplicarOrdenacao();
-    atualizarStats();
     renderLista();
   }
 
@@ -334,30 +329,6 @@
   });
 
   /* ══════════════════════════════════════════
-     Stats
-  ══════════════════════════════════════════ */
-  function atualizarStats(){
-    const total = filtrados.length;
-    document.getElementById('statExib').textContent = total;
-    document.getElementById('statMat').textContent = filtrados.filter(f=>Array.isArray(f.turnos)&&f.turnos.includes('MAT')).length;
-    document.getElementById('statVes').textContent = filtrados.filter(f=>Array.isArray(f.turnos)&&f.turnos.includes('VES')).length;
-    document.getElementById('statNot').textContent = filtrados.filter(f=>Array.isArray(f.turnos)&&f.turnos.includes('NOT')).length;
-    document.getElementById('statCE').textContent  = filtrados.filter(f=>f.status==='CE').length;
-    document.getElementById('statPS').textContent  = filtrados.filter(f=>f.status==='PS').length;
-    document.getElementById('statEF').textContent  = filtrados.filter(f=>f.status==='EF').length;
-    statsRow.style.display = total > 0 ? 'flex' : 'none';
-
-    const total_func = getFuncionariosDoAno().length;
-    if(total_func === 0){
-      subRes.textContent = 'Nenhum funcionário cadastrado ainda.';
-    } else if(total === total_func){
-      subRes.textContent = `${total} funcionário(s) encontrado(s).`;
-    } else {
-      subRes.textContent = `${total} de ${total_func} funcionário(s) corresponde(m) aos filtros.`;
-    }
-  }
-
-  /* ══════════════════════════════════════════
      Render lista (cards) — padrão do sistema, sem paginação
      (lista sempre exibe todos os filtrados, igual ao módulo de aluno)
   ══════════════════════════════════════════ */
@@ -375,9 +346,19 @@
 
     lista.innerHTML = '';
     filtrados.forEach(f => {
-      const nat   = [f.naturalidadeCidade || f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
       const nasc  = formatDate(f.dataNascimento) || '—';
       const idade = calcAge(f.dataNascimento) || '—';
+      const ch    = f.cargaHoraria ? escapeHtml(f.cargaHoraria) + 'H' : '—';
+      const vinc  = escapeHtml(STATUS_LABEL[f.status] || f.status || '—');
+      // Resumo do card: só o essencial. Sexo, cor/raça e naturalidade ficam só na ficha (Visualizar).
+      const meta = [
+        `Nasc: ${escapeHtml(nasc)}`,
+        `RG/CNH: ${highlight(f.rgCnh, query)}`,
+        `Idade: ${escapeHtml(idade)}`,
+        `Turnos: ${escapeHtml(turnosTexto(f.turnos))}`,
+        `C.H.: ${ch}`,
+        `Vínculo: ${vinc}`
+      ].map(t => `<span class="meta-i">${t}</span>`).join(' • ');
       const el    = document.createElement('div');
       el.className = 'item selecionavel';
       el.innerHTML = `
@@ -387,20 +368,14 @@
             <span class="nome">${highlight(f.nome, query) || 'Sem nome'}</span>
             <div class="badges">
               <span class="badge">${highlight(f.funcao, query) || 'Sem função'}</span>
-              ${f.cargaHoraria ? `<span class="badge">${escapeHtml(f.cargaHoraria)}H</span>` : ''}
-              <span class="badge badge-status ${f.status ? f.status.toLowerCase() : ''}">${escapeHtml(STATUS_LABEL[f.status]||f.status||'—')}</span>
+              <span class="badge badge-cpf">CPF: ${highlight(f.cpf, query)}</span>
             </div>
           </div>
-          <div class="meta">
-            CPF: ${highlight(f.cpf, query) || '—'} • RG/CNH: ${highlight(f.rgCnh, query) || '—'} •
-            Nasc: ${escapeHtml(nasc)} • Idade: ${escapeHtml(idade)} • Sexo: ${escapeHtml(SEXO_LABEL[f.sexo]||f.sexo||'—')}
-            <br>Naturalidade: ${highlight(nat, query)} • Cor/Raça: ${escapeHtml(f.corRaca||'—')} •
-            Turnos: ${escapeHtml(turnosTexto(f.turnos))}
-          </div>
+          <div class="meta">${meta}</div>
         </div>
         <div class="right">
-          <a class="btn-edit" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
-          <button type="button" class="btn-view" data-view-func="${escapeHtml(f.funcId)}">👁️ Visualizar</button>
+          <a class="btn small secondary" href="cadastro-funcionario.html?editar=${encodeURIComponent(f.funcId)}">✏️ Editar</a>
+          <button type="button" class="btn small neutral" data-view-func="${escapeHtml(f.funcId)}">👁️ Visualizar</button>
           <label class="check">
             <input type="checkbox" class="chkFuncionario" data-func="${escapeHtml(f.funcId)}" />
             <span>Selecionar</span>
@@ -638,7 +613,7 @@
         return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--card-border,var(--border));">
           <span>${icon}</span>
           <span style="flex:1;font-size:13px;">${escapeHtml(f.label||f.fileName)}</span>
-          <a href="${f.webViewLink}" target="_blank" rel="noopener" style="font-size:12px;font-weight:800;color:var(--primary,#7c3aed);text-decoration:none;">👁️ Ver</a>
+          <a href="${f.webViewLink}" target="_blank" rel="noopener" class="link-doc-ver">👁️ Ver</a>
         </div>`;
       }).join('');
     }catch(e){
@@ -655,8 +630,16 @@
   /* ══════════════════════════════════════════
      Init
   ══════════════════════════════════════════ */
+  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open'));
+  });
+
   (async function init(){
     try{
+      // Contraste do texto do card de destaque (cálculo centralizado em theme-colors.js)
+      if(window.ThemeColors) ThemeColors.ajustarContraste();
+
       await carregarDB();
       await carregarAnoAtivo();
       // garantia: aplicarFiltros depois de ambos estarem prontos
