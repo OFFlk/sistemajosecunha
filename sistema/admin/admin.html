@@ -69,6 +69,8 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
 .card-destaque .btn-save { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
 .card-destaque .btn-save:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
 .card-destaque .btn-save:disabled { opacity: .6; cursor: not-allowed; }
+/* Ano ativo em badge (destaque pela caixa, não pelo tamanho da fonte). */
+.ano-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 76px; padding: 9px 16px; border-radius: 10px; font-size: 14px; font-weight: 800; background: var(--dest-btn-bg); border: 1px solid var(--dest-btn-bd); color: var(--dest-fg); }
 
 .btn-neutral { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 10px; background: var(--pop-bg); border: 1px solid var(--pop-border); color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; }
 .btn-neutral:hover { background: var(--chip-bg); }
@@ -151,7 +153,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
       <div class="field-inline">
         <div>
           <label>Ano ativo atual</label>
-          <b id="lblAnoAtivoAdmin" style="font-size:22px;display:block;">—</b>
+          <span id="lblAnoAtivoAdmin" class="ano-badge">—</span>
         </div>
         <div>
           <label>Definir novo ano</label>
@@ -346,11 +348,23 @@ function _escolaAtiva(){
   return String(id||'').trim();
 }
 
-async function renderMeta(){
+// Espera o Auth de verdade (Auth.db + login do Firebase) — só ter a sessão local
+// não basta: ler o Firestore antes disso falha na primeira carga da página.
+function _authPronto(){
+  return new Promise(res=>{
+    let feito=false; const ok=()=>{ if(!feito){ feito=true; res(); } };
+    if(window.Auth && typeof Auth.onReady==='function'){ Auth.onReady(ok); return; }
+    if(window.Auth && Auth.getSession && Auth.getSession()) return ok();
+    document.addEventListener('auth:ready',ok,{once:true});
+  });
+}
+
+async function renderMeta(tentativa){
+  tentativa = tentativa || 0;
   const metaEl=document.getElementById('dbMeta');
   const originEl=document.getElementById('origin'); if(originEl) originEl.textContent=location.origin;
   try{
-    await new Promise(res=>{ if(window.Auth&&window.Auth.getSession&&window.Auth.getSession()) return res(); document.addEventListener('auth:ready',res,{once:true}); });
+    await _authPronto();
     const sid=_escolaAtiva();
     // Admin global sem escola escolhida: 'ADMIN' é um marcador, não uma escola — não há o que contar.
     if(!sid || sid.toUpperCase()==='ADMIN'){
@@ -359,6 +373,8 @@ async function renderMeta(){
     }
     const base = window.Auth.db.collection('schools').doc(sid);
     const res = await Promise.allSettled(STATUS_COLS.map(c => base.collection(c).get()));
+    // Se NENHUMA coleção respondeu, não é "uma coleção negada": é falha geral.
+    if(res.every(r => r.status==='rejected')) throw res[0].reason;
     const docs = {}, n = {};
     STATUS_COLS.forEach((c,i)=>{
       if(res[i].status==='fulfilled'){ docs[c]=res[i].value.docs.map(d=>d.data()); n[c]=docs[c].length; }
@@ -370,8 +386,9 @@ async function renderMeta(){
       <div class="meta-line"><b>Outros —</b> Schemas CH: ${n.schemasCH} &nbsp;•&nbsp; Funcionários: ${n.funcionarios} &nbsp;•&nbsp; Vínculos de aluno: ${n.alunos}</div>
     `;
   }catch(e){
-    console.error('[admin] renderMeta falhou:', e);
-    metaEl.innerHTML='<div class="meta-line">⚠️ Não foi possível ler o Firestore. Verifique o login.</div>';
+    console.error('[admin] renderMeta falhou (tentativa '+(tentativa+1)+'):', e);
+    if(tentativa < 2){ setTimeout(() => renderMeta(tentativa+1), 1200); return; } // Auth/rede ainda assentando
+    metaEl.innerHTML='<div class="meta-line">⚠️ Não foi possível ler o Firestore: '+escapeHtml(e && (e.code || e.message) || e)+'</div>';
   }
 }
 
