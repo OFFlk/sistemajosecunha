@@ -114,6 +114,23 @@ input[type="checkbox"] {
 .badge.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
 .badge.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
 .badge.err  { background:var(--err-bg);  border-color:var(--err-bd);  color:#991b1b; }
+
+/* ── Resumo do import de backup (Turmas / Schemas) ──
+   Título em cor de destaque + um "chip" por contagem. Verde = vai ser
+   adicionado; cinza = nada a fazer; amarelo = precisa da sua decisão.
+   Contagem zero fica apagada pra o que importa saltar aos olhos. */
+.merge-resumo { display:flex; flex-direction:column; gap:8px; flex:1; min-width:260px; }
+.sum-row   { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.sum-title { min-width:64px; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--brand-600); }
+.sum-chip  { display:inline-flex; align-items:baseline; gap:5px; padding:4px 11px; border-radius:999px;
+             border:1px solid var(--line); background:var(--chip-bg); color:var(--muted); font-size:12px; font-weight:700; }
+.sum-chip b { font-size:14px; font-weight:800; color:var(--text,#1e293b); }
+.sum-chip.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
+.sum-chip.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
+.sum-chip.ok b, .sum-chip.warn b { color:inherit; }
+.sum-chip.zero { opacity:.45; }
+html[data-theme="dark"] .sum-chip.ok   { color:#86efac; }
+html[data-theme="dark"] .sum-chip.warn { color:#fcd34d; }
 html[data-theme="dark"] .badge.warn { color:#fbbf24; }
 html[data-theme="dark"] .badge.ok   { color:#86efac; }
 html[data-theme="dark"] .badge.err  { color:#fca5a5; }
@@ -242,7 +259,7 @@ select.sel-padrao option { background: var(--card-bg, #fff); color: var(--text, 
       </div>
       <div id="mergePreview" style="display:none; margin-top:14px;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
-          <b id="mergeResumo"></b>
+          <div id="mergeResumo" class="merge-resumo"></div>
           <button class="btn btn-primary" id="btnAplicarMerge" onclick="aplicarMerge()">✅ Aplicar merge</button>
           <button class="btn btn-gray" onclick="cancelarMerge()">✖ Cancelar</button>
         </div>
@@ -1171,9 +1188,19 @@ function _renderMergePreview() {
   const {novas,iguais,suspeitas,divergentes}=_pendingMerge.turmas;
   const {novos:schemasNovos,iguais:schemasIguais,conflitos:schemasConflitos}=_pendingMerge.schemas;
   document.getElementById('mergePreview').style.display='block';
+  const _chip=(n,rot,tipo)=>`<span class="sum-chip ${n>0?tipo:'zero'}"><b>${n}</b> ${rot}</span>`;
   document.getElementById('mergeResumo').innerHTML =
-    `Turmas: ${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s) · ${divergentes.length} divergente(s)<br>`+
-    `Schemas: ${schemasNovos.length} novo(s) · ${schemasIguais.length} idêntico(s) · ${schemasConflitos.length} conflito(s)`;
+    `<div class="sum-row"><span class="sum-title">Turmas</span>`+
+      _chip(novas.length,'nova(s)','ok')+
+      _chip(iguais.length,'idêntica(s)','')+
+      _chip(suspeitas.length,'suspeita(s)','warn')+
+      _chip(divergentes.length,'divergente(s)','warn')+
+    `</div>`+
+    `<div class="sum-row"><span class="sum-title">Schemas</span>`+
+      _chip(schemasNovos.length,'novo(s)','ok')+
+      _chip(schemasIguais.length,'idêntico(s)','')+
+      _chip(schemasConflitos.length,'conflito(s)','warn')+
+    `</div>`;
 
   const lista=document.getElementById('mergeLista'); lista.innerHTML='';
 
