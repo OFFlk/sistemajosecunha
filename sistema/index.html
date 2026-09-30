@@ -58,7 +58,7 @@
     </a>
 
     <a class="card" id="cardAdmin" href="admin/admin.html">
-      <span class="card-badge">Admin</span>
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🛠️</div>
       <div class="card-title">Admin & Config</div>
       <div class="card-footer">
@@ -83,7 +83,7 @@
     </a>
 
     <a class="card" id="cardFuncionarios" href="funcionarios/funcionarios.html">
-      <span class="card-badge">Admin</span>
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">👨‍🏫</div>
       <div class="card-title">Funcionários</div>
       <div class="card-footer">
@@ -137,7 +137,8 @@ document.addEventListener('auth:ready', function() {
   function stylesBubble(b) {
     var bc = getBrandColor();
     b.style.background = bc.color;
-    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+    var fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
+    b.style.color      = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
   }
 
   function initBubble(b) {
