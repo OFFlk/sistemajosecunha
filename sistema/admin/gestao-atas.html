@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<script>
+(function(){
+  const t = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  document.documentElement.setAttribute('data-theme', (t === 'dark' || t === 'light') ? t : 'light');
+})();
+</script>
+
+<script src="../loading-overlay.js"></script>
+
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
+<script src="../theme-colors.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+
+<title>Gestão de Dados · Atas</title>
+<style>
+/* ── Oculta até auth confirmar role ── */
+body { visibility: hidden; }
+
+/* ── Variáveis exclusivas desta página ── */
+:root {
+  --ok-bg:   rgba(22,163,74,.10);
+  --ok-bd:   rgba(22,163,74,.30);
+  --warn-bg: rgba(245,158,11,.10);
+  --warn-bd: rgba(245,158,11,.30);
+  --err-bg:  rgba(220,38,38,.10);
+  --err-bd:  rgba(220,38,38,.30);
+}
+
+/* ── Container desta página ── */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 24px 60px;
+}
+
+/* ── Card com background sólido ── */
+.card { background: #ffffff; }
+html[data-theme="dark"] .card { background: #131c2e; }
+
+/* ── Card de destaque (visão geral): usa a cor escolhida pelo usuário ──
+   --btn-home-bg/border/hover vêm do header.css (mesma cor do botão "Início")
+   e já alternam entre --brand (claro) e --brand-d (escuro).
+   .contraste-claro é ligada por JS quando a cor é clara demais pra texto branco
+   (ex.: paleta "Branco", amarelos no tema escuro). */
+.card.card-destaque {
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,.18);
+  --dest-btn-bd: rgba(255,255,255,.40);
+  --dest-btn-hover: rgba(255,255,255,.28);
+  background: var(--btn-home-bg); border-color: var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #0f172a;
+  --dest-btn-bg: rgba(0,0,0,.08);
+  --dest-btn-bd: rgba(0,0,0,.25);
+  --dest-btn-hover: rgba(0,0,0,.16);
+  border-color: var(--line);
+}
+.card-destaque h3 { color: var(--dest-fg); }
+.card-destaque .stat-box { background:#ffffff; border-color:transparent; }
+html[data-theme="dark"] .card-destaque .stat-box { background:#0f172a; }
+.card-destaque.contraste-claro .stat-box { border-color: var(--line); }
+.card-destaque .btn {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+}
+.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+
+/* ── Stats ── */
+.stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+.stat-box {
+  flex:1; min-width:120px;
+  background:var(--chip-bg); border:1px solid var(--line);
+  border-radius:10px; padding:12px 16px; text-align:center;
+}
+.stat-num { font-size:26px; font-weight:800; color:var(--brand-600); line-height:1; }
+.stat-lbl { font-size:12px; color:var(--muted); margin-top:4px; }
+
+/* ── Seção colapsável ── */
+.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
+.sec-header:hover h3 { color:var(--brand-600); }
+.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; }
+.sec-toggle.collapsed { transform:rotate(-90deg); }
+.sec-body.collapsed { display:none; }
+
+/* ── Checkbox na cor do sistema ── */
+input[type="checkbox"] {
+  width:15px; height:15px;
+  accent-color: var(--brand-600);
+  cursor:pointer;
+}
+
+/* ── Merge preview ── */
+.merge-item { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-radius:8px; border:1px solid var(--line); background:var(--bg); margin-bottom:6px; font-size:13px; }
+.merge-item.nova     { border-color:var(--ok-bd);   background:var(--ok-bg); }
+.merge-item.igual    { opacity:.65; }
+.merge-item.suspeita { border-color:var(--warn-bd); background:var(--warn-bg); }
+
+/* ── Badge colorido (extensão dos globais) ── */
+.badge.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
+.badge.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
+.badge.err  { background:var(--err-bg);  border-color:var(--err-bd);  color:#991b1b; }
+html[data-theme="dark"] .badge.warn { color:#fbbf24; }
+html[data-theme="dark"] .badge.ok   { color:#86efac; }
+html[data-theme="dark"] .badge.err  { color:#fca5a5; }
+
+/* ── Botão danger desta página ── */
+.btn-danger { background:var(--danger-500,#b91c1c); border-color:var(--danger-500,#b91c1c); color:#fff; }
+
+/* Corrige o botão "Gerenciar schemas": é <a>, não <button>. No tema
+   escuro, base.css tem `html[data-theme="dark"] a { color: var(--brand-d) }`,
+   que pesa mais (seletor de atributo = classe) que `.btn-primary { color:#fff }`
+   sozinho — o texto virava a própria cor de fundo do botão (invisível).
+   `a.btn.btn-primary` (duas classes) já pesa mais que aquela regra em
+   qualquer tema, sem precisar mexer em base.css/components.css. */
+a.btn.btn-primary,
+a.btn.btn-primary:hover {
+  color: var(--brand-fg, #fff);
+}
+.btn-danger:hover:not(:disabled) { background:var(--danger-600,#991b1b); border-color:var(--danger-600,#991b1b); }
+
+/* ── row-btns ── */
+.row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+
+/* ── Toasts padronizados (ver guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; z-index: 50;
+}
+
+/* ── Painel de log flutuante e fechável (ex.: log de exclusão) ──
+   Diferente do toast padrão (_showToast, auto-some em poucos segundos):
+   este fica até o usuário fechar, porque o conteúdo é um log de várias
+   linhas, não uma mensagem curta. */
+.log-floating {
+  position: fixed; right: 20px; bottom: 20px; z-index: 60;
+  width: min(440px, calc(100vw - 40px)); max-height: 55vh;
+  background: var(--card-bg, #fff); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.28);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.log-floating-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-weight: 800; font-size: 13px; flex-shrink: 0;
+}
+.log-floating-close {
+  border: 0; background: transparent; cursor: pointer;
+  font-size: 15px; line-height: 1; color: var(--muted); padding: 2px 4px;
+}
+.log-floating-close:hover { color: var(--text, #111); }
+.log-floating .console {
+  margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  overflow: auto; max-height: calc(55vh - 44px);
+}
+
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
+   guia-migracao-contraste-theme-colors.md, Parte 2). Copiado do guia com
+   UM ajuste: esta página não define --card/--border como o
+   historico-aluno.html (design system próprio, mais antigo) — aqui os
+   tokens reais são --card-bg/--line (--text já é usado com fallback em
+   outros pontos deste mesmo arquivo, ver .log-floating-close:hover acima).
+   Mapeando pros tokens certos evita o bug já visto em pesquisa-ata.html:
+   balão com fundo transparente por causa de uma variável que não existe
+   nesta página. */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card-bg, #fff); border:1.5px solid var(--line); color:var(--text, #1e293b);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+</style>
+</head>
+<body>
+
+<div id="header-placeholder"></div>
+
+<div class="container">
+
+  <!-- ── ESTATÍSTICAS ── -->
+  <div class="card card-destaque">
+    <h3 style="margin-top:0;">📊 Visão geral — módulo de atas</h3>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas</div></div>
+      <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos no banco</div></div>
+      <div class="stat-box"><div class="stat-num" id="statAlunosDB">—</div><div class="stat-lbl">Identidades (alunos-atas)</div></div>
+      <div class="stat-box"><div class="stat-num" id="statSemId">—</div><div class="stat-lbl">Alunos sem ID</div></div>
+    </div>
+    <div class="row-btns" style="margin-top:14px;">
+      <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
+    </div>
+  </div>
+
+  <!-- ── SCHEMAS DE ATA ── -->
+  <div class="card">
+    <h3 style="margin-top:0;">🧩 Schemas de ata
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble">"Schema" é a lista de matérias de uma ata e como as colunas da planilha são lidas na importação. Se uma turma tiver matérias diferentes das demais, crie, duplique ou edite outro schema e escolha qual deles ela vai usar ao ser cadastrada.</span>
+      </span>
+    </h3>
+    <p class="muted">Gerenciamento de schema — crie, edite ou apague schemas de atas!</p>
+    <div class="row-btns">
+      <a class="btn btn-primary" href="../atas/schema_ata.html">🧩 Gerenciar schemas</a>
+    </div>
+  </div>
+
+  <!-- ── IMPORTAR JSON (merge) ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secJSON')">
+      <h3 style="margin-top:0;">📥 Importar backup JSON (merge)</h3>
+      <span class="sec-toggle" id="togSecJSON">▼</span>
+    </div>
+    <div class="sec-body" id="secJSON">
+      <p class="muted">Envie um arquivo de backup JSON para restaurar turmas e schemas. O sistema compara turma por turma, incluindo os alunos de cada uma, sem custo extra de leitura (os alunos já vêm dentro do documento da turma). Nada é sobrescrito sem você escolher.</p>
+      <div class="row-btns">
+        <label class="btn btn-outline" id="lblJSON" style="cursor:pointer;">
+          📂 Carregar JSON de backup
+          <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="analisarJSON(event)">
+        </label>
+      </div>
+      <div id="mergePreview" style="display:none; margin-top:14px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+          <b id="mergeResumo"></b>
+          <button class="btn btn-primary" id="btnAplicarMerge" onclick="aplicarMerge()">✅ Aplicar merge</button>
+          <button class="btn btn-gray" onclick="cancelarMerge()">✖ Cancelar</button>
+        </div>
+        <div class="muted" style="font-size:12px; font-weight:800; margin-bottom:4px;">Turmas</div>
+        <div id="mergeLista"></div>
+        <div id="mergeSchemasWrap" style="display:none; margin-top:14px;">
+          <div class="muted" style="font-size:12px; font-weight:800; margin-bottom:4px;">Schemas de ata</div>
+          <div id="mergeListaSchemas"></div>
+        </div>
+      </div>
+      <div class="console" id="logJSON" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── EXPORTAR ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secExport')">
+      <h3 style="margin-top:0;">💾 Exportar backup</h3>
+      <span class="sec-toggle" id="togSecExport">▼</span>
+    </div>
+    <div class="sec-body" id="secExport">
+      <p class="muted">Exporta e salva uma cópia de segurança de todos os dados do módulo de atas.</p>
+      <div class="row-btns">
+        <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+        <button class="btn btn-outline" id="btnExportCSV"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── APAGAR TURMAS ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secApagar')">
+      <h3 style="margin-top:0;">🗑️ Apagar turmas
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          i
+          <span class="info-tip-bubble">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
+        </span>
+      </h3>
+      <span class="sec-toggle" id="togSecApagar">▼</span>
+    </div>
+    <div class="sec-body" id="secApagar">
+      <p class="muted">Selecione as turmas que deseja apagar do banco de dados e aperte em "Apagar selecionadas".</p>
+      <div class="row-btns" style="margin-bottom:10px;">
+        <button class="btn btn-gray"   onclick="selecionarTodasTurmas(true)">Marcar todas</button>
+        <button class="btn btn-gray"   onclick="selecionarTodasTurmas(false)">Desmarcar todas</button>
+        <button class="btn btn-danger" id="btnApagarSel" onclick="apagarSelecionadas()" disabled>🗑 Apagar selecionadas</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;"><input type="checkbox" id="chkTodas" onchange="selecionarTodasTurmas(this.checked)"></th>
+              <th>Aba / nome</th>
+              <th>Ano</th>
+              <th>Turno</th>
+              <th>Série</th>
+              <th class="center">Alunos</th>
+              <th>Arquivo de origem</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTurmas">
+            <tr><td colspan="7" class="muted" style="padding:18px;text-align:center;">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="logApagarWrap" class="log-floating" style="display:none;">
+        <div class="log-floating-head">
+          <span>🗑️ Log de exclusão</span>
+          <button type="button" class="log-floating-close" onclick="_fecharLogFloating('logApagarWrap')" aria-label="Fechar">✖</button>
+        </div>
+        <div class="console" id="logApagar"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../header-logic.js"></script>
+
+<script>
+/* =============================================
+   CONTROLE DE ACESSO — somente admin
+   Não-admins são redirecionados antes de
+   qualquer dado ser carregado ou exibido.
+============================================= */
+let IS_ADMIN = false;
+
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora
+// (ver guia-migracao-contraste-theme-colors.md, Parte 2.3). Um só listener
+// pro página inteira, mesmo com vários ícones.
+document.addEventListener("click", ()=>{
+  document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+});
+
+document.addEventListener('auth:ready', function () {
+  const session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  const role = session ? String(session.role || '').trim().toLowerCase() : '';
+  IS_ADMIN = (role === 'admin');
+
+  if (!IS_ADMIN) {
+    // Redireciona imediatamente — não exibe nada da página
+    window.location.replace('../index.html');
+    return;
+  }
+
+  // Revela a página só para admins
+  document.body.style.visibility = 'visible';
+  inicializar();
+});
+
+/* =============================================
+   DB HELPERS
+============================================= */
+function __schoolId() {
+  try {
+    if (window.Auth?.getSession) {
+      const s = window.Auth.getSession();
+      const sid = String(s?.schoolId || '').trim();
+      if (!sid) return 'SEM_ESCOLA';
+      if (sid.toUpperCase() !== 'ADMIN') return sid;
+      return String(localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
+    }
+  } catch(_) {}
+  return 'SEM_ESCOLA';
+}
+function dbKey(base)  { return `schools:${__schoolId()}:${base}`; }
+// Estado em memória (não localStorage): o dado real vive no Firestore;
+// isto é só um espelho de leitura rápida durante a sessão da página —
+// populado no inicializar()/recarregar() e atualizado a cada dbWrite().
+// Some ao fechar/recarregar a aba (não deveria ser usado pra "guardar
+// pra acessar depois" — pra isso, sempre relê do Firestore).
+const _mem = {};
+function dbRead(base, fallback) {
+  const k = dbKey(base);
+  return (k in _mem) ? _mem[k] : fallback;
+}
+function dbWrite(base, val) {
+  _mem[dbKey(base)] = val;
+  try {
+    if (!window.DB || !window.Auth?.getSession()) return Promise.resolve();
+    const map = { turmasDB:'turmas', atasDB:'atas', matriculasDB:'matriculas' };
+    const col = map[base];
+    if (col && window.DB[col]) {
+      // Para turmasDB: cada turma tem seu array de alunos/notas — usa saveAllFull para
+      // garantir que o documento inteiro é sobrescrito (sem merge), preservando o campo alunos.
+      // Retorna a Promise (não engole erro) pra quem chama poder esperar e mostrar
+      // falha real ao usuário.
+      if (base === 'turmasDB') {
+        return _saveAllFull('turmas', val).catch(e => { console.warn('Firestore turmasDB:', e); throw e; });
+      } else {
+        return window.DB[col].saveAll(val).catch(e => console.warn('Firestore ' + base + ':', e));
+      }
+    }
+  } catch(_) {}
+  return Promise.resolve();
+}
+
+/**
+ * Salva array de turmas no Firestore fazendo SET completo (sem merge),
+ * garantindo que o campo `alunos` seja sempre sobrescrito por inteiro.
+ * Usa turmaId (ou _id) como ID do documento — igual ao saveAll do db.firebase.js.
+ *
+ * LOTE_TAMANHO=10 (não 400): o limite de 400 vinha do limite de OPERAÇÕES do
+ * Firestore por batch (500), mas o que estourava a cota do navegador era o
+ * TAMANHO do payload — cada turma carrega o array `alunos` inteiro, então um
+ * lote de 400 turmas em uma importação grande (ex.: 100 abas) ainda cabia
+ * inteiro num commit só, sem throttle nenhum. Reduzido pra 10 e cada lote
+ * espera o anterior confirmar (await) antes de seguir — isso mantém pequeno
+ * o volume de mutação pendente que o Firestore tenta persistir no
+ * localStorage (enablePersistence+synchronizeTabs em auth.firebase.js), e
+ * libera espaço automaticamente a cada confirmação, sem precisar recarregar
+ * a página entre lotes.
+ */
+async function _saveAllFull(colName, arr) {
+  if (!window.DB || !window.Auth) return;
+  await new Promise(res => {
+    if (window.Auth.db) return res();
+    document.addEventListener('auth:ready', res, { once: true });
+  });
+  const schoolId = window.Auth.getActiveSchoolId();
+  if (!schoolId) return;
+  const db = window.Auth.db;
+  const ts = firebase.firestore.FieldValue.serverTimestamp();
+  const LOTE_TAMANHO = 10;
+  const falhas = [];
+  for (let i = 0; i < arr.length; i += LOTE_TAMANHO) {
+    const fatia = arr.slice(i, i + LOTE_TAMANHO);
+    const batch = db.batch();
+    fatia.forEach(obj => {
+      const { _id, ...data } = obj;
+      data.updatedAt = ts;
+      // ID do documento: prioriza _id explícito, depois turmaId, depois id
+      const docId = _id || obj.turmaId || obj.id || null;
+      if (!docId) { console.warn('[_saveAllFull] objeto sem ID ignorado:', obj); return; }
+      const ref = db.collection('schools').doc(schoolId).collection(colName).doc(String(docId));
+      // SET sem merge: sobrescreve o documento inteiro, incluindo o array `alunos`
+      batch.set(ref, data);
+    });
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.warn(`[_saveAllFull] Lote ${i}-${i + fatia.length} falhou:`, e);
+      falhas.push({ inicio: i, fim: i + fatia.length, erro: e });
+      // Não interrompe os lotes seguintes — mas registra quais turmas
+      // ficaram sem salvar, pra não passar a impressão de importação
+      // completa quando só uma parte foi de fato gravada.
+    }
+  }
+  if (falhas.length) {
+    const totalFalhas = falhas.reduce((s, f) => s + (f.fim - f.inicio), 0);
+    console.error(`[_saveAllFull] ${totalFalhas} de ${arr.length} turma(s) NÃO foram salvas. Lotes com falha:`, falhas);
+    throw new Error(`${totalFalhas} de ${arr.length} turma(s) não foram salvas no Firestore. Veja o console para detalhes.`);
+  }
+}
+
+function lerTurmasDB()     { return dbRead('turmasDB', []); }
+function salvarTurmasDB(v) { return dbWrite('turmasDB', v || []); }
+
+function idAtaFrom(tid)      { return 'ATA|' + tid; }
+function idMatFrom(tid, aid) { return 'MAT|' + tid + '|' + aid; }
+
+function reconstruirAuxiliares(turmas) {
+  const atas = [], mats = [], metas = [];
+  for (const t of (turmas || [])) {
+    const turmaId = String(t?.id || t?.turmaId || '').trim();
+    if (!turmaId) continue;
+    const ataId = idAtaFrom(turmaId);
+    // _id explícito garante que saveAll use o ID correto no Firestore
+    atas.push({ _id:ataId, id:ataId, turmaId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
+    metas.push({ _id:turmaId, turmaId, ataId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      alunos:Array.isArray(t.alunos)?t.alunos.length:0 });
+    for (const a of (t.alunos || [])) {
+      const alunoId = String(a?.alunoId || '').trim();
+      if (!alunoId) continue;
+      const matId = idMatFrom(turmaId, alunoId);
+      mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
+        nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
+        resultado:String(a.resultado||'').trim()||'Não informado',
+        anoLetivo:t.anoLetivo||'' });
+    }
+  }
+  dbWrite('atasDB',       atas);
+  dbWrite('matriculasDB', mats);
+  dbWrite('turmasMetaDB', metas);
+  return { atas, mats, metas };
+}
+
+/* =============================================
+   INIT
+============================================= */
+function logEl(msg, id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent  += (el.textContent ? '\n' : '') + msg;
+  // Se existir um painel flutuante pra esse log (ex.: logApagarWrap), mostra
+  // ele também. Pra logs sem painel (ex.: logJSON), isso não faz nada.
+  const wrap = document.getElementById(id + 'Wrap');
+  if (wrap) wrap.style.display = 'flex';
+}
+function clearLogEl(id) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = ''; el.style.display = 'none'; }
+  const wrap = document.getElementById(id + 'Wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+function _fecharLogFloating(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (wrap) wrap.style.display = 'none';
+}
+
+// Turmas do ano-ativo não têm origemArquivo nem aba preenchida com nome de planilha
+function ehTurmaDeAtas(t) {
+  const origem = String(t.origemArquivo || '').trim();
+  const aba    = String(t.aba || '').trim().toUpperCase();
+  // Turmas de atas sempre têm origemArquivo (nome do xlsx) ou aba não-genérica
+  if (origem && origem !== '—') return true;
+  if (aba && !['MANUAL','CADASTRO',''].includes(aba)) return true;
+  return false;
+}
+
+async function inicializar() {
+  // identidade-aluno.js v2 não tem catálogo em memória nem promise de
+  // "pronto" — cada chamada (buscarAtasPorNome, criarAtasBatch, etc.) já é
+  // pontual e aguarda Auth sozinha.
+
+  // Sincroniza com Firestore e filtra apenas turmas de atas
+  try {
+    await new Promise(res => {
+      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, { once: true });
+    });
+    if (window.DB && window.DB.turmas) {
+      const todasFirestore = await window.DB.turmas.list();
+      // Mantém TODAS as turmas no cache local (não esconde as suspeitas) —
+      // elas são marcadas visualmente na tabela e continuam selecionáveis para apagar.
+      _mem[dbKey('turmasDB')] = todasFirestore;
+    }
+  } catch(e) {
+    setMsg('Sem conexão com Firestore — usando cache local.', 'warn');
+  }
+
+  atualizarStats();
+  renderTabelaTurmas();
+  // Contraste do card de destaque agora é centralizado em theme-colors.js
+  // (ver guia-migracao-contraste-theme-colors.md, Parte 1). O próprio
+  // theme-colors.js já reage sozinho ao evento 'colorchange'; esta chamada
+  // aqui é só a inicialização única, depois que o card já existe no DOM.
+  if (window.ThemeColors) ThemeColors.ajustarContraste();
+  // Esconde a tela de loading só depois que stats/tabela já estão prontas —
+  // evita o placeholder "Carregando..." aparecer por baixo quando o overlay
+  // some. Roda tanto no caminho de sucesso quanto no de erro de conexão
+  // (o catch acima não interrompe a função, só avisa via toast).
+  Loading.esconder();
+}
+
+function atualizarStats() {
+  const turmas = lerTurmasDB();
+  let totalAlunos = 0, semId = 0;
+  for (const t of turmas) for (const a of (t.alunos||[])) { totalAlunos++; if (!String(a.alunoId||'').trim()) semId++; }
+  document.getElementById('statTurmas').textContent   = turmas.length;
+  document.getElementById('statAlunos').textContent   = totalAlunos;
+  document.getElementById('statSemId').textContent    = semId;
+  _atualizarStatAlunosAtas();
+}
+
+// statAlunosDB agora reflete o total de `alunos-atas` (catálogo real do
+// módulo), buscado à parte por ser uma leitura assíncrona — nada mais
+// mantém um mirror síncrono dessa coleção em memória (ver redesenho).
+function _atualizarStatAlunosAtas(){
+  if (!window.DB || !window.DB['alunos-atas']) return;
+  window.DB['alunos-atas'].list()
+    .then(arr => { const el = document.getElementById('statAlunosDB'); if (el) el.textContent = arr.length; })
+    .catch(()=>{});
+}
+
+async function recarregar() {
+  setMsg('Recarregando…', 'loading');
+  let falhou = false;
+  try {
+    if (window.DB && window.DB.turmas) {
+      // Limpa o cache interno do db.firebase.js (a chave é o nome da coleção)
+      try { delete window.DB.turmas._cache; } catch(_) {} // compat
+      // O cache real fica em _cache['turmas'] dentro do db.firebase.js — não acessível diretamente;
+      // basta chamar list() que ele já verifica o timestamp.
+      const todasFirestore = await window.DB.turmas.list();
+      _mem[dbKey('turmasDB')] = todasFirestore;
+    }
+  } catch(e) {
+    falhou = true;
+    setMsg('Sem conexão com Firestore — usando cache local.', 'warn');
+  }
+  atualizarStats();
+  renderTabelaTurmas();
+  if (!falhou) setMsg('Dados recarregados.', 'ok');
+}
+
+/* =============================================
+   UI HELPERS
+============================================= */
+function toggleSec(id) {
+  const body = document.getElementById(id);
+  const tog  = document.getElementById('togSec' + id.replace('sec','').replace(/^./,c=>c.toUpperCase()));
+  if (!body) return;
+  const col = body.classList.toggle('collapsed');
+  if (tog) tog.classList.toggle('collapsed', col);
+}
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
+// ── Modal de confirmação (substitui confirm() nativo) ──────────────────
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${_escHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    function fechar(resultado){ backdrop.remove(); resolve(resultado); }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
+}
+
+function _baixar(conteudo, nome, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([conteudo], { type:tipo }));
+  a.download = nome; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function _hoje() { return new Date().toISOString().slice(0,10); }
+
+/* =============================================
+   TABELA DE TURMAS
+============================================= */
+function renderTabelaTurmas() {
+  const turmas = lerTurmasDB();
+  const tbody  = document.getElementById('tbodyTurmas');
+  if (!turmas.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:18px;text-align:center;">Nenhuma turma no banco.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = turmas.map((t, i) => {
+    const alunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
+    const semId  = Array.isArray(t.alunos) ? t.alunos.filter(a => !String(a.alunoId||'').trim()).length : 0;
+    const badgeSemId = semId ? `<span class="badge warn">${semId} sem ID</span>` : '';
+    const badgeLegado = !ehTurmaDeAtas(t) ? `<span class="badge warn" title="Não parece uma turma de atas (sem origemArquivo/aba) — possível resquício legado do ano-ativo">⚠️ suspeita/legado</span>` : '';
+    const origem = (t.origemArquivo||'').replace(/^.+[/\\]/,'') || '—';
+    return `
+      <tr>
+        <td class="center"><input type="checkbox" class="chk-turma" data-idx="${i}" onchange="onCheckTurma()"></td>
+        <td><b>${esc(t.aba||t.id||t._id||t.turmaId||'—')}</b> ${badgeLegado} ${badgeSemId}</td>
+        <td>${esc(t.anoLetivo||'—')}</td>
+        <td>${esc(t.turno||'—')}</td>
+        <td>${esc(t.serieTexto||'—')}</td>
+        <td class="center">${alunos}</td>
+        <td class="muted" style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(t.origemArquivo||'')}">${esc(origem)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function onCheckTurma() {
+  const sel   = document.querySelectorAll('.chk-turma:checked').length;
+  const total = document.querySelectorAll('.chk-turma').length;
+  const btnAp = document.getElementById('btnApagarSel');
+  const chkT  = document.getElementById('chkTodas');
+  if (btnAp && IS_ADMIN) btnAp.disabled = (sel === 0);
+  if (chkT) chkT.checked = (sel === total && total > 0);
+}
+
+function selecionarTodasTurmas(val) {
+  document.querySelectorAll('.chk-turma').forEach(c => c.checked = !!val);
+  const chkT = document.getElementById('chkTodas');
+  if (chkT) chkT.checked = !!val;
+  onCheckTurma();
+}
+
+/* =============================================
+   AUXILIAR LOCAL (sem sync Firestore)
+   Usado após delete para não recriar docs que acabamos de apagar.
+============================================= */
+function _reconstruirAuxLocalmente(turmas) {
+  const atas = [], mats = [], metas = [];
+  for (const t of (turmas || [])) {
+    const turmaId = String(t?.id || t?.turmaId || '').trim();
+    if (!turmaId) continue;
+    const ataId = idAtaFrom(turmaId);
+    atas.push({ _id:ataId, id:ataId, turmaId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
+    metas.push({ _id:turmaId, turmaId, ataId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
+      alunos:Array.isArray(t.alunos)?t.alunos.length:0 });
+    for (const a of (t.alunos || [])) {
+      const alunoId = String(a?.alunoId || '').trim();
+      if (!alunoId) continue;
+      const matId = idMatFrom(turmaId, alunoId);
+      mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
+        nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
+        resultado:String(a.resultado||'').trim()||'Não informado',
+        anoLetivo:t.anoLetivo||'' });
+    }
+  }
+  // Atualiza só o estado em memória (não dispara sync com Firestore)
+  _mem[dbKey('atasDB')] = atas;
+  _mem[dbKey('matriculasDB')] = mats;
+  _mem[dbKey('turmasMetaDB')] = metas;
+  return { atas, mats, metas };
+}
+
+/* =============================================
+   APAGAR TURMAS — limpeza de scans no Cloudinary
+   Complementa a exclusão no Firestore chamando a rota que apaga TODOS os
+   arquivos da pasta atas/{turmaId_slug} + a pasta em si (ver
+   functions/api/atas-delete-turma.js). Sem isso, apagar a turma deixava
+   a pasta de scans órfã pra sempre no Cloudinary.
+============================================= */
+async function _apagarScansCloudinary(turmaId) {
+  try {
+    const resp = await fetch('/api/atas-delete-turma', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turmaId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+    return { ok: true, deletedCount: data.deletedCount || 0, folderRemoved: !!data.folderRemoved };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+/* =============================================
+   APAGAR TURMAS
+============================================= */
+async function apagarSelecionadas() {
+  if (!IS_ADMIN) return;
+  const checks  = [...document.querySelectorAll('.chk-turma:checked')];
+  if (!checks.length) return;
+  const indices = checks.map(c => Number(c.dataset.idx));
+  const turmas  = lerTurmasDB();
+  const aApagar = indices.map(i => turmas[i]).filter(Boolean);
+  const nomes   = aApagar.map(t => t.aba || t.id || t._id || t.turmaId || '?');
+  const confirmou = await _confirmModal({
+    titulo: '🗑️ Apagar turma(s)?',
+    corpo: `Apagar ${aApagar.length} turma(s)?\n\n${nomes.join('\n')}\n\nEsta ação não pode ser desfeita.`,
+    corDestaque: '#991b1b',
+    textoConfirmar: 'Sim, apagar'
+  });
+  if (!confirmou) return;
+
+  const btnAp = document.getElementById('btnApagarSel');
+  if (btnAp) { btnAp.disabled = true; btnAp.textContent = 'Apagando...'; }
+  clearLogEl('logApagar');
+
+  // 1. Deleta do Firestore — usa turmaId como ID do documento (igual ao saveAll)
+  //    e também tenta pelo _id caso exista, além de removeWhere como fallback.
+  //    Log condensado: só entra no console um aviso por turma quando algo sair
+  //    do caminho esperado (precisou de fallback, ou falhou de fato). O caso
+  //    normal (tentativa 1 funcionou) não gera linha nenhuma — só conta.
+  let removidosOk = 0;
+  const avisos = [];
+  if (window.DB && window.DB.turmas) {
+    for (const t of aApagar) {
+      // O saveAll usa turmaId (ou id) como ID do documento no Firestore
+      const docIdPrimario = t.turmaId || t.id;
+      const docIdSecundario = t._id && t._id !== docIdPrimario ? t._id : null;
+      const nomeTurma = t.aba || docIdPrimario || '?';
+      let removido = false;
+
+      // Tentativa 1: pelo turmaId (ID que o saveAll gravou como nome do documento)
+      if (docIdPrimario) {
+        try {
+          await window.DB.turmas.remove(docIdPrimario);
+          removido = true; removidosOk++;
+        } catch(e) {
+          avisos.push(`⚠️ "${nomeTurma}": Firestore (turmaId) falhou — ${e.message}`);
+        }
+      }
+
+      // Tentativa 2: pelo _id (caso a turma tenha sido salva com ID automático do Firestore)
+      if (!removido && docIdSecundario) {
+        try {
+          await window.DB.turmas.remove(docIdSecundario);
+          removido = true; removidosOk++;
+          avisos.push(`ℹ️ "${nomeTurma}": removido por _id, não pelo turmaId padrão`);
+        } catch(e) {
+          avisos.push(`⚠️ "${nomeTurma}": Firestore (_id) falhou — ${e.message}`);
+        }
+      }
+
+      // Tentativa 3: removeWhere pelo campo turmaId (fallback para documentos duplicados)
+      if (!removido && docIdPrimario) {
+        try {
+          await window.DB.turmas.removeWhere('turmaId', docIdPrimario);
+          removido = true; removidosOk++;
+          avisos.push(`ℹ️ "${nomeTurma}": removido via removeWhere (fallback de documento duplicado)`);
+        } catch(e) {
+          avisos.push(`⚠️ "${nomeTurma}": removeWhere falhou — ${e.message}`);
+        }
+      }
+
+      if (!removido) {
+        avisos.push(`❌ "${nomeTurma}": não foi possível remover do Firestore por nenhum método`);
+      }
+
+      // Também remove atas e matrículas associadas
+      if (docIdPrimario && window.DB.atas && window.DB.matriculas) {
+        try {
+          const ataId = idAtaFrom(docIdPrimario);
+          await window.DB.atas.remove(ataId).catch(()=>{});
+          await window.DB.atas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
+          await window.DB.matriculas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
+        } catch(e) {
+          avisos.push(`⚠️ "${nomeTurma}": erro ao limpar atas/matrículas — ${e.message}`);
+        }
+      }
+
+      // Limpa os scans da turma no Cloudinary (arquivos + pasta).
+      // Best-effort: falha aqui NÃO impede a exclusão da turma (já feita
+      // acima) — só gera um aviso no log. Sem isso, a pasta de scans da
+      // turma (atas/{turmaId_slug}) fica órfã pra sempre no Cloudinary.
+      if (docIdPrimario) {
+        const resScan = await _apagarScansCloudinary(docIdPrimario);
+        if (resScan.ok) {
+          if (resScan.deletedCount > 0) {
+            avisos.push(`ℹ️ "${nomeTurma}": ${resScan.deletedCount} scan(s) removido(s) do Cloudinary`
+              + (resScan.folderRemoved ? '' : ' (pasta não pôde ser removida — verificar manualmente)'));
+          }
+        } else {
+          avisos.push(`⚠️ "${nomeTurma}": falha ao limpar scans no Cloudinary — ${resScan.error}`);
+        }
+      }
+    }
+  }
+
+  // 2. Atualiza o estado em memória diretamente (sem reenviar ao Firestore)
+  const novas = turmas.filter((_,i) => !indices.includes(i));
+  _mem[dbKey('turmasDB')] = novas;
+  // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
+  const aux = _reconstruirAuxLocalmente(novas);
+
+  logEl(`✅ ${removidosOk}/${aApagar.length} turma(s) removida(s) do Firestore.`, 'logApagar');
+  logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`, 'logApagar');
+  if (avisos.length) {
+    logEl('', 'logApagar');
+    logEl(`⚠️ ${avisos.length} aviso(s) — turmas que não seguiram o caminho padrão:`, 'logApagar');
+    avisos.forEach(a => logEl(`  ${a}`, 'logApagar'));
+  }
+
+  // 3. Garbage collection de identidades órfãs
+  logEl('', 'logApagar');
+  logEl('🔍 Verificando identidades órfãs...', 'logApagar');
+  try {
+    const apagados = await _limparIdentidadesOrfas(aApagar, novas);
+    if (apagados > 0) logEl(`🧹 ${apagados} identidade(s) órfã(s) removida(s) do banco.`, 'logApagar');
+    else              logEl('✅ Nenhuma identidade órfã encontrada.', 'logApagar');
+  } catch(e) {
+    logEl(`⚠️ Erro ao limpar identidades: ${e.message}`, 'logApagar');
+  }
+
+  renderTabelaTurmas();
+  atualizarStats();
+  document.getElementById('chkTodas').checked = false;
+  if (btnAp) { btnAp.disabled = false; btnAp.textContent = '\u{1F5D1} Apagar selecionadas'; }
+}
+
+/**
+ * Garbage collection de identidades (coleção `alunos-atas`).
+ * Remove apenas alunoId que NÃO aparecem em nenhuma turma de atas restante
+ * E NÃO aparecem em anoAtivoMatriculas (módulo de ano-ativo) — essa segunda
+ * checagem também protege um alunoId já fundido (existe em alunos-atas E
+ * anoAtivoAlunos com o mesmo ID) que ainda tenha matrícula ativa no
+ * Ano-Ativo, mesmo sem turma de Atas restante.
+ *
+ * @param {Array} turmasApagadas  — turmas que acabaram de ser removidas
+ * @param {Array} turmasRestantes — turmas de atas que ainda existem no banco
+ * @returns {number} quantidade de identidades removidas
+ */
+async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
+  if (!window.DB || !window.DB['alunos-atas']) return 0;
+
+  // Coleta IDs dos alunos das turmas apagadas
+  const idsApagados = new Set();
+  for (const t of turmasApagadas)
+    for (const a of (t.alunos || []))
+      if (String(a.alunoId || '').trim()) idsApagados.add(String(a.alunoId).trim());
+
+  if (!idsApagados.size) return 0;
+
+  // Coleta IDs que ainda existem nas turmas de atas restantes
+  const idsEmAtas = new Set();
+  for (const t of turmasRestantes)
+    for (const a of (t.alunos || []))
+      if (String(a.alunoId || '').trim()) idsEmAtas.add(String(a.alunoId).trim());
+
+  // Coleta IDs que existem no módulo de ano-ativo (anoAtivoMatriculas)
+  const idsEmAnoAtivo = new Set();
+  try {
+    const mats = await window.DB.anoAtivoMatriculas.list();
+    for (const m of mats)
+      if (String(m.alunoId || '').trim()) idsEmAnoAtivo.add(String(m.alunoId).trim());
+  } catch(e) {
+    console.warn('[GC] Não foi possível checar anoAtivoMatriculas:', e.message);
+    // Se não conseguiu verificar o ano-ativo, aborta por segurança (não apaga nada)
+    logEl('⚠️ Não foi possível verificar o módulo de ano-ativo. Identidades preservadas por segurança.', 'logApagar');
+    return 0;
+  }
+
+  // Órfãos = estavam nas turmas apagadas, mas não aparecem em nenhum dos dois módulos
+  const idsOrfaos = [...idsApagados].filter(id => !idsEmAtas.has(id) && !idsEmAnoAtivo.has(id));
+
+  if (!idsOrfaos.length) return 0;
+
+  logEl(`  Candidatos a remoção: ${idsOrfaos.length} ID(s)`, 'logApagar');
+
+  // Remove do Firestore (coleção `alunos-atas`)
+  let removidos = 0;
+  for (const alunoId of idsOrfaos) {
+    try {
+      if (window.Identidade?.removerAtas) await window.Identidade.removerAtas(alunoId);
+      else await window.DB['alunos-atas'].remove(alunoId);
+      removidos++;
+    } catch(e) {
+      console.warn('[GC] Erro ao remover identidade', alunoId, e.message);
+    }
+  }
+
+  return removidos;
+}
+
+/* =============================================
+   EXPORTAR
+============================================= */
+async function exportarJSON() {
+  if (!IS_ADMIN) return;
+  let alunosAtas = [];
+  try { alunosAtas = (window.DB?.['alunos-atas']) ? await window.DB['alunos-atas'].list() : []; }
+  catch(_) { alunosAtas = []; }
+  let atasSchemas = [];
+  try { atasSchemas = (window.DB?.atasSchemas) ? await window.DB.atasSchemas.list() : []; }
+  catch(_) { atasSchemas = []; }
+  _baixar(JSON.stringify({ exportadoEm:new Date().toISOString(), versao:3, turmasDB:lerTurmasDB(), alunosAtasDB:alunosAtas, atasSchemas }, null, 2),
+    `backup-atas-${_hoje()}.json`, 'application/json');
+  setMsg('JSON exportado.', 'ok');
+}
+
+function exportarCSV() {
+  if (!IS_ADMIN) return;
+  const linhas = [['turmaId','aba','anoLetivo','turno','serieTexto','origemArquivo','totalAlunos']];
+  for (const t of lerTurmasDB())
+    linhas.push([t.id||t.turmaId||'', t.aba||'', t.anoLetivo||'', t.turno||'', t.serieTexto||'', t.origemArquivo||'', Array.isArray(t.alunos)?t.alunos.length:0]);
+  const csv = linhas.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  _baixar('\uFEFF'+csv, `turmas-atas-${_hoje()}.csv`, 'text/csv;charset=utf-8;');
+  setMsg('CSV exportado.', 'ok');
+}
+
+/* =============================================
+   IMPORTAR JSON — MERGE
+============================================= */
+let _pendingMerge=null;
+
+function analisarJSON(event) {
+  const file=event.target.files?.[0]; if(!file) return;
+  clearLogEl('logJSON');
+  const reader=new FileReader();
+  reader.onload=async ()=>{
+    try {
+      const dump=JSON.parse(reader.result);
+      if (!Array.isArray(dump.turmasDB)) { logEl('❌ JSON inválido: campo turmasDB ausente.','logJSON'); return; }
+      const schemasEntrada = Array.isArray(dump.atasSchemas) ? dump.atasSchemas : [];
+      await _analisarMerge(dump.turmasDB, schemasEntrada);
+    } catch(e) { logEl('❌ Erro ao ler JSON: '+e.message,'logJSON'); }
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
+
+/* ── Comparação de CONTEÚDO de turma (inclui o array `alunos`) ──────────
+ * Os alunos ficam dentro do documento da turma, e as turmas já estão em
+ * memória (lidas em inicializar()) — comparar o conteúdo NÃO faz nenhuma
+ * leitura extra no Firestore. Antes, "mesmo id de turma" já bastava pra
+ * marcar como idêntica, então um aluno removido do banco passava batido.
+ */
+const _VOL_TURMA = ['_id','updatedAt','createdAt','criadoEm','atualizadoEm'];
+
+// Normaliza pra comparação: ordem das chaves não importa, undefined some.
+function _estavel(v) {
+  if (Array.isArray(v)) return v.map(_estavel);
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v).sort().forEach(k => { if (v[k] !== undefined) o[k] = _estavel(v[k]); });
+    return o;
+  }
+  return v;
+}
+function _sig(v) { return JSON.stringify(_estavel(v)); }
+function _semVolateis(obj) { const c = { ...obj }; _VOL_TURMA.forEach(k => delete c[k]); return c; }
+
+// Indexa alunos por alunoId (ou nome+série quando não há ID). Repetidos
+// ganham sufixo de ocorrência (#1, #2...) pra não se sobrescreverem.
+function _indexarAlunos(arr) {
+  const m = new Map(), vistos = {};
+  (Array.isArray(arr) ? arr : []).forEach(a => {
+    const id = String(a?.alunoId || '').trim();
+    const base = id ? 'id:' + id
+      : 'sem:' + String(a?.nome || '').trim().toUpperCase() + '|' + String(a?.serie || '').trim();
+    vistos[base] = (vistos[base] || 0) + 1;
+    m.set(base + '#' + vistos[base], a);
+  });
+  return m;
+}
+
+// null = idêntica. Senão devolve o que difere.
+function _diffTurma(atual, entrada) {
+  const { alunos: aa, ...ra } = atual;
+  const { alunos: ea, ...re } = entrada;
+  const camposDiff = [];
+  new Set([...Object.keys(ra), ...Object.keys(re)]).forEach(k => {
+    if (_VOL_TURMA.includes(k)) return;
+    if (_sig(ra[k]) !== _sig(re[k])) camposDiff.push(k);
+  });
+  const mA = _indexarAlunos(aa), mE = _indexarAlunos(ea);
+  const faltam = [], soBanco = [], alterados = [];
+  mE.forEach((a, k) => {
+    if (!mA.has(k)) faltam.push(a);
+    else if (_sig(_semVolateis(a)) !== _sig(_semVolateis(mA.get(k)))) alterados.push({ banco: mA.get(k), backup: a });
+  });
+  mA.forEach((a, k) => { if (!mE.has(k)) soBanco.push(a); });
+  if (!camposDiff.length && !faltam.length && !soBanco.length && !alterados.length) return null;
+  return { camposDiff, faltam, soBanco, alterados, nBanco: mA.size, nBackup: mE.size };
+}
+
+/**
+ * Monta a turma final conforme a escolha do usuário:
+ *  - 'repor'        → mantém a turma do banco e só devolve os alunos que
+ *                     faltam nela (ordem do backup; alunos que só existem
+ *                     no banco e edições do banco são preservados).
+ *  - 'sobrescrever' → substitui a turma inteira pela do backup.
+ */
+function _montarTurmaMesclada(atual, entrada, modo) {
+  if (modo === 'sobrescrever') {
+    const nova = { ...entrada, _id: atual._id ?? entrada._id };
+    if (atual.createdAt !== undefined) nova.createdAt = atual.createdAt;
+    return nova;
+  }
+  const mA = _indexarAlunos(atual.alunos), mE = _indexarAlunos(entrada.alunos);
+  const usados = new Set(), alunos = [];
+  mE.forEach((a, k) => {
+    if (mA.has(k)) { alunos.push(mA.get(k)); usados.add(k); } else alunos.push(a);
+  });
+  mA.forEach((a, k) => { if (!usados.has(k)) alunos.push(a); });
+  return { ...atual, alunos };
+}
+
+async function _analisarMerge(turmasEntrada, schemasEntrada) {
+  const turmasAtuais=lerTurmasDB();
+  const mapaAtual=new Map(turmasAtuais.map(t=>[t.id||t.turmaId,t]));
+  const novas=[], iguais=[], suspeitas=[], divergentes=[];
+
+  for (const t of turmasEntrada) {
+    const id=t.id||t.turmaId; if(!id) continue;
+    if (mapaAtual.has(id)) {
+      const atual=mapaAtual.get(id);
+      const diff=_diffTurma(atual,t);
+      if (!diff) iguais.push(t); else divergentes.push({entrada:t, atual, diff});
+      continue;
+    }
+    const chave=`${t.anoLetivo||''}|${t.serieTexto||''}`;
+    const parecidas=turmasAtuais.filter(x=>`${x.anoLetivo||''}|${x.serieTexto||''}`===chave&&chave!=='|');
+    if (parecidas.length) suspeitas.push({nova:t,parecidaCom:parecidas}); else novas.push(t);
+  }
+
+  const schemas = await _analisarMergeSchemas(schemasEntrada||[]);
+
+  _pendingMerge={ turmas:{novas,iguais,suspeitas,divergentes}, schemas };
+  _renderMergePreview();
+}
+
+/**
+ * Compara schemas do JSON com os que já existem em `atasSchemas` (Firestore).
+ * Sem esse ID no banco → "novo" (entra direto). Mesmo ID: conteúdo igual →
+ * "idêntico" (ignorado); diferente → "conflito" (checkbox desmarcado por
+ * padrão — nunca sobrescreve sem confirmação explícita, ainda mais
+ * importante pro `padrao`, que só o admin global deveria recriar).
+ * A comparação ignora campos voláteis (updatedAt/createdAt/criadoEm/
+ * atualizadoEm) pra não marcar "conflito" só por causa do timestamp do
+ * Firestore não bater com o do JSON exportado. Sem o shape exato do schema
+ * (schema_ata.html/db.firebase.js não foram lidos por este chat), pode
+ * sobrar algum falso "conflito" por outro campo de metadado desconhecido —
+ * o efeito é só pedir uma confirmação a mais, nunca sobrescrever sozinho.
+ */
+async function _analisarMergeSchemas(schemasEntrada) {
+  let atuais = [];
+  try { atuais = (window.DB?.atasSchemas) ? await window.DB.atasSchemas.list() : []; }
+  catch(e) { console.warn('[merge] falha ao ler atasSchemas atuais:', e.message); }
+  const mapaAtual = new Map(atuais.map(s => [String(s._id||s.id||''), s]));
+  const VOLATEIS = ['updatedAt','createdAt','criadoEm','atualizadoEm'];
+  const limpar = obj => { const c={...obj}; VOLATEIS.forEach(k=>delete c[k]); return c; };
+
+  const novos=[], iguais=[], conflitos=[];
+  for (const s of schemasEntrada) {
+    const id = String(s._id||s.id||'').trim(); if(!id) continue;
+    const atual = mapaAtual.get(id);
+    if (!atual) { novos.push(s); continue; }
+    const igual = JSON.stringify(limpar(s)) === JSON.stringify(limpar(atual));
+    if (igual) iguais.push(s); else conflitos.push({novo:s, atual});
+  }
+  return { novos, iguais, conflitos };
+}
+
+function _renderMergePreview() {
+  if (!_pendingMerge) return;
+  const {novas,iguais,suspeitas,divergentes}=_pendingMerge.turmas;
+  const {novos:schemasNovos,iguais:schemasIguais,conflitos:schemasConflitos}=_pendingMerge.schemas;
+  document.getElementById('mergePreview').style.display='block';
+  document.getElementById('mergeResumo').innerHTML =
+    `Turmas: ${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s) · ${divergentes.length} divergente(s)<br>`+
+    `Schemas: ${schemasNovos.length} novo(s) · ${schemasIguais.length} idêntico(s) · ${schemasConflitos.length} conflito(s)`;
+
+  const lista=document.getElementById('mergeLista'); lista.innerHTML='';
+
+  for (const t of novas) {
+    const div=document.createElement('div'); div.className='merge-item nova';
+    div.innerHTML=`<span class="badge ok">NOVA</span> <b>${esc(t.aba||t.id)}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')} · ${esc(t.serieTexto||'?')} <span class="muted">(${(t.alunos||[]).length} alunos)</span>`;
+    lista.appendChild(div);
+  }
+
+  for (let i=0; i<suspeitas.length; i++) {
+    const {nova,parecidaCom}=suspeitas[i];
+    const div=document.createElement('div'); div.className='merge-item suspeita';
+    div.innerHTML=`
+      <input type="checkbox" id="chkSus${i}" checked style="flex-shrink:0;margin-top:2px;">
+      <div>
+        <span class="badge warn">SUSPEITA</span>
+        <b style="margin-left:6px;">${esc(nova.aba||nova.id)}</b> — ${esc(nova.anoLetivo||'?')} · ${esc(nova.serieTexto||'?')}
+        <span class="muted">(${(nova.alunos||[]).length} alunos)</span><br>
+        <span class="muted" style="font-size:11px;">⚠️ Parecida com: ${parecidaCom.map(x=>esc(x.aba||x.id)).join(', ')}</span>
+      </div>`;
+    lista.appendChild(div);
+  }
+
+  const _nomes = (arr, max=6) => {
+    const n = arr.map(a => esc(a?.nome || a?.alunoId || '?'));
+    return n.slice(0,max).join(', ') + (n.length>max ? ` … (+${n.length-max})` : '');
+  };
+  for (let i=0; i<divergentes.length; i++) {
+    const {entrada,atual,diff}=divergentes[i];
+    const div=document.createElement('div'); div.className='merge-item suspeita';
+    const linhas=[];
+    linhas.push(`Alunos: <b>${diff.nBanco}</b> no banco · <b>${diff.nBackup}</b> no backup`);
+    if (diff.faltam.length)    linhas.push(`➖ Faltam no banco (${diff.faltam.length}): ${_nomes(diff.faltam)}`);
+    if (diff.soBanco.length)   linhas.push(`➕ Só existem no banco (${diff.soBanco.length}): ${_nomes(diff.soBanco)}`);
+    if (diff.alterados.length) linhas.push(`✏️ Alunos com dados diferentes: ${diff.alterados.length} — ${_nomes(diff.alterados.map(x=>x.backup))}`);
+    if (diff.camposDiff.length) linhas.push(`🗂️ Campos da turma diferentes: ${diff.camposDiff.map(esc).join(', ')}`);
+    div.innerHTML=`
+      <div style="flex:1;">
+        <span class="badge warn">DIVERGENTE</span>
+        <b style="margin-left:6px;">${esc(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${esc(entrada.anoLetivo||'?')} · ${esc(entrada.serieTexto||'?')}<br>
+        <span class="muted" style="font-size:11px;">${linhas.join('<br>')}</span><br>
+        <select id="selDiv${i}" style="margin-top:6px;">
+          <option value="">Não importar (manter o banco)</option>
+          ${diff.faltam.length?'<option value="repor">Repor só os alunos que faltam (mantém o resto do banco)</option>':''}
+          <option value="sobrescrever">Sobrescrever a turma inteira pelo backup${diff.soBanco.length?' (perde os '+diff.soBanco.length+' só do banco)':''}</option>
+        </select>
+      </div>`;
+    lista.appendChild(div);
+  }
+
+  for (const t of iguais) {
+    const div=document.createElement('div'); div.className='merge-item igual';
+    div.innerHTML=`<span class="badge">IDÊNTICA</span> <b>${esc(t.aba||t.id)}</b> — será ignorada`;
+    lista.appendChild(div);
+  }
+
+  const wrapSchemas=document.getElementById('mergeSchemasWrap');
+  const listaSchemas=document.getElementById('mergeListaSchemas'); listaSchemas.innerHTML='';
+  wrapSchemas.style.display=(schemasNovos.length||schemasIguais.length||schemasConflitos.length)?'block':'none';
+
+  for (const s of schemasNovos) {
+    const id=s._id||s.id, nome=s.nome||s.titulo||id;
+    const div=document.createElement('div'); div.className='merge-item nova';
+    div.innerHTML=`<span class="badge ok">NOVO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span>`;
+    listaSchemas.appendChild(div);
+  }
+
+  for (let i=0; i<schemasConflitos.length; i++) {
+    const {novo}=schemasConflitos[i];
+    const id=novo._id||novo.id, nome=novo.nome||novo.titulo||id;
+    const ehPadrao = id==='padrao';
+    const div=document.createElement('div'); div.className='merge-item suspeita';
+    div.innerHTML=`
+      <input type="checkbox" id="chkSchemaConf${i}" style="flex-shrink:0;margin-top:2px;">
+      <div>
+        <span class="badge warn">CONFLITO${ehPadrao?' · PADRÃO':''}</span>
+        <b style="margin-left:6px;">${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span><br>
+        <span class="muted" style="font-size:11px;">⚠️ Já existe um schema com este ID e conteúdo diferente${ehPadrao?' — este é o schema padrão da escola, confirme com atenção':''}. Desmarcado por padrão: marque só se quiser <b>sobrescrever</b> o schema atual pelo do backup.</span>
+      </div>`;
+    listaSchemas.appendChild(div);
+  }
+
+  for (const s of schemasIguais) {
+    const id=s._id||s.id, nome=s.nome||s.titulo||id;
+    const div=document.createElement('div'); div.className='merge-item igual';
+    div.innerHTML=`<span class="badge">IDÊNTICO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span> — será ignorado`;
+    listaSchemas.appendChild(div);
+  }
+}
+
+async function aplicarMerge() {
+  if (!IS_ADMIN||!_pendingMerge) return;
+  const {novas,suspeitas,divergentes}=_pendingMerge.turmas;
+  const {novos:schemasNovos,conflitos:schemasConflitos}=_pendingMerge.schemas;
+  const suspeitasIncluir=suspeitas.filter((_,i)=>document.getElementById(`chkSus${i}`)?.checked).map(s=>s.nova);
+  const paraAdicionar=[...novas,...suspeitasIncluir];
+  const schemasConflitosIncluir=schemasConflitos.filter((_,i)=>document.getElementById(`chkSchemaConf${i}`)?.checked).map(c=>c.novo);
+  const schemasParaSalvar=[...schemasNovos,...schemasConflitosIncluir];
+
+  // Divergentes: só entram as que o usuário escolheu (padrão = não importar)
+  const modificadas=new Map(); // id da turma → { nova, modo, atual }
+  divergentes.forEach((d,i)=>{
+    const modo=document.getElementById(`selDiv${i}`)?.value;
+    if (!modo) return;
+    const id=d.atual.id||d.atual.turmaId;
+    modificadas.set(id,{ nova:_montarTurmaMesclada(d.atual,d.entrada,modo), modo, atual:d.atual, diff:d.diff });
+  });
+
+  clearLogEl('logJSON');
+  if (!paraAdicionar.length && !modificadas.size && !schemasParaSalvar.length) { logEl('ℹ️ Nada selecionado para adicionar.','logJSON'); cancelarMerge(); return; }
+
+  if (paraAdicionar.length || modificadas.size) {
+    logEl(`Adicionando ${paraAdicionar.length} turma(s) e atualizando ${modificadas.size} divergente(s)...`,'logJSON');
+    const turmasFinais=[...lerTurmasDB().map(t=>modificadas.get(t.id||t.turmaId)?.nova||t),...paraAdicionar];
+    try { await salvarTurmasDB(turmasFinais); }
+    catch(e) {
+      logEl('❌ Falha ao gravar turmas: '+e.message+' — recarregue a página antes de tentar de novo.','logJSON');
+      return;
+    }
+    // reconstruirAuxiliares() (não a versão local-only): sem isso, `matriculas`
+    // nunca é gravado de verdade no Firestore, e
+    // recalcularUltimoAnoRegistroBatch() não acha nada.
+    const aux=reconstruirAuxiliares(turmasFinais);
+    logEl(`✅ Merge de turmas aplicado: +${paraAdicionar.length} nova(s) · ${modificadas.size} divergente(s) atualizada(s).`,'logJSON');
+    logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
+    paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
+    modificadas.forEach(m=>logEl(`  ✔ ${m.nova.aba||m.nova.id} — ${m.modo==='repor'?`repostos ${m.diff.faltam.length} aluno(s)`:'sobrescrita pelo backup'}`,'logJSON'));
+
+    try {
+      const idsEnvolvidos=[...new Set([...paraAdicionar,...[...modificadas.values()].map(m=>m.nova)].flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
+      if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+        const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
+        await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, dadosEscola?.configAnoAtivo ?? null);
+        logEl(`↻ ultimoAnoRegistro recalculado para ${idsEnvolvidos.length} aluno(s).`,'logJSON');
+      }
+    } catch(e) { console.warn('[aplicarMerge] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
+  }
+
+  if (schemasParaSalvar.length) {
+    logEl(`Salvando ${schemasParaSalvar.length} schema(s)...`,'logJSON');
+    let ok=0, falhas=0;
+    for (const s of schemasParaSalvar) {
+      try { await window.DB.atasSchemas.save(s); ok++; }
+      catch(e) { falhas++; console.warn('[aplicarMerge] falha ao salvar schema', s._id||s.id, e.message); }
+    }
+    logEl(`✅ Schemas salvos: ${ok}${falhas?` • ⚠️ ${falhas} falharam (veja o console)`:''}.`,'logJSON');
+    schemasParaSalvar.forEach(s=>logEl(`  ✔ ${s.nome||s.titulo||s._id||s.id}`,'logJSON'));
+  }
+
+  cancelarMerge();
+  renderTabelaTurmas();
+  atualizarStats();
+}
+
+function cancelarMerge() {
+  _pendingMerge=null;
+  document.getElementById('mergePreview').style.display='none';
+  document.getElementById('mergeLista').innerHTML='';
+  document.getElementById('mergeListaSchemas').innerHTML='';
+  document.getElementById('mergeSchemasWrap').style.display='none';
+}
+</script>
+
+</body>
+</html>
