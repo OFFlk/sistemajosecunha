@@ -67,6 +67,12 @@ html[data-theme="dark"] main .card .acoes button.primary:hover {
   color: var(--brand-fg, #fff);
 }
 
+/* animação de entrada do toast (guia-toasts) */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
    desktop e mobile (sem depender de hover). ===== */
 .info-tip{
@@ -177,7 +183,6 @@ html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b
 
     <div class="acoes">
       <button class="primary" type="button" onclick="salvarDados()">Salvar</button>
-      <span id="feedbackEscola" style="display:none;margin-left:12px;font-weight:700;font-size:14px"></span>
     </div>
 
   </div>
@@ -255,7 +260,7 @@ function salvarDados() {
   const nomeEl = document.getElementById('nomeEscola');
   const endEl  = document.getElementById('enderecoEscola');
   if (!nomeEl?.value?.trim() || !endEl?.value?.trim()) {
-    alert('Preencha os campos obrigatórios.');
+    setMsg('Preencha os campos obrigatórios.', 'err');
     return;
   }
 
@@ -283,6 +288,7 @@ function salvarDados() {
   };
 
   // Salva no Firestore via DB.escola.save()
+  setMsg('Salvando…', 'loading');
   DB.escola.save(dadosEscola)
     .then(() => {
       // Mantém também no localStorage como cache local (usado por historico_auto)
@@ -292,24 +298,12 @@ function salvarDados() {
           : 'dadosEscola';
         localStorage.setItem(key, JSON.stringify(dadosEscola));
       } catch {}
-      mostrarFeedback('Dados salvos com sucesso!', 'ok');
+      setMsg('Dados salvos com sucesso!', 'ok');
     })
     .catch(err => {
       console.error('Erro ao salvar:', err);
-      mostrarFeedback('Erro ao salvar. Tente novamente.', 'erro');
+      setMsg('Erro ao salvar. Tente novamente.', 'err');
     });
-}
-
-function mostrarFeedback(msg, tipo) {
-  const el = document.getElementById('feedbackEscola');
-  if (el) {
-    el.textContent = msg;
-    el.style.display = 'block';
-    el.style.color = tipo === 'erro' ? 'var(--danger, #b91c1c)' : 'var(--brand2, #0b3fbf)';
-    setTimeout(() => { el.style.display = 'none'; }, 3500);
-  } else {
-    alert(msg);
-  }
 }
 
 function preencherFormEscola(escola) {
@@ -484,6 +478,55 @@ function preencherFormEscola(escola) {
 </div>
 
 <script>
+// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+
+// Ponto de entrada único: setMsg(texto, kind) — ok | warn | loading | err
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
 // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
 document.addEventListener("click", function () {
   document.querySelectorAll(".info-tip.open").forEach(function (el) { el.classList.remove("open"); });
