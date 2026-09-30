@@ -66,7 +66,7 @@ button.btn-primary,
 button.btn.btn-primary {
   background: var(--brand, #7c3aed);
   border-color: var(--brand, #7c3aed);
-  color: #fff;
+  color: var(--brand-fg, #fff);
   box-shadow: 0 4px 14px rgba(0,0,0,0.15);
 }
 .btn.btn-primary:hover,
@@ -190,14 +190,15 @@ html[data-theme="dark"] .wrap input::placeholder, html[data-theme="dark"] .wrap 
   font-family:'Nunito',sans-serif; font-size:14px; white-space:nowrap;
   transition:background 0.18s, border-color 0.18s;
 }
-.wrap button:not(.gray):not(.out), .wrap .btn:not(.gray):not(.out) { background:var(--brand,#7c3aed); border-color:var(--brand,#7c3aed); color:#fff; }
-.wrap button:not(.gray):not(.out):hover, .wrap .btn:not(.gray):not(.out):hover { background:var(--brand-hover,#6d28d9); border-color:var(--brand-hover,#6d28d9); }
-html[data-theme="dark"] .wrap button:not(.gray):not(.out), html[data-theme="dark"] .wrap .btn:not(.gray):not(.out) { background:var(--brand-d,#7c3aed); border-color:var(--brand-d,#7c3aed); }
+/* Primário agora é EXPLÍCITO: class="btn btn-primary" (Pesquisar, Exportar DOCX, Salvar dados pessoais).
+   Antes, qualquer botão sem .gray/.out virava primário automaticamente. */
 .wrap button.gray, .wrap .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
 .wrap button.gray:hover, .wrap .btn.gray:hover { background:var(--brand-faded,#f5f3ff); border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
-.wrap button.out, .wrap .btn.out { background:transparent; border:1px solid var(--brand,#7c3aed); color:var(--brand,#7c3aed); }
+.wrap button.out, .wrap .btn.out { background:transparent; border:1px solid var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
 .wrap button.out:hover, .wrap .btn.out:hover { background:var(--brand-faded,#f5f3ff); }
-html[data-theme="dark"] .wrap button.out, html[data-theme="dark"] .wrap .btn.out { border-color:var(--brand-d,#7c3aed); color:var(--brand-d,#7c3aed); }
+html[data-theme="dark"] .wrap button.out, html[data-theme="dark"] .wrap .btn.out { border-color:var(--brand-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
+html[data-theme="dark"] .wrap button.out:hover, html[data-theme="dark"] .wrap .btn.out:hover { background:var(--brand-faded-d,rgba(124,58,237,0.28)); }
+html[data-theme="dark"] .wrap button.gray:hover, html[data-theme="dark"] .wrap .btn.gray:hover { background:var(--brand-faded-d,rgba(124,58,237,0.28)); border-color:var(--brand-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
 html[data-theme="dark"] .wrap button.gray, html[data-theme="dark"] .wrap .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
 .toolbar { display:flex; gap:8px; flex-wrap:wrap; }
 table { width:100%; border-collapse:collapse; font-size:12px; }
@@ -225,6 +226,80 @@ html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
 .row > div:has(.schemaChInline) > label { flex-shrink:0; }
 .row > div:has(.schemaChInline) > .schemaChInline { flex:1; }
 
+
+/* ===== Título de card (todo card da página tem título no topo-esquerdo) ===== */
+.card-title{ margin:0 0 8px; font-size:inherit; font-weight:700; line-height:1.3; }
+
+/* ===== Card de destaque (criado do zero nesta página; contraste via ThemeColors.ajustarContraste) ===== */
+.card.card-destaque {
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,.18);
+  --dest-btn-bd: rgba(255,255,255,.40);
+  --dest-btn-hover: rgba(255,255,255,.28);
+  --dest-panel-bg: rgba(255,255,255,.10);
+  background: var(--btn-home-bg); border-color: var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #0f172a;
+  --dest-btn-bg: rgba(0,0,0,.08);
+  --dest-btn-bd: rgba(0,0,0,.25);
+  --dest-btn-hover: rgba(0,0,0,.16);
+  --dest-panel-bg: rgba(0,0,0,.06);
+  border-color: var(--border);
+}
+.card-destaque h3, .card-destaque .card-title { color: var(--dest-fg); }
+.card-destaque > .card-title { margin-bottom:0; }
+.card-destaque .row > div > label { color: var(--dest-fg); }
+/* botões dentro do destaque (5.5): primário = véu + borda; outline = só contorno.
+   Prefixo .wrap .card.card-destaque vence os overrides dark do próprio CSS da página. */
+.wrap .card.card-destaque .btn-primary,
+html[data-theme="dark"] .wrap .card.card-destaque .btn-primary {
+  background: var(--dest-btn-bg); border: 1.5px solid var(--dest-fg); color: var(--dest-fg); font-weight: 800; box-shadow: none;
+}
+.wrap .card.card-destaque .btn-primary:hover:not(:disabled),
+html[data-theme="dark"] .wrap .card.card-destaque .btn-primary:hover:not(:disabled) {
+  background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
+}
+.wrap .card.card-destaque .btn-outline,
+html[data-theme="dark"] .wrap .card.card-destaque .btn-outline {
+  background: transparent; border: 1.5px solid var(--dest-btn-bd); color: var(--dest-fg);
+}
+.wrap .card.card-destaque .btn-outline:hover:not(:disabled),
+html[data-theme="dark"] .wrap .card.card-destaque .btn-outline:hover:not(:disabled) {
+  background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
+}
+
+/* checkbox: .wrap input (width:100% + padding) não pode valer pra caixa de seleção */
+.wrap input[type="checkbox"] { width:auto; padding:0; margin:0; flex:0 0 auto; }
+/* linha de status do DOCX some quando vazia (só aparece durante/depois de exportar) */
+#docxStatus:empty { display:none; }
+
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2).
+   Tokens reais desta página: --card-bg / --card-border (definidos no :root acima) e --ink (base.css). ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+  text-transform:none; letter-spacing:normal;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card-bg, #ffffff); border:1.5px solid var(--card-border, #cbd5e1); color:var(--ink, #1e293b);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal;
+  font-family:'Nunito',sans-serif; line-height:1.4; text-align:left; text-transform:none; letter-spacing:normal;
+  white-space:normal; cursor:default;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
+/* card Definições: rótulos na mesma linha (o Schema CH é mais alto por ter select + botão) */
+#topFieldsRow{ align-items:flex-start; }
+.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+.info-tip-bubble.align-right{ left:auto; right:0; }
 </style>
 </head>
 <body>
@@ -240,16 +315,41 @@ html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
 
 
 <div class="wrap">
-  <div class="card">
+
+  <!-- 1) Pesquisa (card de destaque) -->
+  <div class="card card-destaque">
+    <h3 class="card-title">Pesquisa de aluno</h3>
     <div class="row">
       <div style="flex:2;min-width:280px">
-        <label>Buscar aluno (ID ou nome) — base: turmas/atas <span class="small muted">(mínimo 3 caracteres)</span></label>
+        <label>Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Busca por ID ou nome do aluno. Para que a listagem seja feita, é necessário digitar pelo menos 3 caracteres. O número de resultados é limitado: quanto mais completo for o nome ou o ID, mais precisa será a pesquisa.</span></span></label>
         <input id="qAluno" oninput="autoSearch()" placeholder="Ex.: ALU-000138 ou ADRIANA">
       </div>
-      <div style="flex:0 0 auto;min-width:auto"><button onclick="pesquisar()">Pesquisar</button></div>
-      <div style="flex:0 0 auto;min-width:auto"><button class="gray" onclick="limpar()">Limpar</button></div>
+      <div style="flex:0 0 auto;min-width:auto"><button type="button" class="btn btn-primary" onclick="pesquisar()">Pesquisar</button></div>
+      <div style="flex:0 0 auto;min-width:auto"><button type="button" class="btn btn-outline" onclick="limpar()">Limpar</button></div>
     </div>
-    <div class="row" id="topFieldsRow" style="margin-top:10px">
+  </div>
+
+  <!-- 2) Resultados | 3) Aluno selecionado -->
+  <div class="cols">
+    <div class="card">
+      <div class="card-title">Resultados <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Clique em um resultado abaixo para que os dados do aluno sejam exibidos nos demais campos da página.</span></span></div>
+      <div id="resultados" class="list"><div class="item muted">Digite parte do nome ou ID e clique em pesquisar.</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Aluno selecionado</div>
+      <div id="resumoAluno" class="small muted">Nenhum aluno selecionado.</div>
+      <div class="toolbar" style="margin-top:10px;flex-wrap:wrap">
+        <button type="button" class="btn btn-primary" onclick="exportarDOCX()">Exportar DOCX</button>
+        <button type="button" class="btn out" onclick="exportarPDF()">Exportar PDF</button>
+      </div>
+      <div id="docxStatus" class="small muted" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- 4) Definições da exportação (card de destaque) -->
+  <div class="card card-destaque" id="cardDefinicoes">
+    <h3 class="card-title">Definições da exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os campos abaixo são regras e textos que preenchem lacunas no documento final: o formato do histórico, o nome da escola, a cidade e a data de emissão que saem no documento, e como a carga horária (CH) é aplicada.</span></span></h3>
+    <div class="row" id="topFieldsRow">
       <div>
         <label>Formato do histórico</label>
         <select id="formato" onchange="onFormatoMudou()">
@@ -278,52 +378,28 @@ html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
             <option value="GLOBAL">Usar regras cadastradas (global)</option>
             <option value="OFF">Não aplicar CH automática</option>
           </select>
-          <a id="btnSchemaCH" class="btn out" href="/paginas/schema_ch.html" rel="noopener" style="white-space:nowrap;text-decoration:none">Schema CH</a>
+          <a id="btnSchemaCH" class="btn btn-outline" href="/paginas/schema_ch.html" rel="noopener" style="white-space:nowrap;text-decoration:none">Schema CH</a>
         </div>
         <div class="small muted hidden" id="schemaCHResumo" style="margin-top:4px;display:none !important">Lendo regras do localStorage...</div>
       </div>
     </div>
-    <div class="small" id="dbInfo" style="margin-top:10px">Carregando DB...</div>
   </div>
 
+  <!-- 5) Diagnóstico | 6) Histórico local de exportações -->
   <div class="cols">
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:8px">Resultados</div>
-      <div id="resultados" class="list"><div class="item muted">Digite parte do nome ou ID e clique em pesquisar.</div></div>
+    <div class="card" id="cardDiagExport">
+      <div class="card-title">Diagnóstico e validação de exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Aluno selecionado:</b> nome completo do aluno.<br><b>Resumo por ano:</b> quantidade de anos em que o aluno estudou na escola.<br><b>CH:</b> identifica divergências entre o schema de carga horária e o schema encontrado na turma do aluno.<br><b>Notas faltando:</b> identifica notas ausentes, com base no que o schema de carga horária esperava.<br><b>CH faltando:</b> identifica a carga horária por matéria que está ausente, com base no que o schema de carga horária esperava.<br><b>Campos essenciais:</b> identifica campos obrigatórios do documento que não foram preenchidos.</span></span></div>
+      <div id="diagExportStatus" class="small muted">Selecione um aluno para ver o diagnóstico.</div>
     </div>
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:8px">Aluno selecionado</div>
-      <div id="resumoAluno" class="small muted">Nenhum aluno selecionado.</div>
-      <div class="toolbar" style="margin-top:10px;flex-wrap:wrap">
-        <button class="out" onclick="copiarJSONLimpo()">Copiar JSON (Limpo)</button>
-        <button class="out" onclick="baixarJSONLimpo()">Baixar JSON (Limpo)</button>
-        <button class="out" onclick="copiarJSON()">Copiar JSON (Completo)</button>
-        <button class="out" onclick="baixarJSON()">Baixar JSON (Completo)</button>
-        <button onclick="exportarDOCX()">Exportar DOCX</button>
-      </div>
-      <div id="docxStatus" class="small muted" style="margin-top:8px">DOCX: pronto para exportar (template embutido).</div>
-    </div>
-  </div>
-
-  <div class="card" id="cardDiagExport">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-      <div style="font-weight:700">Diagnóstico e validação de exportação</div>
-      <div class="small muted">Painel rápido para conferir antes de exportar</div>
-    </div>
-    <div class="row" style="margin-top:10px">
-      <div style="min-width:280px;flex:1.2">
-        <div id="diagExportStatus" class="small muted">Selecione um aluno para ver o diagnóstico.</div>
-      </div>
-      <div style="min-width:280px;flex:1">
-        <label style="margin-bottom:6px">Histórico local de exportações (últimas 6)</label>
-        <div id="exportHistoryBox" class="small muted">Nenhuma exportação registrada.</div>
-      </div>
+    <div class="card" id="cardExportHist">
+      <div class="card-title">Histórico local de exportações (últimas 6)</div>
+      <div id="exportHistoryBox" class="small muted">Nenhuma exportação registrada.</div>
     </div>
   </div>
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
-      <div style="font-weight:700">Dados pessoais (editáveis)</div>
+      <div class="card-title" style="margin:0">Dados pessoais <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Aqui você pode adicionar os dados pessoais do aluno. Eles costumam ser preenchidos automaticamente com os dados do módulo Ano Ativo. Se o aluno só tiver dados no módulo de atas, adicione-os aqui e salve: assim, se precisar refazer a exportação, todos os dados continuarão salvos.</span></span></div>
       <button type="button" id="btnSalvarPessoais" onclick="salvarDadosPessoais()" style="display:none;" class="btn btn-primary">💾 Salvar dados pessoais</button>
     </div>
     <div id="dadosPessoaisWrap" class="small muted">Selecione um aluno para preencher/editar dados pessoais.</div>
@@ -331,26 +407,17 @@ html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-      <div style="font-weight:700">Linha do tempo encontrada (turmas/atas)</div>
-      <div class="small">Busca no padrão da página <span class="mono">pesquisa-ata.html</span></div>
-    </div>
+    <div class="card-title">Linha do tempo encontrada <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Na tabela abaixo são apresentados, em ordem cronológica, todos os registros de frequência do aluno, listando o ano letivo, a série e a turma que ele frequentou.</span></span></div>
     <div id="timeline" style="margin-top:10px" class="small muted">Selecione um aluno.</div>
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-      <div style="font-weight:700">Resumo por ano (editável por linha)</div>
-      <div class="small">Resumo compactado (sem buracos) + escola editável por ano</div>
-    </div>
+    <div class="card-title">Resumo por ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Usando a lista da tabela acima, é montada a lista apresentada na tabela abaixo. Essa mesma ordem será importada para o campo “ESTABELECIMENTO DE ENSINO” do documento oficial. Você pode editar a ordem e todos os campos.</span></span></div>
     <div id="resumoEditavel" style="margin-top:10px" class="small muted">Selecione um aluno.</div>
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-      <div style="font-weight:700">Prévia das notas (como sai no DOCX)</div>
-      <div class="small">Somente campos N/C por linha (A1..A9)</div>
-    </div>
+    <div class="card-title">Prévia das notas</div>
     <div id="notasPreviewDocx" style="margin-top:10px" class="small muted">Selecione um aluno.</div>
   </div>
 
@@ -475,10 +542,7 @@ html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
 <div id="previewWrap" style="margin-top:10px"></div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
-      <div style="font-weight:700">Placeholders (JSON)</div>
-      <div class="small">Prévia padrão (JSON limpo/debug). Export DOCX usa JSON completo com aliases.</div>
-    </div>
+    <div class="card-title">Placeholders (JSON)</div>
     <textarea id="outJson" readonly></textarea>
   </div>
 
@@ -563,9 +627,7 @@ function __getDadosEscolaKey(){
   }catch(e){ return 'dadosEscola'; }
 }
 
-function _atualizarDbInfo(){
-  document.getElementById('dbInfo').innerHTML = `<b>Base carregada:</b> turmasDB=${Array.isArray(state.db.turmasDB)?state.db.turmasDB.length:0}, alunosDB=${Array.isArray(state.db.alunosDB)?state.db.alunosDB.length:0}, matriculasDB=${Array.isArray(state.db.matriculasDB)?state.db.matriculasDB.length:0}`;
-}
+function _atualizarDbInfo(){ /* linha "Base carregada" removida da tela — mantida como no-op porque o restante do JS ainda a chama */ }
 function _prePopulaEscolaFields(){
   const db = state.db.dadosEscola || {};
   const cidadeInp = document.getElementById('inCidade');
@@ -892,7 +954,7 @@ function renderDadosPessoaisEditor(){
     <div><label>NIS</label><input class="mini-input" data-pf="nis" value="${esc(v('nis',e.nis||''))}" ${dis}></div>
     <div><label>Sexo</label><select class="mini-input" data-pf="sexo" ${dis}><option value=""></option><option value="M" ${String(v('sexo',e.sexo||'')).toUpperCase()==='M'?'selected':''}>M</option><option value="F" ${String(v('sexo',e.sexo||'')).toUpperCase()==='F'?'selected':''}>F</option></select></div>
     <div><label>Data nascimento</label><input type="date" class="mini-input" data-pf="dataNascimento_iso" value="${esc(dateISO)}" ${dis}></div>
-    <div><label>Naturalidade</label><div style="display:grid;grid-template-columns:1fr 82px auto;gap:8px;align-items:end"><input class="mini-input" data-pf="naturalidade" value="${esc(v('naturalidade',e.naturalidade||''))}" ${dis}><div style="display:flex;flex-direction:column;gap:3px;"><label style="font-size:11px;font-weight:700;margin:0;color:var(--muted)">UF</label><select class="mini-input" data-pf="ufNascimento" ${nascEstr?'disabled':''} ${dis}><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div><label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:400"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div></div>
+    <div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><label style="margin:0">Naturalidade</label><label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:400;font-size:12px"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div><div style="display:grid;grid-template-columns:1fr 92px;gap:8px"><input class="mini-input" data-pf="naturalidade" value="${esc(v('naturalidade',e.naturalidade||''))}" ${dis}><select class="mini-input" data-pf="ufNascimento" ${nascEstr?'disabled':''} ${dis}><option value="">UF</option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div></div>
     <div><label>Mãe</label><input class="mini-input" data-pf="mae" value="${esc(v('mae',e.mae||''))}" ${dis}></div>
     <div><label>Pai</label><input class="mini-input" data-pf="pai" value="${esc(v('pai',e.pai||''))}" ${dis}></div>
   </div>`;
@@ -1922,6 +1984,11 @@ async function exportarDOCX(){
   }
 }
 
+// Exportar PDF: botão já pronto na tela; a geração ainda não foi implementada.
+function exportarPDF(){
+  if(!state.selected) return alert('Selecione um aluno primeiro.');
+  alert('Exportação em PDF ainda não está disponível.');
+}
 function limpar(){ document.getElementById('qAluno').value=''; document.getElementById('resultados').innerHTML='<div class="item muted">Digite parte do nome ou ID e clique em pesquisar.</div>'; }
 async function recarregarDB(){
   await carregarDB();
@@ -1955,7 +2022,13 @@ async function importarDump(){
 }
 function onFormatoMudou(){ renderTimeline(); renderResumoEditavel(); refreshSaida(); }
 
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+document.addEventListener("click", ()=>{
+  document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+});
+
 document.addEventListener('DOMContentLoaded', async ()=>{
+  if (window.ThemeColors) ThemeColors.ajustarContraste(); // cards .card-destaque (texto pelo contraste da marca)
   const d=new Date(); document.getElementById('inData').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   await carregarDB(); // aguarda cache local + Firestore antes de liberar a tela
   chInitUI();
