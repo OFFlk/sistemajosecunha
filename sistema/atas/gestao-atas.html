@@ -240,7 +240,7 @@ a.btn.btn-primary:hover {
       <span class="sec-toggle" id="togSecJSON">▼</span>
     </div>
     <div class="sec-body" id="secJSON">
-      <p class="muted">Envie um arquivo de backup JSON para restaurar turmas e schemas. O sistema mantém o que já existe e sempre avisa antes de sobrescrever qualquer coisa.</p>
+      <p class="muted">Envie um arquivo de backup JSON para restaurar turmas e schemas. O sistema compara turma por turma, incluindo os alunos de cada uma, sem custo extra de leitura (os alunos já vêm dentro do documento da turma). Nada é sobrescrito sem você escolher.</p>
       <div class="row-btns">
         <label class="btn btn-outline" id="lblJSON" style="cursor:pointer;">
           📂 Carregar JSON de backup
@@ -1060,14 +1060,96 @@ function analisarJSON(event) {
   event.target.value='';
 }
 
+/* ── Comparação de CONTEÚDO de turma (inclui o array `alunos`) ──────────
+ * Os alunos ficam dentro do documento da turma, e as turmas já estão em
+ * memória (lidas em inicializar()) — comparar o conteúdo NÃO faz nenhuma
+ * leitura extra no Firestore. Antes, "mesmo id de turma" já bastava pra
+ * marcar como idêntica, então um aluno removido do banco passava batido.
+ */
+const _VOL_TURMA = ['_id','updatedAt','createdAt','criadoEm','atualizadoEm'];
+
+// Normaliza pra comparação: ordem das chaves não importa, undefined some.
+function _estavel(v) {
+  if (Array.isArray(v)) return v.map(_estavel);
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v).sort().forEach(k => { if (v[k] !== undefined) o[k] = _estavel(v[k]); });
+    return o;
+  }
+  return v;
+}
+function _sig(v) { return JSON.stringify(_estavel(v)); }
+function _semVolateis(obj) { const c = { ...obj }; _VOL_TURMA.forEach(k => delete c[k]); return c; }
+
+// Indexa alunos por alunoId (ou nome+série quando não há ID). Repetidos
+// ganham sufixo de ocorrência (#1, #2...) pra não se sobrescreverem.
+function _indexarAlunos(arr) {
+  const m = new Map(), vistos = {};
+  (Array.isArray(arr) ? arr : []).forEach(a => {
+    const id = String(a?.alunoId || '').trim();
+    const base = id ? 'id:' + id
+      : 'sem:' + String(a?.nome || '').trim().toUpperCase() + '|' + String(a?.serie || '').trim();
+    vistos[base] = (vistos[base] || 0) + 1;
+    m.set(base + '#' + vistos[base], a);
+  });
+  return m;
+}
+
+// null = idêntica. Senão devolve o que difere.
+function _diffTurma(atual, entrada) {
+  const { alunos: aa, ...ra } = atual;
+  const { alunos: ea, ...re } = entrada;
+  const camposDiff = [];
+  new Set([...Object.keys(ra), ...Object.keys(re)]).forEach(k => {
+    if (_VOL_TURMA.includes(k)) return;
+    if (_sig(ra[k]) !== _sig(re[k])) camposDiff.push(k);
+  });
+  const mA = _indexarAlunos(aa), mE = _indexarAlunos(ea);
+  const faltam = [], soBanco = [], alterados = [];
+  mE.forEach((a, k) => {
+    if (!mA.has(k)) faltam.push(a);
+    else if (_sig(_semVolateis(a)) !== _sig(_semVolateis(mA.get(k)))) alterados.push({ banco: mA.get(k), backup: a });
+  });
+  mA.forEach((a, k) => { if (!mE.has(k)) soBanco.push(a); });
+  if (!camposDiff.length && !faltam.length && !soBanco.length && !alterados.length) return null;
+  return { camposDiff, faltam, soBanco, alterados, nBanco: mA.size, nBackup: mE.size };
+}
+
+/**
+ * Monta a turma final conforme a escolha do usuário:
+ *  - 'repor'        → mantém a turma do banco e só devolve os alunos que
+ *                     faltam nela (ordem do backup; alunos que só existem
+ *                     no banco e edições do banco são preservados).
+ *  - 'sobrescrever' → substitui a turma inteira pela do backup.
+ */
+function _montarTurmaMesclada(atual, entrada, modo) {
+  if (modo === 'sobrescrever') {
+    const nova = { ...entrada, _id: atual._id ?? entrada._id };
+    if (atual.createdAt !== undefined) nova.createdAt = atual.createdAt;
+    return nova;
+  }
+  const mA = _indexarAlunos(atual.alunos), mE = _indexarAlunos(entrada.alunos);
+  const usados = new Set(), alunos = [];
+  mE.forEach((a, k) => {
+    if (mA.has(k)) { alunos.push(mA.get(k)); usados.add(k); } else alunos.push(a);
+  });
+  mA.forEach((a, k) => { if (!usados.has(k)) alunos.push(a); });
+  return { ...atual, alunos };
+}
+
 async function _analisarMerge(turmasEntrada, schemasEntrada) {
   const turmasAtuais=lerTurmasDB();
   const mapaAtual=new Map(turmasAtuais.map(t=>[t.id||t.turmaId,t]));
-  const novas=[], iguais=[], suspeitas=[];
+  const novas=[], iguais=[], suspeitas=[], divergentes=[];
 
   for (const t of turmasEntrada) {
     const id=t.id||t.turmaId; if(!id) continue;
-    if (mapaAtual.has(id)) { iguais.push(t); continue; }
+    if (mapaAtual.has(id)) {
+      const atual=mapaAtual.get(id);
+      const diff=_diffTurma(atual,t);
+      if (!diff) iguais.push(t); else divergentes.push({entrada:t, atual, diff});
+      continue;
+    }
     const chave=`${t.anoLetivo||''}|${t.serieTexto||''}`;
     const parecidas=turmasAtuais.filter(x=>`${x.anoLetivo||''}|${x.serieTexto||''}`===chave&&chave!=='|');
     if (parecidas.length) suspeitas.push({nova:t,parecidaCom:parecidas}); else novas.push(t);
@@ -1075,7 +1157,7 @@ async function _analisarMerge(turmasEntrada, schemasEntrada) {
 
   const schemas = await _analisarMergeSchemas(schemasEntrada||[]);
 
-  _pendingMerge={ turmas:{novas,iguais,suspeitas}, schemas };
+  _pendingMerge={ turmas:{novas,iguais,suspeitas,divergentes}, schemas };
   _renderMergePreview();
 }
 
@@ -1113,11 +1195,11 @@ async function _analisarMergeSchemas(schemasEntrada) {
 
 function _renderMergePreview() {
   if (!_pendingMerge) return;
-  const {novas,iguais,suspeitas}=_pendingMerge.turmas;
+  const {novas,iguais,suspeitas,divergentes}=_pendingMerge.turmas;
   const {novos:schemasNovos,iguais:schemasIguais,conflitos:schemasConflitos}=_pendingMerge.schemas;
   document.getElementById('mergePreview').style.display='block';
   document.getElementById('mergeResumo').innerHTML =
-    `Turmas: ${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s)<br>`+
+    `Turmas: ${novas.length} nova(s) · ${iguais.length} idêntica(s) · ${suspeitas.length} suspeita(s) · ${divergentes.length} divergente(s)<br>`+
     `Schemas: ${schemasNovos.length} novo(s) · ${schemasIguais.length} idêntico(s) · ${schemasConflitos.length} conflito(s)`;
 
   const lista=document.getElementById('mergeLista'); lista.innerHTML='';
@@ -1138,6 +1220,33 @@ function _renderMergePreview() {
         <b style="margin-left:6px;">${esc(nova.aba||nova.id)}</b> — ${esc(nova.anoLetivo||'?')} · ${esc(nova.serieTexto||'?')}
         <span class="muted">(${(nova.alunos||[]).length} alunos)</span><br>
         <span class="muted" style="font-size:11px;">⚠️ Parecida com: ${parecidaCom.map(x=>esc(x.aba||x.id)).join(', ')}</span>
+      </div>`;
+    lista.appendChild(div);
+  }
+
+  const _nomes = (arr, max=6) => {
+    const n = arr.map(a => esc(a?.nome || a?.alunoId || '?'));
+    return n.slice(0,max).join(', ') + (n.length>max ? ` … (+${n.length-max})` : '');
+  };
+  for (let i=0; i<divergentes.length; i++) {
+    const {entrada,atual,diff}=divergentes[i];
+    const div=document.createElement('div'); div.className='merge-item suspeita';
+    const linhas=[];
+    linhas.push(`Alunos: <b>${diff.nBanco}</b> no banco · <b>${diff.nBackup}</b> no backup`);
+    if (diff.faltam.length)    linhas.push(`➖ Faltam no banco (${diff.faltam.length}): ${_nomes(diff.faltam)}`);
+    if (diff.soBanco.length)   linhas.push(`➕ Só existem no banco (${diff.soBanco.length}): ${_nomes(diff.soBanco)}`);
+    if (diff.alterados.length) linhas.push(`✏️ Alunos com dados diferentes: ${diff.alterados.length} — ${_nomes(diff.alterados.map(x=>x.backup))}`);
+    if (diff.camposDiff.length) linhas.push(`🗂️ Campos da turma diferentes: ${diff.camposDiff.map(esc).join(', ')}`);
+    div.innerHTML=`
+      <div style="flex:1;">
+        <span class="badge warn">DIVERGENTE</span>
+        <b style="margin-left:6px;">${esc(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${esc(entrada.anoLetivo||'?')} · ${esc(entrada.serieTexto||'?')}<br>
+        <span class="muted" style="font-size:11px;">${linhas.join('<br>')}</span><br>
+        <select id="selDiv${i}" style="margin-top:6px;">
+          <option value="">Não importar (manter o banco)</option>
+          ${diff.faltam.length?'<option value="repor">Repor só os alunos que faltam (mantém o resto do banco)</option>':''}
+          <option value="sobrescrever">Sobrescrever a turma inteira pelo backup${diff.soBanco.length?' (perde os '+diff.soBanco.length+' só do banco)':''}</option>
+        </select>
       </div>`;
     lista.appendChild(div);
   }
@@ -1184,30 +1293,44 @@ function _renderMergePreview() {
 
 async function aplicarMerge() {
   if (!IS_ADMIN||!_pendingMerge) return;
-  const {novas,suspeitas}=_pendingMerge.turmas;
+  const {novas,suspeitas,divergentes}=_pendingMerge.turmas;
   const {novos:schemasNovos,conflitos:schemasConflitos}=_pendingMerge.schemas;
   const suspeitasIncluir=suspeitas.filter((_,i)=>document.getElementById(`chkSus${i}`)?.checked).map(s=>s.nova);
   const paraAdicionar=[...novas,...suspeitasIncluir];
   const schemasConflitosIncluir=schemasConflitos.filter((_,i)=>document.getElementById(`chkSchemaConf${i}`)?.checked).map(c=>c.novo);
   const schemasParaSalvar=[...schemasNovos,...schemasConflitosIncluir];
 
-  clearLogEl('logJSON');
-  if (!paraAdicionar.length && !schemasParaSalvar.length) { logEl('ℹ️ Nada selecionado para adicionar.','logJSON'); cancelarMerge(); return; }
+  // Divergentes: só entram as que o usuário escolheu (padrão = não importar)
+  const modificadas=new Map(); // id da turma → { nova, modo, atual }
+  divergentes.forEach((d,i)=>{
+    const modo=document.getElementById(`selDiv${i}`)?.value;
+    if (!modo) return;
+    const id=d.atual.id||d.atual.turmaId;
+    modificadas.set(id,{ nova:_montarTurmaMesclada(d.atual,d.entrada,modo), modo, atual:d.atual, diff:d.diff });
+  });
 
-  if (paraAdicionar.length) {
-    logEl(`Adicionando ${paraAdicionar.length} turma(s)...`,'logJSON');
-    const turmasFinais=[...lerTurmasDB(),...paraAdicionar];
-    salvarTurmasDB(turmasFinais);
+  clearLogEl('logJSON');
+  if (!paraAdicionar.length && !modificadas.size && !schemasParaSalvar.length) { logEl('ℹ️ Nada selecionado para adicionar.','logJSON'); cancelarMerge(); return; }
+
+  if (paraAdicionar.length || modificadas.size) {
+    logEl(`Adicionando ${paraAdicionar.length} turma(s) e atualizando ${modificadas.size} divergente(s)...`,'logJSON');
+    const turmasFinais=[...lerTurmasDB().map(t=>modificadas.get(t.id||t.turmaId)?.nova||t),...paraAdicionar];
+    try { await salvarTurmasDB(turmasFinais); }
+    catch(e) {
+      logEl('❌ Falha ao gravar turmas: '+e.message+' — recarregue a página antes de tentar de novo.','logJSON');
+      return;
+    }
     // reconstruirAuxiliares() (não a versão local-only): sem isso, `matriculas`
     // nunca é gravado de verdade no Firestore, e
     // recalcularUltimoAnoRegistroBatch() não acha nada.
     const aux=reconstruirAuxiliares(turmasFinais);
-    logEl(`✅ Merge de turmas aplicado: +${paraAdicionar.length} turma(s).`,'logJSON');
+    logEl(`✅ Merge de turmas aplicado: +${paraAdicionar.length} nova(s) · ${modificadas.size} divergente(s) atualizada(s).`,'logJSON');
     logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
     paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
+    modificadas.forEach(m=>logEl(`  ✔ ${m.nova.aba||m.nova.id} — ${m.modo==='repor'?`repostos ${m.diff.faltam.length} aluno(s)`:'sobrescrita pelo backup'}`,'logJSON'));
 
     try {
-      const idsEnvolvidos=[...new Set(paraAdicionar.flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
+      const idsEnvolvidos=[...new Set([...paraAdicionar,...[...modificadas.values()].map(m=>m.nova)].flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
       if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
         const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
         await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, dadosEscola?.configAnoAtivo ?? null);
