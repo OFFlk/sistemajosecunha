@@ -56,6 +56,48 @@ button:disabled {
 [data-tooltip] {
   position: relative;
 }
+
+/* botão Salvar: texto calculado pelo contraste da marca (--brand-fg, theme-colors.js).
+   O estilo base do botão mora em escola_form.css (carrega antes deste <style>);
+   seletor mais forte + variantes de hover/dark garantem que o valor não seja desfeito. */
+main .card .acoes button.primary,
+main .card .acoes button.primary:hover,
+html[data-theme="dark"] main .card .acoes button.primary,
+html[data-theme="dark"] main .card .acoes button.primary:hover {
+  color: var(--brand-fg, #fff);
+}
+
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
+   desktop e mobile (sem depender de hover). ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+  text-transform:none; letter-spacing:normal;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+/* tokens do balão: esta página não define --card/--border/--text, então usa
+   --card-bg/--card-border de base.css (se existirem) com fallback por tema */
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card-bg, #ffffff); border:1.5px solid var(--card-border, #cbd5e1); color:#1e293b;
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal;
+  font-family:inherit; line-height:1.4; text-align:left; text-transform:none; letter-spacing:normal;
+  white-space:normal; cursor:default;
+}
+html[data-theme="dark"] .info-tip-bubble{
+  background:var(--card-bg, #0f172a); border-color:var(--card-border, #334155); color:#e5e7eb;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+/* link dentro do balão (fundo neutro → --brand-text, nunca --brand puro).
+   As linhas html[data-theme="dark"] vencem o "a { color: var(--brand-d) }" do base.css. */
+.info-tip-bubble a{ color:var(--brand-text, #6d28d9); font-weight:700; text-decoration:underline; cursor:pointer; }
+.info-tip-bubble a:hover{ color:var(--brand-text, #6d28d9); }
+html[data-theme="dark"] .info-tip-bubble a,
+html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b5fd); }
 </style>
 </head>
 <body>
@@ -70,12 +112,22 @@ button:disabled {
     <div class="form">
 
       <div class="campo">
-        <label>Nome da escola *</label>
+        <label>Nome da escola *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Informe o nome completo da escola. Esse nome será exibido nas exportações de listas, documentos, fichas e demais exportações em todo o sistema.</span>
+          </span>
+        </label>
         <input type="text" id="nomeEscola" required>
       </div>
 
       <div class="campo">
-        <label>Endereço *</label>
+        <label>Endereço *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Especifique rua, povoado, bairro, número etc. O que informar aqui fica a critério do gestor.</span>
+          </span>
+        </label>
         <input type="text" id="enderecoEscola" required>
       </div>
 
@@ -99,12 +151,22 @@ button:disabled {
       </div>
 
       <div class="campo">
-        <label>Código INEP</label>
+        <label>Código INEP
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Código de identificação da escola, gerado pelo INEP. Se você não souber o INEP da sua escola, consulte no <a href="https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/inep-data/catalogo-de-escolas" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">site oficial do INEP</a>.</span>
+          </span>
+        </label>
         <input type="text" id="inepEscola" inputmode="numeric" maxlength="8" placeholder="Ex.: 12345678" required oninput="this.value=(this.value||'').replace(/\D+/g,'').slice(0,8)" pattern="\d{8}">
       </div>
 
       <div class="campo">
-        <label>Escudo da escola</label>
+        <label>Escudo da escola
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Prefira imagens PNG sem fundo (transparente). Mesmo que os documentos exportados tenham fundo branco, outras páginas do sistema usam tons mais escuros, e um escudo com fundo visível pode destoar dessa identidade visual.</span>
+          </span>
+        </label>
         <input type="file" accept="image/*" onchange="previewEscudo(event)">
         <div class="preview">
           <img id="escudoPreview" style="display:none" onclick="abrirLightbox()" title="Clique para ampliar">
@@ -336,7 +398,8 @@ function preencherFormEscola(escola) {
   function stylesBubble(b) {
     var bc = getBrandColor();
     b.style.background = bc.color;
-    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+    var fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
+    b.style.color      = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
   }
 
   function initBubble(b) {
@@ -421,6 +484,11 @@ function preencherFormEscola(escola) {
 </div>
 
 <script>
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+document.addEventListener("click", function () {
+  document.querySelectorAll(".info-tip.open").forEach(function (el) { el.classList.remove("open"); });
+});
+
 function abrirLightbox() {
   var src = document.getElementById('escudoPreview').src;
   if (!src) return;
