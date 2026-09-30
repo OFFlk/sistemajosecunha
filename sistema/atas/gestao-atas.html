@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="/css/components.css">
 
 <title>Gestão de Dados · Atas</title>
+<script>console.info('[gestao-atas] build 2026-09-30 · diff de alunos + toasts');</script>
 <style>
 /* ── Oculta até auth confirmar role ── */
 body { visibility: hidden; }
@@ -146,38 +147,30 @@ a.btn.btn-primary:hover {
   padding: 18px; z-index: 50;
 }
 
-/* ── Painel de log flutuante e fechável (ex.: log de exclusão) ──
-   Diferente do toast padrão (_showToast, auto-some em poucos segundos):
-   este fica até o usuário fechar, porque o conteúdo é um log de várias
-   linhas, não uma mensagem curta. */
-.log-floating {
-  position: fixed; right: 20px; bottom: 20px; z-index: 60;
-  width: min(440px, calc(100vw - 40px)); max-height: 55vh;
-  background: var(--card-bg, #fff); border: 1px solid var(--line);
-  border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.28);
-  display: flex; flex-direction: column; overflow: hidden;
+/* ── Select padronizado (select de ação nos itens DIVERGENTES do import) ──
+   Tokens e visual alinhados aos .btn/.info-tip desta página, pra não cair no
+   estilo default do Chrome. Se /css/components.css já tiver uma classe padrão
+   de select, troque `sel-padrao` por ela e apague este bloco. */
+select.sel-padrao {
+  appearance: none; -webkit-appearance: none;
+  font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700;
+  color: var(--text, #1e293b); background-color: var(--card-bg, #fff);
+  border: 1.5px solid var(--line); border-radius: 10px;
+  padding: 8px 34px 8px 12px; max-width: 100%; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  transition: border-color .18s, box-shadow .18s;
 }
-.log-floating-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-bottom: 1px solid var(--line);
-  font-weight: 800; font-size: 13px; flex-shrink: 0;
-}
-.log-floating-close {
-  border: 0; background: transparent; cursor: pointer;
-  font-size: 15px; line-height: 1; color: var(--muted); padding: 2px 4px;
-}
-.log-floating-close:hover { color: var(--text, #111); }
-.log-floating .console {
-  margin: 0; border: 0; border-radius: 0; box-shadow: none;
-  overflow: auto; max-height: calc(55vh - 44px);
-}
+select.sel-padrao:hover { border-color: var(--brand, #2563eb); }
+select.sel-padrao:focus { outline: none; border-color: var(--brand, #2563eb); box-shadow: 0 0 0 3px rgba(37,99,235,.18); }
+select.sel-padrao option { background: var(--card-bg, #fff); color: var(--text, #1e293b); }
 
 /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
    guia-migracao-contraste-theme-colors.md, Parte 2). Copiado do guia com
    UM ajuste: esta página não define --card/--border como o
    historico-aluno.html (design system próprio, mais antigo) — aqui os
    tokens reais são --card-bg/--line (--text já é usado com fallback em
-   outros pontos deste mesmo arquivo, ver .log-floating-close:hover acima).
+   outros pontos deste mesmo arquivo).
    Mapeando pros tokens certos evita o bug já visto em pesquisa-ata.html:
    balão com fundo transparente por causa de uma variável que não existe
    nesta página. */
@@ -260,7 +253,6 @@ a.btn.btn-primary:hover {
           <div id="mergeListaSchemas"></div>
         </div>
       </div>
-      <div class="console" id="logJSON" style="display:none;"></div>
     </div>
   </div>
 
@@ -314,13 +306,6 @@ a.btn.btn-primary:hover {
             <tr><td colspan="7" class="muted" style="padding:18px;text-align:center;">Carregando...</td></tr>
           </tbody>
         </table>
-      </div>
-      <div id="logApagarWrap" class="log-floating" style="display:none;">
-        <div class="log-floating-head">
-          <span>🗑️ Log de exclusão</span>
-          <button type="button" class="log-floating-close" onclick="_fecharLogFloating('logApagarWrap')" aria-label="Fechar">✖</button>
-        </div>
-        <div class="console" id="logApagar"></div>
       </div>
     </div>
   </div>
@@ -505,27 +490,6 @@ function reconstruirAuxiliares(turmas) {
 /* =============================================
    INIT
 ============================================= */
-function logEl(msg, id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.display = 'block';
-  el.textContent  += (el.textContent ? '\n' : '') + msg;
-  // Se existir um painel flutuante pra esse log (ex.: logApagarWrap), mostra
-  // ele também. Pra logs sem painel (ex.: logJSON), isso não faz nada.
-  const wrap = document.getElementById(id + 'Wrap');
-  if (wrap) wrap.style.display = 'flex';
-}
-function clearLogEl(id) {
-  const el = document.getElementById(id);
-  if (el) { el.textContent = ''; el.style.display = 'none'; }
-  const wrap = document.getElementById(id + 'Wrap');
-  if (wrap) wrap.style.display = 'none';
-}
-function _fecharLogFloating(wrapId) {
-  const wrap = document.getElementById(wrapId);
-  if (wrap) wrap.style.display = 'none';
-}
-
 // Turmas do ano-ativo não têm origemArquivo nem aba preenchida com nome de planilha
 function ehTurmaDeAtas(t) {
   const origem = String(t.origemArquivo || '').trim();
@@ -835,7 +799,8 @@ async function apagarSelecionadas() {
 
   const btnAp = document.getElementById('btnApagarSel');
   if (btnAp) { btnAp.disabled = true; btnAp.textContent = 'Apagando...'; }
-  clearLogEl('logApagar');
+  setMsg('Apagando turma(s)…','loading');
+  _gcAviso = '';
 
   // 1. Deleta do Firestore — usa turmaId como ID do documento (igual ao saveAll)
   //    e também tenta pelo _id caso exista, além de removeWhere como fallback.
@@ -924,24 +889,32 @@ async function apagarSelecionadas() {
   // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
   const aux = _reconstruirAuxLocalmente(novas);
 
-  logEl(`✅ ${removidosOk}/${aApagar.length} turma(s) removida(s) do Firestore.`, 'logApagar');
-  logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`, 'logApagar');
-  if (avisos.length) {
-    logEl('', 'logApagar');
-    logEl(`⚠️ ${avisos.length} aviso(s) — turmas que não seguiram o caminho padrão:`, 'logApagar');
-    avisos.forEach(a => logEl(`  ${a}`, 'logApagar'));
-  }
+  console.log(`[apagar] Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`);
+  avisos.forEach(a => console.log('[apagar]', a));
+  // ℹ️ = fallback que funcionou (só informativo); ⚠️/❌ = problema de verdade.
+  const problemas = avisos.filter(a => a.startsWith('⚠️') || a.startsWith('❌')).length;
 
   // 3. Garbage collection de identidades órfãs
-  logEl('', 'logApagar');
-  logEl('🔍 Verificando identidades órfãs...', 'logApagar');
+  setMsg('Verificando identidades órfãs…','loading');
+  let apagados = 0, gcErro = '';
   try {
-    const apagados = await _limparIdentidadesOrfas(aApagar, novas);
-    if (apagados > 0) logEl(`🧹 ${apagados} identidade(s) órfã(s) removida(s) do banco.`, 'logApagar');
-    else              logEl('✅ Nenhuma identidade órfã encontrada.', 'logApagar');
+    apagados = await _limparIdentidadesOrfas(aApagar, novas);
   } catch(e) {
-    logEl(`⚠️ Erro ao limpar identidades: ${e.message}`, 'logApagar');
+    gcErro = e.message;
+    console.warn('[apagar] Erro ao limpar identidades:', e);
   }
+
+  // Um toast final só, na cor do resultado (verde / amarelo / vermelho)
+  const partes = [`${removidosOk}/${aApagar.length} turma(s) removida(s)`];
+  if (apagados > 0) partes.push(`${apagados} identidade(s) órfã(s) removida(s)`);
+  const ressalvas = [];
+  if (problemas) ressalvas.push(`${problemas} aviso(s) — veja o console`);
+  if (gcErro) ressalvas.push('falha ao limpar identidades');
+  if (_gcAviso) ressalvas.push(_gcAviso);
+  const textoFinal = partes.join(' · ') + (ressalvas.length ? ' — ' + ressalvas.join('; ') : '') + '.';
+  if (removidosOk === 0)                          setMsg('Nenhuma turma foi removida — veja o console. ' + textoFinal, 'err');
+  else if (removidosOk < aApagar.length || ressalvas.length) setMsg(textoFinal, 'warn');
+  else                                            setMsg(textoFinal, 'ok');
 
   renderTabelaTurmas();
   atualizarStats();
@@ -961,6 +934,7 @@ async function apagarSelecionadas() {
  * @param {Array} turmasRestantes — turmas de atas que ainda existem no banco
  * @returns {number} quantidade de identidades removidas
  */
+let _gcAviso = ''; // ressalva do GC de identidades, lida por apagarSelecionadas() pro toast final
 async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
   if (!window.DB || !window.DB['alunos-atas']) return 0;
 
@@ -987,7 +961,7 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
   } catch(e) {
     console.warn('[GC] Não foi possível checar anoAtivoMatriculas:', e.message);
     // Se não conseguiu verificar o ano-ativo, aborta por segurança (não apaga nada)
-    logEl('⚠️ Não foi possível verificar o módulo de ano-ativo. Identidades preservadas por segurança.', 'logApagar');
+    _gcAviso = 'ano-ativo não verificado, identidades preservadas';
     return 0;
   }
 
@@ -996,7 +970,7 @@ async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
 
   if (!idsOrfaos.length) return 0;
 
-  logEl(`  Candidatos a remoção: ${idsOrfaos.length} ID(s)`, 'logApagar');
+  console.log(`[GC] Candidatos a remoção: ${idsOrfaos.length} ID(s)`);
 
   // Remove do Firestore (coleção `alunos-atas`)
   let removidos = 0;
@@ -1046,15 +1020,14 @@ let _pendingMerge=null;
 
 function analisarJSON(event) {
   const file=event.target.files?.[0]; if(!file) return;
-  clearLogEl('logJSON');
   const reader=new FileReader();
   reader.onload=async ()=>{
     try {
       const dump=JSON.parse(reader.result);
-      if (!Array.isArray(dump.turmasDB)) { logEl('❌ JSON inválido: campo turmasDB ausente.','logJSON'); return; }
+      if (!Array.isArray(dump.turmasDB)) { setMsg('JSON inválido: campo turmasDB ausente.','err'); return; }
       const schemasEntrada = Array.isArray(dump.atasSchemas) ? dump.atasSchemas : [];
       await _analisarMerge(dump.turmasDB, schemasEntrada);
-    } catch(e) { logEl('❌ Erro ao ler JSON: '+e.message,'logJSON'); }
+    } catch(e) { setMsg('Erro ao ler JSON: '+e.message,'err'); }
   };
   reader.readAsText(file);
   event.target.value='';
@@ -1242,7 +1215,7 @@ function _renderMergePreview() {
         <span class="badge warn">DIVERGENTE</span>
         <b style="margin-left:6px;">${esc(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${esc(entrada.anoLetivo||'?')} · ${esc(entrada.serieTexto||'?')}<br>
         <span class="muted" style="font-size:11px;">${linhas.join('<br>')}</span><br>
-        <select id="selDiv${i}" style="margin-top:6px;">
+        <select id="selDiv${i}" class="sel-padrao" style="margin-top:8px;">
           <option value="">Não importar (manter o banco)</option>
           ${diff.faltam.length?'<option value="repor">Repor só os alunos que faltam (mantém o resto do banco)</option>':''}
           <option value="sobrescrever">Sobrescrever a turma inteira pelo backup${diff.soBanco.length?' (perde os '+diff.soBanco.length+' só do banco)':''}</option>
@@ -1309,48 +1282,56 @@ async function aplicarMerge() {
     modificadas.set(id,{ nova:_montarTurmaMesclada(d.atual,d.entrada,modo), modo, atual:d.atual, diff:d.diff });
   });
 
-  clearLogEl('logJSON');
-  if (!paraAdicionar.length && !modificadas.size && !schemasParaSalvar.length) { logEl('ℹ️ Nada selecionado para adicionar.','logJSON'); cancelarMerge(); return; }
+  if (!paraAdicionar.length && !modificadas.size && !schemasParaSalvar.length) { setMsg('Nada selecionado para importar.','warn'); cancelarMerge(); return; }
+
+  // Detalhe por item vai pro console (o toast mostra só o resumo).
+  const resumo=[];
+  let falhasSchemas=0;
 
   if (paraAdicionar.length || modificadas.size) {
-    logEl(`Adicionando ${paraAdicionar.length} turma(s) e atualizando ${modificadas.size} divergente(s)...`,'logJSON');
+    setMsg('Gravando turmas…','loading');
     const turmasFinais=[...lerTurmasDB().map(t=>modificadas.get(t.id||t.turmaId)?.nova||t),...paraAdicionar];
     try { await salvarTurmasDB(turmasFinais); }
     catch(e) {
-      logEl('❌ Falha ao gravar turmas: '+e.message+' — recarregue a página antes de tentar de novo.','logJSON');
+      setMsg('Falha ao gravar turmas: '+e.message+' — recarregue a página antes de tentar de novo.','err');
       return;
     }
     // reconstruirAuxiliares() (não a versão local-only): sem isso, `matriculas`
     // nunca é gravado de verdade no Firestore, e
     // recalcularUltimoAnoRegistroBatch() não acha nada.
     const aux=reconstruirAuxiliares(turmasFinais);
-    logEl(`✅ Merge de turmas aplicado: +${paraAdicionar.length} nova(s) · ${modificadas.size} divergente(s) atualizada(s).`,'logJSON');
-    logEl(`Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`,'logJSON');
-    paraAdicionar.forEach(t=>logEl(`  ✔ ${t.aba||t.id}`,'logJSON'));
-    modificadas.forEach(m=>logEl(`  ✔ ${m.nova.aba||m.nova.id} — ${m.modo==='repor'?`repostos ${m.diff.faltam.length} aluno(s)`:'sobrescrita pelo backup'}`,'logJSON'));
+    if (paraAdicionar.length) resumo.push(`${paraAdicionar.length} turma(s) nova(s)`);
+    if (modificadas.size) resumo.push(`${modificadas.size} divergente(s) atualizada(s)`);
+    console.log(`[merge] Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`);
+    paraAdicionar.forEach(t=>console.log(`[merge]  ✔ ${t.aba||t.id}`));
+    modificadas.forEach(m=>console.log(`[merge]  ✔ ${m.nova.aba||m.nova.id} — ${m.modo==='repor'?`repostos ${m.diff.faltam.length} aluno(s)`:'sobrescrita pelo backup'}`));
 
     try {
       const idsEnvolvidos=[...new Set([...paraAdicionar,...[...modificadas.values()].map(m=>m.nova)].flatMap(t=>(t.alunos||[]).map(a=>String(a.alunoId||'').trim()).filter(Boolean)))];
       if (idsEnvolvidos.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
         const dadosEscola = window.DB?.escola ? await window.DB.escola.get() : {};
         await window.Identidade.recalcularUltimoAnoRegistroBatch(idsEnvolvidos, dadosEscola?.configAnoAtivo ?? null);
-        logEl(`↻ ultimoAnoRegistro recalculado para ${idsEnvolvidos.length} aluno(s).`,'logJSON');
+        console.log(`[merge] ↻ ultimoAnoRegistro recalculado para ${idsEnvolvidos.length} aluno(s).`);
       }
     } catch(e) { console.warn('[aplicarMerge] recalcularUltimoAnoRegistroBatch falhou:', e.message); }
   }
 
   if (schemasParaSalvar.length) {
-    logEl(`Salvando ${schemasParaSalvar.length} schema(s)...`,'logJSON');
-    let ok=0, falhas=0;
+    setMsg('Gravando schemas…','loading');
+    let ok=0;
     for (const s of schemasParaSalvar) {
       try { await window.DB.atasSchemas.save(s); ok++; }
-      catch(e) { falhas++; console.warn('[aplicarMerge] falha ao salvar schema', s._id||s.id, e.message); }
+      catch(e) { falhasSchemas++; console.warn('[aplicarMerge] falha ao salvar schema', s._id||s.id, e.message); }
     }
-    logEl(`✅ Schemas salvos: ${ok}${falhas?` • ⚠️ ${falhas} falharam (veja o console)`:''}.`,'logJSON');
-    schemasParaSalvar.forEach(s=>logEl(`  ✔ ${s.nome||s.titulo||s._id||s.id}`,'logJSON'));
+    if (ok) resumo.push(`${ok} schema(s) salvo(s)`);
+    if (falhasSchemas) resumo.push(`${falhasSchemas} schema(s) falharam (veja o console)`);
+    schemasParaSalvar.forEach(s=>console.log(`[merge]  ✔ schema ${s.nome||s.titulo||s._id||s.id}`));
   }
 
   cancelarMerge();
+  // Verde se tudo gravou; amarelo se algum schema falhou (parcial — situação
+  // que o guia não define; ver nota na resposta).
+  setMsg('Merge aplicado: '+resumo.join(' · ')+'.', falhasSchemas ? 'warn' : 'ok');
   renderTabelaTurmas();
   atualizarStats();
 }
