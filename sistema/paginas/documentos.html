@@ -35,6 +35,9 @@
   .card[data-tooltip] {
     position: relative;
   }
+  /* grid 1 linha x 2 colunas (módulo com uma única página ativa) */
+  .grid-atas.grid-docs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 700px) { .grid-atas.grid-docs { grid-template-columns: 1fr; } }
 </style>
 
 <title>Documentos • Menu</title>
@@ -48,9 +51,10 @@
     <div class="l-slabel">// relatórios</div>
     <div class="l-sline"></div>
   </div>
-  <div class="grid-atas">
+  <div class="grid-atas grid-docs">
 
     <a class="card" href="/paginas/historico_auto.html">
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">👤</div>
       <div class="card-title">Histórico por aluno</div>
       <div class="card-footer">
@@ -58,29 +62,12 @@
       </div>
     </a>
 
-    <a class="card" href="pesquisa.html">
+    <div class="card disabled" data-tooltip="Em desenvolvimento">
+      <span class="card-badge">Em breve</span>
       <div class="card-icon">📋</div>
       <div class="card-title">Ata da turma</div>
       <div class="card-footer">
         <div class="card-desc">Abra uma turma pela pesquisa e exporte o PDF individual ou em lote.</div>
-      </div>
-    </a>
-
-    <div class="card disabled" data-tooltip="Em desenvolvimento">
-      <span class="card-badge">Em breve</span>
-      <div class="card-icon">📊</div>
-      <div class="card-title">Relatórios da escola</div>
-      <div class="card-footer">
-        <div class="card-desc">Frequência, rendimento e comparativos por ano.</div>
-      </div>
-    </div>
-
-    <div class="card disabled" data-tooltip="Em desenvolvimento">
-      <span class="card-badge">Em breve</span>
-      <div class="card-icon">📄</div>
-      <div class="card-title">Boletim por aluno</div>
-      <div class="card-footer">
-        <div class="card-desc">Resumo em PDF separado do histórico completo.</div>
       </div>
     </div>
 
@@ -121,7 +108,8 @@
   function stylesBubble(b){
     const { color, dark } = getBrandColor();
     b.style.background  = color;
-    b.style.color       = dark ? '#f0f0f8' : '#ffffff';
+    const fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
+    b.style.color       = fg || (dark ? '#f0f0f8' : '#ffffff');
   }
 
   function initBubble(b){
