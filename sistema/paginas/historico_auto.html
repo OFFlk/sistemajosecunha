@@ -237,6 +237,10 @@ html[data-theme="dark"] .wrap tbody tr:hover td { background: var(--field-bg); }
 .wrap th,
 html[data-theme="dark"] .wrap th { background: var(--chip-bg); color: var(--ink); text-align: center; }
 
+/* Prévia das notas: cores de borda/linha por tema (claro = tons suaves; escuro = tokens da página) */
+.notas-prev{ --nt-border:#dbe2ef; --nt-td:#fff; --nt-zebra:#fcfdff; }
+html[data-theme="dark"] .notas-prev{ --nt-border:var(--border); --nt-td:var(--field-bg); --nt-zebra:var(--chip-bg); }
+
 /* ===== Título de card (todo card da página tem título no topo-esquerdo) ===== */
 .card-title{ margin:0 0 8px; font-size:inherit; font-weight:700; line-height:1.3; }
 
@@ -1293,15 +1297,16 @@ function renderNotasPreviewDocx(){
     rows += `<tr>${tds}</tr>`;
   }
   if(!hasAny){ el.innerHTML='Nenhuma nota encontrada ainda.'; return; }
-  const isDark = document.documentElement.getAttribute('data-theme')==='dark';
-  const borderCol = isDark ? 'var(--border)' : '#dbe2ef';
+  // Cores vêm de variáveis CSS (.notas-prev, definidas no <style>): acompanham o tema ao vivo.
+  // Antes eram decididas aqui, pelo tema do instante do render — se o tema mudasse depois, ficavam congeladas.
+  const borderCol = 'var(--nt-border)';
   const thBg      = 'var(--chip-bg)'; // igual às outras tabelas: acompanha a paleta nos dois temas
-  const tdBg      = isDark ? 'var(--field-bg)' : '#fff';
-  const zebraBg   = isDark ? 'var(--chip-bg)'  : '#fcfdff';
+  const tdBg      = 'var(--nt-td)';
+  const zebraBg   = 'var(--nt-zebra)';
   el.innerHTML = `
-    <div style="overflow:auto;border:1px solid ${borderCol};border-radius:10px">
+    <div class="notas-prev" style="overflow:auto;border:1px solid ${borderCol};border-radius:10px">
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;color:var(--ink)">
-        <thead><tr>${headCols.map((h,idx)=>`<th style="border-bottom:1px solid ${borderCol};padding:6px;text-align:${idx? 'center':'left'};position:${idx===0?'sticky':'static'};left:${idx===0?'0':'auto'};background:${thBg};color:var(--ink);z-index:${idx===0?2:1}">${h}</th>`).join('')}</tr></thead>
+        <thead><tr>${headCols.map((h,idx)=>`<th style="border-bottom:1px solid ${borderCol};padding:6px;text-align:center;position:${idx===0?'sticky':'static'};left:${idx===0?'0':'auto'};background:${thBg};color:var(--ink);z-index:${idx===0?2:1}">${h}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
