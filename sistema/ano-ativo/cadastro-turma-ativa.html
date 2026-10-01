@@ -14,6 +14,8 @@
 })();
 </script>
 
+<script src="../loading-overlay.js"></script>
+
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
@@ -288,9 +290,9 @@ html[data-theme="dark"] .btn.success:hover { background: #166534; border-color: 
 }
 html[data-theme="dark"] .btn.ghost:hover,
 html[data-theme="dark"] .btn.secondary:hover {
-  background: rgba(124,58,237,0.18);
+  background: var(--brand-faded-d, rgba(124,58,237,0.28));
   border-color: var(--brand-d, #7c3aed);
-  color: #c4b5fd;
+  color: var(--brand-text-d, #c4b5fd);
 }
 
 .btn.outline { background: var(--brand-faded, #f5f3ff); border-color: var(--brand-border, #ddd6fe); color: var(--brand-text, #6d28d9); }
@@ -642,7 +644,16 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   font-family:'Nunito', sans-serif; line-height:1.4; text-align:left; white-space:normal; cursor:default;
 }
 .info-tip.open .info-tip-bubble{ display:block; }
-.info-tip.up .info-tip-bubble{ top:auto; bottom:calc(100% + 8px); }
+.card-destaque #btnOrdenarCriacao{
+  background: color-mix(in srgb, var(--dest-fg) 14%, transparent);
+  border: 2px solid color-mix(in srgb, var(--dest-fg) 60%, transparent);
+  color: var(--dest-fg);
+}
+.card-destaque #btnOrdenarCriacao:hover{
+  background: color-mix(in srgb, var(--dest-fg) 26%, transparent);
+  border-color: var(--dest-fg); color: var(--dest-fg);
+}
+.btn:disabled, .input:disabled { opacity: .55; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -652,7 +663,12 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   <div class="split-grid">
 
     <div class="card">
-      <h2 style="margin:0 0 10px">Cadastrar / editar turma</h2>
+      <h2 style="margin:0 0 10px">Cadastrar / editar turma
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Por enquanto, esta tela cadastra e edita apenas turmas. No próximo passo, vamos matricular alunos na página de cadastro!</span>
+          </span>
+      </h2>
 
       <div class="form-section">
         <div class="form-row">
@@ -670,6 +686,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
             </select>
           </div>
         </div>
+        <div id="avisoTravaEdicao" class="warn" style="display:none;margin-top:10px;">🔒 Ano letivo e séries não podem ser alterados numa turma já cadastrada (o ID depende deles). Aqui você pode editar o nome, o turno e o professor(a).</div>
       </div>
 
       <div class="form-section">
@@ -722,21 +739,14 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
           <span class="label-inline">ID da turma:
             <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">O ID da turma é gerado automaticamente usando os dados anteriores — não é possível editá-lo manualmente. Caso haja um ID idêntico, uma letra (A, B, C...) é adicionada ao final pra torná-lo único.<br><br>Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há alunos vinculados a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+            <span class="info-tip-bubble">O ID da turma é gerado automaticamente a partir do ano letivo e das séries — não é possível editá-lo manualmente. Como pode haver mais de uma turma com as mesmas séries (por exemplo, em turnos diferentes), uma letra (A, B, C...) é sempre adicionada ao final pra torná-lo único.<br><br>Depois que a turma é salva, o ano letivo e as séries ficam travados, porque o ID depende deles. Pra corrigir algum desses dados, o fluxo é: <b>Gestão de dados</b> → apague a turma → volte aqui e cadastre-a de novo. O turno e o nome podem ser alterados normalmente.</span>
           </span>
           </span>
           <span class="id-badge" id="turmaIdBadge">—</span>
         </div>
       </div>
 
-      <div class="row" style="margin-top:18px;justify-content:space-between;gap:10px;align-items:center">
-        <div class="row" style="gap:0;flex-wrap:nowrap">
-          <div class="pill" id="dbInfo">DB: —</div>
-          <span class="info-tip up" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">Por enquanto, esta tela cadastra e edita apenas turmas. No próximo passo, vamos matricular alunos na página de cadastro!</span>
-          </span>
-        </div>
+      <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px;align-items:center">
         <div class="row" style="gap:10px;justify-content:flex-end">
           <button class="btn ghost" id="btnResetForm" type="button">Limpar formulário</button>
           <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
@@ -753,7 +763,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
           </span>
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma voltam para o formulário e você pode alterar alguns campos. Siga também as dicas em <b>ID da turma</b>. <b>Inativar</b> muda o status da turma para inativa; para vê-las, troque o filtro do card de "Ativas" para "Inativas".</span>
+            <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma voltam para o formulário e você pode alterar o nome, o turno e o professor(a). Para os demais dados, siga as dicas em <b>ID da turma</b>. <b>Inativar</b> muda o status da turma para inativa; para vê-las, troque o filtro do card de "Ativas" para "Inativas".</span>
           </span>
         </h2>
         <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
@@ -786,84 +796,6 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
 
 <script>
 (function(){
-  const KEYS = {
-    turmas: "anoAtivoTurmasDB_v1",
-    alunos: "anoAtivoAlunosDB_v1",
-    mats: "anoAtivoMatriculasDB_v1",
-    anoAtual: "configAnoAtivoAtual_v1",
-  };
-
-  // ---------- school-scoped storage (Ano Ativo) ----------
-  function _safeJSONParse(raw, fallback){
-    try{ return JSON.parse(raw); }catch(_){ return fallback; }
-  }
-  function _getSessionFallback(){
-    try{
-      if (window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
-    }catch(_){}
-    return _safeJSONParse(_getItem('auth_session_v2') || 'null', null);
-  }
-  function _getEffectiveSchoolId(){
-    const s = _getSessionFallback();
-    if (!s) return null;
-    const sid = (s.schoolId || '').toString();
-    if (sid.toUpperCase() !== 'ADMIN') return sid;
-    return (_getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
-  }
-  function _scopedKey(k){
-    const sid = _getEffectiveSchoolId();
-    if (!sid) return k; // sem sessão, usa legado
-    return `schools:${sid}:${k}`;
-  }
-  function _isAnoAtivoKey(k){
-    return Object.values(KEYS).includes(k);
-  }
-  function _lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
-  function _lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){ } }
-  function _lsRemove(k){ try{ localStorage.removeItem(k); }catch(_){ } }
-
-  function _getItem(k){
-    if (_isAnoAtivoKey(k)) return _lsGet(_scopedKey(k));
-    return _lsGet(k);
-  }
-  function _setItem(k, v){
-    if (_isAnoAtivoKey(k)) _lsSet(_scopedKey(k), v);
-    else _lsSet(k, v);
-    // Persiste no Firestore em paralelo
-    if(_isAnoAtivoKey(k)){
-      const _MAP={'anoAtivoTurmasDB_v1':'anoAtivoTurmas','anoAtivoAlunosDB_v1':'anoAtivoAlunos','anoAtivoMatriculasDB_v1':'anoAtivoMatriculas','configAnoAtivoAtual_v1':null};
-      const col=_MAP[k];
-      if(col!==undefined){
-        try{
-          if(window.DB&&window.Auth&&window.Auth.getSession()){
-            if(col===null){ if(window.DB.escola) window.DB.escola.save({configAnoAtivo:v}).catch(()=>{}); }
-            else{
-              const parsed=JSON.parse(v); const fc=window.DB[col]; if(fc)
-              Array.isArray(parsed)?fc.saveAll(parsed).catch(()=>{}):fc.save(parsed).catch(()=>{});
-            }
-          }
-        }catch(_){}
-      }
-    }
-  }
-  function _removeItem(k){
-    if (_isAnoAtivoKey(k)) return _lsRemove(_scopedKey(k));
-    return _lsRemove(k);
-  }
-  // Migração: se houver DB legado (global) e ainda não existir o scoped, copia
-  (function migrate(){
-    try{
-      Object.values(KEYS).forEach(function(k){
-        if(!_isAnoAtivoKey(k)) return;
-        const scoped = _scopedKey(k);
-        if (_getItem(scoped) != null) return;
-        const legacy = _getItem(k);
-        if (legacy != null) _setItem(scoped, legacy);
-      });
-    }catch(_){}
-  })();
-
-
   const $ = (id)=>document.getElementById(id);
 
   // ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
@@ -961,10 +893,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   /* ========================= */
   /* Permissões               */
   /* ========================= */
-  const _session = (window.Auth && typeof Auth.getSession === 'function')
-    ? Auth.getSession()
-    : null;
-  const _podeEditar = !!_session && _session.role === 'admin';
+  let _podeEditar = false; // definido no init(), depois que a sessão está confirmada
 
   let seriesSel = [];
   let editingTurmaId = null;
@@ -972,100 +901,69 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   let ordemCriacao = "desc"; // "desc"/"asc" — direção da ordenação atual
   let criterioOrdenacao = "criadoEm"; // "criadoEm" | "serie" | "nome"
 
-  // ---------- storage helpers (compatível com outras páginas) ----------
-  function safeParseRaw(raw){
-    if(raw == null) return null;
-    try { return JSON.parse(raw); } catch(e) { return raw; }
-  }
+  /* ── Dados: Firestore direto, cache só em memória (sem localStorage). Depois de
+     qualquer gravação a página dá hard refresh e relê tudo do banco. ── */
+  let TURMAS_CACHE = [];
+  let ANO_CONFIG = null; // escola.configAnoAtivo
 
-  function safeParse(key, fallback){
+  // Admin global em "Todas as escolas": o marcador "ADMIN" não é uma escola (leitura volta vazia, escrita é bloqueada).
+  function _semEscola(){ return String(window.Auth.getActiveSchoolId() || "").trim().toUpperCase() === "ADMIN"; }
+
+  async function carregarTurmasCache(){
     try{
-      const raw = _getItem(key);
-      if(!raw) return fallback;
-      const v = JSON.parse(raw);
-      // aceitar array ou objeto
-      if(Array.isArray(fallback) && v && !Array.isArray(v) && typeof v === "object") return Object.values(v);
-      return v;
-    }catch(e){
-      return fallback;
-    }
+      const lista = _semEscola()
+        ? ((await window.DB.loadAllAnoAtivo()).turmasDB || []) // só leitura, junta todas as escolas
+        : await window.DB.anoAtivoTurmas.list();
+      TURMAS_CACHE = Array.isArray(lista) ? lista : [];
+      return true;
+    }catch(e){ console.warn("[cadastro-turma-ativa] carregarTurmasCache:", e); TURMAS_CACHE = []; return false; }
   }
+  async function carregarAnoConfig(){
+    try{ const esc = await window.DB.escola.get(); ANO_CONFIG = (esc && esc.configAnoAtivo != null) ? esc.configAnoAtivo : null; }
+    catch(e){ console.warn("[cadastro-turma-ativa] carregarAnoConfig:", e); ANO_CONFIG = null; }
+  }
+  function getTurmas(){ return TURMAS_CACHE.filter(x => String(x?.turmaId||"").startsWith("ATUR|")); }
 
-  function save(key, value){
-    _setItem(key, JSON.stringify(value));
+  /* Mensagem que sobrevive ao hard refresh (o toast não pode morrer junto com a página). */
+  const CHAVE_MSG_POS_RELOAD = "cadastroTurmaAtiva.msgPosReload";
+  function guardarMsgPosReload(text, kind){
+    try{ sessionStorage.setItem(CHAVE_MSG_POS_RELOAD, JSON.stringify({ text, kind })); }catch(_){}
   }
-
-  function getTurmas(){
-    const t = safeParse(KEYS.turmas, []);
-    const arr = Array.isArray(t) ? t : [];
-    return arr.filter(x => String(x?.turmaId||'').startsWith('ATUR|'));
-  }
-  function getAlunos(){
-    const a = safeParse(KEYS.alunos, []);
-    return Array.isArray(a) ? a : [];
-  }
-  function getMats(){
-    const m = safeParse(KEYS.mats, []);
-    return Array.isArray(m) ? m : [];
+  function lerMsgPosReload(){
+    try{
+      const raw = sessionStorage.getItem(CHAVE_MSG_POS_RELOAD);
+      if(!raw) return null;
+      sessionStorage.removeItem(CHAVE_MSG_POS_RELOAD);
+      const m = JSON.parse(raw);
+      return (m && m.text) ? m : null;
+    }catch(_){ return null; }
   }
 
   // ---------- ano ativo ----------
   function extractYear(v){
     if(v == null) return null;
     if(typeof v === "number") return isNaN(v) ? null : v;
-    if(typeof v === "string"){
-      const n = parseInt(v.trim(), 10);
-      return isNaN(n) ? null : n;
-    }
+    if(typeof v === "string"){ const n = parseInt(v.trim(), 10); return isNaN(n) ? null : n; }
     if(typeof v === "object"){
-      const candKeys = ["anoAtivo","ano","anoLetivo","year","ano_atual","anoAtual"];
-      for(const k of candKeys){
-        if(k in v){
-          const n = parseInt(v[k], 10);
-          if(!isNaN(n)) return n;
-        }
+      for(const k of ["anoAtivo","ano","anoLetivo","year","ano_atual","anoAtual"]){
+        if(k in v){ const n = parseInt(v[k], 10); if(!isNaN(n)) return n; }
       }
     }
     return null;
   }
-
   function getAnoAtivoDefault(){
-    const raw = _getItem(KEYS.anoAtual);
-    const parsed = safeParseRaw(raw);
-    const n = extractYear(parsed);
+    const n = extractYear(ANO_CONFIG);
     if(n) return n;
-
-    // fallback: maior ano das turmas
-    const turmas = getTurmas();
-    let max = 0;
-    for(const t of turmas){
-      const a = parseInt(t?.anoLetivo, 10);
-      if(!isNaN(a)) max = Math.max(max, a);
-    }
+    let max = 0; // fallback: maior ano das turmas
+    for(const t of getTurmas()){ const a = parseInt(t?.anoLetivo, 10); if(!isNaN(a)) max = Math.max(max, a); }
     return max || new Date().getFullYear();
   }
-
-  function setAnoAtivoIfMissingOrCompat(ano){
-    const raw = _getItem(KEYS.anoAtual);
-    if(!raw){
-      save(KEYS.anoAtual, ano);
-      return;
-    }
-    const parsed = safeParseRaw(raw);
-    // se já é number/string válido, mantém (não sobrescreve)
-    const existingYear = extractYear(parsed);
-    if(existingYear) return;
-
-    // se for objeto, tenta preencher uma chave padrão
-    if(parsed && typeof parsed === "object"){
-      const out = {...parsed};
-      out.anoAtivo = ano;
-      save(KEYS.anoAtual, out);
-      return;
-    }
-
-    // fallback: grava número
-    save(KEYS.anoAtual, ano);
+  // Se a escola ainda não tem ano ativo configurado, grava o da turma salva (não sobrescreve um existente).
+  async function garantirAnoAtivoConfig(ano){
+    if(extractYear(ANO_CONFIG)) return;
+    const novo = (ANO_CONFIG && typeof ANO_CONFIG === "object") ? { ...ANO_CONFIG, anoAtivo: ano } : ano;
+    try{ await window.DB.escola.save({ configAnoAtivo: novo }); }
+    catch(e){ console.warn("[cadastro-turma-ativa] garantirAnoAtivoConfig:", e); }
   }
 
   // ---------- UI builders ----------
@@ -1174,34 +1072,12 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
       .replace(/^EIXO\s*(\d)$/,"EIXO $1");
   }
 
-  function turnoAbbrev(turno){
-    const t = String(turno||"").toUpperCase();
-    if(t.startsWith("MAT")) return "MAT";
-    if(t.startsWith("VES")) return "VES";
-    if(t.startsWith("NOT")) return "NOT";
-    if(t.startsWith("INT")) return "INT";
-    return t.substring(0,3) || "TUR";
-  }
-
   function slugSerie(s){
     return normalizeSerie(s)
       .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
       .replace(/[ºª]/g,"")
       .replace(/\s+/g,"_")
       .replace(/[^A-Z0-9_]/g,"");
-  }
-
-  function turmaIdBaseFromFull(id){
-    if(!id) return "";
-    const s = String(id);
-    const parts = s.split("|");
-    if(parts.length >= 5){
-      const last = parts[parts.length-1];
-      if(/^[A-Z]+$/.test(last)){
-        return parts.slice(0,-1).join("|");
-      }
-    }
-    return s;
   }
 
   function indexToLetters(n){
@@ -1228,86 +1104,30 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
 
   function buildTurmaIdBase(){
     const ano = $("anoSelect")?.value || String(getAnoAtivoDefault());
-    const turno = turnoAbbrev($("turno")?.value);
     const seriesSlug = seriesSel.map(slugSerie).filter(Boolean).join("+") || "SEM_SERIE";
-    return `ATUR|${ano}|${turno}|${seriesSlug}`;
+    return `ATUR|${ano}|${seriesSlug}`;
   }
 
-  function sameBase(base, id){
-    if(!base || !id) return false;
-    return id === base || id.startsWith(base + "|");
-  }
-
-  function updateMatriculasTurmaId(oldId, newId){
-    if(!oldId || !newId || oldId === newId) return;
-    const mats = getMats();
-    if(!Array.isArray(mats) || !mats.length) return;
-
-    let changed = false;
-    for(const m of mats){
-      if(m && m.turmaId === oldId){
-        m.turmaId = newId;
-        changed = true;
-      }
-      if(m && typeof m.matriculaId === "string" && m.matriculaId.includes(oldId)){
-        // substituição simples para manter compatibilidade com vários formatos
-        m.matriculaId = m.matriculaId.split(oldId).join(newId);
-        changed = true;
-      }
-    }
-    if(changed) save(KEYS.matriculas, mats);
-  }
-
-  function ensureFirstGetsA(base, turmas){
-    // Se existe turma com ID "base" (sem sufixo) e vamos ter duplicidade,
-    // renomeia para "base|A" e ajusta matrículas.
-    const idx = turmas.findIndex(t => t && t.turmaId === base);
-    if(idx >= 0){
-      const newId = base + "|A";
-      turmas[idx].turmaId = newId;
-      updateMatriculasTurmaId(base, newId);
-    }
-    return turmas;
-  }
-
+  // Toda turma leva sufixo de letra (A, B, C...): o ID é só ano + séries, e mais de uma
+  // turma pode ter as mesmas séries (ex.: turnos diferentes).
   function pickNextIdForBase(base, turmas){
+    const pre = base + "|";
     const used = new Set();
     for(const t of turmas){
       const id = t?.turmaId;
-      if(!sameBase(base, id)) continue;
-      if(id === base){
-        // sem sufixo -> trata como "A" quando há duplicidade
-        used.add(0);
-      } else {
-        const suf = id.slice(base.length + 1);
-        const ix = lettersToIndex(suf);
-        if(ix !== null) used.add(ix);
-      }
+      if(!id || !id.startsWith(pre)) continue;
+      const ix = lettersToIndex(id.slice(pre.length));
+      if(ix !== null) used.add(ix);
     }
     let n = 0;
     while(used.has(n)) n++;
-    return base + "|" + indexToLetters(n);
+    return pre + indexToLetters(n);
   }
 
   function buildTurmaIdPreview(){
-    const base = buildTurmaIdBase();
-    const turmas = getTurmas();
-
-    if(editingTurmaId){
-      const baseEdit = turmaIdBaseFromFull(editingTurmaId);
-      if(baseEdit === base) return editingTurmaId;
-      // se mudou base durante edição, mostra o próximo ID disponível (sem mexer no DB ainda)
-      const others = turmas.filter(t => t && t.turmaId !== editingTurmaId);
-      const same = others.filter(t => sameBase(base, t.turmaId));
-      if(!same.length) return base;
-      return pickNextIdForBase(base, ensureFirstGetsA(base, [...others]));
-    }
-
-    const same = turmas.filter(t => sameBase(base, t.turmaId));
-    if(!same.length) return base; // primeira turma "igual" fica sem sufixo
-    return pickNextIdForBase(base, ensureFirstGetsA(base, [...turmas]));
+    if(editingTurmaId) return editingTurmaId; // em edição o ID nunca muda
+    return pickNextIdForBase(buildTurmaIdBase(), getTurmas());
   }
-
 
   function buildNomeAuto(){
     const ano = $("anoSelect")?.value || String(getAnoAtivoDefault());
@@ -1324,17 +1144,26 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
     for(const s of seriesSel){
       const chip = document.createElement("span");
       chip.className = "chip";
-      chip.innerHTML = `${s} <button type="button" aria-label="remover">×</button>`;
-      chip.querySelector("button").addEventListener("click", ()=>{
-        seriesSel = seriesSel.filter(x=>x!==s);
-        syncDerived();
-        renderChips();
-      });
+      chip.textContent = s;
+      if(!editingTurmaId){ // em edição as séries ficam travadas
+        const x = document.createElement("button");
+        x.type = "button"; x.setAttribute("aria-label","remover"); x.textContent = "×";
+        x.addEventListener("click", ()=>{ seriesSel = seriesSel.filter(v=>v!==s); syncDerived(); renderChips(); });
+        chip.append(" ", x);
+      }
       box.appendChild(chip);
     }
   }
 
+  // Edição: ano e séries compõem o ID — ficam travados (nome, turno e professor podem mudar).
+  function aplicarTravaEdicao(){
+    const trava = !!editingTurmaId;
+    ["anoSelect","serieSelect","btnAddSerie","btnClearSeries"].forEach(id => { const el = $(id); if(el) el.disabled = trava; });
+    const av = $("avisoTravaEdicao"); if(av) av.style.display = trava ? "block" : "none";
+  }
+
   function syncDerived(){
+    aplicarTravaEdicao();
     const turmaIdEl = $("turmaId");
     const previewId = buildTurmaIdPreview();
     if(turmaIdEl) turmaIdEl.value = previewId;
@@ -1344,14 +1173,6 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
       const nomeEl = $("nomeTurma");
       if(nomeEl) nomeEl.value = buildNomeAuto();
     }
-  }
-
-  function updateDbInfo(){
-    const turmas = getTurmas();
-    const alunos = getAlunos();
-    const mats = getMats();
-    const el = $("dbInfo");
-    if(el) el.textContent = `DB: turmas=${turmas.length} • alunos=${alunos.length} • matrículas=${mats.length}`;
   }
 
   function renderListaTurmas(){
@@ -1487,10 +1308,10 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   }
 
   async function toggleStatusTurma(turmaId){
-    const turmas = getTurmas();
-    const t = turmas.find(x => x && x.turmaId === turmaId);
+    if(!_podeEditar) return;
+    if(_semEscola()){ setMsg("Selecione uma escola no topo da página para alterar turmas.", "warn"); return; }
+    const t = getTurmas().find(x => x && x.turmaId === turmaId);
     if(!t) return;
-
     const vaiInativar = t.status !== "INATIVA";
 
     const confirmou = await _confirmModal({
@@ -1503,17 +1324,20 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
     });
     if(!confirmou) return;
 
-    t.status = vaiInativar ? "INATIVA" : "ATIVA";
-    save(KEYS.turmas, turmas);
-
-    buildFiltroAnoOptions();
-    renderListaTurmas();
-    updateDbInfo();
-    setMsg(vaiInativar ? "Turma inativada." : "Turma reativada.", "ok");
+    setMsg("Salvando…", "loading");
+    try{
+      await window.DB.anoAtivoTurmas.save({ ...t, status: vaiInativar ? "INATIVA" : "ATIVA" });
+    }catch(e){
+      console.warn("[toggleStatusTurma]", e);
+      setMsg("Erro ao alterar o status da turma.", "err");
+      return;
+    }
+    guardarMsgPosReload(vaiInativar ? "Turma inativada." : "Turma reativada.", "ok");
+    window.location.reload();
   }
 
   function loadTurma(turmaId){
-    if(!turmaId) return;
+    if(!turmaId || !_podeEditar) return;
     const t = getTurmas().find(x => x.turmaId === turmaId);
     if(!t) return;
 
@@ -1585,87 +1409,48 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
     renderListaTurmas();
   }
 
-  function salvarTurma(){
-    if(!_podeEditar) return;
-    const ano = parseInt($("anoSelect")?.value || getAnoAtivoDefault(), 10);
-    const turno = $("turno")?.value || "MATUTINO";
+  async function salvarTurma(){
+    if(!_podeEditar){ setMsg("Apenas administradores podem cadastrar ou editar turmas.", "warn"); return; }
+    if(_semEscola()){ setMsg("Selecione uma escola no topo da página para cadastrar ou editar turmas.", "warn"); return; }
     const nome = ($("nomeTurma")?.value || "").trim();
     const professor = ($("prof")?.value || "").trim();
+    const ehEdicao = !!editingTurmaId;
 
-    if(!seriesSel.length){
-      setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err");
-      return;
-    }
-    if(!nome){
-      setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err");
-      return;
-    }
+    if(!ehEdicao && !seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
+    if(!nome){ setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err"); return; }
 
-    const base = buildTurmaIdBase();
-    let turmas = getTurmas();
-
-    // Se estamos editando, removemos o registro antigo antes de recalcular o ID (caso a base mude)
-    // — mas preservamos a data de criação original antes de removê-lo.
-    let oldId = null;
-    let criadoEmExistente = null;
-    let statusExistente = null;
-    if(editingTurmaId){
-      oldId = editingTurmaId;
-      const existente = turmas.find(t => t && t.turmaId === oldId);
-      if(existente && existente.criadoEm) criadoEmExistente = existente.criadoEm;
-      if(existente && existente.status) statusExistente = existente.status;
-      turmas = turmas.filter(t => t && t.turmaId !== oldId);
-    }
-
-    let turmaId;
-
-    const same = turmas.filter(t => sameBase(base, t.turmaId));
-    if(!same.length){
-      // primeira turma "igual" -> fica sem sufixo
-      turmaId = base;
-    } else {
-      // já existe turma com mesma base -> força A/B/C...
-      turmas = ensureFirstGetsA(base, turmas);
-      turmaId = pickNextIdForBase(base, turmas);
-    }
-
-    // Se está editando e a base não mudou, preserva o ID original
-    if(oldId){
-      const baseEdit = turmaIdBaseFromFull(oldId);
-      if(baseEdit === base){
-        turmaId = oldId;
-      } else {
-        // base mudou durante a edição: ajustar matrículas do antigo ID para o novo
-        updateMatriculasTurmaId(oldId, turmaId);
+    const btn = $("btnSalvar");
+    if(btn) btn.disabled = true;
+    setMsg("Salvando…", "loading");
+    try{
+      let payload;
+      if(ehEdicao){
+        // get() lê direto o documento (o list() tem cache de 30s no db.firebase.js).
+        const original = await window.DB.anoAtivoTurmas.get(editingTurmaId);
+        if(!original) throw Object.assign(new Error("turma inexistente"), { userMsg: "Essa turma não existe mais no banco — recarregue a página." });
+        // Só nome, turno e professor mudam; ID, ano, séries, status e criadoEm ficam como estão.
+        payload = { ...original, nome, turno: $("turno")?.value || original.turno, professor: professor || "" };
+      }else{
+        const ano = parseInt($("anoSelect")?.value || getAnoAtivoDefault(), 10) || getAnoAtivoDefault();
+        const turmaId = pickNextIdForBase(buildTurmaIdBase(), getTurmas());
+        // Confere direto no banco: se outra pessoa criou esse ID depois que a página abriu, não sobrescreve.
+        if(await window.DB.anoAtivoTurmas.get(turmaId)) throw Object.assign(new Error("ID ocupado"), { userMsg: "Já existe uma turma com esse ID (talvez outra pessoa tenha acabado de cadastrar). Recarregue a página e tente de novo." });
+        payload = {
+          _id: turmaId, id: turmaId, turmaId, nome, anoLetivo: ano,
+          series: [...seriesSel], turno: $("turno")?.value || "MATUTINO",
+          professor: professor || "", criadoEm: Date.now(), status: "ATIVA"
+        };
       }
+      await window.DB.anoAtivoTurmas.save(payload);
+      await garantirAnoAtivoConfig(parseInt(payload.anoLetivo, 10));
+    }catch(e){
+      console.warn("[salvarTurma]", e);
+      setMsg((e && e.userMsg) || "Erro ao salvar turma.", "err");
+      if(btn) btn.disabled = false;
+      return;
     }
-
-    const payload = {
-      turmaId,
-      nome,
-      anoLetivo: ano,
-      series: [...seriesSel],
-      turno,
-      professor: professor || "",
-      criadoEm: criadoEmExistente || Date.now(),
-      status: statusExistente || "ATIVA"
-    };
-
-    // upsert
-    const idx = turmas.findIndex(x => x && x.turmaId === turmaId);
-    if(idx >= 0){
-      turmas[idx] = payload;
-    } else {
-      turmas.push(payload);
-    }
-
-    save(KEYS.turmas, turmas);
-    setAnoAtivoIfMissingOrCompat(ano);
-
-    buildFiltroAnoOptions();
-    updateDbInfo();
-    setMsg("Turma salva no banco do Ano Ativo!", "ok");
-    resetForm(); // limpa todos os campos e já atualiza a lista
+    guardarMsgPosReload("Turma salva!", "ok");
+    window.location.reload();
   }
 
   // ---------- professores do DB ----------
@@ -1767,69 +1552,51 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   });
 
   // ---------- init ----------
-  buildAnoInput();
-  buildFiltroAnoOptions();
-  fillSerieSelect();
-  resetForm();
-  renderListaTurmas();
-  updateDbInfo();
-  carregarProfessores();
-  if (window.ThemeColors) ThemeColors.ajustarContraste();
-
-  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
-  document.addEventListener("click", ()=>{
-    document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
-  });
-
-  // Restrição de acesso: USER só visualiza
-  if(!_podeEditar){
-    // Oculta o formulário de cadastro/edição inteiro
-    const formCard = document.querySelector('.card .grid2 > div:first-child');
-    if(formCard){
-      formCard.style.display = 'none';
-    }
-    // Aviso de somente leitura na lista
-    const listHeader = document.querySelector('.card .grid2 > div:last-child');
-    if(listHeader){
-      const aviso = document.createElement('div');
-      aviso.style.cssText = 'padding:10px 14px;border-radius:10px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.30);font-size:13px;margin-bottom:12px;';
-      aviso.innerHTML = '⚠️ <strong>Modo somente leitura.</strong> Apenas administradores podem cadastrar, editar ou excluir turmas.';
-      listHeader.insertBefore(aviso, listHeader.firstChild);
-    }
-  }
-})();
-</script>
-
-<script src="../header-logic.js"></script>
-
-<script>
-(function(){
-  async function bootAsync(){
+  async function init(){
     try{
       await new Promise(res=>{
         if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
         document.addEventListener('auth:ready', res, {once:true});
       });
-      const dados = await window.DB.loadAllAnoAtivo();
-      const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
-      if(sid){
-        const pre=(k)=>`schools:${sid}:${k}`;
-        if(dados.turmasDB)   localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify((Array.isArray(dados.turmasDB)?dados.turmasDB:[]).filter(t=>String(t?.turmaId||'').startsWith('ATUR|'))));
-        if(dados.alunosDB)   localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dados.alunosDB));
-        if(dados.matriculas) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dados.matriculas));
-        if(dados.dadosEscola?.configAnoAtivo)
-          localStorage.setItem(pre('configAnoAtivoAtual_v1'), JSON.stringify(dados.dadosEscola.configAnoAtivo));
-        // Re-renderiza a lista após Firestore carregar
-        if(typeof buildFiltroAnoOptions === 'function') buildFiltroAnoOptions();
-        if(typeof renderListaTurmas === 'function') renderListaTurmas();
-        if(typeof updateDbInfo === 'function') updateDbInfo();
+      const s = window.Auth.getSession && window.Auth.getSession();
+      _podeEditar = !!s && s.role === 'admin';
+
+      const [okTurmas] = await Promise.all([carregarTurmasCache(), carregarAnoConfig()]);
+      buildAnoInput();
+      buildFiltroAnoOptions();
+      fillSerieSelect();
+      resetForm();
+      renderListaTurmas();
+      await carregarProfessores();
+      if (window.ThemeColors) ThemeColors.ajustarContraste();
+
+      // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+      document.addEventListener("click", ()=>{
+        document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+      });
+
+      // Não-admin: formulário visível, mas sem botões no subcard e sem salvar.
+      if(!_podeEditar){
+        const b = $("btnSalvar");
+        if(b){ b.disabled = true; b.title = "Somente administradores podem salvar turmas."; }
       }
-    }catch(e){ console.warn('Ano Ativo Firestore pré-carga:', e); }
+
+      const msgPosReload = lerMsgPosReload();
+      if(!okTurmas) setMsg("Não foi possível carregar as turmas cadastradas — recarregue a página.", "err");
+      else if(msgPosReload) setMsg(msgPosReload.text, msgPosReload.kind || "ok");
+      else if(!_podeEditar) setMsg("Modo somente leitura — apenas administradores podem cadastrar ou editar turmas.", "warn");
+    }catch(e){
+      console.error('[init]', e);
+      setMsg('Erro ao carregar a página — recarregue e tente de novo.', 'err');
+    }finally{
+      if (window.Loading) Loading.esconder();
+    }
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootAsync);
-  else bootAsync();
+  init();
 })();
 </script>
+
+<script src="../header-logic.js"></script>
 
 </body>
 </html>
