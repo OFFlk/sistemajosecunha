@@ -443,10 +443,6 @@ html[data-theme="dark"] .wrap tbody tr:hover td { background:var(--field-bg); }
             <option value="7º ANO">7º ano</option>
             <option value="8º ANO">8º ano</option>
             <option value="9º ANO">9º ano</option>
-            <option value="1º EM">1º EM</option>
-            <option value="2º EM">2º EM</option>
-            <option value="3º EM">3º EM</option>
-            <option value="4º EM">4º EM</option>
           </select>
           </div>
           <div style="flex:0 0 auto;min-width:auto">
@@ -501,7 +497,6 @@ function chCanonSerie(txt){
   const num = numMatch ? String(parseInt(numMatch[1],10)) : '';
   if(/alfabetiz|\balfa\b/.test(t)) return 'ALFAB';
   if(/eixo/.test(t)) return 'EIXO'+num;
-  if(/\bem\b|ensino medio/.test(t)) return 'EM'+num;
   // "série" é nomenclatura antiga do Ensino Fundamental, sinônimo de "ano"
   // — nunca é, por si só, indicativo de Ensino Médio ("1ª série" = "1º ano").
   if(/serie/.test(t)) return 'ANO'+num;
