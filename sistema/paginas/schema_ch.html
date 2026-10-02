@@ -12,6 +12,8 @@
 </script>
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
+<!-- página exclusiva de admin (gestor da escola ou admin global: ambos têm role=admin) -->
+<script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
 <script src="../theme-colors.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -480,7 +482,13 @@ html[data-theme="dark"] .wrap tbody tr:hover td { background:var(--field-bg); }
 <!-- 2. Script específico da página -->
 <script>
 
-const DISC = [['LP','LP'],['MAT','MAT'],['CIE','CIE'],['HIS','HIS'],['GEO','GEO'],['ART','ART'],['EDF','EDF'],['ER','ER'],['ING','ING']];
+/* CATÁLOGO DO DOCUMENTO OFICIAL DE HISTÓRICO — única fonte dos códigos desta página.
+   Cada código = um espaço fixo do template DOCX (placeholders A{n}_{CODE}_CH, A{n}{CODE}C…).
+   O código é a LIGAÇÃO entre nota (schemaAta), carga horária (schemaCH) e placeholder.
+   Futuro: virá do "Schema para históricos (padrão)" do schemaAta (ver doc-schema-historico.md);
+   quando isso acontecer, só esta constante muda. */
+const CATALOGO_HISTORICO = ['LP','MAT','CIE','HIS','GEO','ART','EDF','ER','ING'];
+const DISC = CATALOGO_HISTORICO.map(c=>[c,c]);
 
 function nrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
 // Reduz um texto de série livre (ex: "1º Ano", "1ºano", "1o ano do EF") a uma forma
@@ -506,10 +514,11 @@ function chCanonSerie(txt){
   return t;
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
-function getLS(k,fb){ try{ const r=localStorage.getItem(k); return r==null?fb:JSON.parse(r);}catch{return fb;} }
 
 
-const CH_LS_KEY='historicoCHSchemas_v1';
+// Esta página NÃO usa localStorage para dados de regras (o servidor é a única fonte).
+// Remove a cópia antiga deixada por versões anteriores, que podia reintroduzir regras apagadas.
+try{ localStorage.removeItem('historicoCHSchemas_v1'); }catch(e){}
 const ATIVIDADES_T2 = [
   ['AP','Acompanhamento Pedagógico'], ['CA','Cultura e Arte'], ['EL','Esporte e Lazer'],
   ['DH','Direitos Humanos'], ['PS','Promoção de Saúde'], ['IC','Iniciação Científica'],
@@ -601,7 +610,7 @@ function chOrdenar(arr){
   return arr.slice().sort((x,y)=> minAno(x)-minAno(y) || String(x.nome||'').localeCompare(String(y.nome||''),'pt-BR'));
 }
 // Carrega regras do Firestore ao iniciar. O servidor SEMPRE manda: se vier vazio, a lista fica vazia
-// (antes, uma cópia antiga do localStorage — que não é separada por escola — voltava a ser gravada no servidor).
+
 (async function initCHRules(){
   if(!(window.DB && DB.schemas)){ chState.carregado = true; return; }
   try{
@@ -612,11 +621,10 @@ function chOrdenar(arr){
     const rules = await DB.schemas.listRules();
     chState.rules = chOrdenar((rules||[]).map(chNormalizeRuleShape));
     chState.carregado = true;
-    chLSMirror();
   }catch(e){
     console.warn('initCHRules:', e);
-    chState.rules = chOrdenar((getLS(CH_LS_KEY, [])||[]).map(chNormalizeRuleShape)); // só leitura
-    setMsg('Não foi possível carregar as regras do servidor. Exibindo a cópia deste navegador — edição bloqueada. Recarregue a página.', 'err');
+    chState.rules = [];
+    setMsg('Não foi possível carregar as regras do servidor. Recarregue a página.', 'err');
   }
   chRenderTabela();
 })();
@@ -628,7 +636,6 @@ function chDisciplinas(){
   base.forEach(x=>map.set(x.code,x));
   return [...map.values()];
 }
-function chLSMirror(){ try{ localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules||[])); }catch(e){} }
 function chDocId(r){ return String((r && (r._id || r.id)) || ''); }
 function chBloqueado(){
   if(chState.carregado) return false;
@@ -637,17 +644,15 @@ function chBloqueado(){
 }
 // Grava SÓ a regra alterada. ID do documento = _id existente (se houver) ou o id da regra → upsert estável, sem cópias.
 async function chPersistRule(rule){
-  chLSMirror();
   if(!(window.DB && DB.schemas)) return true;
   try{
     const { _id, createdAt, updatedAt, ...data } = rule;
     const saved = await DB.schemas.save({ _id: chDocId(rule), ...data });
     rule._id = saved._id;
-    chLSMirror();
     return true;
   }catch(e){
     console.warn('chPersistRule:', e);
-    setMsg('Não foi possível salvar no servidor. A alteração ficou salva apenas neste navegador.', 'err');
+    setMsg('Não foi possível salvar no servidor: ' + (e && e.message ? e.message : 'erro desconhecido') + '. Recarregue a página para ver o estado real.', 'err');
     return false;
   }
 }
@@ -758,7 +763,6 @@ async function chAcoesRegra(act,id){
     if(!ok) return;
     const regra = chState.rules[i];
     chState.rules.splice(i,1);
-    chLSMirror();
     chRenderTabela(); if(chState.editingId===id) chLimparEditor();
     if(window.DB && DB.schemas){
       setMsg('Excluindo…', 'loading');
