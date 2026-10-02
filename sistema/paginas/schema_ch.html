@@ -321,7 +321,7 @@ html[data-theme="dark"] .wrap .card.card-destaque .btn-outline:hover:not(:disabl
 .card-destaque .pill{ color:var(--chip-color); }
 
 /* ---- tabela de regras: larguras por coluna (fixed + colgroup) ---- */
-.ch-tabela{ table-layout:fixed; width:100%; min-width:1120px; }
+.ch-tabela{ table-layout:fixed; width:100%; min-width:1064px; }
 .ch-tabela th, .ch-tabela td{ padding:6px 4px; word-break:break-word; }
 .ch-tabela .toolbar{ flex-wrap:nowrap; gap:4px; justify-content:center; }
 .ch-tabela .toolbar button{ padding:4px 8px; font-size:12px; border-radius:8px; }
@@ -466,7 +466,7 @@ html[data-theme="dark"] .wrap tbody tr:hover td { background:var(--field-bg); }
 
   <div class="card ch-card">
     <div class="hrow">
-      <div class="card-title" style="margin:0">Regras cadastradas (prioridade: de cima para baixo)</div>
+      <div class="card-title" style="margin:0">Regras cadastradas</div>
       <div class="small" id="chResumoRegras">0 regra(s)</div>
     </div>
     <div id="chRegrasTabela" style="margin-top:8px" class="small muted">Nenhuma regra cadastrada.</div>
@@ -594,24 +594,31 @@ function chSetEditorCargas(cargas){
     inp.value = (val==null || val==='') ? '' : String(val);
   });
 }
-const chState = { rules:(getLS(CH_LS_KEY, [])||[]).map(chNormalizeRuleShape), editor:{anos:[], series:[]}, editingId:null };
-// Carrega regras frescas do Firestore ao iniciar
+const chState = { rules:[], editor:{anos:[], series:[]}, editingId:null, carregado:false };
+function chOrdenar(arr){
+  // ordem estável de exibição (o Firestore devolve por ID do documento, que é aleatório)
+  const minAno = r => { const n=(r.anos||[]).map(Number).filter(Boolean); return n.length?Math.min(...n):9999; };
+  return arr.slice().sort((x,y)=> minAno(x)-minAno(y) || String(x.nome||'').localeCompare(String(y.nome||''),'pt-BR'));
+}
+// Carrega regras do Firestore ao iniciar. O servidor SEMPRE manda: se vier vazio, a lista fica vazia
+// (antes, uma cópia antiga do localStorage — que não é separada por escola — voltava a ser gravada no servidor).
 (async function initCHRules(){
+  if(!(window.DB && DB.schemas)){ chState.carregado = true; return; }
   try{
     await new Promise(res=>{
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
       document.addEventListener('auth:ready', res, {once:true});
     });
     const rules = await DB.schemas.listRules();
-    if(rules && rules.length){
-      chState.rules = rules.map(chNormalizeRuleShape);
-      localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules));
-      chRenderTabela();
-    }
+    chState.rules = chOrdenar((rules||[]).map(chNormalizeRuleShape));
+    chState.carregado = true;
+    chLSMirror();
   }catch(e){
     console.warn('initCHRules:', e);
-    setMsg('Não foi possível carregar as regras do servidor. Exibindo as salvas neste navegador.', 'err');
+    chState.rules = chOrdenar((getLS(CH_LS_KEY, [])||[]).map(chNormalizeRuleShape)); // só leitura
+    setMsg('Não foi possível carregar as regras do servidor. Exibindo a cópia deste navegador — edição bloqueada. Recarregue a página.', 'err');
   }
+  chRenderTabela();
 })();
 
 function chDisciplinas(){
@@ -621,28 +628,28 @@ function chDisciplinas(){
   base.forEach(x=>map.set(x.code,x));
   return [...map.values()];
 }
-async function chSaveLS(){
-  chState.rules=(Array.isArray(chState.rules)?chState.rules:[]).map(chNormalizeRuleShape);
-  // Cache local imediato
-  localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules||[]));
-  // Persiste no Firestore (não bloqueia a UI)
-  let ok=true;
-  if(window.DB && DB.schemas){
-    try{
-      const saved = await DB.schemas.saveAll(chState.rules||[]);
-      // saveAll devolve os objetos com o _id real do Firestore preenchido —
-      // sincroniza aqui pra nunca mais precisar de reload pra saber o _id
-      // de uma regra recém-criada (evita doc novo aleatório no próximo save).
-      if(Array.isArray(saved) && saved.length){
-        chState.rules = saved.map(chNormalizeRuleShape);
-        localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules));
-      }
-    }catch(e){
-      console.warn('chSaveLS Firestore:', e); ok=false;
-      setMsg('Não foi possível salvar no servidor. A alteração ficou salva apenas neste navegador.', 'err');
-    }
+function chLSMirror(){ try{ localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules||[])); }catch(e){} }
+function chDocId(r){ return String((r && (r._id || r.id)) || ''); }
+function chBloqueado(){
+  if(chState.carregado) return false;
+  setMsg('As regras ainda não foram carregadas do servidor. Aguarde ou recarregue a página.', 'err');
+  return true;
+}
+// Grava SÓ a regra alterada. ID do documento = _id existente (se houver) ou o id da regra → upsert estável, sem cópias.
+async function chPersistRule(rule){
+  chLSMirror();
+  if(!(window.DB && DB.schemas)) return true;
+  try{
+    const { _id, createdAt, updatedAt, ...data } = rule;
+    const saved = await DB.schemas.save({ _id: chDocId(rule), ...data });
+    rule._id = saved._id;
+    chLSMirror();
+    return true;
+  }catch(e){
+    console.warn('chPersistRule:', e);
+    setMsg('Não foi possível salvar no servidor. A alteração ficou salva apenas neste navegador.', 'err');
+    return false;
   }
-  return ok; // true = salvou (ou não há servidor); false = falhou no servidor (o toast de erro já foi exibido)
 }
 function chAnoSort(a,b){ return (+a||0)-(+b||0); }
 function chColetaAnosDetectados(){
@@ -701,7 +708,7 @@ function chRenderTabela(){
   const rules=Array.isArray(chState.rules)?chState.rules:[];
   if(!rules.length){ wrap.innerHTML='<div class="muted">Nenhuma regra cadastrada.</div>'; return; }
   const discHeaders = chDisciplinas().map(d=>`<th>${esc(d.code)}</th>`).join('');
-  const colgroup = `<colgroup><col style="width:38px"><col><col style="width:130px"><col style="width:150px">${chDisciplinas().map(()=>'<col style="width:46px">').join('')}<col style="width:254px"></colgroup>`;
+  const colgroup = `<colgroup><col style="width:38px"><col><col style="width:130px"><col style="width:150px">${chDisciplinas().map(()=>'<col style="width:46px">').join('')}<col style="width:198px"></colgroup>`;
   wrap.innerHTML = `
     <div class="table-wrap"><table class="ch-tabela">${colgroup}
       <thead><tr>
@@ -720,8 +727,6 @@ function chRenderTabela(){
             <td><div class="toolbar">
               <button type="button" class="out" data-ch-act="edit" data-id="${esc(r.id)}">Editar</button>
               <button type="button" class="out" data-ch-act="dup" data-id="${esc(r.id)}">Duplicar</button>
-              <button type="button" class="out" data-ch-act="up" data-id="${esc(r.id)}">↑</button>
-              <button type="button" class="out" data-ch-act="down" data-id="${esc(r.id)}">↓</button>
               <button type="button" class="gray" data-ch-act="del" data-id="${esc(r.id)}">Excluir</button>
             </div></td>
           </tr>`;
@@ -733,12 +738,17 @@ function chRenderTabela(){
 async function chAcoesRegra(act,id){
   const i=(chState.rules||[]).findIndex(r=>r.id===id); if(i<0) return;
   if(act==='edit'){ chCarregarRegraNoEditor(chState.rules[i]); return; }
+  if(chBloqueado()) return;
   if(act==='dup'){
-    const cp=JSON.parse(JSON.stringify(chState.rules[i])); cp.id=`ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; cp.nome=(cp.nome||'')+' (cópia)';
-    chState.rules.splice(i+1,0,cp); chSaveLS(); chRenderTabela(); return;
+    const cp=JSON.parse(JSON.stringify(chState.rules[i]));
+    // a cópia é um documento NOVO: sem _id (senão sobrescreveria o original) e sem carimbos de data
+    delete cp._id; delete cp.createdAt; delete cp.updatedAt;
+    cp.id=`ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; cp.nome=(cp.nome||'')+' (cópia)';
+    chState.rules.splice(i+1,0,cp); chRenderTabela();
+    setMsg('Duplicando…', 'loading');
+    if(await chPersistRule(cp)) setMsg('Regra duplicada.', 'ok');
+    return;
   }
-  if(act==='up' && i>0){ [chState.rules[i-1], chState.rules[i]]=[chState.rules[i], chState.rules[i-1]]; chSaveLS(); chRenderTabela(); return; }
-  if(act==='down' && i<chState.rules.length-1){ [chState.rules[i+1], chState.rules[i]]=[chState.rules[i], chState.rules[i+1]]; chSaveLS(); chRenderTabela(); return; }
   if(act==='del'){
     const ok = await _confirmModal({
       titulo: '⚠️ Excluir regra?',
@@ -746,16 +756,18 @@ async function chAcoesRegra(act,id){
       textoConfirmar: 'Sim, excluir',
     });
     if(!ok) return;
+    const regra = chState.rules[i];
     chState.rules.splice(i,1);
-    localStorage.setItem(CH_LS_KEY, JSON.stringify(chState.rules||[]));
-    // Apaga de verdade no Firestore (por chave de negócio `id`, pra pegar
-    // também eventuais cópias duplicadas que ainda restem dessa regra) —
-    // splice()+chSaveLS() sozinho nunca deletava, só deixava de reenviar.
+    chLSMirror();
     chRenderTabela(); if(chState.editingId===id) chLimparEditor();
     if(window.DB && DB.schemas){
       setMsg('Excluindo…', 'loading');
-      try{ await DB.schemas.removeWhere('id', id); setMsg('Regra excluída.', 'ok'); }
-      catch(e){
+      try{
+        // pelo ID do documento (pega também regras sem campo `id`) + por `id` de negócio (cópias antigas)
+        await DB.schemas.remove(chDocId(regra));
+        await DB.schemas.removeWhere('id', id);
+        setMsg('Regra excluída.', 'ok');
+      }catch(e){
         console.warn('chAcoesRegra del Firestore:', e);
         setMsg('Não foi possível excluir a regra no servidor. Ela pode reaparecer ao recarregar a página.', 'err');
       }
@@ -868,6 +880,7 @@ document.addEventListener("click", function () {
   document.querySelectorAll(".info-tip.open").forEach(function (el) { el.classList.remove("open"); });
 });
 async function chSalvarRegra(){
+  if(chBloqueado()) return;
   const nome=String(document.getElementById('chNomeRegra')?.value||'').trim();
   const cargas=chGetEditorCargas();
   const series=[...new Set((chState.editor.series||[]).map(String))];
@@ -889,7 +902,10 @@ async function chSalvarRegra(){
     setMsg(`Já existe a regra "${conflito.nome}" para a série "${series.join(', ')||'(sem série definida)'}" no(s) ano(s) ${anosConflitantes.join(', ')}. Edite ou exclua a regra existente antes de salvar.`, 'err');
     return;
   }
+  // ao editar, parte da regra antiga (preserva _id e demais campos) — recriar o objeto perdia o _id
+  const anterior = (chState.rules||[]).find(r => r.id === chState.editingId) || {};
   const rule=chNormalizeRuleShape({
+    ...anterior,
     id: chState.editingId || `ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
     nome, cargas, anos, series,
     temTurno2: document.getElementById('chTemTurno2')?.value==='1',
@@ -900,7 +916,7 @@ async function chSalvarRegra(){
   if(idx>=0) chState.rules[idx]=rule; else chState.rules.unshift(rule);
   setMsg('Salvando…', 'loading');
   chRenderTabela(); chLimparEditor();
-  const salvou = await chSaveLS();
+  const salvou = await chPersistRule(rule);
   if(salvou) setMsg('Regra de CH salva.', 'ok');
 }
 function chInitUI(){
