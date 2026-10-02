@@ -112,7 +112,7 @@ Fica coberta pelo card *Turno 2* do `schema_ch` (`rule.cargasT2[CODE]`, `ATIVIDA
 Consequência: o schemaAta não precisa conter essas atividades; o histórico lê só a CH delas.
 
 **Ensino Médio descontinuado (✅ decidido).** Nada será feito para EM neste módulo. No `schema_ch` foram removidas as opções
-1º–4º EM do select de séries. O ramo `EM` em `chCanonSerie` foi mantido só por segurança com regras antigas já salvas.
+1º–4º EM do select de séries. O ramo `EM` de `chCanonSerie` também foi removido (não havia dados reais de EM salvos; só testes).
 
 ---
 
