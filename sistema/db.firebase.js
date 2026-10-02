@@ -334,71 +334,64 @@
     },
 
     /**
-     * Limpeza única da coleção schemasCH: remove documentos duplicados da
-     * mesma regra (mesmo campo `id` de negócio) mantendo só o mais completo,
-     * e remove documentos órfãos/de formato legado (sem `id`/`cargas`/`anos`
-     * — sobras de outro formato antigo que o app já ignora, mas que ficam
-     * ocupando espaço na coleção). Rode uma vez pelo console:
-     *   await DB.schemas.cleanupDuplicates()
-     * Retorna um resumo do que foi removido/mantido, sem apagar nada por
-     * engano: documentos que já parecem únicos e válidos não são tocados.
+     * Limpeza da coleção schemasCH. SEMPRE rode primeiro em modo simulação:
+     *   await DB.schemas.cleanupDuplicates({ dryRun: true })   // só mostra, não apaga
+     *   await DB.schemas.cleanupDuplicates()                    // apaga de verdade
+     * Remove: (1) regras em branco (nenhuma carga horária > 0 — a tela não deixa
+     * salvar assim, então são sementes/lixo); (2) duplicatas da mesma regra, seja
+     * pela chave de negócio (`id`, ou o próprio _id se não houver `id`), seja pela
+     * assinatura nome + anos + séries; mantém a mais completa.
      */
-    async cleanupDuplicates() {
+    async cleanupDuplicates(opts = {}) {
+      const dryRun = !!opts.dryRun;
       await waitAuth();
-      guardWrite('cleanupDuplicates', 'schemasCH');
+      if (!dryRun) guardWrite('cleanupDuplicates', 'schemasCH');
       cacheClear('schemasCH');
       const snap = await col('schemasCH').get();
       const all = snap.docs.map(d => ({ _id: d.id, ref: d.ref, data: d.data() }));
 
-      const isValidRule = (data) => {
-        const temCargas = data && typeof data.cargas === 'object' && data.cargas && Object.keys(data.cargas).length > 0;
-        const temAnos = Array.isArray(data.anos) && data.anos.length > 0;
-        return !!data.id && (temCargas || temAnos);
+      const nCh = (m) => (m && typeof m === 'object') ? Object.values(m).filter(v => Number(v) > 0).length : 0;
+      const nCargas = (d) => nCh(d.cargas) + nCh(d.cargasT2);
+      const completeness = (d) => nCargas(d) * 10 + (Array.isArray(d.anos) ? d.anos.length : 0) + (Array.isArray(d.series) ? d.series.length : 0);
+      const norm = (t) => String(t || '').trim().toLowerCase();
+      const signature = (d) => [norm(d.nome), (d.anos || []).map(String).sort().join(','), (d.series || []).map(norm).sort().join(',')].join('|');
+
+      const motivo = new Map(); // _id -> motivo da remoção
+      const vivos = [];
+      all.forEach(d => { if (nCargas(d.data) === 0) motivo.set(d._id, 'em branco (sem carga horária)'); else vivos.push(d); });
+
+      const dedupe = (lista, keyFn, rotulo) => {
+        const g = new Map();
+        lista.forEach(d => { const k = keyFn(d); if (!g.has(k)) g.set(k, []); g.get(k).push(d); });
+        const sobra = [];
+        g.forEach(docs => {
+          docs.sort((a, b) => completeness(b.data) - completeness(a.data));
+          sobra.push(docs[0]);
+          docs.slice(1).forEach(x => motivo.set(x._id, `duplicata (${rotulo}) de ${docs[0]._id}`));
+        });
+        return sobra;
       };
+      const pos1 = dedupe(vivos, d => String(d.data.id || d._id), 'mesmo id');
+      const mantidos = dedupe(pos1, d => signature(d.data), 'mesmo nome/anos/séries');
 
-      const orphans = all.filter(d => !isValidRule(d.data));
-      const valid = all.filter(d => isValidRule(d.data));
+      const detalhes = all.map(d => ({
+        _id: d._id, id: d.data.id || '(sem id)', nome: d.data.nome || '(sem nome)',
+        anos: (d.data.anos || []).join(','), series: (d.data.series || []).join(','),
+        cargas: nCargas(d.data), acao: motivo.has(d._id) ? 'REMOVER: ' + motivo.get(d._id) : 'manter',
+      }));
+      console.table(detalhes);
 
-      // Agrupa os válidos por id de negócio (campo `id`, minúsculo)
-      const groups = new Map();
-      valid.forEach(d => {
-        const key = String(d.data.id);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(d);
-      });
-
-      const completeness = (data) => {
-        const nCargas = data && typeof data.cargas === 'object' ? Object.keys(data.cargas).length : 0;
-        const nAnos = Array.isArray(data.anos) ? data.anos.length : 0;
-        return nCargas + nAnos;
-      };
-
-      const toDelete = [...orphans];
-      const kept = [];
-      groups.forEach(docs => {
-        if (docs.length === 1) { kept.push(docs[0]); return; }
-        // mantém o mais completo (mais cargas/anos preenchidos); em empate, o último (_id mais recente costuma ordenar depois)
-        docs.sort((a, b) => completeness(b.data) - completeness(a.data));
-        kept.push(docs[0]);
-        toDelete.push(...docs.slice(1));
-      });
-
-      if (toDelete.length) {
+      const toDelete = all.filter(d => motivo.has(d._id));
+      if (!dryRun && toDelete.length) {
         const db = window.Auth.db;
         for (let i = 0; i < toDelete.length; i += 400) {
           const batch = db.batch();
           toDelete.slice(i, i + 400).forEach(d => batch.delete(d.ref));
           await batch.commit();
         }
+        cacheClear('schemasCH');
       }
-      cacheClear('schemasCH');
-
-      const resumo = {
-        totalAntes: all.length,
-        duplicatasRemovidas: toDelete.length - orphans.length,
-        orfaosRemovidos: orphans.length,
-        totalDepois: kept.length,
-      };
+      const resumo = { dryRun, totalAntes: all.length, aRemover: toDelete.length, totalDepois: mantidos.length };
       console.log('[DB.schemas.cleanupDuplicates] resumo:', resumo);
       return resumo;
     },
