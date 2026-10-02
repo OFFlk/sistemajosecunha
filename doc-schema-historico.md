@@ -1,7 +1,7 @@
 # Módulo Histórico + Schema de Carga Horária — Documentação de decisões
 
 Documento de arquivo. Complementa o `handoff-backend-historico.md`.
-Data da última atualização: 01/10/2026.
+Data da última atualização: 01/10/2026 (inclui as respostas sobre template/parte diversificada e Ensino Médio).
 
 > **Legenda:** ✅ feito e entregue · 📌 decidido, a implementar · ❓ em aberto · ⚠️ depende de arquivo ainda não analisado
 
@@ -107,7 +107,12 @@ Não permitir salvar regra de CH sem nenhuma carga. Se nenhuma regra casar com a
 ### 4.5 Preparação já feita em `schema_ch.html`
 Os códigos agora vivem em **uma constante** `CATALOGO_HISTORICO` (`LP, MAT, CIE, HIS, GEO, ART, EDF, ER, ING`),
 com comentário apontando para este documento. Quando o schema padrão for a fonte, só essa constante muda.
-As atividades do Turno 2 (`ATIVIDADES_T2`) seguem fixas e independentes (premissa a confirmar).
+**Turno 2 = parte diversificada (✅ confirmado).** No template existe a "parte diversificada": ela **não recebe notas, só carga horária**.
+Fica coberta pelo card *Turno 2* do `schema_ch` (`rule.cargasT2[CODE]`, `ATIVIDADES_T2`), fixa e independente do schemaAta.
+Consequência: o schemaAta não precisa conter essas atividades; o histórico lê só a CH delas.
+
+**Ensino Médio descontinuado (✅ decidido).** Nada será feito para EM neste módulo. No `schema_ch` foram removidas as opções
+1º–4º EM do select de séries. O ramo `EM` em `chCanonSerie` foi mantido só por segurança com regras antigas já salvas.
 
 ---
 
@@ -116,8 +121,8 @@ As atividades do Turno 2 (`ATIVIDADES_T2`) seguem fixas e independentes (premiss
 Ordem sugerida:
 1. 📌 Guard `requireRole('admin')` (+ card do hub).
 2. **Ligação por código:** notas das matérias do schemaAta da turma → placeholders pelo código; aviso de matérias fora do catálogo; CH achada por ano+série+código.
-3. **A3 — formato fixo F2 (N1→N9):** remover o `<select id="formato">` (F1/F2/EM/TODOS) e trocar por constante; ajustar `formatoPermite`, `getFilteredRegs`, `onFormatoMudou`, `buildPlaceholders`, registro do histórico de exportações.
-   ❓ **Em aberto:** o que acontece com aluno do **Ensino Médio**? Hoje `F2` filtra só 1º–9º ano. Dizer na tela que o histórico é só do fundamental, ou o EM some do export sem aviso.
+3. **A3 — formato fixo F2 (N1→N9) e fim do EM (📌 decidido):** remover o `<select id="formato">` (F1/F2/EM/TODOS) e trocar por constante F2; ajustar `formatoPermite`, `getFilteredRegs`, `onFormatoMudou`, `buildPlaceholders`, registro do histórico de exportações.
+   **Retirar tudo de Ensino Médio** (opção `EM`, filtros 1ª–3ª série EM, textos, rótulos). Alunos que só tenham matrícula de EM simplesmente não aparecem — deixar claro na tela que o histórico é do Ensino Fundamental.
 4. **B3 no histórico:** o resumo "Usando regras globais com prioridade por ordem…" deixa de ser verdade (setas removidas) → reescrever/remover. O select `#schemaCHModo` já pré-seleciona o último escolhido ou `GLOBAL`, não "a primeira regra".
 5. **Limpeza do legado:** editor de CH escondido (`#cardCHSchema`, `chState`, `chSaveLS` com `saveAll`, importar/exportar JSON) — **pode reintroduzir os bugs 1 e 2**; usa a mesma chave de localStorage. Remover. Depois: 29 `alert()` + 1 `confirm()` → toast/modal (`guia-toasts.md`); avaliar tirar o template DOCX embutido (469 KB).
 6. **A2 — export em PDF** (por último). ❓ Caminho a decidir: (1) converter o mesmo DOCX no servidor (máxima fidelidade, exige backend); (2) PDF no navegador (`pdf-lib`/`jsPDF`) redesenhando o layout; (3) HTML de impressão (`window.print`). O documento é institucional → fidelidade pesa. O stub atual `alert('…ainda não está disponível')` vira toast ou some; decidir se o histórico de exportações registra "PDF".
@@ -126,11 +131,11 @@ Ordem sugerida:
 
 ## 6. Perguntas em aberto (resumo)
 
-- ❓ Template DOCX: existem linhas além das 9 matérias ("parte diversificada")? O que fazer com matéria sem espaço (hoje: avisar e não entrar)?
+- ✅ Template: tem a parte diversificada (só CH, coberta pelo Turno 2). ❓ Ainda falta confirmar se há outras linhas além das 9 matérias + Turno 2; matéria sem espaço: avisar e não entrar.
 - ❓ Duas matérias com o mesmo código no mesmo aluno (somar, média ou barrar)? Pela regra 4.3.1 deve ser barrado no schema.
-- ❓ A3: Ensino Médio com formato fixo em F2.
+- ✅ Ensino Médio descontinuado (retirar tudo no histórico).
 - ❓ A2: caminho do PDF.
-- ❓ `ATIVIDADES_T2` continua fixa?
+- ✅ `ATIVIDADES_T2` continua fixa (= parte diversificada).
 - ❓ `schema_ch`: manter o bloqueio de edição quando o carregamento do servidor falha? (hoje mantido, pois sem a lista a checagem de conflito série/ano fica cega)
 
 ## 7. Arquivos necessários para continuar
