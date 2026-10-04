@@ -205,19 +205,6 @@ html[data-theme="dark"] .turno-btn { background: var(--card); color: var(--muted
 html[data-theme="dark"] .turno-btn.selected { background: var(--chip-bg); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
 
 /* ── Integral toggle ── */
-#integralBox {
-  display: none;
-  margin-top: 10px;
-  padding: 10px 14px;
-  border: 1.5px solid var(--brand-border, #ddd6fe);
-  border-radius: 12px;
-  background: var(--chip-bg);
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  animation: fadeSlide 0.18s ease;
-}
-#integralBox.visible { display: flex; }
 @keyframes fadeSlide {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -226,16 +213,6 @@ html[data-theme="dark"] .turno-btn.selected { background: var(--chip-bg); border
   from { opacity: 0; transform: translateX(-50%) translateY(16px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-.integral-toggle { display: flex; gap: 6px; }
-.integral-btn {
-  padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
-  border: 1.5px solid var(--border); background: var(--card); color: var(--muted);
-  cursor: pointer; font-family: 'Nunito', sans-serif;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.integral-btn:hover { background: var(--pf-brand-faded); border-color: var(--pf-brand); color: var(--text); }
-.integral-btn.selected-sim, .integral-btn.selected-nao,
-.integral-btn.selected-sim:hover, .integral-btn.selected-nao:hover { background: var(--pf-brand); border-color: var(--pf-brand); color: var(--brand-fg, #fff); }
 .statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 
 /* ── Banner aluno encontrado ── */
@@ -526,12 +503,14 @@ html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
   --pf-brand-text:var(--brand-text,#6d28d9);
   --pf-brand-faded:var(--brand-faded,#f5f3ff);
   --pf-body-bg:var(--bg,#ffffff);
+  --pf-brand-sutil:color-mix(in srgb, var(--pf-brand) 38%, #ffffff);
 }
 html[data-theme="dark"]{
   --pf-brand:var(--brand-d,#8b5cf6);
   --pf-brand-text:var(--brand-text-d,#c4b5fd);
   --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
   --pf-body-bg:var(--bg,#0b1220);
+  --pf-brand-sutil:color-mix(in srgb, var(--pf-brand) 50%, #000000);
 }
 
 /* Card de destaque (contraste calculado por ThemeColors.ajustarContraste()) */
@@ -613,10 +592,11 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .nee-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; background:var(--chip-bg,#f5f3ff); flex-wrap:wrap; }
 .nee-header-label{ font-size:13px; font-weight:800; display:flex; align-items:center; gap:8px; }
 .nee-toggle{ display:flex; gap:6px; }
-.nee-sim-nao{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; border:1.5px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; font-family:'Nunito',sans-serif; transition:background .15s,border-color .15s,color .15s,filter .15s; }
-.nee-sim-nao:hover{ background:var(--pf-brand-faded); border-color:var(--pf-brand); color:var(--text); }
-.nee-sim-nao.sim, .nee-sim-nao.nao{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
-.nee-sim-nao.sim:hover, .nee-sim-nao.nao:hover{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); filter:brightness(.92); }
+/* Botões do cabeçalho (NEE, AEE e Modelo de ensino): mesmo desenho */
+.nee-sim-nao, .integral-btn{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; border:1.5px solid var(--pf-brand-sutil); background:var(--card); color:var(--muted); cursor:pointer; font-family:'Nunito',sans-serif; transition:background .15s,border-color .15s,color .15s,filter .15s; }
+.nee-sim-nao:hover, .integral-btn:hover{ background:var(--pf-brand-faded); border-color:var(--pf-brand); color:var(--text); }
+.nee-sim-nao.sim, .nee-sim-nao.nao, .integral-btn.selected-sim, .integral-btn.selected-nao{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
+.nee-sim-nao.sim:hover, .nee-sim-nao.nao:hover, .integral-btn.selected-sim:hover, .integral-btn.selected-nao:hover{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); filter:brightness(.92); }
 .nee-panel{ display:none; padding:16px; border-top:1px solid var(--border); }
 .nee-panel.open{ display:block; animation:fadeSlide .18s ease; }
 .nee-section-title{ font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 8px; }
@@ -867,14 +847,16 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
   </div>
 
   <div class="field" style="grid-column:1/-1;">
-    <label>📚 Modelo de ensino <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Regular:</b> o aluno estuda em apenas um turno, cursando a sua série pedagógica.<br><br><b>Integral:</b> o aluno estuda o ensino regular no turno da turma e, no contraturno, participa de aulas e atividades extras.</span></span></label>
-    <div id="integralBox" class="visible">
-      <div class="integral-toggle">
-        <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">Regular</button>
-        <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">Integral</button>
+    <div class="nee-block">
+      <div class="nee-header">
+        <div class="nee-header-label">📚 Modelo de ensino <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Regular:</b> o aluno estuda em apenas um turno, cursando a sua série pedagógica.<br><br><b>Integral:</b> o aluno estuda o ensino regular no turno da turma e, no contraturno, participa de aulas e atividades extras.</span></span></div>
+        <div class="nee-toggle">
+          <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">Regular</button>
+          <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">Integral</button>
+        </div>
       </div>
     </div>
-    <!-- Turno não é mais definido aqui — vem da turma selecionada (cadastro de turma). -->
+\1 é mais definido aqui — vem da turma selecionada (cadastro de turma). -->
     <input type="hidden" id="turnoSelecionado" value="" />
     <input type="hidden" id="modeloEnsino" value="" />
     <small class="help" id="turnoMsg" aria-live="polite"></small>
