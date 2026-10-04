@@ -233,22 +233,9 @@ html[data-theme="dark"] .turno-btn.selected { background: var(--chip-bg); border
   cursor: pointer; font-family: 'Nunito', sans-serif;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.integral-btn.selected-sim {
-  background: #d1fae5; border-color: #34d399; color: #065f46;
-}
-.integral-btn.selected-nao {
-  background: var(--chip-bg); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
-}
-html[data-theme="dark"] .integral-btn { background: var(--card); color: var(--muted); border-color: var(--border); }
-html[data-theme="dark"] .integral-btn.selected-sim { background: rgba(52,211,153,0.18); border-color: #34d399; color: #6ee7b7; }
-html[data-theme="dark"] .integral-btn.selected-nao { background: var(--chip-bg); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-#integralBadge {
-  display: none; font-size: 12px; font-weight: 800;
-  padding: 3px 10px; border-radius: 999px;
-  background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
-}
-#integralBadge.visible { display: inline-flex; align-items: center; gap: 4px; }
-html[data-theme="dark"] #integralBadge { background: rgba(52,211,153,0.18); border-color: #34d399; color: #6ee7b7; }
+.integral-btn:hover { background: var(--pf-brand-faded); border-color: var(--pf-brand); color: var(--text); }
+.integral-btn.selected-sim, .integral-btn.selected-nao,
+.integral-btn.selected-sim:hover, .integral-btn.selected-nao:hover { background: var(--pf-brand); border-color: var(--pf-brand); color: var(--brand-fg, #fff); }
 .statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 
 /* ── Banner aluno encontrado ── */
@@ -673,7 +660,6 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 <select id="turmaSelect">
 <option value="">— Selecione —</option>
 </select>
-<div class="subnote" id="turmaInfo"></div>
 </div>
 <div>
 <label for="anoLetivo">Ano letivo</label>
@@ -811,6 +797,7 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
   <div class="field">
     <label for="nasc">Data de nascimento <span class="req">*</span></label>
     <input id="nasc" type="date" required />
+    <small class="help" id="nascMsg" aria-live="polite"></small>
   </div>
 
   <div class="field">
@@ -880,13 +867,12 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
   </div>
 
   <div class="field" style="grid-column:1/-1;">
-    <label>📚 Frequenta o Integral? <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Aluno que frequenta o Integral estuda o ensino regular no turno da turma e recebe atividades de contraturno.</span></span></label>
+    <label>📚 Modelo de ensino <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Regular:</b> o aluno estuda em apenas um turno, cursando a sua série pedagógica.<br><br><b>Integral:</b> o aluno estuda o ensino regular no turno da turma e, no contraturno, participa de aulas e atividades extras.</span></span></label>
     <div id="integralBox" class="visible">
       <div class="integral-toggle">
-        <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">✅ Sim</button>
-        <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">❌ Não</button>
+        <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">Regular</button>
+        <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">Integral</button>
       </div>
-      <span id="integralBadge">📚 Modelo Integral</span>
     </div>
     <!-- Turno não é mais definido aqui — vem da turma selecionada (cadastro de turma). -->
     <input type="hidden" id="turnoSelecionado" value="" />
@@ -1374,7 +1360,7 @@ function normSerie(s){
 
   // ---------- UI refs ----------
   const turmaSelect = document.getElementById("turmaSelect");
-  const turmaInfo = document.getElementById("turmaInfo");
+  const turmaInfo = { textContent: "" }; // descrição da turma removida da página (campo mantido só para o JS legado não quebrar)
   const pillStatus = document.getElementById("pillStatus");
   const pillAnoAtivo = document.getElementById("pillAnoAtivo");
   const anoLetivo = document.getElementById("anoLetivo");
@@ -1408,6 +1394,31 @@ function normSerie(s){
     if(typeof v === "string" && v.trim()) return parseInt(v,10) || new Date().getFullYear();
     return new Date().getFullYear();
   }
+
+  // Data de nascimento: avisa quando é irreal (futuro, posterior ao ano ativo ou com mais de 100 anos).
+  // Retorna "" se estiver ok (ou vazia) e o texto do problema se não estiver.
+  function validarNascimento(valor){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor||"").trim());
+    if(!m) return "";
+    const ano = +m[1], mes = +m[2], dia = +m[3];
+    const anoAtivo = getAnoAtivoDefault();
+    const hoje = new Date();
+    const hojeStr = hoje.getFullYear() + "-" + String(hoje.getMonth()+1).padStart(2,"0") + "-" + String(hoje.getDate()).padStart(2,"0");
+    if(ano > anoAtivo) return `Data de nascimento irreal: ${ano} é posterior ao ano ativo (${anoAtivo}).`;
+    if(String(valor) > hojeStr) return "Data de nascimento irreal: a data está no futuro.";
+    if(ano < anoAtivo - 100) return `Data de nascimento irreal: ${ano} indica mais de 100 anos de idade.`;
+    return "";
+  }
+  window._validarNascimento = validarNascimento;
+  function checarNascimentoCampo(){
+    const msg = validarNascimento(nasc.value);
+    const el = document.getElementById("nascMsg");
+    if(el){ el.textContent = msg; el.className = msg ? "help err" : "help"; }
+    return !msg;
+  }
+  window._checarNascimentoCampo = checarNascimentoCampo;
+  nasc.addEventListener("input", checarNascimentoCampo);
+  nasc.addEventListener("change", checarNascimentoCampo);
 
   function isAnoAtivo(anoValor){
     const a = String(anoValor||"").trim();
@@ -1480,9 +1491,7 @@ function normSerie(s){
     for(const t of turmas){
       const tid = t.turmaId || t.id || "";
       if(!tid) continue;
-      const series = Array.isArray(t.series) ? t.series.map(normSerie).join(", ") : (t.serie ? normSerie(t.serie) : "");
-      const turno = t.turno ? String(t.turno) : "";
-      const label = `${t.nome || tid}${turno ? " • " + turno : ""}${series ? " • " + series : ""}`;
+      const label = String(t.nome || tid); // o nome automático já traz série e turno
       const opt = document.createElement("option");
       opt.value = tid;
       opt.textContent = label;
@@ -1555,10 +1564,6 @@ function normSerie(s){
       return;
     }
     const tid = t.turmaId || t.id;
-    const series = Array.isArray(t.series) ? t.series.map(normSerie).join(", ") : (t.serie ? normSerie(t.serie) : "—");
-    const turno = t.turno ? String(t.turno) : "—";
-    const prof = t.professor ? String(t.professor) : "";
-    turmaInfo.textContent = `ID: ${tid} • Ano: ${t.anoLetivo || getAnoAtivoDefault()} • Turno: ${turno} • Séries: ${series}${prof ? " • Prof.: " + prof : ""}`;
     // Preenche o anoLetivo a partir da turma SOMENTE se o campo estiver vazio
     if(!anoLetivo.value) anoLetivo.value = t.anoLetivo || getAnoAtivoDefault();
     // Turno não é mais escolhido no cadastro de aluno — é herdado da turma selecionada.
@@ -1629,13 +1634,14 @@ function normSerie(s){
     nome.value = "";
     cpf.value = "";
     nasc.value = "";
+    checarNascimentoCampo();
     mae.value = "";
     pai.value = "";
     if(paiNaoInformado){ paiNaoInformado.checked = false; pai.disabled = false; }
     naturalidadeCidade.value = "";
     naturalidadeUF.value = "";
     sexo.value = "";
-    corRaca.value = "";
+    corRaca.value = "NÃO DECLARADA";
     // reset integral (turno é resetado junto com a turma, em refreshTurmaInfo)
     const modeloHidden = document.getElementById('modeloEnsino');
     if(modeloHidden) modeloHidden.value = '';
@@ -1720,6 +1726,7 @@ function normSerie(s){
   if(!nomeVal)  return setMsg("Informe o nome do aluno.", "err");
   if(!maeNome)  return setMsg("Informe o nome da mãe.", "err");
   if(!nascVal)  return setMsg("Informe a data de nascimento.", "err");
+  { const _n = validarNascimento(nascVal); if(_n){ checarNascimentoCampo(); return setMsg(_n, "err"); } }
   if(!cpfDigits) return setMsg("Informe o CPF.", "err");
   if(!checkCpfField()){
     const t = document.getElementById("cpfMsg")?.textContent || "CPF inválido.";
@@ -1732,8 +1739,8 @@ function normSerie(s){
   if(!anoEhAtivo && !situacaoEscolhida) return setMsg("Selecione a situação da matrícula (ano não é o ativo).", "err");
   if(!modelo){
     const turnoMsg = document.getElementById('turnoMsg');
-    if(turnoMsg){ turnoMsg.textContent = 'Informe se o aluno frequenta o Integral.'; turnoMsg.className = 'help err'; }
-    return setMsg("Informe se o aluno frequenta o Integral.", "err");
+    if(turnoMsg){ turnoMsg.textContent = 'Selecione o modelo de ensino (Regular ou Integral).'; turnoMsg.className = 'help err'; }
+    return setMsg("Selecione o modelo de ensino (Regular ou Integral).", "err");
   }
   if(window._neeValidar){
     const erroNee = window._neeValidar();
@@ -2546,6 +2553,7 @@ function normSerie(s){
       if(!(document.getElementById('nome')?.value||'').trim()) return false;
       if(!(document.getElementById('mae')?.value||'').trim()) return false;
       if(!(document.getElementById('nasc')?.value||'').trim()) return false;
+      if(window._validarNascimento && window._validarNascimento(document.getElementById('nasc').value)) return false;
       if(!(document.getElementById('cpf')?.value||'').replace(/\D/g,'')) return false;
       const paiNaoInf = document.getElementById('paiNaoInformado');
       if(!(document.getElementById('pai')?.value||'').trim() && !paiNaoInf?.checked) return false;
@@ -2563,6 +2571,7 @@ function normSerie(s){
       if(!(document.getElementById('nome')?.value||'').trim()){ _toastErro('⚠️ Informe o nome do aluno.'); return false; }
       if(!(document.getElementById('mae')?.value||'').trim()){ _toastErro('⚠️ Informe o nome da mãe.'); return false; }
       if(!(document.getElementById('nasc')?.value||'').trim()){ _toastErro('⚠️ Informe a data de nascimento.'); return false; }
+      { const _n = window._validarNascimento ? window._validarNascimento(document.getElementById('nasc').value) : ''; if(_n){ window._checarNascimentoCampo && window._checarNascimentoCampo(); _toastErro('⚠️ ' + _n); return false; } }
       if(!(document.getElementById('cpf')?.value||'').replace(/\D/g,'')){ _toastErro('⚠️ Informe o CPF.'); return false; }
       if(typeof checkCpfField === 'function' && !checkCpfField()){
         _toastErro('⚠️ ' + (document.getElementById('cpfMsg')?.textContent || 'CPF inválido.')); return false;
@@ -2572,7 +2581,7 @@ function normSerie(s){
       if(!(document.getElementById('naturalidadeCidade')?.value||'').trim() || !(document.getElementById('naturalidadeUF')?.value||'').trim()){ _toastErro('⚠️ Informe a naturalidade (cidade e UF).'); return false; }
       if(!(document.getElementById('sexo')?.value||'').trim()){ _toastErro('⚠️ Selecione o sexo.'); return false; }
       const modeloV = (document.getElementById('modeloEnsino')?.value||'').trim();
-      if(!modeloV){ _toastErro('⚠️ Informe se o aluno frequenta o Integral.'); return false; }
+      if(!modeloV){ _toastErro('⚠️ Selecione o modelo de ensino (Regular ou Integral).'); return false; }
       return true;
     }
 
