@@ -621,6 +621,25 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .nee-radio-item.selected{ background:var(--pf-brand); color:var(--brand-fg,#fff); }
 .nee-radio-item input[type="radio"]{ width:15px; height:15px; flex-shrink:0; accent-color:var(--pf-brand); cursor:pointer; margin:0; }
 .nee-radio-item.selected input[type="radio"]{ accent-color:var(--brand-fg,#fff); }
+
+/* Identificação do aluno (CPF / Nome) */
+.nee-block{ overflow:visible; }
+.nee-header{ border-radius:12px; }
+.nee-block:has(.nee-panel.open) .nee-header{ border-radius:12px 12px 0 0; }
+.ident-trava{ opacity:.5; filter:grayscale(.35); pointer-events:none; user-select:none; }
+.id-banner{ display:none; align-items:center; gap:14px; flex-wrap:wrap; background:var(--chip-bg); border:1px solid var(--chip-border); border-left:4px solid var(--pf-brand); color:var(--ink,var(--text)); padding:12px 14px; border-radius:12px; margin-bottom:12px; }
+.id-banner-ico{ font-size:22px; }
+.id-banner-txt{ flex:1; min-width:0; }
+.id-banner-nome{ font-weight:800; font-size:14px; }
+.id-banner-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+.id-resultados{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+.id-resultados[hidden]{ display:none; }
+.id-res-item{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--pf-brand-sutil); background:var(--card); color:var(--text); font-family:'Nunito',sans-serif; cursor:pointer; transition:background .15s,border-color .15s; }
+.id-res-item:hover, .id-res-item:focus-visible{ background:var(--pf-brand-faded); border-color:var(--pf-brand); outline:none; }
+.id-res-nome{ font-size:13px; font-weight:800; }
+.id-res-meta{ font-size:11px; color:var(--muted); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.id-tag{ padding:1px 8px; border-radius:999px; border:1px solid var(--chip-border); background:var(--chip-bg); color:var(--ink,var(--text)); font-weight:700; }
+.id-res-novo{ flex-direction:row; align-items:center; font-size:13px; font-weight:800; border-style:dashed; }
 </style>
 
 <title>Cadastro de alunos • Ano Ativo</title>
@@ -710,43 +729,28 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
   </button>
 </div>
 
-<!-- Banner de aluno encontrado (CPF ou Nome) -->
-<div id="bannerAlunoEncontrado" style="display:none;
-  background:#f0fdf4; border:1px solid #86efac; border-radius:14px;
-  padding:12px 16px; margin-bottom:12px; display:none;
-  align-items:center; gap:14px; flex-wrap:wrap;">
-  <span style="font-size:22px;">✅</span>
-  <div style="flex:1; min-width:0;">
-    <div style="font-weight:800; font-size:14px;" id="bannerNome">—</div>
-    <div style="font-size:12px; color:#166534;" id="bannerSub">—</div>
+<!-- Banner do resultado da identificação -->
+<div id="bannerAlunoEncontrado" class="id-banner">
+  <span class="id-banner-ico" id="bannerIcone">✅</span>
+  <div class="id-banner-txt">
+    <div class="id-banner-nome" id="bannerNome">—</div>
+    <div class="id-banner-sub" id="bannerSub">—</div>
   </div>
-  <button type="button" id="btnLimparAutoFill"
-    style="border:1px solid #86efac; background:#dcfce7; color:#166534;
-           border-radius:999px; padding:6px 12px; font-size:12px;
-           font-weight:700; cursor:pointer;">
-    ✏️ Cadastrar como novo
-  </button>
+  <button type="button" class="btn small ghost" id="btnLimparAutoFill">↺ Refazer identificação</button>
 </div>
 
 <div class="grid-3">
-  <!-- Toggle modo de identificação -->
-  <div class="field" style="grid-column:1/-1; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:2px;">
-    <span style="font-size:13px; font-weight:700; color:var(--muted)">Identificar por:</span>
-    <div style="display:flex; gap:6px;">
-      <button type="button" id="btnModoCPF"
-        onclick="_setModoId('cpf')"
-        style="border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;
-               background:#2563eb;color:#fff;border:1.5px solid #2563eb;">
-        🔑 CPF
-      </button>
-      <button type="button" id="btnModoNome"
-        onclick="_setModoId('nome')"
-        style="border-radius:999px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;
-               background:#fff;color:#374151;border:1.5px solid #d1d5db;">
-        👤 Nome
-      </button>
+  <!-- Seletor de identificação -->
+  <div class="field ident-keep" id="fieldIdentModo" style="grid-column:1/-1;">
+    <div class="nee-block">
+      <div class="nee-header">
+        <div class="nee-header-label">🔎 Identificar por <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>CPF:</b> procura o aluno primeiro entre os do ano-ativo (cria uma nova matrícula) e depois no histórico das atas.<br><br><b>Nome:</b> use quando o aluno já estudou na escola e você quer vincular o cadastro ao histórico dele. Digite o nome e tecle Enter (mínimo 2 palavras). São exibidos apenas 3 resultados — quanto mais completo o nome, mais preciso.<br><br>O CPF continua obrigatório nos dois casos.</span></span></div>
+        <div class="nee-toggle">
+          <button type="button" class="integral-btn selected-sim" id="btnModoCPF" onclick="_setModoId('cpf')">CPF</button>
+          <button type="button" class="integral-btn" id="btnModoNome" onclick="_setModoId('nome')">Nome</button>
+        </div>
+      </div>
     </div>
-    <span id="modoIdHint" style="font-size:12px;color:var(--muted)">CPF é a chave principal. Sem CPF, use o nome para vincular a um aluno já cadastrado.</span>
   </div>
 
   <div class="field" id="fieldCpf">
@@ -757,15 +761,8 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 
   <div class="field" id="fieldNome">
     <label for="nome">Nome do aluno <span class="req">*</span></label>
-    <div style="position:relative;">
-      <input id="nome" placeholder="Nome completo" required autocomplete="off" oninput="this.value=this.value.toUpperCase()" />
-      <span id="nomeGhost" style="position:absolute;left:0;top:0;padding:inherit;color:#9ca3af;
-        pointer-events:none;white-space:nowrap;overflow:hidden;width:100%;"></span>
-      <div id="nomeDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;
-        background:#fff;border:1px solid #d1d5db;border-radius:10px;z-index:200;
-        box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto;margin-top:2px;">
-      </div>
-    </div>
+    <input id="nome" placeholder="Nome completo" required autocomplete="off" oninput="this.value=this.value.toUpperCase()" />
+    <div id="nomeResultados" class="id-resultados" hidden></div>
     <small class="help" id="nomeLookupMsg" aria-live="polite"></small>
   </div>
 
@@ -1262,16 +1259,8 @@ function normSerie(s){
       setCpfMsg("err","CPF inválido");
       return false;
     }
-    // CPF existente = aluno já cadastrado = rematrícula (não é erro)
-    const fonte = window.Identidade ? window.Identidade.lerTodos() : getAlunos();
-    const existente = fonte.find(a => stripNum(a.cpf || "") === cpfDigits);
-    if(existente){
-      const nomEx = existente.nomeOficial || existente.nome || existente.alunoId;
-      setCpfMsg("ok", `✔ Aluno já cadastrado: ${nomEx} (${existente.alunoId}) — nova matrícula será criada.`);
-    } else {
-      setCpfMsg("ok","CPF válido");
-    }
-    return true; // CPF duplicado = rematrícula, não bloqueia
+    setCpfMsg("ok","CPF válido");
+    return true; // a busca por aluno existente é feita pelo módulo de identificação
   }
 
   function calcAge(dateStr){
@@ -1520,8 +1509,9 @@ function normSerie(s){
   // Bloqueia os cards do formulário até haver turma. Só trava a interação:
   // os valores já digitados/carregados (modo edição) permanecem nos campos.
   function _aplicarBloqueioPorTurma(){
-    const liberado = !!turmaSelect.value;
-    ['wzEtapa1','wzEtapa2'].forEach(id => {
+    const comTurma = !!turmaSelect.value;
+    const identOk = window._identPronta ? window._identPronta() : true;
+    [['wzEtapa1', comTurma], ['wzEtapa2', comTurma && identOk]].forEach(([id, liberado]) => {
       const el = document.getElementById(id);
       if(!el) return;
       el.classList.toggle('bloqueada', !liberado);
@@ -1734,29 +1724,8 @@ function normSerie(s){
   const naturalidade = natCidade + "/" + natUF.toUpperCase();
   const idade = calcAge(nascVal);
 
-  // ── Barreira: nome igual em atas + modo CPF ─────────────────────
-  // Detecta se existe aluno de mesmo nome nas atas SEM vínculo de ID
-  // (significa que o usuário deveria ter usado o modo Nome para vincular)
-  if(window._modoId !== 'nome' && !window._alunoEncontrado){
-    const nomeNorm = (s => (s||'').trim().toLowerCase()
-      .normalize('NFD').replace(/[̀-ͯ]/g,''))(nomeVal);
-    const fonte = window.Identidade ? window.Identidade.lerTodos() : [];
-    const atasAluno = fonte.find(a => {
-      const n = (s => (s||'').trim().toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g,''))(a.nomeOficial||a.nome||'');
-      return n === nomeNorm;
-    });
-    if(atasAluno){
-      const confirmou = await _confirmModal({
-        titulo: '⚠️ Nome já cadastrado',
-        corpo: `Já existe um aluno com o nome "${nomeVal}" cadastrado no sistema (ID: ${atasAluno.alunoId||atasAluno.id}).\n\n` +
-          `Se for a mesma pessoa, use o modo 👤 Nome para vinculá-la ao mesmo ID — assim o histórico ficará completo.\n\n` +
-          `Deseja continuar mesmo assim e criar um ID separado?`,
-        textoConfirmar: 'Sim, criar ID separado',
-      });
-      if(!confirmou) return;
-    }
-  }
+  // ── Identificação concluída? (CPF achado/novo ou vínculo por nome resolvido) ──
+  if(window._identPronta && !window._identPronta()) return setMsg("Conclua a identificação do aluno (CPF ou Nome) antes de salvar.", "err");
 
   // ── Identidade: find-or-create ────────────────────────────────
   // Se o aluno já existe no sistema (mesmo que em outro módulo/ano),
@@ -2510,6 +2479,7 @@ function normSerie(s){
 
       window._modoEdicaoId    = editId;
       window._modoEdicaoAluno = aluno;
+      if(window._identModoEdicao) window._identModoEdicao();
     }
 
     function _pre(id, valor){
@@ -3183,302 +3153,285 @@ function normSerie(s){
     renderMatriculados();
   });
 
-  // ── Auto-fill por CPF ───────────────────────────────────────────────────
+  // ── Identificação do aluno: CPF ou Nome ─────────────────────────────────
+  // CPF  → procura em anoAtivoAlunos (cpfNum) e, se não achar, no elo (`alunos`).
+  // Nome → procura nas atas (prefixo, 3 resultados, só no Enter) e marca quais já têm elo.
+  // Enquanto a identificação não termina, o resto do formulário fica travado: nada é
+  // autopreenchido por cima do que o usuário já digitou.
   (function(){
-    /* ── Modo de identificação: CPF ↔ Nome ─────────────────────── */
-    function _setModoId(modo){
-      const fieldCpf   = document.getElementById('fieldCpf');
-      const fieldNome  = document.getElementById('fieldNome');
-      const btnCPF     = document.getElementById('btnModoCPF');
-      const btnNome    = document.getElementById('btnModoNome');
-      const cpfEl      = document.getElementById('cpf');
-      const nomeEl     = document.getElementById('nome');
-      const hint       = document.getElementById('modoIdHint');
-
-      if(modo === 'cpf'){
-        if(fieldCpf)  fieldCpf.style.display  = '';
-        if(fieldNome){ fieldNome.style.order = ''; } // mantém posição natural no grid
-        if(btnCPF)  { btnCPF.style.background  = '#2563eb'; btnCPF.style.color  = '#fff'; btnCPF.style.borderColor = '#2563eb'; }
-        if(btnNome) { btnNome.style.background = '#fff';    btnNome.style.color = '#374151'; btnNome.style.borderColor = '#d1d5db'; }
-        if(cpfEl)    cpfEl.required = true;
-        if(hint)     hint.textContent = 'CPF é a chave principal. Use para vincular ou criar um aluno.';
-        window._modoId = 'cpf';
-      } else {
-        // No modo nome o CPF fica visível (opcional) para poder cadastrá-lo
-        if(fieldCpf)  fieldCpf.style.display  = '';
-        if(btnCPF)  { btnCPF.style.background  = '#fff';    btnCPF.style.color  = '#374151'; btnCPF.style.borderColor = '#d1d5db'; }
-        if(btnNome) { btnNome.style.background = '#2563eb'; btnNome.style.color = '#fff'; btnNome.style.borderColor = '#2563eb'; }
-        if(cpfEl)  { cpfEl.required = false; }  // opcional — pode ser preenchido manualmente
-        if(hint)     hint.textContent = 'Busca pelo nome no banco global. CPF fica disponível para ser adicionado ao aluno encontrado.';
-        window._modoId = 'nome';
-        document.getElementById('nome')?.focus();
-      }
-    }
-    window._setModoId = _setModoId;
-    window._modoId = 'cpf'; // default
-    _setModoId('cpf'); // aplica estado inicial
-
+    const $ = id => document.getElementById(id);
     const CAMPOS_AUTOPREENCH = ['nome','nasc','mae','pai','sexo','corRaca','naturalidadeCidade','naturalidadeUF'];
-    const banner   = document.getElementById('bannerAlunoEncontrado');
-    const bannerNm = document.getElementById('bannerNome');
-    const bannerSb = document.getElementById('bannerSub');
-    const btnLimpar= document.getElementById('btnLimparAutoFill');
-    const cpfEl    = document.getElementById('cpf');
-    if(!banner || !cpfEl) return;
+    const cpfEl = $('cpf'), nomeEl = $('nome'), banner = $('bannerAlunoEncontrado');
+    const wz = $('wzEtapa1'), resBox = $('nomeResultados'), nomeMsg = $('nomeLookupMsg');
+    if(!cpfEl || !nomeEl || !banner || !wz || !resBox) return;
 
-    let _alunoEncontrado = null; // aluno atualmente auto-preenchido
-    window._alunoEncontrado = null; // espelho público para inserirAluno
+    const dig = s => String(s||'').replace(/\D/g,'');
+    const emEdicao = () => !!window._modoEdicaoId;
+    const ID = { modo:'cpf', pronto:false, anoAtivo:null, atas:null, novo:false, cpfOverride:null };
+    window._ident = ID;   // estado lido pelo salvar: anoAtivo / atas / novo / cpfOverride
+    window._modoId = 'cpf';
+    window._identPronta = () => emEdicao() || ID.pronto;
+    const _cacheCpf = new Map();
+    let _tick = 0;
 
+    /* ── Travas ─────────────────────────────────────────── */
     function setLocked(locked){
       CAMPOS_AUTOPREENCH.forEach(id => {
-        const el = document.getElementById(id);
-        if(!el) return;
+        const el = $(id); if(!el) return;
         const field = el.closest('.field') || el.parentElement;
-        if(locked){ field.classList.add('field-locked'); el.readOnly = (el.tagName==='INPUT'); }
-        else      { field.classList.remove('field-locked'); el.readOnly = false; }
+        field.classList.toggle('field-locked', locked);
+        el.readOnly = locked && el.tagName === 'INPUT';
       });
-      // paiNaoInformado checkbox
-      const chk = document.getElementById('paiNaoInformado');
-      if(chk) chk.disabled = locked;
+      const chk = $('paiNaoInformado'); if(chk) chk.disabled = locked;
+    }
+    function aplicarTrava(){
+      const bloquear = !emEdicao() && !ID.pronto;
+      const ativo = ID.modo === 'cpf' ? $('fieldCpf') : $('fieldNome');
+      wz.querySelectorAll('.grid-3 > .field, .foto-box, .actions-wizard .btn').forEach(el => {
+        if(el.classList.contains('ident-keep') || el === ativo || el.id === 'btnLimparCampos') return;
+        el.classList.toggle('ident-trava', bloquear);
+        if(bloquear) el.setAttribute('inert',''); else el.removeAttribute('inert');
+      });
+      ativo.classList.remove('ident-trava'); ativo.removeAttribute('inert');
+      // resolvido por CPF: o CPF não pode mais ser trocado sem "Refazer identificação"
+      const travaCpf = ID.pronto && ID.modo === 'cpf';
+      cpfEl.readOnly = travaCpf;
+      $('fieldCpf').classList.toggle('field-locked', travaCpf);
+      if(typeof _aplicarBloqueioPorTurma === 'function') _aplicarBloqueioPorTurma();
+    }
+    function pintarModo(){
+      $('btnModoCPF').classList.toggle('selected-sim', ID.modo === 'cpf');
+      $('btnModoNome').classList.toggle('selected-sim', ID.modo === 'nome');
+      window._modoId = ID.modo;
+      cpfEl.placeholder  = ID.modo === 'cpf'  ? 'Digite o CPF para buscar o aluno' : 'CPF do aluno';
+      nomeEl.placeholder = ID.modo === 'nome' ? 'Nome completo — tecle Enter para buscar' : 'Nome completo';
     }
 
-    function preencherCampos(a){
-      const get = id => document.getElementById(id);
-      if(get('nome'))    get('nome').value    = a.nomeOficial || a.nome || '';
-      if(get('nasc'))    get('nasc').value    = a.dataNascimento || '';
-      if(get('mae'))     get('mae').value     = a.mae  || '';
-      if(get('pai'))     get('pai').value     = (a.pai && a.pai !== '--') ? a.pai : '';
-      if(get('sexo'))    get('sexo').value    = a.sexo || '';
-      if(get('corRaca')) get('corRaca').value = a.corRaca || 'NÃO DECLARADA';
-
-      // Naturalidade
-      if(get('naturalidadeCidade')){
-        get('naturalidadeCidade').value = a.naturalidadeCidade ||
-          (a.naturalidade ? a.naturalidade.split('/')[0] : '');
-      }
-      if(get('naturalidadeUF')){
-        get('naturalidadeUF').value = a.naturalidadeUF ||
-          (a.naturalidade ? (a.naturalidade.split('/')[1]||'').trim() : '');
-      }
-
-      // pai não informado
-      const chk = document.getElementById('paiNaoInformado');
-      if(chk){ chk.checked = (a.pai === '--'); }
-
-      // Dispara eventos para que outros listeners (ex: autocomplete nat) percebam
-      ['nome','nasc','mae','pai','naturalidadeCidade','naturalidadeUF'].forEach(id => {
-        get(id)?.dispatchEvent(new Event('input', {bubbles:true}));
-      });
-    }
-
-    function mostrarBanner(a, semLock){
-      const turmasComAluno = getMats()
-        .filter(m => m.alunoId === a.alunoId)
-        .map(m => `${m.anoLetivo||'?'} • ${m.serie||'?'}`)
-        .join(' | ');
-
-      bannerNm.textContent = a.nomeOficial || a.nome || a.alunoId;
-      bannerSb.textContent = `${a.alunoId}${turmasComAluno ? ' — Matrículas: ' + turmasComAluno : ' — Nenhuma matrícula anterior'}`;
+    /* ── Banner / estado ─────────────────────────────────── */
+    function mostrar(icone, titulo, sub){
+      $('bannerIcone').textContent = icone;
+      $('bannerNome').textContent = titulo;
+      $('bannerSub').textContent = sub;
       banner.classList.add('visible');
-      if(semLock){
-        // Modo nome: campos editáveis para adicionar dados pessoais que as atas não têm
-        setLocked(false);
-        const btnLimparEl = document.getElementById('btnLimparAutoFill');
-        if(btnLimparEl) btnLimparEl.textContent = '✏️ Desvincular';
-      } else {
-        setLocked(true);
-        const btnLimparEl = document.getElementById('btnLimparAutoFill');
-        if(btnLimparEl) btnLimparEl.textContent = '✏️ Cadastrar como novo';
-      }
-      _alunoEncontrado = a;
-      window._alunoEncontrado = a;
-      // Trava o alunoId explicitamente — inserirAluno() usa isso para vincular
-      // direto (Identidade.vincularExplicito), sem redescobrir o match por
-      // heurística. Evita o caso de dois alunos com mesmo nome nas atas onde
-      // a heurística por nome único falharia e criaria um ID novo, mesmo com
-      // o usuário já tendo escolhido um específico aqui.
-      window._alunoIdVinculado = a.alunoId;
     }
-
-    function limparBanner(){
+    function limparEstado(){
+      _tick++;
+      ID.pronto = false; ID.anoAtivo = null; ID.atas = null; ID.novo = false; ID.cpfOverride = null;
       banner.classList.remove('visible');
+      resBox.hidden = true; resBox.innerHTML = '';
+      if(nomeMsg) nomeMsg.textContent = '';
       setLocked(false);
-      _alunoEncontrado = null;
-      window._alunoEncontrado = null;
-      window._alunoIdVinculado = null;
+      if(window.limparFotoSugerida) window.limparFotoSugerida();
+      aplicarTrava();
+    }
+    window._limparAutoFill = limparEstado;   // clearFields() chama
+
+    function finalizar(){ ID.pronto = true; resBox.hidden = true; aplicarTrava(); }
+
+    function preencher(a){
+      const get = id => $(id);
+      get('nome').value    = a.nomeOficial || a.nome || '';
+      get('nasc').value    = a.dataNascimento || '';
+      get('mae').value     = a.mae || '';
+      get('pai').value     = (a.pai && a.pai !== '--') ? a.pai : '';
+      get('sexo').value    = a.sexo || '';
+      get('corRaca').value = a.corRaca || 'NÃO DECLARADA';
+      if(get('naturalidadeCidade')) get('naturalidadeCidade').value = a.naturalidadeCidade || (a.naturalidade ? a.naturalidade.split('/')[0] : '');
+      if(get('naturalidadeUF'))     get('naturalidadeUF').value     = a.naturalidadeUF || (a.naturalidade ? (a.naturalidade.split('/')[1]||'').trim() : '');
+      const chk = $('paiNaoInformado'); if(chk) chk.checked = (a.pai === '--');
+      ['nome','nasc','mae','pai','naturalidadeCidade','naturalidadeUF'].forEach(id => get(id)?.dispatchEvent(new Event('input', {bubbles:true})));
     }
 
-    function buscarPorCpf(digits){
-      if(!window.Identidade) return null;
-      return window.Identidade.lerTodos()
-        .find(a => (a.cpf||'').replace(/\D/g,'') === digits) || null;
+    /* ── Resultados ──────────────────────────────────────── */
+    function resolverAnoAtivo(a, elo){
+      const id = a.alunoId || a._id;
+      ID.anoAtivo = a; ID.novo = false;
+      ID.atas = elo && elo.atasId ? { atasId: elo.atasId, nome: elo.nome, elo } : null;
+      preencher(a);
+      cpfEl.value = formatCPF(dig(a.cpfNum || a.cpf));
+      setCpfMsg('ok', 'CPF válido');
+      setLocked(true);
+      mostrar('✅', a.nomeOficial || a.nome || id, `Aluno já cadastrado no ano-ativo (ID ${id}). Uma nova matrícula será criada nesta turma.`);
+      if(window.sugerirFotoExistente) window.sugerirFotoExistente(id);
+      finalizar();
+    }
+    function resolverAtas(c){   // c = { atasId, nome, elo }
+      ID.anoAtivo = null; ID.novo = false;
+      ID.atas = { atasId: c.atasId, nome: c.nome, elo: c.elo || null };
+      const dp = (c.elo && c.elo.dadosPessoais) || {};
+      preencher({ ...dp, nome: c.nome });
+      const cpfPre = dig((c.elo && c.elo.cpf) || dp.cpf);
+      if(cpfPre.length === 11 && !dig(cpfEl.value)) cpfEl.value = formatCPF(cpfPre);
+      setLocked(false);
+      mostrar('📚', c.nome, `Encontrado no histórico das atas (ID ${c.atasId}). O cadastro será vinculado a ele. Complete os dados e informe o CPF.`);
+      finalizar();
+    }
+    function resolverNovo(sub){
+      ID.anoAtivo = null; ID.atas = null; ID.novo = true;
+      setLocked(false);
+      mostrar('🆕', 'Novo aluno', sub);
+      finalizar();
     }
 
-    // Exposição para clearFields e modo nome usar
-    window._limparAutoFill = limparBanner;
-    window._preencherCampos = preencherCampos;
-    window._mostrarBanner   = mostrarBanner;
-
-    // Escuta digitação no CPF
-    cpfEl.addEventListener('input', function(){
-      const digits = cpfEl.value.replace(/\D/g,'');
-      if(digits.length !== 11){ limparBanner(); return; }
-      if(!isValidCPF(digits)){  limparBanner(); return; }
-      const encontrado = buscarPorCpf(digits);
-      if(encontrado){
-        preencherCampos(encontrado);
-        mostrarBanner(encontrado);
-        if(window.sugerirFotoExistente) window.sugerirFotoExistente(encontrado.alunoId);
-      } else {
-        limparBanner();
-        if(window.limparFotoSugerida) window.limparFotoSugerida();
+    /* ── Busca por CPF ───────────────────────────────────── */
+    async function lookupCpf(d){
+      if(_cacheCpf.has(d)) return _cacheCpf.get(d);
+      let r;
+      const A = await window.DB.anoAtivoAlunos.whereEquals('cpfNum', d, { limit: 1 });
+      if(A.length) r = { tipo:'anoAtivo', aluno:A[0] };
+      else {
+        const elo = await window.Identidade.buscarEloPorCpf(d);
+        if(elo && elo.anoAtivoId){
+          const doc = await window.DB.anoAtivoAlunos.get(elo.anoAtivoId);
+          r = doc ? { tipo:'anoAtivo', aluno:doc, elo } : { tipo:'historico', elo };
+        } else if(elo) r = { tipo:'historico', elo };
+        else r = { tipo:'novo' };
       }
-    });
-
-    // Botão "Cadastrar como novo"
-    if(btnLimpar){
-      btnLimpar.addEventListener('click', function(){
-        limparBanner();
-        if(window.limparFotoSugerida) window.limparFotoSugerida();
-        // Limpa apenas os campos auto-preenchidos, mantém CPF
-        CAMPOS_AUTOPREENCH.forEach(id => {
-          const el = document.getElementById(id);
-          if(el && el.tagName === 'INPUT') el.value = '';
+      _cacheCpf.set(d, r);
+      return r;
+    }
+    // CPF que não pode ser usado por este cadastro (pertence a OUTRA pessoa)
+    async function conflitoCpf(d){
+      const r = await lookupCpf(d);
+      const meuAA = ID.anoAtivo ? (ID.anoAtivo.alunoId || ID.anoAtivo._id) : null;
+      const meuAtas = ID.atas ? ID.atas.atasId : null;
+      if(r.tipo === 'anoAtivo'){
+        const id = r.aluno.alunoId || r.aluno._id;
+        return id === meuAA ? null : { tipo:'anoAtivo', nome: r.aluno.nomeOficial || r.aluno.nome || id, id };
+      }
+      if(r.tipo === 'historico') return r.elo.atasId === meuAtas ? null : { tipo:'historico', nome: r.elo.nome || r.elo.atasId, id: r.elo.atasId };
+      return null;
+    }
+    async function avisarConflito(c, d){
+      const cpfFmt = formatCPF(d);
+      if(c.tipo === 'anoAtivo'){
+        await _confirmModal({
+          titulo: '⚠️ CPF já cadastrado',
+          corpo: `O CPF ${cpfFmt} já pertence a ${_escHtml(c.nome)} (ID ${_escHtml(c.id)}) no ano-ativo, e não pode haver 2 alunos com o mesmo CPF.\n\nSe for a mesma pessoa, use “Refazer identificação” e identifique por CPF para criar uma nova matrícula. Se o CPF estiver errado em um dos cadastros, peça ao gestor/admin para verificar.`,
+          textoConfirmar: 'Entendi, limpar o CPF', textoCancelar: 'Fechar',
         });
-        document.getElementById('sexo')?.dispatchEvent(new Event('change'));
-        document.getElementById('corRaca')?.value && (document.getElementById('corRaca').value = 'NÃO DECLARADA');
-        const chk = document.getElementById('paiNaoInformado');
-        if(chk){ chk.checked = false; chk.disabled = false; }
-        setCpfMsg('ok','CPF válido — novo cadastro');
-        document.getElementById('nome')?.focus();
+        cpfEl.value = ''; setCpfMsg(null, ''); return;
+      }
+      const ok = await _confirmModal({
+        titulo: '⚠️ CPF já está no histórico',
+        corpo: `O CPF ${cpfFmt} já está registrado no histórico em nome de ${_escHtml(c.nome)} (ID ${_escHtml(c.id)}).\n\nO ideal é pedir ao gestor/admin para conferir, editar ou apagar esse CPF no histórico antes de continuar.\n\nSe continuar mesmo assim, o CPF será removido do registro de ${_escHtml(c.nome)} e ficará apenas neste cadastro.`,
+        textoConfirmar: 'Cadastrar mesmo assim', textoCancelar: 'Cancelar e limpar o CPF',
       });
-    }
-  })();
-
-  // ── Autocomplete de Nome (modo identificação por nome) ──────────────────
-  (function(){
-    const nomeEl   = document.getElementById('nome');
-    const dropdown = document.getElementById('nomeDropdown');
-    const ghost    = document.getElementById('nomeGhost');
-    const msgEl    = document.getElementById('nomeLookupMsg');
-    if(!nomeEl || !dropdown) return;
-
-    let _activeIdx = -1;
-
-    function norm(s){
-      return (s||'').trim().toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(ok){ ID.cpfOverride = { atasId: c.id }; setCpfMsg('ok', `CPF será removido do histórico de ${c.nome}.`); }
+      else { cpfEl.value = ''; setCpfMsg(null, ''); }
     }
 
-    function getAlunosGlobal(){
-      return window.Identidade ? window.Identidade.lerTodos() : [];
-    }
-
-    function filtrar(val){
-      if(!val || val.length < 3) return [];
-      const n = norm(val);
-      return getAlunosGlobal()
-        .filter(a => norm(a.nomeOficial||a.nome||'').includes(n))
-        .slice(0, 10);
-    }
-
-    function renderDropdown(lista, typed){
-      if(!lista.length){ dropdown.style.display='none'; if(ghost) ghost.textContent=''; return; }
-      dropdown.innerHTML = '';
-      _activeIdx = -1;
-      lista.forEach((a, i) => {
-        const nome    = a.nomeOficial || a.nome || '(sem nome)';
-        const sub     = [a.alunoId, a.cpf].filter(Boolean).join(' • ');
-        const div = document.createElement('div');
-        div.style.cssText='padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;font-size:13px;';
-        div.innerHTML = `<b>${nome}</b>${sub ? ' <span style="color:#9ca3af;font-size:11px;">'+sub+'</span>' : ''}`;
-        div.addEventListener('mouseenter', ()=>{ setActive(i); });
-        div.addEventListener('click', ()=>{ selecionarAluno(a); });
-        dropdown.appendChild(div);
-      });
-      dropdown.style.display = 'block';
-      // ghost text: primeira sugestão
-      if(ghost){
-        const first = norm(lista[0].nomeOficial||lista[0].nome||'');
-        const typedN = norm(typed);
-        if(first.startsWith(typedN)){
-          ghost.textContent = typed + (lista[0].nomeOficial||lista[0].nome||'').slice(typed.length);
+    cpfEl.addEventListener('input', async () => {
+      if(emEdicao()) return;
+      const d = dig(cpfEl.value);
+      if(ID.modo === 'nome') ID.cpfOverride = null;
+      if(d.length !== 11 || !isValidCPF(d)) return;
+      if(ID.modo === 'cpf' && ID.pronto) return;
+      if(ID.modo === 'nome' && !ID.pronto) return;
+      const tk = ++_tick;
+      setCpfMsg('ok', 'Buscando…');
+      try{
+        if(ID.modo === 'cpf'){
+          const r = await lookupCpf(d);
+          if(tk !== _tick) return;
+          if(r.tipo === 'anoAtivo') resolverAnoAtivo(r.aluno, r.elo);
+          else if(r.tipo === 'historico') resolverAtas({ atasId:r.elo.atasId, nome:r.elo.nome, elo:r.elo });
+          else resolverNovo(`CPF ${formatCPF(d)} não encontrado. Preencha os dados do aluno.`);
+          if(r.tipo !== 'anoAtivo') setCpfMsg('ok', 'CPF válido');
         } else {
-          ghost.textContent = '';
+          const c = await conflitoCpf(d);
+          if(tk !== _tick) return;
+          if(c) await avisarConflito(c, d); else setCpfMsg('ok', 'CPF válido');
         }
-      }
-    }
-
-    function setActive(idx){
-      const items = dropdown.querySelectorAll('div');
-      items.forEach((el,i)=> el.style.background = i===idx ? '#eff6ff' : '');
-      _activeIdx = idx;
-    }
-
-    function closeDropdown(){
-      dropdown.style.display = 'none';
-      if(ghost) ghost.textContent = '';
-      _activeIdx = -1;
-    }
-
-    function selecionarAluno(a){
-      nomeEl.value = a.nomeOficial || a.nome || '';
-      closeDropdown();
-      // Preenche campos mas NÃO trava — no modo nome o usuário precisa adicionar dados pessoais
-      if(typeof window._preencherCampos === 'function') window._preencherCampos(a);
-      if(typeof window._mostrarBanner   === 'function') window._mostrarBanner(a, true); // semLock=true
-      if(window.sugerirFotoExistente) window.sugerirFotoExistente(a.alunoId);
-      // Preenche CPF se o aluno já tiver (caso venha das atas sem CPF, campo fica vazio p/ preenchimento)
-      const cpfEl = document.getElementById('cpf');
-      if(cpfEl && !cpfEl.value && a.cpf) cpfEl.value = a.cpf;
-      if(msgEl){ msgEl.textContent = '✅ Aluno vinculado — preencha os dados pessoais e insira'; msgEl.style.color='#166534'; }
-    }
-
-    nomeEl.addEventListener('input', function(){
-      if(window._modoId !== 'nome') return;
-      const val = nomeEl.value;
-      const lista = filtrar(val);
-      renderDropdown(lista, val);
-      if(msgEl && val.length >= 3 && !lista.length){
-        msgEl.textContent = 'Nenhum aluno encontrado — será criado como novo.';
-        msgEl.style.color = '#6b7280';
-      } else if(msgEl && val.length < 3){
-        msgEl.textContent = '';
+      }catch(e){
+        console.error('[identificacao] falha ao buscar CPF:', e);
+        setCpfMsg('err', 'Falha ao buscar o CPF.');
+        setMsg('Não foi possível buscar o CPF: ' + (e && e.message ? e.message : e), 'err');
       }
     });
 
-    nomeEl.addEventListener('keydown', function(e){
-      if(window._modoId !== 'nome') return;
-      const items = dropdown.querySelectorAll('div');
-      if(e.key === 'ArrowDown'){ e.preventDefault(); setActive(Math.min(_activeIdx+1, items.length-1)); }
-      else if(e.key === 'ArrowUp'){ e.preventDefault(); setActive(Math.max(_activeIdx-1, 0)); }
-      else if(e.key === 'Enter' && _activeIdx >= 0){
-        e.preventDefault();
-        // Find the aluno by index
-        const lista = filtrar(nomeEl.value);
-        if(lista[_activeIdx]) selecionarAluno(lista[_activeIdx]);
-      } else if(e.key === 'Escape'){ closeDropdown(); }
-      else if(e.key === 'Tab' && ghost?.textContent){
-        // Tab aceita ghost text
-        e.preventDefault();
-        const lista = filtrar(nomeEl.value);
-        if(lista[0]) selecionarAluno(lista[0]);
+    /* ── Busca por Nome (só no Enter, 2+ palavras, 3 resultados) ── */
+    let _cands = [];
+    async function buscarNome(){
+      const q = nomeEl.value.trim().replace(/\s+/g, ' ');
+      if(q.split(' ').filter(Boolean).length < 2){
+        if(nomeMsg){ nomeMsg.textContent = 'Digite pelo menos 2 palavras do nome e tecle Enter.'; nomeMsg.className = 'help err'; }
+        return;
+      }
+      const tk = ++_tick;
+      if(nomeMsg){ nomeMsg.textContent = 'Buscando…'; nomeMsg.className = 'help'; }
+      try{
+        const atas = await window.Identidade.buscarAtasPorNome(q, 3);
+        const elos = await window.Identidade.buscarEloPorAtasIds(atas.map(a => a.alunoId));
+        if(tk !== _tick) return;
+        const porAtas = new Map(elos.map(e => [e.atasId, e]));
+        _cands = atas.map(a => ({ atasId:a.alunoId, nome:a.nome, elo: porAtas.get(a.alunoId) || null }));
+        if(nomeMsg) nomeMsg.textContent = '';
+        renderResultados();
+      }catch(e){
+        console.error('[identificacao] falha na busca por nome:', e);
+        if(nomeMsg){ nomeMsg.textContent = 'Falha na busca.'; nomeMsg.className = 'help err'; }
+        setMsg('Não foi possível buscar o nome: ' + (e && e.message ? e.message : e), 'err');
+      }
+    }
+    function renderResultados(){
+      const itens = _cands.map((c, i) => {
+        const tags = [];
+        if(c.elo && c.elo.anoAtivoId) tags.push('<span class="id-tag">já cadastrado no ano-ativo</span>');
+        else if(c.elo && c.elo.dadosPessoais) tags.push('<span class="id-tag">com dados do histórico</span>');
+        return `<button type="button" class="id-res-item" data-i="${i}"><span class="id-res-nome">${_escHtml(c.nome)}</span>` +
+               `<span class="id-res-meta">ID nas atas: ${_escHtml(c.atasId)} ${tags.join(' ')}</span></button>`;
+      }).join('');
+      const vazio = _cands.length ? '' : '<div class="id-res-meta" style="padding:4px 2px;">Nenhum aluno encontrado nas atas com esse nome.</div>';
+      resBox.innerHTML = vazio + itens + '<button type="button" class="id-res-item id-res-novo" data-novo="1">➕ Nenhum deles — cadastrar como novo aluno</button>';
+      resBox.hidden = false;
+    }
+    resBox.addEventListener('click', async ev => {
+      const btn = ev.target.closest('.id-res-item'); if(!btn) return;
+      if(btn.dataset.novo){ resolverNovo('Sem vínculo com o histórico das atas. Preencha os dados e informe o CPF.'); return; }
+      const c = _cands[Number(btn.dataset.i)]; if(!c) return;
+      try{
+        if(c.elo && c.elo.anoAtivoId){
+          const doc = await window.DB.anoAtivoAlunos.get(c.elo.anoAtivoId);
+          if(doc){ resolverAnoAtivo(doc, c.elo); return; }
+        }
+        resolverAtas(c);
+        const d = dig(cpfEl.value);
+        if(d.length === 11 && isValidCPF(d)){
+          const conf = await conflitoCpf(d);
+          if(conf) await avisarConflito(conf, d);
+        }
+      }catch(e){
+        console.error('[identificacao] falha ao escolher aluno:', e);
+        setMsg('Não foi possível carregar o aluno: ' + (e && e.message ? e.message : e), 'err');
       }
     });
-
-    // Fecha ao clicar fora
-    document.addEventListener('click', function(e){
-      if(!nomeEl.contains(e.target) && !dropdown.contains(e.target)) closeDropdown();
+    nomeEl.addEventListener('keydown', ev => {
+      if(ev.key === 'Enter' && ID.modo === 'nome' && !ID.pronto && !emEdicao()){ ev.preventDefault(); buscarNome(); }
     });
+    nomeEl.addEventListener('input', () => { if(ID.modo === 'nome' && !ID.pronto){ resBox.hidden = true; if(nomeMsg) nomeMsg.textContent = ''; } });
 
-    // Expõe preencherCampos e mostrarBanner para uso do bloco acima
-    // (eles são definidos no IIFE anterior — precisamos de uma ponte)
-    // A ponte é feita via window no bloco CPF:
-    // window._nomeLookupSelecionar = selecionarAluno — mas como estamos num IIFE
-    // sem acesso direto, usamos eventos customizados
-    nomeEl.addEventListener('_nomeSelecionado', function(e){
-      if(e.detail) selecionarAluno(e.detail);
+    /* ── Troca de modo / refazer ─────────────────────────── */
+    window._setModoId = async function(modo){
+      if(emEdicao() || modo === ID.modo) return;
+      if(ID.pronto || cpfEl.value.trim() || nomeEl.value.trim()){
+        const ok = await _confirmModal({ titulo:'Trocar a forma de identificar?', corpo:'O formulário será limpo para recomeçar a identificação.', textoConfirmar:'Sim, limpar e trocar' });
+        if(!ok) return;
+      }
+      ID.modo = modo; clearFields(); pintarModo(); aplicarTrava();
+    };
+    $('btnLimparAutoFill').addEventListener('click', async () => {
+      const ok = await _confirmModal({ titulo:'Refazer a identificação?', corpo:'O formulário será limpo para recomeçar a identificação.', textoConfirmar:'Sim, limpar' });
+      if(ok){ clearFields(); aplicarTrava(); }
     });
+    window._identModoEdicao = function(){
+      const m = $('fieldIdentModo'); if(m) m.style.display = 'none';
+      banner.classList.remove('visible'); resBox.hidden = true;
+      aplicarTrava();
+    };
+
+    pintarModo();
+    aplicarTrava();
   })();
 
   // Naturalidade (etapa 1) — mesma base de cidades do endereço acima
