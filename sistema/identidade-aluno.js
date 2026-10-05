@@ -11,18 +11,24 @@
  *   ultimoAnoRegistro, criadoEm, atualizadoEm }. Sem CPF/nascimento/mãe/pai —
  *   Atas nunca manda esses dados; quando apareciam na coleção antiga `alunos`,
  *   vinham só de fusão manual (isso agora vive só no elo, ver abaixo).
- * - `alunos` — elo de confirmação entre um alunoId de Atas e um de Ano-Ativo
- *   já fundidos: { alunoId, atasId, anoAtivoId, idEngolido, nome, nomeBusca,
- *   cpf, vinculadoEm }. `alunoId` é sempre o menor entre atasId/anoAtivoId
- *   (o canônico); `idEngolido` é o maior, apagado da coleção de origem
- *   depois de copiado. Só existe doc aqui depois de fusão confirmada —
- *   EXCLUSIVAMENTE em idaluno.html (decisão de alinhamento: fundir() não
- *   vira função compartilhada, por histórico de bugs de matching rodando em
- *   páginas de cadastro). Este arquivo só expõe CRUD desse doc — nunca
- *   decide qual ID sobrevive nem reescreve referências; isso é 100% de
- *   idaluno.html. cadastro-aluno-ativo.html só LÊ (buscarAtasPorNome /
- *   buscarEloPorNome) pra detectar candidato e redirecionar pra
- *   idaluno.html — nunca escreve aqui.
+ * - `alunos` — ELO entre o aluno de Atas e o aluno de Ano-Ativo (mesma pessoa).
+ *   Cada módulo tem o SEU ID por pessoa (ALU-xxxxxx, mesmo contador, nunca
+ *   repetem) e NENHUM ID é reescrito ou "engolido": o elo só liga os dois.
+ *   ID do documento: `ELO|{atasId}` (determinístico: 1 aluno de Atas = no
+ *   máximo 1 elo; backup/restauração regrava o mesmo doc, sem duplicar).
+ *   Schema: { atasId, anoAtivoId, nome, nomeBusca, cpf, vinculadoEm,
+ *   dadosPessoais? }
+ *     - `anoAtivoId` fica '' enquanto o aluno só existe em Atas;
+ *     - `cpf` é SEMPRE só dígitos (é o que as buscas comparam);
+ *     - `dadosPessoais` é um objeto livre (o schema é de quem grava — hoje
+ *       historico-auto.html) e só existe ENQUANTO `anoAtivoId` está vazio:
+ *       ao vincular ao Ano-Ativo os dados passam a viver em `anoAtivoAlunos`
+ *       e o campo é removido (use campoRemover() dentro do batch).
+ *   Quem grava o elo: cadastro-aluno-ativo.html, historico-auto.html,
+ *   idaluno.html (ainda no formato antigo — pendência) e as páginas de gestão
+ *   (importação/restauração de backup). Este arquivo só monta/lê o doc; a
+ *   decisão de vincular é sempre de quem chama. Para gravar o elo JUNTO com
+ *   outros docs de forma atômica, use prepararElo() + DB.batchWrite().
  * - `anoAtivoAlunos` — módulo Ano-Ativo, inalterado, não é tocado aqui.
  *
  * SEM MATCHING EMBUTIDO: criarAtas()/criarAtasBatch() sempre reservam um
@@ -313,53 +319,105 @@
   }
 
   /* ────────────────────────────────────────────
-     Elo cross-módulo (`alunos`) — confirmação de que um alunoId de Atas
-     e um de Ano-Ativo são a mesma pessoa.
-
-     Schema fechado (decisão de alinhamento, sem código, registrada em
-     separado): { alunoId, atasId, anoAtivoId, idEngolido, nome, nomeBusca,
-     cpf, vinculadoEm }. `alunoId` == o menor entre atasId/anoAtivoId (o
-     canônico); `idEngolido` é o maior, que teve os dados copiados pra
-     `alunoId` e foi apagado da coleção de origem. `nome`/`nomeBusca`/`cpf`
-     são cópias pra permitir que historico_auto.html busque direto aqui
-     (nome/ID/CPF) sem tocar `alunos-atas`/`anoAtivoAlunos` na busca inicial.
-
-     ESTE ARQUIVO SÓ FAZ CRUD DESSE DOC. A decisão de qual ID vira canônico,
-     o que copiar de qual coleção e a reescrita de referências em
-     matriculas/turmas/anoAtivoMatriculas são responsabilidade exclusiva de
-     `idaluno.html` (decisão de alinhamento: fundir() não vira função
-     compartilhada, por causa de bugs anteriores de matching rodando em
-     páginas de cadastro). Este arquivo nunca decide, só grava o que
-     idaluno.html já decidiu.
+     Elo cross-módulo (`alunos`) — ver cabeçalho do arquivo.
+     ID do doc: `ELO|{atasId}`. Escrita sempre por prepararElo() (que só
+     inclui os campos informados — merge nunca zera o que já existe).
   ──────────────────────────────────────────── */
 
+  const PREFIXO_ELO = 'ELO|';
+
+  function _somenteDigitos(v) { return _str(v).replace(/\D/g, ''); }
+
+  /** ID do documento do elo para um aluno de Atas. */
+  function eloId(atasId) {
+    const id = _str(atasId);
+    if (!id) throw new Error('Identidade.eloId: atasId obrigatório.');
+    if (id.includes('/')) throw new Error('Identidade.eloId: atasId inválido ("' + id + '").');
+    if (id.startsWith(PREFIXO_ELO)) throw new Error('Identidade.eloId: recebeu um ID de elo ("' + id + '"); passe o atasId.');
+    return PREFIXO_ELO + id;
+  }
+
+  /** Remove um campo do doc (use em dadosPessoais ao vincular; vale em batchWrite/salvarElo). */
+  function campoRemover() { return firebase.firestore.FieldValue.delete(); }
+
+  /** Normaliza um doc de `alunos` LIDO do Firestore. Só leitura — não use pra gravar. */
   function normalizarElo(obj) {
     if (!obj) return null;
     const nome = _str(obj.nome || '');
-    return {
-      alunoId: _str(obj.alunoId || obj._id || ''),
+    const out = {
+      eloId: _str(obj._id || ''),
       atasId: _str(obj.atasId || ''),
       anoAtivoId: _str(obj.anoAtivoId || ''),
-      idEngolido: _str(obj.idEngolido || ''),
       nome,
       nomeBusca: _normNome(nome),
-      cpf: _str(obj.cpf || ''),
+      cpf: _somenteDigitos(obj.cpf),
       vinculadoEm: obj.vinculadoEm || null,
     };
+    if (obj.dadosPessoais && typeof obj.dadosPessoais === 'object') out.dadosPessoais = obj.dadosPessoais;
+    return out;
   }
 
-  /** Busca o elo pelo alunoId canônico. null se esse aluno não foi fundido. */
-  async function buscarElo(alunoId) {
+  /**
+   * Monta a operação de escrita do elo (formato de DB.batchWrite) — NÃO grava.
+   * Só entram no doc os campos que você informar (merge: o que já existe e
+   * não foi informado permanece). `nomeBusca` é derivado de `nome`; `cpf` vira
+   * só dígitos (11, ou '' pra limpar); `dadosPessoais` passa sem validação
+   * (objeto livre, ou campoRemover() pra apagar). Se informar `anoAtivoId`
+   * e não informar `vinculadoEm`, grava a data/hora atual.
+   *
+   * @param {Object} dados { atasId (obrigatório), anoAtivoId?, nome?, cpf?, vinculadoEm?, dadosPessoais? }
+   * @returns {{col:string, op:'set', id:string, data:Object}}
+   */
+  function prepararElo(dados) {
+    const d = dados || {};
+    const data = { atasId: _str(d.atasId) };
+    const id = eloId(data.atasId);
+    if (d.anoAtivoId !== undefined) data.anoAtivoId = _str(d.anoAtivoId);
+    if (d.nome !== undefined) {
+      data.nome = _str(d.nome);
+      data.nomeBusca = _normNome(data.nome);
+    }
+    if (d.cpf !== undefined) {
+      const dig = _somenteDigitos(d.cpf);
+      if (dig && dig.length !== 11) throw new Error('Identidade.prepararElo: CPF deve ter 11 dígitos (recebeu ' + dig.length + ').');
+      data.cpf = dig;
+    }
+    if (d.dadosPessoais !== undefined) data.dadosPessoais = d.dadosPessoais;
+    if (d.vinculadoEm !== undefined) data.vinculadoEm = d.vinculadoEm;
+    else if (data.anoAtivoId) data.vinculadoEm = new Date().toISOString();
+    return { col: CHAVE_ELO, op: 'set', id, data };
+  }
+
+  /** Busca o elo de um aluno de Atas (1 leitura). null se não houver. */
+  async function buscarElo(atasId) {
     await _waitAuth();
-    const doc = await window.DB[CHAVE_ELO].get(_str(alunoId));
+    const doc = await window.DB[CHAVE_ELO].get(eloId(atasId));
     return normalizarElo(doc);
   }
 
   /**
-   * Busca elos por prefixo de nome (query pontual, via nomeBusca).
-   * Usado por historico_auto.html: busca primeiro em `alunos`, só cai pra
-   * `alunos-atas` se não achar nada aqui.
+   * Busca os elos de VÁRIOS alunos de Atas de uma vez (whereIn, lotes de 10).
+   * Custo = nº de elos encontrados (mín. 1 leitura). Usada pra marcar quais
+   * candidatos de uma busca por nome já estão vinculados ao Ano-Ativo.
    */
+  async function buscarEloPorAtasIds(atasIds) {
+    await _waitAuth();
+    const ids = Array.from(new Set((atasIds || []).map(_str).filter(Boolean)));
+    if (!ids.length) return [];
+    const docs = await window.DB[CHAVE_ELO].whereIn('atasId', ids);
+    return docs.map(normalizarElo).filter(Boolean);
+  }
+
+  /** Busca o elo pelo ID do aluno de Ano-Ativo. null se esse aluno não tem elo. */
+  async function buscarEloPorAnoAtivoId(anoAtivoId) {
+    await _waitAuth();
+    const id = _str(anoAtivoId);
+    if (!id) return null;
+    const docs = await window.DB[CHAVE_ELO].whereEquals('anoAtivoId', id, { limit: 1 });
+    return docs.length ? normalizarElo(docs[0]) : null;
+  }
+
+  /** Busca elos por prefixo de nome (query pontual via nomeBusca; acento/caixa-insensível). */
   async function buscarEloPorNome(nome, limit = 15) {
     await _waitAuth();
     const termo = _normNome(nome);
@@ -369,29 +427,26 @@
     return docs.map(normalizarElo).filter(Boolean);
   }
 
-  /** Busca elo por CPF exato (match único, CPF só existe aqui pós-fusão). */
+  /** Busca elo por CPF exato (só dígitos; aceita com máscara). null se não houver. */
   async function buscarEloPorCpf(cpf) {
     await _waitAuth();
-    const alvo = _str(cpf).replace(/\D/g, '');
+    const alvo = _somenteDigitos(cpf);
     if (!alvo) return null;
     const docs = await window.DB[CHAVE_ELO].whereEquals('cpf', alvo, { limit: 1 });
     return docs.length ? normalizarElo(docs[0]) : null;
   }
 
   /**
-   * Grava o doc do elo, no schema fechado. idaluno.html já decidiu tudo
-   * (canônico, engolido, nome/cpf finais) antes de chamar — esta função
-   * só persiste. Idempotente: pode ser chamada de novo pra atualizar.
-   *
-   * @param {Object} dados  { alunoId, atasId, anoAtivoId, idEngolido, nome, cpf }
+   * Grava SOZINHO o elo (um único documento). Quando o elo for gravado junto
+   * com outros docs (cadastro de aluno, backup), NÃO use esta função: use
+   * prepararElo() e passe a operação ao DB.batchWrite() pra ser atômico.
+   * @returns {Promise<{id:string, data:Object}>}
    */
   async function salvarElo(dados) {
     await _waitAuth();
-    const registro = normalizarElo(dados);
-    if (!registro.alunoId) throw new Error('Identidade.salvarElo: alunoId obrigatório.');
-    if (!registro.vinculadoEm) registro.vinculadoEm = new Date().toISOString();
-    await window.DB[CHAVE_ELO].save({ _id: registro.alunoId, ...registro });
-    return registro;
+    const op = prepararElo(dados);
+    await window.DB[CHAVE_ELO].save({ _id: op.id, ...op.data });
+    return { id: op.id, data: op.data };
   }
 
   /* ────────────────────────────────────────────
@@ -412,11 +467,16 @@
     recalcularUltimoAnoRegistro,
     recalcularUltimoAnoRegistroBatch,
 
-    // Elo cross-módulo — CRUD puro, sem decisão (fundir() é de idaluno.html)
+    // Elo cross-módulo (`alunos`, ID `ELO|{atasId}`) — sem decisão de matching
+    eloId,
+    prepararElo,        // monta a operação (pra DB.batchWrite) — não grava
+    salvarElo,          // grava só o elo (1 doc)
+    campoRemover,       // FieldValue.delete() (ex.: dadosPessoais ao vincular)
     buscarElo,
+    buscarEloPorAtasIds,
+    buscarEloPorAnoAtivoId,
     buscarEloPorNome,
     buscarEloPorCpf,
-    salvarElo,
 
     // Utilidades
     normalizarAtas,
@@ -428,5 +488,5 @@
     async proximoId() { return _proximoId(); },
   };
 
-  console.log('[identidade-aluno.js] Pronto (v2 — alunos-atas + elo). Sem auto-boot, sem catálogo em memória.');
+  console.log('[identidade-aluno.js] Pronto (v2.1 — alunos-atas + elo ELO|atasId). Sem auto-boot, sem catálogo em memória.');
 })();

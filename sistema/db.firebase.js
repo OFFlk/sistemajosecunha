@@ -536,6 +536,72 @@
     migrate,
 
     /**
+     * Grava VÁRIOS documentos, de coleções diferentes, de forma ATÔMICA:
+     * ou todas as operações são aplicadas, ou nenhuma (um único batch do
+     * Firestore). Use quando um cadastro toca mais de uma coleção (ex.:
+     * anoAtivoAlunos + anoAtivoMatriculas + alunos) pra não deixar aluno
+     * sem matrícula ou elo órfão se a segunda gravação falhar.
+     *
+     * Passa pela MESMA guarda de escrita do save()/remove() (schoolId
+     * "ADMIN" é bloqueado) e limpa o cache de cada coleção tocada.
+     * Tudo é validado ANTES de tocar no Firestore.
+     *
+     * @param {Array<Object>} ops  máx. 500 itens, cada um:
+     *   { col: 'anoAtivoAlunos',        // nome da coleção (chave de window.DB)
+     *     op:  'set' | 'update' | 'delete',
+     *     id:  'ALU-000123',            // ID do documento (obrigatório)
+     *     data: { ... },                // set/update; aceita FieldValue.delete()
+     *     merge: true }                 // só 'set'; padrão true (igual ao save())
+     *   - 'set'    cria ou mescla (upsert); grava updatedAt.
+     *   - 'update' exige que o doc já exista (senão o batch inteiro falha).
+     *   - 'delete' apaga o doc.
+     * @returns {Promise<Array<{col,id,op}>>} as operações aplicadas, na ordem.
+     */
+    async batchWrite(ops) {
+      await waitAuth();
+      if (!Array.isArray(ops) || !ops.length) throw new Error('DB.batchWrite: informe ao menos 1 operação.');
+      if (ops.length > 500) throw new Error('DB.batchWrite: máximo de 500 operações por chamada (recebeu ' + ops.length + ').');
+
+      // 1) Validação completa antes de qualquer escrita
+      const vistos = new Set();
+      ops.forEach((o, i) => {
+        const onde = 'DB.batchWrite: operação #' + (i + 1);
+        if (!o || typeof o !== 'object') throw new Error(onde + ' inválida.');
+        if (!o.col || !window.DB[o.col] || typeof window.DB[o.col].get !== 'function')
+          throw new Error(onde + ': coleção desconhecida "' + o.col + '".');
+        if (!['set', 'update', 'delete'].includes(o.op))
+          throw new Error(onde + ': op deve ser "set", "update" ou "delete" (recebeu "' + o.op + '").');
+        const id = o.id == null ? '' : String(o.id).trim();
+        if (!id || id.includes('/')) throw new Error(onde + ': id obrigatório e sem "/" (recebeu "' + o.id + '").');
+        if (o.op !== 'delete' && (!o.data || typeof o.data !== 'object' || Array.isArray(o.data)))
+          throw new Error(onde + ': "data" (objeto) é obrigatório em ' + o.op + '.');
+        const chave = o.col + '/' + id;
+        if (vistos.has(chave)) throw new Error(onde + ': documento repetido no mesmo batch (' + chave + ').');
+        vistos.add(chave);
+      });
+
+      // 2) Guarda de escrita (bloqueia "ADMIN") por coleção distinta
+      [...new Set(ops.map(o => o.col))].forEach(c => guardWrite('batchWrite', c));
+
+      // 3) Um único batch, um único commit
+      const db = window.Auth.db;
+      const ts = firebase.firestore.FieldValue.serverTimestamp();
+      const batch = db.batch();
+      ops.forEach(o => {
+        const ref = col(o.col).doc(String(o.id).trim());
+        if (o.op === 'delete') { batch.delete(ref); return; }
+        const { _id, ...data } = o.data;
+        data.updatedAt = ts;
+        if (o.op === 'update') batch.update(ref, data);
+        else batch.set(ref, data, { merge: o.merge !== false });
+      });
+      await batch.commit();
+
+      [...new Set(ops.map(o => o.col))].forEach(cacheClear);
+      return ops.map(o => ({ col: o.col, id: String(o.id).trim(), op: o.op }));
+    },
+
+    /**
      * Atalho: carrega todas as coleções do módulo de ATAS.
      * Retorna objeto no mesmo formato que state.db já espera.
      *
