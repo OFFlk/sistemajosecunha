@@ -1668,6 +1668,8 @@ function normSerie(s){
   if(window._modoEdicaoId){
     return await _atualizarAluno();
   }
+  if((window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) === 'ADMIN')
+    return setMsg("Selecione uma escola no topo da página antes de cadastrar.", "err");
   const turmaSel = getSelectedTurma();
   if(!turmaSel) return setMsg("Selecione uma turma.", "err");
 
@@ -1768,163 +1770,132 @@ function normSerie(s){
     ...dadosComp,
   };
 
-  // ── CPF dedup: se já existe aluno com esse CPF, atualiza e reutiliza ──
-  // Evita ter 2 registros com o mesmo CPF. Se o usuário clicou em
-  // "Cadastrar como novo", os dados novos substituem os antigos em TODAS as turmas.
-  const todosAlunos = window.Identidade.lerTodos ? window.Identidade.lerTodos() : [];
-  const alunoMesmoCPF = cpfDigits
-    ? todosAlunos.find(a => stripNum(a.cpf || '') === cpfDigits)
-    : null;
+  // ── Gravação: aluno + matrícula (+ elo) num único batch — tudo ou nada ──────
+  // Dados pessoais ficam no doc do aluno; a matrícula guarda só o vínculo
+  // (alunoId + turmaId) e dados datados (ano, série, turno, modelo, status).
+  if(window._salvandoAluno) return;
 
-  let alunoId, isNew;
-
-  if(alunoMesmoCPF){
-    // Reutiliza o ID e atualiza os dados no Firestore + cache
-    alunoId = alunoMesmoCPF.alunoId || alunoMesmoCPF.id;
-    isNew = false;
-    const dadosAtualizados = { _id: alunoId, alunoId, ...dadosAluno };
-    try{
-      if(window.DB && window.Auth && window.Auth.getSession()){
-        await window.DB.alunos.save(dadosAtualizados);
-      }
-    }catch(e){ console.warn('Firestore aluno update (CPF dedup):', e); }
-    // Atualiza cache local de alunos
-    try{
-      const alunosCache = safeParse(KEYS.alunos, []);
-      const idx = alunosCache.findIndex(a => (a.alunoId || a.id) === alunoId);
-      if(idx >= 0) alunosCache[idx] = { ...alunosCache[idx], ...dadosAtualizados };
-      else alunosCache.push(dadosAtualizados);
-      save(KEYS.alunos, alunosCache);
-    }catch(e){ console.warn('Cache aluno update:', e); }
-  } else if(window._alunoIdVinculado){
-    // Usuário já escolheu explicitamente um aluno das atas (dropdown de nome
-    // ou CPF encontrado) — vincula direto, sem deixar a heurística de
-    // findOrCreate redescobrir (e possivelmente discordar) o match.
-    const result = await window.Identidade.vincularExplicito(window._alunoIdVinculado, dadosAluno);
-    alunoId = result.alunoId;
-    isNew = result.isNew;
-  } else {
-    const result = await window.Identidade.findOrCreate(dadosAluno);
-    alunoId = result.alunoId;
-    isNew = result.isNew;
-  }
-
-  // ── Matrícula: evita duplicata na mesma turma + ano ───────────
-  const mats = getMats();
-
-  // ID único por turma + aluno + ano (inclui o ano para evitar colisão entre anos letivos)
-  const matriculaId = `MAT|${tid}|${alunoId}|${ano}`;
-
-  const matExistente = mats.find(m =>
-    m.turmaId === tid && m.alunoId === alunoId &&
-    String(m.anoLetivo) === String(ano)
-  );
-  if(matExistente) return setMsg(`Aluno já matriculado nessa turma em ${ano}.`, "err");
-
-  // ── Barreira: aluno não pode estar em 2 turmas ao mesmo tempo no mesmo ano ──
-  // Não existe motivo lógico pra isso. MAS: em anos retroativos, TODA
-  // matrícula nasce com status 'INATIVO' + uma situação terminal
-  // (TRANSFERIDO/DESISTENTE/FALECIDO/APROVADO/REPROVADO) — nunca 'ATIVO'.
-  // Então não dá pra usar status==='ATIVO' como sinal de duplicidade aqui
-  // como fazemos no ano corrente: uma transferência real no meio do ano
-  // (2 matrículas legítimas, mesmo aluno, mesmo ano, turmas diferentes) é
-  // um cenário válido que também bateria nesse filtro. Por isso:
-  //   • ano ativo (corrente)  → BLOQUEIA de vez (nunca é legítimo)
-  //   • ano retroativo        → AVISA e pede confirmação (pode ser
-  //     transferência real, mas também pode ser erro humano/duplicidade)
-  const outraMatriculaNoAno = mats.find(m =>
-    m.alunoId === alunoId &&
-    String(m.anoLetivo) === String(ano) &&
-    m.turmaId !== tid
-  );
-  if(outraMatriculaNoAno){
-    const turmaOutra = getTurmas().find(t => t.turmaId === outraMatriculaNoAno.turmaId);
-    const nomeTurmaOutra = turmaOutra ? (turmaOutra.nome || turmaOutra.turmaId) : outraMatriculaNoAno.turmaId;
-
-    if(anoEhAtivo && (outraMatriculaNoAno.status || 'ATIVO').toUpperCase() === 'ATIVO'){
-      return setMsg(
-        `Este aluno já tem uma matrícula ATIVA em ${ano} na turma "${nomeTurmaOutra}". ` +
-        `Encerre essa matrícula (na tela de edição do aluno) antes de matricular em outra turma no mesmo ano.`,
-        "err"
-      );
-    }
-
-    if(!anoEhAtivo){
-      const situacaoOutra = outraMatriculaNoAno.situacao || '—';
-      if(!(await _confirmModal({
-        titulo: '⚠️ Matrícula duplicada em outro ano?',
-        corpo: `Este aluno já tem outra matrícula em ${ano}, na turma "${_escHtml(nomeTurmaOutra)}" (situação: ${_escHtml(situacaoOutra)}).\n\n` +
-               `Isso só faz sentido se ele realmente estudou nas duas turmas naquele ano (ex.: transferência no meio do ano). ` +
-               `Se não for o caso, cancele e confira se não é um cadastro duplicado.\n\n` +
-               `Deseja continuar e criar esta matrícula mesmo assim?`,
-        corDestaque: '#b45309',
-        textoConfirmar: 'Continuar mesmo assim',
-      }))) return setMsg('Matrícula cancelada.', 'warn');
-    }
-  }
-
-  const modeloFinal = modelo || 'REGULAR';
-  let novaMatricula = {
-    matriculaId,
-    turmaId: tid,
-    alunoId,
-    anoLetivo: ano,
-    serie,
-    turno,
-    modelo: modeloFinal,
-    status: anoEhAtivo ? 'ATIVO' : 'INATIVO',
-    situacao: anoEhAtivo ? null : situacaoEscolhida,
-    criadoEm: new Date().toISOString()
-  };
-
-  if(window.MatriculaUtils){
-    try{
-      novaMatricula = window.MatriculaUtils.validarMatricula(novaMatricula);
-    }catch(e){
-      return setMsg(e.message, "err");
-    }
-  }
-
-  // Salva no Firestore diretamente com ID determinístico (upsert seguro)
+  const ID = window._ident || {};
+  const _btns = ['btnInserir','btnSalvarEtapa1','btnProximo'].map(i => document.getElementById(i)).filter(Boolean);
+  const _estadoBtns = _btns.map(b => b.disabled);   // restaura o estado anterior (ex.: somente leitura)
+  const _travar = v => { window._salvandoAluno = v; _btns.forEach((b, i) => { b.disabled = v ? true : _estadoBtns[i]; }); };
+  const _falha = (m, kind) => Object.assign(new Error(m), { amigavel: true, kind: kind || 'err' });
+  let recarregando = false;
+  _travar(true);
   try{
-    if(window.DB && window.Auth && window.Auth.getSession()){
-      await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, ...novaMatricula });
-    }
-  }catch(e){ console.warn('Firestore matricula save:', e); }
+    setMsg("Salvando…", "loading");
+    const existente = !!ID.anoAtivo;          // CPF/Nome achou aluno do ano-ativo → rematrícula
+    let alunoId, alunoDoc;
 
-  // Atualiza apenas o cache local em memória (sem chamar saveAll no Firestore de novo)
-  mats.push(novaMatricula);
-  localStorage.setItem(_k(KEYS.mats), JSON.stringify(mats));
-
-  // Garante que o aluno recém-cadastrado está no cache local de alunos,
-  // para que renderMatriculados() o encontre imediatamente sem recarregar a página.
-  if(!alunoMesmoCPF){
-    try{
-      const alunosCache = safeParse(KEYS.alunos, []);
-      const jaExiste = alunosCache.some(a => (a.alunoId || a.id) === alunoId);
-      if(!jaExiste){
-        alunosCache.push({ _id: alunoId, alunoId, ...dadosAluno });
-        save(KEYS.alunos, alunosCache);
+    if(existente){
+      alunoId = ID.anoAtivo.alunoId || ID.anoAtivo._id;
+      const original = await window.DB.anoAtivoAlunos.get(alunoId);   // dado fresco (1 leitura)
+      if(!original) throw _falha(`O cadastro do aluno (${alunoId}) não existe mais. Use "Refazer identificação".`);
+      alunoDoc = { ...original, ...dadosAluno, alunoId, cpfNum: cpfDigits };   // preserva o resto (foto etc.)
+    } else {
+      // Guardas finais (o CPF pode ter sido usado por outra pessoa depois da identificação)
+      const aa = await window.DB.anoAtivoAlunos.whereEquals('cpfNum', cpfDigits, { limit: 1 });
+      if(aa.length) throw _falha(`O CPF ${cpfFormatado} já pertence a ${aa[0].nomeOficial || aa[0].nome || aa[0]._id} no ano-ativo — não pode haver 2 alunos com o mesmo CPF.`);
+      const meuAtas = ID.atas ? ID.atas.atasId : null;
+      const eloCpf = await window.Identidade.buscarEloPorCpf(cpfDigits);
+      if(eloCpf && eloCpf.atasId !== meuAtas && !(ID.cpfOverride && ID.cpfOverride.atasId === eloCpf.atasId))
+        throw _falha(`O CPF ${cpfFormatado} está no histórico em nome de ${eloCpf.nome || eloCpf.atasId}. Use "Refazer identificação" para tratar o conflito.`);
+      if(ID.atas){
+        const eloAtual = await window.Identidade.buscarElo(ID.atas.atasId);
+        if(eloAtual && eloAtual.anoAtivoId) throw _falha('Este aluno do histórico já foi vinculado a outro cadastro do ano-ativo. Use "Refazer identificação".');
       }
-    }catch(e){ console.warn('Cache aluno insert:', e); }
-  }
+      alunoId = await window.Identidade.proximoId();    // só aqui: consome o contador
+      alunoDoc = { alunoId, ...dadosAluno, cpfNum: cpfDigits, criadoEm: new Date().toISOString() };
+      // Campos do histórico que o formulário do ano-ativo não tem: migram junto (nada se perde ao apagar dadosPessoais do elo)
+      const dp = (ID.atas && ID.atas.elo && ID.atas.elo.dadosPessoais) || {};
+      ['rgCnTipo','rgCn','nis','nascimentoEstrangeiro'].forEach(k => {
+        if(dp[k] !== undefined && dp[k] !== '' && alunoDoc[k] === undefined) alunoDoc[k] = dp[k];
+      });
+    }
 
-  updatePill();
-  refreshTurmaInfo(true);
-  renderMatriculados();
-  if(pillAnoAtivo) pillAnoAtivo.textContent = `ano ativo: ${ano}`;
+    // ── Matrícula ──
+    const matriculaId = `MAT|${tid}|${alunoId}|${ano}`;
+    if(existente){
+      const mats = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', alunoId);   // só as deste aluno
+      if(mats.some(m => m.turmaId === tid && String(m.anoLetivo) === String(ano)))
+        throw _falha(`Aluno já matriculado nessa turma em ${ano}.`);
+      // Mesmo ano em outra turma: no ano ativo bloqueia se a outra está ATIVA; em ano retroativo pede confirmação
+      const outra = mats.find(m => String(m.anoLetivo) === String(ano) && m.turmaId !== tid);
+      if(outra){
+        const tOutra = getTurmas().find(x => x.turmaId === outra.turmaId);
+        const nomeOutra = tOutra ? (tOutra.nome || tOutra.turmaId) : outra.turmaId;
+        if(anoEhAtivo && (outra.status || 'ATIVO').toUpperCase() === 'ATIVO')
+          throw _falha(`Este aluno já tem uma matrícula ATIVA em ${ano} na turma "${nomeOutra}". Encerre essa matrícula (na tela de edição do aluno) antes de matricular em outra turma no mesmo ano.`);
+        if(!anoEhAtivo){
+          const ok = await _confirmModal({
+            titulo: '⚠️ Matrícula duplicada em outro ano?',
+            corpo: `Este aluno já tem outra matrícula em ${ano}, na turma "${_escHtml(nomeOutra)}" (situação: ${_escHtml(outra.situacao || '—')}).\n\n` +
+                   `Isso só faz sentido se ele realmente estudou nas duas turmas naquele ano (ex.: transferência no meio do ano). ` +
+                   `Se não for o caso, cancele e confira se não é um cadastro duplicado.\n\nDeseja continuar e criar esta matrícula mesmo assim?`,
+            textoConfirmar: 'Continuar mesmo assim',
+          });
+          if(!ok) throw _falha('Matrícula cancelada.', 'warn');
+        }
+      }
+    }
+    let novaMatricula = {
+      matriculaId, turmaId: tid, alunoId, anoLetivo: ano, serie, turno,
+      modelo: modelo || 'REGULAR',
+      status: anoEhAtivo ? 'ATIVO' : 'INATIVO',
+      situacao: anoEhAtivo ? null : situacaoEscolhida,
+      criadoEm: new Date().toISOString()
+    };
+    if(window.MatriculaUtils){
+      try{ novaMatricula = window.MatriculaUtils.validarMatricula(novaMatricula); }
+      catch(e){ throw _falha(e.message); }
+    }
 
-  const msg = isNew
-    ? "Aluno cadastrado e matriculado com sucesso."
-    : alunoMesmoCPF
+    // ── Operações do batch ──
+    const ops = [
+      { col: 'anoAtivoAlunos',     op: 'set', id: alunoId,     data: alunoDoc },
+      { col: 'anoAtivoMatriculas', op: 'set', id: matriculaId, data: novaMatricula },
+    ];
+    if(!existente && ID.atas){      // vínculo com o histórico: elo ELO|{atasId}; dados pessoais saem de lá
+      ops.push(window.Identidade.prepararElo({
+        atasId: ID.atas.atasId, anoAtivoId: alunoId, nome: ID.atas.nome, cpf: cpfDigits,
+        dadosPessoais: window.Identidade.campoRemover(),
+      }));
+    }
+    if(ID.cpfOverride){             // "cadastrar mesmo assim": o CPF sai do outro registro do histórico
+      const lim = { atasId: ID.cpfOverride.atasId, cpf: '' };
+      if(ID.cpfOverride.temDP) lim.dadosPessoais = { cpf: '' };
+      ops.push(window.Identidade.prepararElo(lim));
+    }
+    await window.DB.batchWrite(ops);
+
+    // ── Pós-gravação: documentos e foto (falha aqui NÃO desfaz o cadastro, mas é avisada) ──
+    const avisos = [];
+    try{
+      if(window.initDocs) window.initDocs(alunoId);
+      if(window.uploadDocsQueue) await window.uploadDocsQueue();
+    }catch(e){ console.error('[salvar] documentos:', e); avisos.push('dos documentos'); }
+    try{
+      if(window.enviarFotoPendente) await window.enviarFotoPendente(alunoId, ano, matriculaId);
+    }catch(e){ console.error('[salvar] foto:', e); avisos.push('da foto'); }
+
+    let msg = existente
       ? `Dados do aluno (${alunoId}) atualizados e nova matrícula criada para ${ano}.`
-      : `Aluno já existente (${alunoId}) — nova matrícula criada para ${ano}.`;
-  setMsg(msg, "ok");
-  if(window.initDocs) window.initDocs(alunoId);
-  if(window.uploadDocsQueue) await window.uploadDocsQueue();
-  if(window.enviarFotoPendente) await window.enviarFotoPendente(alunoId, ano, matriculaId);
-  clearFields();
-  if(window._natRebuild) window._natRebuild();
+      : `Aluno cadastrado e matriculado com sucesso (${alunoId})` + (ID.atas ? ', vinculado ao histórico das atas.' : '.');
+    if(avisos.length) msg += ` Atenção: falhou o envio ${avisos.join(' e ')}. Abra o aluno em edição para reenviar.`;
+    // Hard refresh (padrão do módulo): o toast e a turma escolhida sobrevivem ao reload
+    try{
+      sessionStorage.setItem('anoAtivoAluno:toast', JSON.stringify({ msg, kind: avisos.length ? 'warn' : 'ok' }));
+      sessionStorage.setItem('anoAtivoAluno:retomar', JSON.stringify({ turmaId: tid, ano }));
+    }catch(_){}
+    recarregando = true;
+    window.location.reload();
+  }catch(e){
+    console.error('[salvar aluno]', e);
+    if(e && e.amigavel) setMsg(e.message, e.kind || 'err');
+    else setMsg('Não foi possível salvar: ' + (e && e.message ? e.message : e), 'err');
+  }finally{
+    if(!recarregando) _travar(false);
+  }
 }
 
 // events
@@ -3179,10 +3150,11 @@ function normSerie(s){
       CAMPOS_AUTOPREENCH.forEach(id => {
         const el = $(id); if(!el) return;
         const field = el.closest('.field') || el.parentElement;
-        field.classList.toggle('field-locked', locked);
-        el.readOnly = locked && el.tagName === 'INPUT';
+        const trava = locked && String(el.value || '').trim() !== '';   // campo vazio no cadastro antigo continua editável
+        field.classList.toggle('field-locked', trava);
+        el.readOnly = trava && el.tagName === 'INPUT';
       });
-      const chk = $('paiNaoInformado'); if(chk) chk.disabled = locked;
+      const chk = $('paiNaoInformado'); if(chk) chk.disabled = locked && !!$('pai').value;
     }
     function aplicarTrava(){
       const bloquear = !emEdicao() && !ID.pronto;
@@ -3299,7 +3271,7 @@ function normSerie(s){
         const id = r.aluno.alunoId || r.aluno._id;
         return id === meuAA ? null : { tipo:'anoAtivo', nome: r.aluno.nomeOficial || r.aluno.nome || id, id };
       }
-      if(r.tipo === 'historico') return r.elo.atasId === meuAtas ? null : { tipo:'historico', nome: r.elo.nome || r.elo.atasId, id: r.elo.atasId };
+      if(r.tipo === 'historico') return r.elo.atasId === meuAtas ? null : { tipo:'historico', nome: r.elo.nome || r.elo.atasId, id: r.elo.atasId, temDP: !!r.elo.dadosPessoais };
       return null;
     }
     async function avisarConflito(c, d){
@@ -3317,7 +3289,7 @@ function normSerie(s){
         corpo: `O CPF ${cpfFmt} já está registrado no histórico em nome de ${_escHtml(c.nome)} (ID ${_escHtml(c.id)}).\n\nO ideal é pedir ao gestor/admin para conferir, editar ou apagar esse CPF no histórico antes de continuar.\n\nSe continuar mesmo assim, o CPF será removido do registro de ${_escHtml(c.nome)} e ficará apenas neste cadastro.`,
         textoConfirmar: 'Cadastrar mesmo assim', textoCancelar: 'Cancelar e limpar o CPF',
       });
-      if(ok){ ID.cpfOverride = { atasId: c.id }; setCpfMsg('ok', `CPF será removido do histórico de ${c.nome}.`); }
+      if(ok){ ID.cpfOverride = { atasId: c.id, temDP: !!c.temDP }; setCpfMsg('ok', `CPF será removido do histórico de ${c.nome}.`); }
       else { cpfEl.value = ''; setCpfMsg(null, ''); }
     }
 
@@ -3481,6 +3453,17 @@ function normSerie(s){
     loadTurmaOptions();
     refreshTurmaInfo();
     renderMatriculados();
+    try{   // pós-salvar (hard refresh): volta pra mesma turma e mostra o resultado
+      const ret = JSON.parse(sessionStorage.getItem('anoAtivoAluno:retomar') || 'null');
+      const tst = JSON.parse(sessionStorage.getItem('anoAtivoAluno:toast') || 'null');
+      sessionStorage.removeItem('anoAtivoAluno:retomar'); sessionStorage.removeItem('anoAtivoAluno:toast');
+      if(ret && ret.turmaId && [...turmaSelect.options].some(o => o.value === ret.turmaId)){
+        turmaSelect.value = ret.turmaId;
+        if(ret.ano) anoLetivo.value = ret.ano;
+        turmaSelect.dispatchEvent(new Event('change'));
+      }
+      if(tst && tst.msg) setMsg(tst.msg, tst.kind || 'ok');
+    }catch(e){ console.warn('retomada pós-salvar:', e); }
     Loading.esconder();
   })();
 
