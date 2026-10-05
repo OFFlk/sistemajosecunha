@@ -291,7 +291,6 @@ html[data-theme="dark"] .wrap .card.card-destaque .btn-outline:hover:not(:disabl
 /* checkbox: .wrap input (width:100% + padding) não pode valer pra caixa de seleção */
 .wrap input[type="checkbox"] { width:auto; padding:0; margin:0; flex:0 0 auto; }
 /* linha de status do DOCX some quando vazia (só aparece durante/depois de exportar) */
-#docxStatus:empty { display:none; }
 
 /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2).
    Tokens reais desta página: --card-bg / --card-border (definidos no :root acima) e --ink (base.css). ===== */
@@ -360,18 +359,13 @@ html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
         <button type="button" class="btn btn-primary" onclick="exportarDOCX()">Exportar DOCX</button>
         <button type="button" class="btn out" onclick="exportarPDF()">Exportar PDF</button>
       </div>
-      <div id="docxStatus" class="small muted" style="margin-top:8px"></div>
-    </div>
+      </div>
   </div>
 
   <!-- 4) Definições da exportação (card de destaque) -->
   <div class="card card-destaque" id="cardDefinicoes">
     <h3 class="card-title">Definições da exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os campos abaixo são regras e textos que preenchem lacunas no documento final: o nome da escola, a cidade e a data de emissão que saem no documento, e como a carga horária (CH) é aplicada.</span></span></h3>
     <div class="row" id="topFieldsRow">
-      <div>
-        <label>Etapa do histórico</label>
-        <input value="Ensino Fundamental (1º ao 9º ano)" disabled>
-      </div>
       <div>
         <label>Escola padrão (fallback)</label>
         <input id="inEscola" placeholder="Se vazio usa dadosEscola/localStorage" oninput="refreshSaida()">
@@ -416,7 +410,6 @@ html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
       <button type="button" id="btnSalvarPessoais" onclick="salvarDadosPessoais()" style="display:none;" class="btn btn-primary">💾 Salvar dados pessoais</button>
     </div>
     <div id="dadosPessoaisWrap" class="small muted">Selecione um aluno para preencher/editar dados pessoais.</div>
-    <div id="msgSalvoPessoais" style="display:none;margin-top:8px;color:#16a34a;font-size:13px;font-weight:700;"></div>
   </div>
 
   <div class="card">
@@ -535,7 +528,6 @@ function _infoModal({ titulo, corpo, corDestaque }){
     backdrop.addEventListener('click', ev=>{ if(ev.target===backdrop) fechar(); });
   });
 }
-function getLS(k,fb){ try{ const r=localStorage.getItem(k); return r==null?fb:JSON.parse(r);}catch{return fb;} }
 function fmtBRDate(v){ const s=String(v||''); if(/^\d{4}-\d{2}-\d{2}$/.test(s)){ const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`;} return s; }
 
 // Converte um nome salvo em CAIXA ALTA no banco para "Nome Sobrenome" (padrão de tabela do guia de formatação).
@@ -552,40 +544,6 @@ function toTitleCasePT(str){
 }
 function mesExtensoBR(s){ const meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']; s=String(s||''); let i=0; if(/^\d{4}-\d{2}-\d{2}$/.test(s)) i=+s.slice(5,7)-1; else if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)) i=+s.slice(3,5)-1; return meses[i]||''; }
 function serieNum(txt){ const m=String(txt||'').match(/(\d+)/); return m?+m[1]:null; }
-
-function __getSchoolId(){
-  try{
-    const s = (window.Auth && typeof Auth.getSession==='function') ? Auth.getSession() : JSON.parse(localStorage.getItem('auth_session_v2')||'null');
-    if(!s) return '';
-    const sid = (s.schoolId||'').toString();
-    const effective = sid.toUpperCase()==='ADMIN' ? ((localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN') : sid;
-    return effective || '';
-  }catch(e){ return ''; }
-}
-function __getScopedKey(base){
-  const sid = __getSchoolId();
-  return sid ? `schools:${sid}:${base}` : base;
-}
-function __getLS(base, fb){
-  // Tenta chave com escopo primeiro, cai para chave legada
-  try{
-    const scoped = __getScopedKey(base);
-    const r1 = localStorage.getItem(scoped);
-    if(r1 != null) return JSON.parse(r1);
-    const r2 = localStorage.getItem(base);
-    if(r2 != null) return JSON.parse(r2);
-    return fb;
-  }catch(e){ return fb; }
-}
-function __getDadosEscolaKey(){
-  try{
-    const s = (window.Auth && typeof Auth.getSession==='function') ? Auth.getSession() : JSON.parse(localStorage.getItem('auth_session_v2')||'null');
-    if(!s) return 'dadosEscola';
-    const sid = (s.schoolId||'').toString();
-    const effective = sid.toUpperCase()==='ADMIN' ? ((localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN') : sid;
-    return effective ? `schools:${effective}:dadosEscola` : 'dadosEscola';
-  }catch(e){ return 'dadosEscola'; }
-}
 
 function _atualizarDbInfo(){ /* linha "Base carregada" removida da tela — mantida como no-op porque o restante do JS ainda a chama */ }
 function _prePopulaEscolaFields(){
@@ -613,54 +571,32 @@ function _filtrarTurmasAtivas(arr){
 }
 
 async function carregarDB(){
-  // 1) Carrega do localStorage IMEDIATAMENTE — UI disponível em < 100ms
-  state.db = {
-    dadosEscola:  getLS(__getDadosEscolaKey(), {}) || getLS('dadosEscola', {}),
-    alunosDB:     _normalizarAlunosDB(__getLS('alunosDB', [])),
-    matriculasDB: __getLS('matriculasDB', []),
-    turmasDB:     _filtrarTurmasAtivas(__getLS('turmasDB', [])),
-    atasDB:       __getLS('atasDB', [])
-  };
+  // Fonte única: Firestore (sem cache em localStorage). A tela só libera depois da leitura.
+  state.db = { dadosEscola:{}, alunosDB:[], matriculasDB:[], turmasDB:[], atasDB:[] };
   construirIndex();
-  _atualizarDbInfo();
-  _prePopulaEscolaFields();
-
-  // 2) Atualiza do Firestore (aguardado pelo chamador, mas não bloqueia a UI —
-  //    os campos já foram pré-preenchidos com o cache acima)
-  if(window.DB && typeof DB.loadAll === 'function'){
-    try{
-      // Espera Auth ficar pronto (mas não mais que 8s)
-      await new Promise(res=>{
-        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-        if(!window.Auth) return res();
-        const t = setTimeout(res, 8000);
-        document.addEventListener('auth:ready', ()=>{ clearTimeout(t); res(); }, {once:true});
-      });
-      const dados = await DB.loadAll();
-      if(dados && Array.isArray(dados.turmasDB)){
-        dados.alunosDB = _normalizarAlunosDB(dados.alunosDB);
-        dados.turmasDB = _filtrarTurmasAtivas(dados.turmasDB);
-        state.db = dados;
-        construirIndex();
-        _atualizarDbInfo();
-        _prePopulaEscolaFields();
-      }
-      // Leitura read-only do módulo ano-ativo, só pra saber se o aluno já
-      // tem matrícula lá (nesse caso os dados pessoais são editados por lá,
-      // não aqui — nunca gravamos nada nessas coleções a partir desta página).
-      if(DB.anoAtivoMatriculas && DB.anoAtivoAlunos){
-        try{
-          const [anoAtivoMatriculasDB, anoAtivoAlunosDB] = await Promise.all([
-            DB.anoAtivoMatriculas.list(),
-            DB.anoAtivoAlunos.list()
-          ]);
-          state.db.anoAtivoMatriculasDB = anoAtivoMatriculasDB;
-          state.db.anoAtivoAlunosDB = anoAtivoAlunosDB;
-        }catch(e){ console.warn('carregarDB anoAtivo (read-only):', e); }
-      }
-    }catch(e){ console.warn('carregarDB Firestore:', e); }
+  if(!(window.DB && typeof DB.loadAll === 'function')){ setMsg('Banco de dados indisponível.', 'err'); return; }
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      if(!window.Auth) return res();
+      const t = setTimeout(res, 8000);
+      document.addEventListener('auth:ready', ()=>{ clearTimeout(t); res(); }, {once:true});
+    });
+    const dados = await DB.loadAll();
+    if(dados && Array.isArray(dados.turmasDB)){
+      dados.alunosDB = _normalizarAlunosDB(dados.alunosDB);
+      dados.turmasDB = _filtrarTurmasAtivas(dados.turmasDB);
+      state.db = dados;
+      construirIndex();
+      _atualizarDbInfo();
+      _prePopulaEscolaFields();
+    }
+  }catch(e){
+    console.warn('carregarDB Firestore:', e);
+    setMsg('Não foi possível carregar os dados do servidor. Recarregue a página.', 'err');
   }
 }
+
 function construirIndex(){
   const map=new Map();
   (Array.isArray(state.db.turmasDB)?state.db.turmasDB:[]).forEach(t=>{
@@ -743,128 +679,108 @@ function enrichAluno(item){
   const sexoRaw=pick(a.sexo,m.sexo).toUpperCase();
   return { id:pick(a.id,alvoId), nome:pick(a.nomeOficial,a.nome,m.nomeRaw,item.nome), cpf:pick(a.cpf,a.CPF,m.cpf), rgCn:pick(a.rgCn,a.rg,m.rgCn,m.rg), nis:pick(a.nis,m.nis), dataNascimento:pick(a.dataNascimento,a.nascimento,a.dtNascimento,m.dataNascimento), naturalidade:pick(a.naturalidadeCidade,a.naturalidade,m.naturalidade), ufNascimento:pick(a.naturalidadeUF,a.ufNascimento,a.uf,m.ufNascimento), mae:pick(a.nomeMae,a.mae,m.mae), pai:pick(a.nomePai,a.pai,m.pai), sexo:sexoRaw.startsWith('F')?'F':(sexoRaw.startsWith('M')?'M':'') };
 }
-// Verifica (somente leitura) se o aluno já tem matrícula no módulo ano-ativo.
-// As duas coleções (atas x ano-ativo) nunca se misturam para escrita — isso serve
-// só pra decidir se o editor de dados pessoais desta página fica travado ou não,
-// já que pra alunos com matrícula ativa os dados pessoais são editados por lá.
-function temMatriculaAnoAtivo(item){
-  const matsAA = Array.isArray(state.db.anoAtivoMatriculasDB) ? state.db.anoAtivoMatriculasDB : [];
-  const alunosAA = Array.isArray(state.db.anoAtivoAlunosDB) ? state.db.anoAtivoAlunosDB : [];
-  const alvoId = item.alunoId || '';
-  const alvoNome = nrm(item.nome);
-  if(alvoId && matsAA.some(m => String(m?.alunoId||'')===alvoId)) return true;
-  if(alvoNome){
-    const alunoAA = alunosAA.find(a => nrm(a?.nomeOficial||a?.nome||'')===alvoNome);
-    const idAA = alunoAA ? String(alunoAA._id||alunoAA.id||alunoAA.alunoId||'') : '';
-    if(idAA && matsAA.some(m => String(m?.alunoId||'')===idAA)) return true;
-  }
-  return false;
-}
-/* =========================
-   Salvar dados pessoais no Identidade (localStorage + Firestore)
-========================= */
-function salvarDadosPessoais(){
-  if(!state.selected){ setMsg("Nenhum aluno selecionado.", "warn"); return; }
-  if(state.selected.temMatriculaAtiva){ setMsg("Este aluno já possui matrícula no módulo Ano Ativo — os dados pessoais devem ser editados por lá.", "warn"); return; }
-
-  const ed = state.edits.pessoais || {};
-  const alunoId = state.selected.alunoId || '';
-  const nomeAtual = state.selected.nome || '';
-
-  if(!alunoId && !nomeAtual){ setMsg("Aluno sem ID e sem nome — não é possível salvar.", "warn"); return; }
-
-  // Usa getPessoalFinal() para capturar tanto edits quanto valores pré-preenchidos
-  // Isso garante que campos não tocados mas já preenchidos (RG, UF, Mãe, Pai) também sejam salvos
-  const pf = getPessoalFinal();
-  const rgCnTipoVal = ed.rgCnTipo || (()=>{ const sel = document.querySelector('[data-pf="rgCnTipo"]'); return sel ? sel.value : ''; })() || undefined;
-  // Monta objeto para salvar no Identidade
-  const dados = {
-    alunoId:         alunoId || undefined,
-    nomeOficial:     pf.nome    || nomeAtual,
-    nome:            pf.nome    || nomeAtual,
-    cpf:             pf.cpf             || undefined,
-    rgCn:            pf.rgCn            || undefined,
-    rgCnTipo:        rgCnTipoVal,
-    nis:             pf.nis             || undefined,
-    dataNascimento:  pf.dataNascimento  || undefined,
-    naturalidade:    pf.naturalidade    || undefined,
-    ufNascimento:    pf.ufNascimento    || undefined,
-    nomeMae:         pf.mae             || undefined,
-    nomePai:         pf.pai             || undefined,
-    sexo:            pf.sexo            || undefined,
-    atualizadoEm:    new Date().toISOString(),
+/* ===== DADOS PESSOAIS — contrato do elo =====
+   Onde moram:
+     • aluno COM cadastro no Ano-Ativo  → anoAtivoAlunos/{elo.anoAtivoId}  (aqui: SOMENTE LEITURA)
+     • aluno SEM cadastro no Ano-Ativo  → alunos/ELO|{atasId}.dadosPessoais  (aqui: leitura e gravação)
+   Leitura ao selecionar o aluno: Identidade.buscarElo(atasId) (1 leitura) + anoAtivoAlunos.get() só se vinculado (+1).
+   Gravação: Identidade.salvarElo({ atasId, nome, cpf, dadosPessoais }). Não grava nada se já houver anoAtivoId.
+   TODO nomes/formatos abaixo = os do anoAtivoAlunos; se o contrato mudar, só estas duas funções mudam. */
+const DP_ARMAZENADO = { // chave na tela (pf) → chave armazenada
+  cpf:'cpf', rgCn:'rgCn', rgCnTipo:'rgCnTipo', nis:'nis', dataNascimento:'dataNascimento',
+  naturalidade:'naturalidadeCidade', ufNascimento:'naturalidadeUF', mae:'nomeMae', pai:'nomePai',
+  sexo:'sexo', nascimentoEstrangeiro:'nascimentoEstrangeiro'
+};
+function dpParaArmazenar(pf){
+  const iso = (v)=>{ const m=String(v||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?`${m[3]}-${m[2]}-${m[1]}`:(/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v):''); };
+  const o = {
+    cpf: onlyDigits(pf.cpf), rgCn: onlyDigits(pf.rgCn), rgCnTipo: pf.rgCnTipo||'', nis: onlyDigits(pf.nis),
+    dataNascimento: iso(pf.dataNascimento), naturalidade: String(pf.naturalidade||'').trim(),
+    ufNascimento: String(pf.ufNascimento||'').toUpperCase(), mae: String(pf.mae||'').trim(), pai: String(pf.pai||'').trim(),
+    sexo: String(pf.sexo||'').toUpperCase().slice(0,1), nascimentoEstrangeiro: pf.nascimentoEstrangeiro==='1' ? '1' : '0'
   };
-
-  // Remove campos undefined
-  Object.keys(dados).forEach(k => { if(dados[k] === undefined) delete dados[k]; });
-
-  let ok = false;
-
-  // Tenta via Identidade.salvar (módulo cross-módulo)
-  if(window.Identidade && typeof Identidade.salvar === 'function'){
-    try{
-      Identidade.salvar(dados);
-      ok = true;
-    }catch(e){ console.warn('Identidade.salvar:', e); }
-  }
-
-  // Fallback: salva direto no alunosDB (chave com escopo)
-  if(!ok){
-    try{
-      const key = __getScopedKey('alunosDB');
-      const lista = __getLS('alunosDB', []);
-      const idx = lista.findIndex(a => (a.alunoId||a.id) === alunoId || (nomeAtual && (a.nomeOficial||a.nome) === nomeAtual));
-      if(idx >= 0){
-        lista[idx] = {...lista[idx], ...dados};
-      } else {
-        lista.push(dados);
-      }
-      localStorage.setItem(key, JSON.stringify(lista));
-      // Sincroniza chave legada também
-      localStorage.setItem('alunosDB', JSON.stringify(lista));
-      ok = true;
-    }catch(e){ console.warn('fallback salvarDadosPessoais:', e); }
-  }
-
-  // Persiste no Firestore em background se disponível
-  if(ok && window.DB && typeof DB.alunos?.save === 'function'){
-    DB.alunos.save(dados).catch(e => console.warn('Firestore salvarDadosPessoais:', e));
-  }
-
-  // Feedback visual
-  const msg = document.getElementById('msgSalvoPessoais');
-  if(msg){
-    msg.textContent = ok ? '✅ Dados pessoais salvos! Próxima vez que pesquisar este aluno, os campos serão preenchidos automaticamente.' : '⚠️ Não foi possível salvar.';
-    msg.style.color = ok ? '#16a34a' : '#b91c1c';
-    msg.style.display = 'block';
-    setTimeout(() => { msg.style.display = 'none'; }, 5000);
-  }
-
-  // Atualiza o enrich do aluno em memória para refletir imediatamente
-  if(ok && state.selected){
-    state.selected.enrich = {...(state.selected.enrich||{}), ...dados};
-    // Recarrega DB em background para refletir nas próximas pesquisas
-    if(window.DB && typeof DB.loadAll === 'function'){
-      (async ()=>{
-        try{
-          const novos = await DB.loadAll();
-          if(novos && Array.isArray(novos.turmasDB)){
-            novos.alunosDB = _normalizarAlunosDB(novos.alunosDB);
-            state.db = novos;
-            construirIndex();
-          }
-        }catch(e){}
-      })();
+  const out = {}; Object.keys(DP_ARMAZENADO).forEach(k=>{ out[DP_ARMAZENADO[k]] = o[k] ?? ''; });
+  return out;
+}
+// aceita tanto o objeto do elo quanto o doc do anoAtivoAlunos (mesmos nomes + apelidos antigos)
+function dpDeArmazenado(d){
+  d = d || {};
+  const pick=(...v)=>{ for(const x of v){ if(x!=null && String(x).trim()!=='') return String(x).trim(); } return ''; };
+  return {
+    nome: pick(d.nomeOficial, d.nome),
+    cpf: pick(d.cpf, d.CPF), rgCn: pick(d.rgCn, d.rg), rgCnTipo: pick(d.rgCnTipo), nis: pick(d.nis),
+    dataNascimento: pick(d.dataNascimento, d.nascimento, d.dtNascimento),
+    naturalidade: pick(d.naturalidadeCidade, d.naturalidade), ufNascimento: pick(d.naturalidadeUF, d.ufNascimento, d.uf),
+    mae: pick(d.nomeMae, d.mae), pai: pick(d.nomePai, d.pai), sexo: pick(d.sexo).toUpperCase().slice(0,1),
+    nascimentoEstrangeiro: pick(d.nascimentoEstrangeiro)
+  };
+}
+async function carregarPessoalDoAluno(item){
+  const out = { origem:'nenhuma', anoAtivoId:'', dados:{}, erro:false };
+  const atasId = item.alunoId || '';
+  if(!atasId) return out;
+  if(!(window.Identidade && typeof Identidade.buscarElo==='function')){ out.erro=true; return out; }
+  try{
+    const elo = await Identidade.buscarElo(atasId);
+    if(!elo) return out;
+    if(elo.anoAtivoId){
+      out.anoAtivoId = elo.anoAtivoId; out.origem = 'anoAtivo';
+      const aa = (window.DB && DB.anoAtivoAlunos) ? await DB.anoAtivoAlunos.get(elo.anoAtivoId) : null;
+      out.dados = dpDeArmazenado(aa || {});
+    } else {
+      out.origem = 'elo';
+      out.dados = dpDeArmazenado(elo.dadosPessoais || {});
+      if(!out.dados.nome && elo.nome) out.dados.nome = elo.nome;
+      if(!out.dados.cpf && elo.cpf) out.dados.cpf = elo.cpf;
     }
+  }catch(e){ console.warn('carregarPessoalDoAluno:', e); out.erro = true; setMsg('Não foi possível ler os dados pessoais deste aluno. A edição ficou bloqueada.', 'err'); }
+  return out;
+}
+
+async function salvarDadosPessoais(){
+  if(!state.selected){ setMsg("Nenhum aluno selecionado.", "warn"); return; }
+  if(state.selected.temMatriculaAtiva){ setMsg("Este aluno já tem cadastro no módulo Ano Ativo — os dados pessoais devem ser editados por lá.", "warn"); return; }
+  if(state.selected.pessoalErro){ setMsg("Os dados pessoais deste aluno não foram lidos — recarregue a seleção antes de salvar.", "warn"); return; }
+  const atasId = state.selected.alunoId || '';
+  if(!atasId){ setMsg("Aluno sem ID — não é possível salvar.", "warn"); return; }
+  if(!(window.Identidade && typeof Identidade.salvarElo==='function' && typeof Identidade.buscarElo==='function')){ setMsg("Módulo de identidade indisponível.", "err"); return; }
+  const pf = getPessoalFinal();
+  const rgCnTipoVal = (state.edits.pessoais||{}).rgCnTipo || (()=>{ const sel=document.querySelector('[data-pf="rgCnTipo"]'); return sel?sel.value:''; })() || '';
+  const nome = pf.nome || state.selected.nome || '';
+  if(!nome){ setMsg("Aluno sem nome — não é possível salvar.", "warn"); return; }
+  // O elo só aceita CPF com 11 dígitos (ou vazio). Avisa antes, em vez de estourar erro técnico.
+  const cpfDig = onlyDigits(pf.cpf);
+  if(cpfDig && cpfDig.length !== 11){ setMsg('CPF incompleto: informe os 11 dígitos ou deixe o campo em branco.', 'warn'); return; }
+  setMsg('Salvando dados pessoais…', 'loading');
+  try{
+    // reconfere: se o aluno foi vinculado ao Ano-Ativo depois que a tela abriu, NÃO grava
+    const elo = await Identidade.buscarElo(atasId);
+    if(elo && elo.anoAtivoId){
+      state.selected.temMatriculaAtiva = true; renderDadosPessoaisEditor();
+      const btn = document.getElementById('btnSalvarPessoais'); if(btn) btn.style.display='none';
+      setMsg('Este aluno acabou de ser vinculado ao Ano Ativo — recarregue a seleção.', 'warn'); return;
+    }
+    const dadosPessoais = dpParaArmazenar({ ...pf, rgCnTipo: rgCnTipoVal, nascimentoEstrangeiro: (state.edits.pessoais||{}).nascimentoEstrangeiro || '0' });
+    await Identidade.salvarElo({ atasId, nome, cpf: cpfDig, dadosPessoais }); // sem anoAtivoId → não marca vinculadoEm
+    state.selected.enrich = { ...(state.selected.enrich||{}), ...pf };
+    setMsg('Dados pessoais salvos.', 'ok');
+  }catch(e){
+    console.warn('salvarDadosPessoais:', e);
+    setMsg('Não foi possível salvar os dados pessoais: ' + (e && e.message ? e.message : 'erro desconhecido'), 'err');
   }
 }
 
-function selecionarAluno(key){
+async function selecionarAluno(key){
   const item=state.index.find(x=>x.key===key); if(!item) return;
-  state.selected = {...item, enrich: enrichAluno(item), registros: getTurmaAlunoRowsFor(item)};
-  state.selected.temMatriculaAtiva = temMatriculaAnoAtivo(item);
-  const btnSP = document.getElementById('btnSalvarPessoais'); if(btnSP) btnSP.style.display = state.selected.temMatriculaAtiva ? 'none' : 'inline-flex';
-  const msgSP = document.getElementById('msgSalvoPessoais'); if(msgSP) msgSP.style.display='none';
+  const pessoal = await carregarPessoalDoAluno(item);
+  const enrich = enrichAluno(item);
+  // sobrepõe com os dados pessoais da fonte correta (só campos preenchidos)
+  Object.keys(pessoal.dados||{}).forEach(k=>{ if(pessoal.dados[k]) enrich[k]=pessoal.dados[k]; });
+  state.selected = {...item, enrich, registros: getTurmaAlunoRowsFor(item)};
+  state.selected.temMatriculaAtiva = !!pessoal.anoAtivoId;
+  state.selected.pessoalErro = !!pessoal.erro;
+  state.selected.pessoalOrigem = pessoal.origem;
+  const btnSP = document.getElementById('btnSalvarPessoais'); if(btnSP) btnSP.style.display = (state.selected.temMatriculaAtiva || state.selected.pessoalErro) ? 'none' : 'inline-flex';
   state.edits = { pessoais:{}, anos:{}, meta:{} };
   renderResumoSelecionado(); renderDadosPessoaisEditor(); renderTimeline(); renderResumoEditavel(); refreshSaida();
 }
@@ -917,9 +833,9 @@ function renderDadosPessoaisEditor(){
   const ufNasc = String(v('ufNascimento', e.ufNascimento||'')).toUpperCase();
   const nascEstr = String(v('nascimentoEstrangeiro','0'))==='1';
   const dateISO = (()=>{ const m=String(nasc||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?`${m[3]}-${m[2]}-${m[1]}`:''; })();
-  const travado = !!state.selected.temMatriculaAtiva;
+  const travado = !!state.selected.temMatriculaAtiva || !!state.selected.pessoalErro;
   const dis = travado ? 'disabled' : '';
-  const aviso = travado ? `<div class="warn" style="margin-bottom:10px;padding:8px;border-radius:6px;background:color-mix(in srgb, orange 15%, transparent);">⚠️ Este aluno já possui matrícula no módulo Ano Ativo. Os dados pessoais são editados por lá — os campos abaixo ficam bloqueados aqui para não haver divergência entre os dois cadastros.</div>` : '';
+  const aviso = travado ? `<div class="warn" style="margin-bottom:10px;padding:8px;border-radius:6px;background:color-mix(in srgb, orange 15%, transparent);">⚠️ ${state.selected.pessoalErro ? 'Não foi possível ler os dados pessoais deste aluno — os campos ficam bloqueados para não sobrescrever o cadastro.' : 'Este aluno já tem cadastro no módulo Ano Ativo. Os dados pessoais são editados por lá — os campos abaixo ficam bloqueados aqui (somente leitura) para não haver divergência entre os dois cadastros.'}</div>` : '';
   box.innerHTML = `${aviso}<div class="grid2">
     <div><label>Nome do aluno</label><input class="mini-input" data-pf="nome" value="${esc(v('nome',e.nome||state.selected.nome||''))}" ${dis}></div>
     <div><label>ID interno</label><input class="mini-input" data-pf="id" value="${esc(v('id',e.id||state.selected.alunoId||''))}" ${dis}></div>
@@ -1599,8 +1515,7 @@ async function exportarDOCX(){
       renderDiagExport();
       return _infoModal({ titulo: 'Exportação bloqueada', corpo: 'Travas configuradas impediram a exportação:\n\n- ' + precheck.bloqueios.join('\n- ') + (precheck.avisos.length?'\n\nAvisos:\n- '+precheck.avisos.join('\n- '):'') });
     }
-    const status = document.getElementById('docxStatus');
-    if(status) status.textContent='DOCX: gerando arquivo...';
+    setMsg('Gerando DOCX…', 'loading');
     const DocxCtor = window.docxtemplater || window.Docxtemplater;
     if(typeof window.PizZip === 'undefined' || typeof DocxCtor === 'undefined'){
       throw new Error('Bibliotecas de DOCX não carregadas. Verifique: (1) se este HTML é a versão com scripts CDN, (2) bloqueio do navegador/extensão/firewall ao jsDelivr, e (3) recarregue a página (Ctrl+F5).');
@@ -1617,7 +1532,6 @@ async function exportarDOCX(){
     const faltasCH = diagnosticoCHParaExport(data);
     if(faltasCH.length){
       console.warn('CH não encontrada para alguns slots:', faltasCH);
-      if(status) status.textContent = `DOCX: gerando com ${faltasCH.length} CH em branco (ver console).`;
     }
     for(const k of Object.keys(data)){
       const v = data[k];
@@ -1640,7 +1554,8 @@ async function exportarDOCX(){
     a.click();
     a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
-    if(status) status.textContent='DOCX: arquivo gerado com sucesso.';
+    if(faltasCH.length) setMsg(`DOCX gerado, mas ${faltasCH.length} CH ficaram em branco (ver console).`, 'warn');
+    else setMsg('DOCX gerado com sucesso.', 'ok');
     try{
       const schemaTxt = (document.getElementById('schemaCHResumo')?.textContent || '').trim();
       salvarHistoricoExportItem({
@@ -1655,8 +1570,6 @@ async function exportarDOCX(){
   } catch(err) {
     console.error(err);
     const msg = err?.properties?.errors?.map(e=>e.properties?.explanation||e.message).join('\n') || err?.message || String(err);
-    const status = document.getElementById('docxStatus');
-    if(status) status.textContent='DOCX: erro ao gerar.';
     _infoModal({ titulo: 'Erro ao gerar DOCX', corpo: msg, corDestaque: '#b91c1c' });
   }
 }
