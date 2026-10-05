@@ -218,6 +218,12 @@ html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
 .mono { font-family:Consolas,monospace; }
 .pill { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--chip-border); background:var(--chip-bg); color:var(--chip-color); border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:6px; }
 .warn { color:#b45309; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.30); padding:8px 12px; border-radius:8px; font-size:13px; }
+.aviso-warn { background: var(--chip-bg); border: 1px solid var(--chip-border);
+  border-left: 4px solid #d97706; color: var(--ink);
+  padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 13px; }
+.aviso-warn a,
+html[data-theme="dark"] .aviso-warn a,
+html[data-theme="dark"] .aviso-warn a:hover { color: inherit; font-weight: 700; text-decoration: underline; }
 .hidden { display:none !important; }
 /* toast + modal (guia-toasts) */
 @keyframes toastSubir { from{opacity:0;transform:translateX(-50%) translateY(16px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
@@ -825,6 +831,9 @@ function persistResumoRows(rows){
   }
 }
 
+// Página do módulo Ano Ativo (ajuste aqui se o caminho for outro)
+const URL_ANO_ATIVO = '/ano-ativo/ano-ativo'; // hub do módulo (link propositalmente genérico)
+
 function renderDadosPessoaisEditor(){
   const box=document.getElementById('dadosPessoaisWrap'); if(!state.selected){ box.innerHTML='Selecione um aluno para preencher/editar dados pessoais.'; return; }
   const e=state.selected.enrich||{}, ed=state.edits.pessoais||{}; const v=(k,fb='')=>ed[k]??fb;
@@ -835,7 +844,7 @@ function renderDadosPessoaisEditor(){
   const dateISO = (()=>{ const m=String(nasc||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?`${m[3]}-${m[2]}-${m[1]}`:''; })();
   const travado = !!state.selected.temMatriculaAtiva || !!state.selected.pessoalErro;
   const dis = travado ? 'disabled' : '';
-  const aviso = travado ? `<div class="warn" style="margin-bottom:10px;padding:8px;border-radius:6px;background:color-mix(in srgb, orange 15%, transparent);">⚠️ ${state.selected.pessoalErro ? 'Não foi possível ler os dados pessoais deste aluno — os campos ficam bloqueados para não sobrescrever o cadastro.' : 'Este aluno já tem cadastro no módulo Ano Ativo. Os dados pessoais são editados por lá — os campos abaixo ficam bloqueados aqui (somente leitura) para não haver divergência entre os dois cadastros.'}</div>` : '';
+  const aviso = travado ? `<div class="aviso-warn">⚠️ ${state.selected.pessoalErro ? 'Não foi possível ler os dados pessoais deste aluno — os campos ficam bloqueados para não sobrescrever o cadastro.' : `Este aluno já tem cadastro no módulo <a href="${URL_ANO_ATIVO}">Ano Ativo</a>. Os dados pessoais são editados por lá — os campos abaixo ficam bloqueados aqui (somente leitura) para não haver divergência entre os dois cadastros.`}</div>` : '';
   box.innerHTML = `${aviso}<div class="grid2">
     <div><label>Nome do aluno</label><input class="mini-input" data-pf="nome" value="${esc(v('nome',e.nome||state.selected.nome||''))}" ${dis}></div>
     <div><label>ID interno</label><input class="mini-input" data-pf="id" value="${esc(v('id',e.id||state.selected.alunoId||''))}" ${dis}></div>
