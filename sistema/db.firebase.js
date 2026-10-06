@@ -205,6 +205,7 @@
       async whereEquals(field, value, opts = {}) {
         await waitAuth();
         let q = col(colName).where(field, '==', value);
+        (opts.and || []).forEach(([f, v]) => { q = q.where(f, '==', v); });   // igualdades extras (sem índice composto)
         if (opts.limit) q = q.limit(opts.limit);
         const snap = await q.get();
         return snap2arr(snap);
