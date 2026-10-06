@@ -3086,12 +3086,12 @@ function normSerie(s){
       const get = id => $(id);
       get('nome').value    = a.nomeOficial || a.nome || '';
       get('nasc').value    = a.dataNascimento || '';
-      get('mae').value     = a.mae || '';
-      get('pai').value     = (a.pai && a.pai !== '--') ? a.pai : '';
+      get('mae').value     = a.mae || a.nomeMae || '';   // nomeMae/nomePai: nomes que o histórico gravou no elo
+      { const _p = a.pai || a.nomePai || ''; get('pai').value = (_p && _p !== '--') ? _p : ''; }
       get('sexo').value    = a.sexo || '';
       get('corRaca').value = a.corRaca || 'NÃO DECLARADA';
       if(get('naturalidadeCidade')) get('naturalidadeCidade').value = a.naturalidadeCidade || (a.naturalidade ? a.naturalidade.split('/')[0] : '');
-      if(get('naturalidadeUF'))     get('naturalidadeUF').value     = a.naturalidadeUF || (a.naturalidade ? (a.naturalidade.split('/')[1]||'').trim() : '');
+      if(get('naturalidadeUF'))     get('naturalidadeUF').value     = String(a.naturalidadeUF || (a.naturalidade ? (a.naturalidade.split('/')[1]||'') : '')).trim().toUpperCase();
       const chk = $('paiNaoInformado'); if(chk) chk.checked = (a.pai === '--');
       ['nome','nasc','mae','pai','naturalidadeCidade','naturalidadeUF'].forEach(id => get(id)?.dispatchEvent(new Event('input', {bubbles:true})));
     }
@@ -3114,6 +3114,11 @@ function normSerie(s){
       ID.atas = { atasId: c.atasId, nome: c.nome, elo: c.elo || null };
       const dp = (c.elo && c.elo.dadosPessoais) || {};
       preencher({ ...dp, nome: c.nome });
+      const rgNum = String(dp.rgCn || '').trim();   // histórico: RG -> compRG, CN -> compCertidao (só se o campo estiver vazio)
+      if(rgNum){
+        const alvo = $(String(dp.rgCnTipo || '').toUpperCase() === 'CN' ? 'compCertidao' : 'compRG');
+        if(alvo && !alvo.value) alvo.value = rgNum;
+      }
       const cpfPre = dig((c.elo && c.elo.cpf) || dp.cpf);
       if(cpfPre.length === 11 && !dig(cpfEl.value)) cpfEl.value = formatCPF(cpfPre);
       setLocked(false);
