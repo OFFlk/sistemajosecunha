@@ -95,7 +95,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
   transition: background 0.18s, border-color 0.18s, transform 0.06s;
 }
 .btn:active { transform: translateY(1px); }
-.btn.primary, .btn-primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
+.btn.primary, .btn-primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: var(--brand-fg, #fff); }
 .btn.primary:hover, .btn-primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
 html[data-theme="dark"] .btn.primary, html[data-theme="dark"] .btn-primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
 html[data-theme="dark"] .btn.primary:hover, html[data-theme="dark"] .btn-primary:hover { background: var(--brand-hover-d, #6d28d9); }
@@ -625,6 +625,15 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 /* Zona de perigo (mesmo desenho do .nee-block, em vermelho translúcido) e modais */
 .nee-block.danger{ border-color:rgba(185,28,28,.35); }
 .nee-block.danger .nee-header{ background:rgba(185,28,28,.06); }
+.dz-row{ flex-wrap:nowrap !important; gap:16px; align-items:center; }
+.dz-row > div{ flex:1 1 auto; min-width:0; }
+.dz-row > button{ flex:0 0 auto; white-space:nowrap; }
+@media (max-width:560px){ .dz-row{ flex-wrap:wrap !important; } }
+#anoLetivo:disabled, #turmaSelect:disabled, #serieAluno:disabled{ background:var(--pf-brand-faded); border-color:var(--pf-brand-sutil); color:var(--text); opacity:1; cursor:not-allowed; }
+.id-banner.dup{ border-color:rgba(185,28,28,.40); border-left-color:var(--danger); background:rgba(185,28,28,.08); }
+.id-banner.dup .id-banner-nome{ color:var(--danger); }
+html[data-theme="dark"] .id-banner.dup .id-banner-nome{ color:#fca5a5; }
+.id-banner.dup .id-banner-sub{ color:var(--text); font-weight:700; }
 .dz-desc{ font-size:12px; color:var(--muted); margin-top:3px; font-weight:600; }
 .dz-btn{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; font-family:inherit; cursor:pointer; background:rgba(185,28,28,.10); border:1.5px solid rgba(185,28,28,.35); color:var(--danger); }
 .dz-btn:hover:not(:disabled){ background:rgba(185,28,28,.20); border-color:rgba(185,28,28,.60); }
@@ -673,7 +682,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 <main class="wrap">
 <section class="card card-destaque topo-destaque">
 <div class="card-head">
-<h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno. Na edição, turma, ano e série ficam travados; para mudar o aluno de turma, use o botão “Trocar de turma” no fim da página.</span></span></h2>
+<h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno. Na edição, turma e ano ficam travados (a série pode ser corrigida aqui); para mudar o aluno de turma, use o botão “Trocar de turma” no fim da página.</span></span></h2>
 </div>
 <div class="inline">
 <div>
@@ -766,7 +775,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="field ident-keep" id="fieldIdentModo" style="grid-column:1/-1;">
     <div class="nee-block">
       <div class="nee-header">
-        <div class="nee-header-label">🔎 Identificar por <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>CPF:</b> procura o aluno primeiro entre os do ano-ativo (cria uma nova matrícula) e depois no histórico das atas.<br><br><b>Nome:</b> use quando o aluno já estudou na escola e você quer vincular o cadastro ao histórico dele. Digite o nome e tecle Enter (mínimo 2 palavras). São exibidos apenas 3 resultados — quanto mais completo o nome, mais preciso.<br><br>O CPF continua obrigatório nos dois casos.</span></span></div>
+        <div class="nee-header-label">🔎 Identificar por <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>CPF:</b> procura o aluno primeiro entre os do ano-ativo (cria uma nova matrícula) e depois no histórico das atas.<br><br><b>Nome:</b> use quando o aluno já estudou na escola e você quer vincular o cadastro ao histórico dele. Digite o nome e tecle Enter (mínimo 2 palavras). São exibidos apenas 3 resultados — quanto mais completo o nome, mais preciso.<br><br>O CPF continua obrigatório nos dois casos.<br><br><b>Aluno já matriculado no ano letivo:</b> o cadastro fica bloqueado para evitar duas matrículas (ou dois documentos) do mesmo aluno. Para corrigir dados, série ou mudar de turma, use a edição do aluno na pesquisa (botão “Trocar de turma”); se a matrícula estiver encerrada, use a readmissão.</span></span></div>
         <div class="nee-toggle">
           <button type="button" class="integral-btn selected-sim" id="btnModoCPF" onclick="_setModoId('cpf')">CPF</button>
           <button type="button" class="integral-btn" id="btnModoNome" onclick="_setModoId('nome')">Nome</button>
@@ -987,8 +996,8 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="left">
     <button class="btn secondary" id="btnLimparCampos" type="button">Limpar campos</button>
   </div>
-  <button class="btn ghost" id="btnSalvarEtapa1" type="button">💾 Salvar</button>
-  <button class="btn primary" id="btnProximo" type="button">Próximo →</button>
+  <button class="btn primary" id="btnSalvarEtapa1" type="button">💾 Salvar</button>
+  <button class="btn outline" id="btnProximo" type="button">Próximo →</button>
 </div>
 </section>
 
@@ -1107,7 +1116,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 
 <div class="actions-wizard">
   <div class="left">
-    <button class="btn ghost" id="btnVoltar" type="button">← Voltar</button>
+    <button class="btn outline" id="btnVoltar" type="button">← Voltar</button>
   </div>
   <button class="btn primary" id="btnInserir" type="button">💾 Salvar aluno</button>
 </div>
@@ -1870,9 +1879,12 @@ function normSerie(s){
       const matId = window._modoEdicaoMatId;
       if(matId){
         const mat = await window.DB.anoAtivoMatriculas.get(matId);
-        const novo = dadosComp.modeloEnsino || 'REGULAR';
-        if(mat && (mat.modelo || 'REGULAR').toUpperCase() !== novo.toUpperCase())
-          ops.push({ col:'anoAtivoMatriculas', op:'update', id: matId, data: { modelo: novo } });
+        const upd = {};
+        const novo = (dadosComp.modeloEnsino || '').trim();
+        if(mat && novo && String(mat.modelo || '').toUpperCase() !== novo.toUpperCase()) upd.modelo = novo;   // modelo em branco na matrícula também é corrigido aqui
+        const serieNova = (document.getElementById('serieAluno')?.value || '').trim();
+        if(mat && serieNova && serieNova !== String(mat.serie || '')) upd.serie = serieNova;   // série não faz parte do matriculaId
+        if(Object.keys(upd).length) ops.push({ col:'anoAtivoMatriculas', op:'update', id: matId, data: upd });
       }
       if(elo && (mudouCpf || mudouNome)){
         ops.push(window.Identidade.prepararElo({ atasId: elo.atasId, ...(mudouNome ? { nome } : {}), ...(mudouCpf ? { cpf: cpfNum } : {}) }));
@@ -2118,7 +2130,7 @@ function normSerie(s){
               // Aguarda série ser carregada e seleciona
               setTimeout(() => {
                 const serieEl = document.getElementById('serieAluno');
-                if(serieEl && matAluno.serie){ serieEl.value = matAluno.serie; serieEl.disabled = true; }
+                if(serieEl && matAluno.serie){ serieEl.value = matAluno.serie; }
               }, 200);
             } else if(tentativas < 10){
               setTimeout(() => _tentarSetar(tentativas + 1), 300);
@@ -2136,12 +2148,12 @@ function normSerie(s){
         wrapEncerrar.style.cssText = 'width:100%;margin-top:10px;';
         wrapEncerrar.innerHTML =
           '<div class="nee-block danger">'+
-            '<div class="nee-header" style="border-radius:12px 12px 0 0;border-bottom:1px solid rgba(185,28,28,.25);">'+
+            '<div class="nee-header dz-row" style="border-radius:12px 12px 0 0;border-bottom:1px solid rgba(185,28,28,.25);">'+
               '<div><div class="nee-header-label">🔁 Trocar de turma</div>'+
               '<div class="dz-desc">Encerra a matrícula atual como REMANEJADO e cria uma nova na turma escolhida, no mesmo ano. O modelo de ensino deve ser informado de novo, na edição do aluno já na turma nova.</div></div>'+
               '<button id="btnTrocarTurma" type="button" class="dz-btn">Trocar de turma</button>'+
             '</div>'+
-            '<div class="nee-header" style="border-radius:0 0 12px 12px;">'+
+            '<div class="nee-header dz-row" style="border-radius:0 0 12px 12px;">'+
               '<div><div class="nee-header-label">🚪 Encerrar matrícula</div>'+
               '<div class="dz-desc">Encerra a matrícula na turma atual. O cadastro do aluno é preservado e ele pode ser readmitido depois.</div></div>'+
               '<button id="btnEncerrarMatricula" type="button" class="dz-btn">Encerrar matrícula</button>'+
@@ -3154,7 +3166,7 @@ function normSerie(s){
     const ID = { modo:'cpf', pronto:false, anoAtivo:null, atas:null, novo:false, cpfOverride:null };
     window._ident = ID;   // estado lido pelo salvar: anoAtivo / atas / novo / cpfOverride
     window._modoId = 'cpf';
-    window._identPronta = () => emEdicao() || ID.pronto;
+    window._identPronta = () => emEdicao() || (ID.pronto && !ID.dup && !ID.verificando);
     const _cacheCpf = new Map();
     let _tick = 0;
 
@@ -3170,7 +3182,7 @@ function normSerie(s){
       const chk = $('paiNaoInformado'); if(chk) chk.disabled = locked && !!$('pai').value;
     }
     function aplicarTrava(){
-      const bloquear = !emEdicao() && !ID.pronto;
+      const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup || !!ID.verificando);
       const ativo = ID.modo === 'cpf' ? $('fieldCpf') : $('fieldNome');
       wz.querySelectorAll('.grid-3 > .field, .foto-box, .actions-wizard .btn').forEach(el => {
         if(el.classList.contains('ident-keep') || el === ativo || el.id === 'btnLimparCampos') return;
@@ -3178,6 +3190,8 @@ function normSerie(s){
         if(bloquear) el.setAttribute('inert',''); else el.removeAttribute('inert');
       });
       ativo.classList.remove('ident-trava'); ativo.removeAttribute('inert');
+      const fSerie = $('serieAluno') && $('serieAluno').closest('.field');   // série também é bloqueada (faz parte da matrícula)
+      if(fSerie){ fSerie.classList.toggle('ident-trava', bloquear); if(bloquear) fSerie.setAttribute('inert',''); else fSerie.removeAttribute('inert'); }
       // resolvido por CPF: o CPF não pode mais ser trocado sem "Refazer identificação"
       const travaCpf = ID.pronto && ID.modo === 'cpf';
       cpfEl.readOnly = travaCpf;
@@ -3194,6 +3208,7 @@ function normSerie(s){
 
     /* ── Banner / estado ─────────────────────────────────── */
     function mostrar(icone, titulo, sub){
+      banner.classList.remove('dup');
       $('bannerIcone').textContent = icone;
       $('bannerNome').textContent = titulo;
       $('bannerSub').textContent = sub;
@@ -3202,6 +3217,7 @@ function normSerie(s){
     function limparEstado(){
       _tick++;
       ID.pronto = false; ID.anoAtivo = null; ID.atas = null; ID.novo = false; ID.cpfOverride = null;
+      ID.mats = null; ID.dup = null; ID.verificando = false;
       banner.classList.remove('visible');
       resBox.hidden = true; resBox.innerHTML = '';
       if(nomeMsg) nomeMsg.textContent = '';
@@ -3238,8 +3254,46 @@ function normSerie(s){
       setLocked(true);
       mostrar('✅', a.nomeOficial || a.nome || id, `Aluno já cadastrado no ano-ativo (ID ${id}). Uma nova matrícula será criada nesta turma.`);
       if(window.sugerirFotoExistente) window.sugerirFotoExistente(id);
+      ID.verificando = true;   // bloqueado até saber se já existe matrícula neste ano
       finalizar();
+      verificarMatriculasDoAno(id);
     }
+    async function verificarMatriculasDoAno(id){
+      const t = _tick;
+      try{
+        const mats = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', String(id));
+        if(t !== _tick) return;   // a identificação mudou durante a consulta
+        ID.mats = mats;
+      }catch(e){
+        if(t !== _tick) return;
+        console.error('Erro ao verificar matrículas do aluno:', e);
+        _toastErro('❌ Não foi possível verificar as matrículas do aluno: ' + (e && e.message ? e.message : e));
+        ID.mats = [];
+      }
+      ID.verificando = false;
+      reavaliarDup(true);
+    }
+    function reavaliarDup(avisar){
+      if(emEdicao() || !ID.anoAtivo){ ID.dup = null; aplicarTrava(); return; }
+      const ano = String(($('anoLetivo') || {}).value || '');
+      const m = (ID.mats || []).find(x => String(x.anoLetivo) === ano) || null;
+      const mudou = !!m !== !!ID.dup;
+      ID.dup = m;
+      const a = ID.anoAtivo, nomeAl = a.nomeOficial || a.nome || a.alunoId || a._id;
+      if(m){
+        const ativa = (m.status || 'ATIVO').toUpperCase() === 'ATIVO';
+        const orient = ativa
+          ? 'Para corrigir dados ou série, ou mudar de turma, abra a edição do aluno na pesquisa (botão “Trocar de turma”).'
+          : 'A matrícula deste ano está encerrada: para reativá-lo, use a readmissão de alunos.';
+        mostrar('⛔', nomeAl, `Este aluno já tem matrícula em ${ano}. ${orient}`);
+        banner.classList.add('dup');
+        if(mudou || avisar) _toastAviso('⚠️ Aluno já matriculado em ' + ano + '. ' + orient);
+      }else if(mudou){
+        mostrar('✅', nomeAl, `Aluno já cadastrado no ano-ativo (ID ${a.alunoId || a._id}). Uma nova matrícula será criada nesta turma.`);
+      }
+      aplicarTrava();
+    }
+    ['input','change'].forEach(ev => $('anoLetivo')?.addEventListener(ev, () => reavaliarDup(false)));
     function resolverAtas(c){   // c = { atasId, nome, elo }
       ID.anoAtivo = null; ID.novo = false;
       ID.atas = { atasId: c.atasId, nome: c.nome, elo: c.elo || null };
