@@ -102,6 +102,8 @@ html[data-theme="dark"] .btn.primary:hover, html[data-theme="dark"] .btn-primary
 .btn.danger, .btn-danger { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: var(--danger); }
 .btn.danger:hover { background: rgba(185,28,28,0.18); }
 .btn.ghost, .btn.secondary { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn.outline:hover:not(:disabled){ background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+html[data-theme="dark"] .btn.outline:hover:not(:disabled){ background: var(--brand-faded-d, rgba(124,58,237,.18)); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
 .btn.ghost:hover, .btn.secondary:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
 .btn.small { padding: 7px 11px; font-size: 13px; }
 .btn.cancel { background: var(--card); border-color: var(--border); color: var(--muted); }
@@ -629,7 +631,8 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .dz-row > div{ flex:1 1 auto; min-width:0; }
 .dz-row > button{ flex:0 0 auto; white-space:nowrap; }
 @media (max-width:560px){ .dz-row{ flex-wrap:wrap !important; } }
-#anoLetivo:disabled, #turmaSelect:disabled, #serieAluno:disabled{ background:var(--pf-brand-faded); border-color:var(--pf-brand-sutil); color:var(--text); opacity:1; cursor:not-allowed; }
+#anoLetivo:disabled, #turmaSelect:disabled{ background:color-mix(in srgb, var(--dest-fg, var(--text)) 16%, transparent); border-color:color-mix(in srgb, var(--dest-fg, var(--text)) 40%, transparent); color:var(--dest-fg, var(--text)); opacity:1; cursor:not-allowed; }
+#naturalidadeCidade:disabled, #naturalidadeUF:disabled{ background:var(--pf-brand-faded); border-color:var(--pf-brand-sutil); color:var(--text); opacity:1; cursor:not-allowed; }
 .id-banner.dup{ border-color:rgba(185,28,28,.40); border-left-color:var(--danger); background:rgba(185,28,28,.08); }
 .id-banner.dup .id-banner-nome{ color:var(--danger); }
 html[data-theme="dark"] .id-banner.dup .id-banner-nome{ color:#fca5a5; }
@@ -824,7 +827,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   </div>
 
   <div class="field">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
       <label style="margin:0;">Naturalidade <span class="req">*</span></label>
       <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer;"><input type="checkbox" id="natEstrangeiro" style="width:15px;height:15px;cursor:pointer;"/> Estrangeiro</label>
     </div>
@@ -1594,6 +1597,7 @@ function normSerie(s){
 
   // ── Validações ────────────────────────────────────────────────
   if(!serie)    return setMsg("Selecione a série do aluno.", "err");
+  if(!modelo)   return setMsg("Selecione o modelo de ensino (Regular ou Integral).", "err");
   if(!nomeVal)  return setMsg("Informe o nome do aluno.", "err");
   if(!maeNome)  return setMsg("Informe o nome da mãe.", "err");
   if(!nascVal)  return setMsg("Informe a data de nascimento.", "err");
@@ -1837,6 +1841,7 @@ function normSerie(s){
     if(!dadosComp.mae)           return _toastErro('⚠️ Informe o nome da mãe.');
     if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
     if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
+    if(!dadosComp.modeloEnsino)  return _toastErro('⚠️ Selecione o modelo de ensino (Regular ou Integral).');
     { const eN = window._natValidar ? window._natValidar() : ''; if(eN) return _toastErro('⚠️ ' + eN); }
     if(window._neeValidar){
       const erroNee = window._neeValidar();
@@ -3184,7 +3189,8 @@ function normSerie(s){
     function aplicarTrava(){
       const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup || !!ID.verificando);
       const ativo = ID.modo === 'cpf' ? $('fieldCpf') : $('fieldNome');
-      wz.querySelectorAll('.grid-3 > .field, .foto-box, .actions-wizard .btn').forEach(el => {
+      wz.querySelectorAll('.grid-3 > .field, .foto-box, .actions-wizard .btn, .nee-block:not(.danger)').forEach(el => {
+        if(el.querySelector('#fieldCpf, #fieldNome')) return;   // o bloco de identificação nunca trava
         if(el.classList.contains('ident-keep') || el === ativo || el.id === 'btnLimparCampos') return;
         el.classList.toggle('ident-trava', bloquear);
         if(bloquear) el.setAttribute('inert',''); else el.removeAttribute('inert');
