@@ -631,14 +631,18 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .dz-btn:disabled{ opacity:.5; cursor:not-allowed; }
 html[data-theme="dark"] .dz-btn{ color:#fca5a5; border-color:rgba(248,113,113,.45); }
 html[data-theme="dark"] .dz-btn:hover:not(:disabled){ background:rgba(248,113,113,.34); border-color:rgba(248,113,113,.70); color:#fecaca; }
-.cm-box{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; max-width:440px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto; }
+.cm-box{ background:var(--card-bg,var(--card,#fff)); border:1px solid var(--border); border-radius:14px; padding:22px; max-width:440px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto; }
 .cm-titulo{ margin:0 0 6px; font-size:16px; font-weight:800; color:var(--text); }
 .cm-titulo.perigo{ color:var(--danger); }
 html[data-theme="dark"] .cm-titulo.perigo{ color:#fca5a5; }
-.cm-corpo{ margin:0 0 18px; font-size:13px; color:var(--muted); white-space:pre-line; line-height:1.5; }
+.cm-corpo{ margin:0 0 14px; font-size:13px; color:var(--text); white-space:pre-line; line-height:1.5; }
 .cm-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-.cm-ok{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; font-family:inherit; cursor:pointer; background:var(--pf-brand); border:1.5px solid var(--pf-brand); color:var(--brand-fg,#fff); }
-.cm-ok:hover{ filter:brightness(1.08); }
+.cm-ok{ padding:9px 16px; border-radius:8px; font-size:13px; font-weight:800; font-family:'Nunito',sans-serif; cursor:pointer; background:var(--brand); border:1px solid var(--brand); color:var(--brand-fg,#fff); }
+.cm-ok:hover:not(:disabled){ filter:brightness(1.08); }
+.cm-ok:disabled{ opacity:.55; cursor:not-allowed; }
+.cm-ok.perigo{ background:var(--danger); border-color:var(--danger); color:#fff; }
+html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626; }
+.cm-opcao{ width:100%; justify-content:flex-start; }
 
 /* Identificação do aluno (CPF / Nome) */
 .nee-block{ overflow:visible; }
@@ -811,7 +815,10 @@ html[data-theme="dark"] .cm-titulo.perigo{ color:#fca5a5; }
   </div>
 
   <div class="field">
-    <label>Naturalidade <span class="req">*</span></label>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <label style="margin:0;">Naturalidade <span class="req">*</span></label>
+      <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer;"><input type="checkbox" id="natEstrangeiro" style="width:15px;height:15px;cursor:pointer;"/> Estrangeiro</label>
+    </div>
     <div class="inline-2">
       <div class="nat-wrap">
         <div class="nat-ghost-layer" id="natGhost" aria-hidden="true"></div>
@@ -1492,6 +1499,7 @@ function normSerie(s){
     if(paiNaoInformado){ paiNaoInformado.checked = false; pai.disabled = false; }
     naturalidadeCidade.value = "";
     naturalidadeUF.value = "";
+    { const _c = document.getElementById('natEstrangeiro'); if(_c) _c.checked = false; if(window._natSync) window._natSync(); }
     sexo.value = "";
     corRaca.value = "NÃO DECLARADA";
     // reset integral (turno é resetado junto com a turma, em refreshTurmaInfo)
@@ -1587,7 +1595,7 @@ function normSerie(s){
     return setMsg(t, "err");
   }
   if(!paiNome)  return setMsg("Informe o nome do pai ou marque “Pai não informado”.", "err");
-  if(!natCidade || !natUF) return setMsg("Informe a naturalidade (cidade e UF).", "err");
+  { const eN = window._natValidar ? window._natValidar() : ''; if(eN) return setMsg(eN, 'err'); }
   if(!sexoVal)  return setMsg("Selecione o sexo.", "err");
   if(!ano)      return setMsg("Informe o ano letivo.", "err");
   if(!anoEhAtivo && !situacaoEscolhida) return setMsg("Selecione a situação da matrícula (ano não é o ativo).", "err");
@@ -1603,7 +1611,8 @@ function normSerie(s){
   const erroEndereco = _validarEnderecoTudoOuNada();
   if(erroEndereco) return setMsg(erroEndereco, "err");
 
-  const naturalidade = natCidade + "/" + natUF.toUpperCase();
+  const natEstrangeiro = !!document.getElementById('natEstrangeiro')?.checked;
+  const naturalidade = natEstrangeiro ? '' : natCidade + "/" + natUF.toUpperCase();
   const idade = calcAge(nascVal);
 
   // ── Identificação concluída? (CPF achado/novo ou vínculo por nome resolvido) ──
@@ -1641,6 +1650,7 @@ function normSerie(s){
     mae:                maeNome,
     pai:                paiNome,
     naturalidade,
+    nascimentoEstrangeiro: natEstrangeiro ? '1' : '0',
     naturalidadeCidade: natCidade,
     naturalidadeUF:     natUF.toUpperCase(),
     sexo:               sexoVal,
@@ -1810,13 +1820,15 @@ function normSerie(s){
       cidade:       (document.getElementById('compCidade')?.value || '').trim(),
       obs:          (document.getElementById('compObs')?.value || '').trim(),
     };
-    dadosComp.naturalidade = dadosComp.naturalidadeCidade + '/' + dadosComp.naturalidadeUF;
+    dadosComp.nascimentoEstrangeiro = document.getElementById('natEstrangeiro')?.checked ? '1' : '0';
+    dadosComp.naturalidade = dadosComp.nascimentoEstrangeiro === '1' ? '' : dadosComp.naturalidadeCidade + '/' + dadosComp.naturalidadeUF;
 
     if(!nome)                    return _toastErro('⚠️ Informe o nome do aluno.');
     if(cpfNum.length !== 11 || !isValidCPF(cpfNum)) return _toastErro('⚠️ Informe um CPF válido.');
     if(!dadosComp.mae)           return _toastErro('⚠️ Informe o nome da mãe.');
     if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
     if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
+    { const eN = window._natValidar ? window._natValidar() : ''; if(eN) return _toastErro('⚠️ ' + eN); }
     if(window._neeValidar){
       const erroNee = window._neeValidar();
       if(erroNee) return _toastErro('⚠️ ' + erroNee);
@@ -1956,8 +1968,8 @@ function normSerie(s){
           `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
           `<p class="cm-corpo">${corpo || ''}</p>`+
           `<div class="cm-acoes">`+
-            `<button type="button" class="nee-sim-nao" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-            `<button type="button" class="${perigo ? 'dz-btn' : 'cm-ok'}" id="_confirmModalOk">${_escHtml(textoConfirmar || 'Continuar')}</button>`+
+            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk">${_escHtml(textoConfirmar || 'Continuar')}</button>`+
           `</div>`+
         `</div>`;
       document.body.appendChild(backdrop);
@@ -2126,7 +2138,7 @@ function normSerie(s){
           '<div class="nee-block danger">'+
             '<div class="nee-header" style="border-radius:12px 12px 0 0;border-bottom:1px solid rgba(185,28,28,.25);">'+
               '<div><div class="nee-header-label">🔁 Trocar de turma</div>'+
-              '<div class="dz-desc">Encerra a matrícula atual como REMANEJADO e cria uma nova na turma escolhida, no mesmo ano.</div></div>'+
+              '<div class="dz-desc">Encerra a matrícula atual como REMANEJADO e cria uma nova na turma escolhida, no mesmo ano. O modelo de ensino deve ser informado de novo, na edição do aluno já na turma nova.</div></div>'+
               '<button id="btnTrocarTurma" type="button" class="dz-btn">Trocar de turma</button>'+
             '</div>'+
             '<div class="nee-header" style="border-radius:0 0 12px 12px;">'+
@@ -2143,13 +2155,13 @@ function normSerie(s){
         modalEncerrar.innerHTML =
           '<div class="cm-box" style="max-width:420px;">'+
             '<h3 class="cm-titulo perigo">Encerrar matrícula</h3>'+
-            '<p class="cm-corpo" style="margin-bottom:12px;">Selecione o motivo do encerramento:</p>'+
+            '<p class="cm-corpo">Selecione o motivo do encerramento:</p>'+
             '<div style="display:flex;flex-direction:column;gap:8px;">'+
-              '<button type="button" class="nee-sim-nao" data-situacao="TRANSFERIDO" style="text-align:left;border-radius:10px;">🔁 Transferido</button>'+
-              '<button type="button" class="nee-sim-nao" data-situacao="DESISTENTE" style="text-align:left;border-radius:10px;">🚫 Desistente</button>'+
-              '<button type="button" class="nee-sim-nao" data-situacao="FALECIDO" style="text-align:left;border-radius:10px;">🕊️ Faleceu</button>'+
+              '<button type="button" class="btn ghost cm-opcao" data-situacao="TRANSFERIDO">🔁 Transferido</button>'+
+              '<button type="button" class="btn ghost cm-opcao" data-situacao="DESISTENTE">🚫 Desistente</button>'+
+              '<button type="button" class="btn ghost cm-opcao" data-situacao="FALECIDO">🕊️ Faleceu</button>'+
             '</div>'+
-            '<div class="cm-acoes"><button type="button" class="nee-sim-nao" id="btnCancelarEncerramento">Cancelar</button></div>'+
+            '<div class="cm-acoes"><button type="button" class="btn ghost" id="btnCancelarEncerramento">Cancelar</button></div>'+
           '</div>';
         document.body.appendChild(modalEncerrar);
 
@@ -2159,12 +2171,13 @@ function normSerie(s){
         modalTrocar.id = 'modalTrocarTurma';
         modalTrocar.innerHTML =
           '<div class="cm-box" style="max-width:420px;">'+
-            '<h3 class="cm-titulo perigo">Trocar de turma</h3>'+
-            '<p class="cm-corpo" style="margin-bottom:12px;">Só aparecem turmas ativas do mesmo ano letivo da matrícula.</p>'+
-            '<label for="trocarTurma">Nova turma</label><select id="trocarTurma"></select>'+
-            '<label for="trocarSerie" style="display:block;margin-top:10px;">Série</label><select id="trocarSerie"></select>'+
-            '<div class="cm-acoes"><button type="button" class="nee-sim-nao" id="btnTrocarCancelar">Cancelar</button>'+
-            '<button type="button" class="dz-btn" id="btnTrocarOk">Trocar de turma</button></div>'+
+            '<h3 class="cm-titulo">Trocar de turma</h3>'+
+            '<p class="cm-corpo">Só aparecem turmas ativas do mesmo ano letivo da matrícula.</p>'+
+            '<div class="field"><label for="trocarTurma">Nova turma</label><select id="trocarTurma"></select></div>'+
+            '<div class="field" style="margin-top:10px;"><label for="trocarSerie">Série</label><select id="trocarSerie"></select></div>'+
+            '<p class="cm-corpo" style="margin:12px 0 0;font-size:12px;">⚠️ O modelo de ensino (Regular/Integral) pode ficar em branco na nova matrícula. Depois da troca, abra a edição do aluno na turma nova e informe o modelo.</p>'+
+            '<div class="cm-acoes"><button type="button" class="btn ghost" id="btnTrocarCancelar">Cancelar</button>'+
+            '<button type="button" class="cm-ok" id="btnTrocarOk">Trocar de turma</button></div>'+
           '</div>';
         document.body.appendChild(modalTrocar);
         const _fecharTrocar = () => { modalTrocar.style.display = 'none'; };
@@ -2211,7 +2224,7 @@ function normSerie(s){
             if(todas.some(m => m._id !== mat._id && String(m.anoLetivo) === String(mat.anoLetivo) && (m.status || 'ATIVO').toUpperCase() === 'ATIVO'))
               throw new Error('Este aluno tem outra matrícula ATIVA em ' + mat.anoLetivo + '. Encerre-a antes.');
             const ok = await _confirmModal({
-              titulo: '⚠️ Trocar de turma', corDestaque: 'danger', textoConfirmar: 'Sim, trocar',
+              titulo: '⚠️ Trocar de turma', textoConfirmar: 'Sim, trocar',
               corpo: `Mover "${_escHtml(aluno.nome || editId)}" para "${_escHtml(t.nome || t.turmaId)}" (${_escHtml(mat.anoLetivo)})?\n\nA matrícula atual será encerrada como REMANEJADO.`,
             });
             if(!ok) return;
@@ -2246,7 +2259,7 @@ function normSerie(s){
             const situacaoEscolhida = btn.dataset.situacao;
             const nomeAluno = aluno.nome || editId;
             const rotulo = { TRANSFERIDO: 'Transferido', DESISTENTE: 'Desistente', FALECIDO: 'Faleceu' }[situacaoEscolhida];
-            if(!(await _confirmModal({
+            if(!(await _confirmModal({ corDestaque: 'danger',
               titulo: '⚠️ Encerrar matrícula',
               corpo: `Encerrar matrícula de "${nomeAluno}" como "${rotulo}"?\n\nO cadastro do aluno será preservado.\nEsta ação não pode ser desfeita.`,
               textoConfirmar: 'Sim, encerrar',
@@ -2305,6 +2318,7 @@ function normSerie(s){
       _pre('corRaca',            aluno.corRaca || 'NÃO DECLARADA');
       _pre('naturalidadeCidade', aluno.naturalidadeCidade || '');
       _pre('naturalidadeUF',     aluno.naturalidadeUF || '');
+      { const c = document.getElementById('natEstrangeiro'); if(c) c.checked = String(aluno.nascimentoEstrangeiro) === '1'; if(window._natSync) window._natSync(); }
 
       // Pai não informado
       if(aluno.pai === '--'){
@@ -2448,8 +2462,8 @@ function normSerie(s){
       if(!(document.getElementById('cpf')?.value||'').replace(/\D/g,'')) return false;
       const paiNaoInf = document.getElementById('paiNaoInformado');
       if(!(document.getElementById('pai')?.value||'').trim() && !paiNaoInf?.checked) return false;
-      if(!(document.getElementById('naturalidadeCidade')?.value||'').trim()) return false;
-      if(!(document.getElementById('naturalidadeUF')?.value||'').trim()) return false;
+      if(window._natValidar && window._natValidar()) return false;
+      
       if(!(document.getElementById('sexo')?.value||'').trim()) return false;
       if(!(document.getElementById('modeloEnsino')?.value||'').trim()) return false;
       return true;
@@ -2469,7 +2483,7 @@ function normSerie(s){
       }
       const paiNaoInf = document.getElementById('paiNaoInformado');
       if(!(document.getElementById('pai')?.value||'').trim() && !paiNaoInf?.checked){ _toastErro('⚠️ Informe o nome do pai ou marque "Pai não informado".'); return false; }
-      if(!(document.getElementById('naturalidadeCidade')?.value||'').trim() || !(document.getElementById('naturalidadeUF')?.value||'').trim()){ _toastErro('⚠️ Informe a naturalidade (cidade e UF).'); return false; }
+      { const eN = window._natValidar ? window._natValidar() : ''; if(eN){ _toastErro('⚠️ ' + eN); return false; } }
       if(!(document.getElementById('sexo')?.value||'').trim()){ _toastErro('⚠️ Selecione o sexo.'); return false; }
       const modeloV = (document.getElementById('modeloEnsino')?.value||'').trim();
       if(!modeloV){ _toastErro('⚠️ Selecione o modelo de ensino (Regular ou Integral).'); return false; }
@@ -2915,7 +2929,7 @@ function normSerie(s){
   })();
 
   // ── Fábrica de autocomplete de cidade (reutilizada em endereço + naturalidade) ──
-  function criarAutocompleteCidade({ inputId, selUFId, dropdownId, ghostId, incluirCidadeEndereco, uppercase }){
+  function criarAutocompleteCidade({ inputId, selUFId, dropdownId, ghostId, incluirCidadeEndereco, uppercase, exigirUF }){
     const inpCidade = document.getElementById(inputId);
     const selUF     = document.getElementById(selUFId);
     const dropdown  = document.getElementById(dropdownId);
@@ -2938,7 +2952,8 @@ function normSerie(s){
           if(ce && ue && !keys.has(ce.toUpperCase() + '|' + ue)) extras.set(ce.toUpperCase() + '|' + ue, { cidade: ce, uf: ue });
         }
       });
-      cidadeDB = extras.size ? base.concat([...extras.values()]) : base;   // base é montada uma vez; sem reordenar a cada tecla
+      const todas = extras.size ? base.concat([...extras.values()]) : base;   // base é montada uma vez; sem reordenar a cada tecla
+      cidadeDB = (exigirUF && selUF.value) ? todas.filter(o => o.uf === selUF.value) : todas;   // só cidades da UF escolhida
     }
 
     function norm(s){ return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
@@ -3017,9 +3032,27 @@ function normSerie(s){
       if(!inpCidade.contains(e.target) && !dropdown.contains(e.target)){ closeDropdown(); ghost.innerHTML = ''; }
     });
 
-    selUF.addEventListener('change', () => closeDropdown());
+    selUF.addEventListener('change', () => {
+      closeDropdown(); ghost.innerHTML = '';
+      if(!exigirUF) return;
+      buildCidadeDB();
+      if(inpCidade.value && cidadeDB.length && !cidadeDB.some(o => norm(o.cidade) === norm(inpCidade.value))) inpCidade.value = '';   // cidade de outra UF
+    });
 
     buildCidadeDB();
+    if(exigirUF){
+      // '' = ok; senão, a mensagem para o usuário (estrangeiro dispensa cidade/UF)
+      window._natValidar = function(){
+        if(document.getElementById('natEstrangeiro')?.checked) return '';
+        const c = (inpCidade.value || '').trim(), u = (selUF.value || '').trim();
+        if(!u) return 'Selecione a UF da naturalidade (ou marque “Estrangeiro”).';
+        if(!c) return 'Informe a cidade de nascimento (ou marque “Estrangeiro”).';
+        buildCidadeDB();
+        if(window._cidadeBase && !cidadeDB.some(o => o.uf === u && norm(o.cidade) === norm(c)))
+          return `Cidade "${c}" não encontrada em ${u}. Escolha uma das sugestões da lista.`;
+        return '';
+      };
+    }
     return { rebuild: buildCidadeDB };
   }
 
@@ -3212,6 +3245,7 @@ function normSerie(s){
       ID.atas = { atasId: c.atasId, nome: c.nome, elo: c.elo || null };
       const dp = (c.elo && c.elo.dadosPessoais) || {};
       preencher({ ...dp, nome: c.nome });
+      { const ck = $('natEstrangeiro'); if(ck) ck.checked = String(dp.nascimentoEstrangeiro) === '1'; if(window._natSync) window._natSync(); }
       const rgNum = String(dp.rgCn || '').trim();   // histórico: RG -> compRG, CN -> compCertidao (só se o campo estiver vazio)
       if(rgNum){
         const alvo = $(String(dp.rgCnTipo || '').toUpperCase() === 'CN' ? 'compCertidao' : 'compRG');
@@ -3396,8 +3430,24 @@ function normSerie(s){
     inputId: 'naturalidadeCidade', selUFId: 'naturalidadeUF',
     dropdownId: 'natDropdown', ghostId: 'natGhost',
     incluirCidadeEndereco: true,
-    uppercase: true
+    uppercase: true,
+    exigirUF: true
   })?.rebuild;
+
+  // UF primeiro: cidade só destrava com UF; "Estrangeiro" dispensa cidade/UF (grava vazio, como "pai não informado")
+  window._natSync = function(){
+    const est = !!document.getElementById('natEstrangeiro')?.checked;
+    const sc = document.getElementById('naturalidadeCidade'), su = document.getElementById('naturalidadeUF');
+    if(!sc || !su) return;
+    if(est){ sc.value = ''; su.value = ''; sc.disabled = true; su.disabled = true; sc.required = false; su.required = false; sc.placeholder = 'Nascido(a) no exterior'; return; }
+    su.disabled = false; su.required = true; sc.required = true;
+    const sem = !su.value;
+    sc.disabled = sem; if(sem) sc.value = '';
+    sc.placeholder = sem ? 'Selecione a UF primeiro' : 'Cidade de nascimento';
+  };
+  document.getElementById('natEstrangeiro')?.addEventListener('change', window._natSync);
+  document.getElementById('naturalidadeUF')?.addEventListener('change', window._natSync);
+  window._natSync();
 
   // Recarrega turmas ao mudar o ano letivo
   anoLetivo.addEventListener("change", ()=>{
