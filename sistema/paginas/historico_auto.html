@@ -571,10 +571,10 @@ function _filtrarTurmasAtivas(arr){
 }
 
 async function carregarDB(){
-  // Fonte única: Firestore (sem cache em localStorage). A tela só libera depois da leitura.
+  // Só a escola é lida na abertura (1 leitura). Alunos, matrículas e turmas são lidos SOB DEMANDA:
+  // a busca consulta alunos-atas/matriculas; as turmas só são carregadas do aluno selecionado.
   state.db = { dadosEscola:{}, alunosDB:[], matriculasDB:[], turmasDB:[], atasDB:[] };
-  construirIndex();
-  if(!(window.DB && typeof DB.loadAll === 'function')){ setMsg('Banco de dados indisponível.', 'err'); return; }
+  if(!(window.DB && DB.escola && typeof DB.escola.get === 'function')){ setMsg('Banco de dados indisponível.', 'err'); return; }
   try{
     await new Promise(res=>{
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
@@ -582,69 +582,76 @@ async function carregarDB(){
       const t = setTimeout(res, 8000);
       document.addEventListener('auth:ready', ()=>{ clearTimeout(t); res(); }, {once:true});
     });
-    const dados = await DB.loadAll();
-    if(dados && Array.isArray(dados.turmasDB)){
-      dados.alunosDB = _normalizarAlunosDB(dados.alunosDB);
-      dados.turmasDB = _filtrarTurmasAtivas(dados.turmasDB);
-      state.db = dados;
-      construirIndex();
-      _atualizarDbInfo();
-      _prePopulaEscolaFields();
-    }
+    state.db.dadosEscola = (await DB.escola.get()) || {};
+    _atualizarDbInfo();
+    _prePopulaEscolaFields();
   }catch(e){
     console.warn('carregarDB Firestore:', e);
     setMsg('Não foi possível carregar os dados do servidor. Recarregue a página.', 'err');
   }
 }
 
-function construirIndex(){
-  const map=new Map();
-  (Array.isArray(state.db.turmasDB)?state.db.turmasDB:[]).forEach(t=>{
-    (Array.isArray(t?.alunos)?t.alunos:[]).forEach(a=>{
-      const nome=String(a?.nome||'').trim(), alunoId=String(a?.alunoId||'').trim();
-      if(!nome && !alunoId) return;
-      const key = alunoId || ('NOME:'+nrm(nome));
-      if(!map.has(key)) map.set(key,{key,alunoId,nome,oc:0,anos:new Set(),series:new Set()});
-      const it=map.get(key);
-      if(!it.nome && nome) it.nome=nome;
-      if(!it.alunoId && alunoId) it.alunoId=alunoId;
-      it.oc++;
-      if(t?.anoLetivo) it.anos.add(String(t.anoLetivo));
-      if(a?.serie || t?.serieTexto) it.series.add(String(a?.serie||t?.serieTexto));
-    });
-  });
-  state.index=[...map.values()].map(x=>({...x, anosArr:[...x.anos].sort((a,b)=>(+a||0)-(+b||0)), seriesArr:[...x.series], _search:nrm([x.alunoId,x.nome,[...x.anos].join(' '),[...x.series].join(' ')].join(' '))}))
-    .sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
-}
+// ===== Pesquisa por consulta direcionada (sem carregar a base inteira) =====
+// state.index = resultados da ÚLTIMA pesquisa: [{key, alunoId, nome, oc, anosArr, seriesArr, matriculas}]
+let _pesqTimer = null, _pesqSeq = 0, _selSeq = 0;
 function autoSearch(){
+  clearTimeout(_pesqTimer);
   const q = (document.getElementById('qAluno').value||'').trim();
-  if(q.length >= 3) pesquisar();
-  else if(!q) document.getElementById('resultados').innerHTML = '<div class="item muted">Digite parte do nome ou ID.</div>';
+  if(q.length >= 3) _pesqTimer = setTimeout(pesquisar, 400);   // debounce: 1 consulta por pausa na digitação
+  else if(!q){ _pesqSeq++; document.getElementById('resultados').innerHTML = '<div class="item muted">Digite parte do nome ou ID.</div>'; }
 }
-function pesquisar(){
-    const raw=document.getElementById('qAluno').value, out=document.getElementById('resultados');
-    const q=nrm(raw);
-    if(!q){ out.innerHTML='<div class="item muted">Digite parte do nome ou ID.</div>'; return; }
-    // Regra: só números (ou "ALU" + números) → busca pelo ID; qualquer texto → busca pelo NOME.
-    // O prefixo "ALU" é comum a todos os IDs, então é ignorado no ID e, digitado sozinho, vira busca por nome.
-    const mId = q.match(/^(?:alu[-\s]*)?(\d+)$/);
-    const LIMITE = 5;
-    let achados;
+async function pesquisar(){
+  clearTimeout(_pesqTimer);
+  const raw=document.getElementById('qAluno').value, out=document.getElementById('resultados');
+  const q=nrm(raw);
+  if(!q){ _pesqSeq++; out.innerHTML='<div class="item muted">Digite parte do nome ou ID.</div>'; return; }
+  if(!(window.Identidade && Identidade.buscarAtasPorNome && Identidade.buscarAtasPorId && window.DB && DB.matriculas && DB.matriculas.whereIn)){
+    out.innerHTML='<div class="item muted">Módulo de busca indisponível.</div>'; return;
+  }
+  const seq = ++_pesqSeq;
+  out.innerHTML='<div class="item muted">Buscando…</div>';
+  // Regra: só números (ou "ALU" + números) → busca pelo ID (completado a 6 dígitos); qualquer texto → busca pelo NOME (início do nome).
+  const mId = q.match(/^(?:alu[-\s]*)?(\d+)$/);
+  const LIMITE = 5;
+  try{
+    let alunos = [], temMais = false;
     if(mId){
-      const dig = mId[1];
-      achados = state.index.filter(x=>{
-        const idDig = String(x.alunoId||'').replace(/\D+/g,'');
-        return idDig && idDig.includes(dig);
-      });
+      const a = await Identidade.buscarAtasPorId('ALU-' + mId[1].padStart(6,'0'));
+      if(a && a.alunoId) alunos = [a];
     } else {
-      achados = state.index.filter(x=>nrm(x.nome).includes(q));
-      // nomes que COMEÇAM com o texto vêm primeiro (a lista já está em ordem alfabética)
-      achados = achados.filter(x=>nrm(x.nome).startsWith(q)).concat(achados.filter(x=>!nrm(x.nome).startsWith(q)));
+      const r = await Identidade.buscarAtasPorNome(q, LIMITE + 1);
+      temMais = r.length > LIMITE; alunos = r.slice(0, LIMITE);
     }
-    const lista = achados.slice(0, LIMITE);
-    if(!lista.length){ out.innerHTML='<div class="item muted">Nenhum resultado.</div>'; return; }
-    out.innerHTML = lista.map(x=>`<div class="item" data-k="${esc(x.key)}"><div><b>${esc(x.nome||'(sem nome)')}</b> ${x.alunoId?`<span class="pill">${esc(x.alunoId)}</span>`:''}</div><div class="small">ocorrências: ${x.oc} • anos: ${esc(x.anosArr.join(', ')||'—')} • séries: ${esc(x.seriesArr.join(', ')||'—')}</div></div>`).join('');
-  out.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('click',()=>selecionarAluno(el.getAttribute('data-k'))));
+    const mats = alunos.length ? await DB.matriculas.whereIn('alunoId', alunos.map(a=>a.alunoId)) : [];
+    if(seq !== _pesqSeq) return;   // chegou uma pesquisa mais nova: descarta esta
+    const porAluno = new Map();
+    mats.forEach(m=>{ const id=String(m?.alunoId||'').trim(); if(!porAluno.has(id)) porAluno.set(id,[]); porAluno.get(id).push(m); });
+    state.index = alunos.map(a=>{
+      const ms = porAluno.get(a.alunoId) || [];
+      const anosArr = [...new Set(ms.map(m=>String(m?.anoLetivo||'')).filter(Boolean))].sort((x,y)=>(+x||0)-(+y||0));
+      const seriesArr = [...new Set(ms.map(m=>String(m?.serie||'')).filter(Boolean))];
+      return { key:a.alunoId, alunoId:a.alunoId, nome:a.nome, oc:ms.length, anosArr, seriesArr, matriculas:ms };
+    });
+    if(!state.index.length){ out.innerHTML='<div class="item muted">Nenhum resultado.' + (mId ? '' : ' A busca por nome considera o início do nome.') + '</div>'; return; }
+    out.innerHTML = state.index.map(x=>`<div class="item" data-k="${esc(x.key)}"><div><b>${esc(x.nome||'(sem nome)')}</b> ${x.alunoId?`<span class="pill">${esc(x.alunoId)}</span>`:''}</div><div class="small">ocorrências: ${x.oc} • anos: ${esc(x.anosArr.join(', ')||'—')} • séries: ${esc(x.seriesArr.join(', ')||'—')}</div></div>`).join('')
+      + (temMais ? '<div class="item muted">Há mais resultados — digite mais do nome para refinar.</div>' : '');
+    out.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('click',()=>selecionarAluno(el.getAttribute('data-k'))));
+  }catch(e){
+    if(seq !== _pesqSeq) return;
+    console.warn('pesquisar:', e);
+    out.innerHTML='<div class="item muted">Não foi possível pesquisar agora. Tente novamente.</div>';
+  }
+}
+// Turmas SÓ do aluno: ids vêm das matrículas dele (doc da turma = turmaId; se não achar, tenta o campo turmaId).
+async function carregarTurmasDoAluno(item){
+  const ids = [...new Set((item.matriculas||[]).map(m=>String(m?.turmaId||'').trim()).filter(Boolean))];
+  if(!ids.length) return [];
+  const docs = await Promise.all(ids.map(id=>DB.turmas.get(id)));
+  const faltando = ids.filter((id,i)=>!docs[i]);
+  const extra = faltando.length ? await DB.turmas.whereIn('turmaId', faltando) : [];
+  const vistos = new Set(), todas = [];
+  docs.concat(extra).forEach(t=>{ if(t && !vistos.has(t._id)){ vistos.add(t._id); todas.push(t); } });
+  return _filtrarTurmasAtivas(todas);
 }
 // Histórico fixo no Ensino Fundamental (1º ao 9º ano). Etapas sem número (ex.: ALFABETIZAÇÃO) ficam de fora, como no antigo F2.
 function formatoPermite(etapa){
@@ -808,7 +815,21 @@ async function salvarDadosPessoais(){
 
 async function selecionarAluno(key){
   const item=state.index.find(x=>x.key===key); if(!item) return;
-  const pessoal = await carregarPessoalDoAluno(item);
+  const seq = ++_selSeq;
+  setMsg('Carregando histórico do aluno…', 'loading');
+  let turmas, pessoal;
+  try{
+    [turmas, pessoal] = await Promise.all([carregarTurmasDoAluno(item), carregarPessoalDoAluno(item)]);
+  }catch(e){
+    if(seq !== _selSeq) return;
+    console.warn('selecionarAluno:', e);
+    setMsg('Não foi possível carregar as turmas deste aluno. Tente selecioná-lo de novo.', 'err'); return;
+  }
+  if(seq !== _selSeq) return;   // o usuário já clicou em outro aluno
+  // dados lidos só deste aluno — as funções abaixo (getTurmaAlunoRowsFor/enrichAluno) continuam lendo de state.db
+  state.db.turmasDB = turmas;
+  state.db.alunosDB = _normalizarAlunosDB([{ alunoId:item.alunoId, nome:item.nome }]);
+  state.db.matriculasDB = item.matriculas || [];
   const enrich = enrichAluno(item);
   // sobrepõe com os dados pessoais da fonte correta (só campos preenchidos)
   Object.keys(pessoal.dados||{}).forEach(k=>{ if(pessoal.dados[k]) enrich[k]=pessoal.dados[k]; });
@@ -1621,6 +1642,7 @@ async function recarregarDB(){
   if(state.selected){
     const k=state.selected.key;
     state.selected=null;
+    await pesquisar();   // renova state.index (matrículas) antes de reabrir o aluno
   const btnSP2 = document.getElementById('btnSalvarPessoais'); if(btnSP2) btnSP2.style.display='none';
     state.edits={pessoais:{},anos:{}};
     document.getElementById('timeline').innerHTML='Selecione um aluno.';
@@ -1645,8 +1667,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   try{ const v=localStorage.getItem('historicoCHModo_v1'); if(v && document.getElementById('schemaCHModo')) document.getElementById('schemaCHModo').value=v; }catch(e){}
   atualizarSchemaCHResumo();
   document.getElementById('qAluno').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); pesquisar(); }});
-  // autoSearch já adicionado pelo oninput no input, mas garante também aqui
-  document.getElementById('qAluno').addEventListener('input', ev=>{ if((ev.target.value||'').trim().length>=3) pesquisar(); });
+  // a pesquisa automática (com debounce) já vem do oninput="autoSearch()" no input
 
   Loading.esconder(); // ← linha adicionada
 });
