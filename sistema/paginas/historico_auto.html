@@ -435,11 +435,6 @@ html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
 
 <div id="previewWrap" style="margin-top:10px"></div>
 
-  <div class="card">
-    <div class="card-title">Placeholders (JSON)</div>
-    <textarea id="outJson" readonly></textarea>
-  </div>
-
 </div>
 
 <script>
@@ -1219,7 +1214,8 @@ function renderNotasPreviewDocx(){
   });
 }
 
-function refreshSaida(){ if(!state.selected){ document.getElementById('outJson').value=''; state.placeholders=null; state.placeholdersClean=null; if(state.previewVisible) renderPreview(); renderDiagExport(); renderNotasPreviewDocx(); return; } state.placeholders=buildPlaceholders(); state.placeholdersClean=buildPlaceholdersClean(state.placeholders); document.getElementById('outJson').value=JSON.stringify(state.placeholdersClean,null,2); if(state.previewVisible) renderPreview(); renderDiagExport(); renderNotasPreviewDocx(); }
+// state.placeholders = dados que alimentam o DOCX, as validações e a prévia (NÃO é só visual: o card de JSON foi removido, os dados não).
+function refreshSaida(){ if(!state.selected){ state.placeholders=null; if(state.previewVisible) renderPreview(); renderDiagExport(); renderNotasPreviewDocx(); return; } state.placeholders=buildPlaceholders(); if(state.previewVisible) renderPreview(); renderDiagExport(); renderNotasPreviewDocx(); }
 function togglePreview(){ state.previewVisible=!state.previewVisible; document.getElementById('cardPreview').classList.toggle('hidden',!state.previewVisible); document.getElementById('btnTogglePreview').textContent=state.previewVisible?'Ocultar tabela de preenchimento':'Ver tabela de preenchimento'; if(state.previewVisible) renderPreview(); }
 
 
@@ -1627,7 +1623,6 @@ async function recarregarDB(){
     state.selected=null;
   const btnSP2 = document.getElementById('btnSalvarPessoais'); if(btnSP2) btnSP2.style.display='none';
     state.edits={pessoais:{},anos:{}};
-    document.getElementById('outJson').value='';
     document.getElementById('timeline').innerHTML='Selecione um aluno.';
     document.getElementById('resumoEditavel').innerHTML='Selecione um aluno.';
     document.getElementById('dadosPessoaisWrap').innerHTML='Selecione um aluno para preencher/editar dados pessoais.';
