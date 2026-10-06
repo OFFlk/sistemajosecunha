@@ -53,12 +53,12 @@
   </div>
   <div class="grid-atas grid-docs">
 
-    <a class="card" href="/paginas/historico_auto.html">
-      <span class="card-badge">Admin/Gestor</span>
+    <a class="card" id="cardHistorico" href="/paginas/historico_auto.html">
+      <span class="card-badge">Admin</span>
       <div class="card-icon">👤</div>
       <div class="card-title">Histórico por aluno</div>
       <div class="card-footer">
-        <div class="card-desc">Pesquise um aluno e exporte um PDF com todos os anos encontrados no banco.</div>
+        <div class="card-desc">Pesquise um aluno e exporte o histórico escolar em DOCX, com todos os anos encontrados no banco.</div>
       </div>
     </a>
 
@@ -166,6 +166,8 @@
 
   function initCards(){
     document.querySelectorAll('.card[data-tooltip]').forEach(function(card){
+      if(card.__ttBound) return;      /* não liga duas vezes (o bloqueio por papel chama initCards de novo) */
+      card.__ttBound = true;
       card.addEventListener('mouseenter', showTooltip);
       card.addEventListener('mouseleave', hideTooltip);
     });
@@ -178,8 +180,27 @@
     }
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initCards);
-  else initCards();
+  /* ── Bloqueio por papel (só interface — a barreira real está em historico_auto.html
+     e nas Firestore Rules). Histórico: só role 'admin' (gestor da escola e admin global
+     são ambos role 'admin'; ver guia 6.2/7.10). ──────────────────────────────────── */
+  function aplicarPapeis(){
+    var s    = (window.Auth && typeof Auth.getSession === 'function') ? Auth.getSession() : null;
+    var role = s ? String(s.role || '').trim().toLowerCase() : '';
+    var card = document.getElementById('cardHistorico');
+    if(card && role !== 'admin'){
+      card.removeAttribute('href');
+      card.classList.add('disabled');
+      card.setAttribute('data-tooltip', 'Sem acesso');
+      initCards();
+    }
+  }
+  function aguardarSessao(){
+    if(window.Auth && typeof Auth.getSession === 'function' && Auth.getSession()) aplicarPapeis();
+    else document.addEventListener('auth:ready', aplicarPapeis, { once: true });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ initCards(); aguardarSessao(); });
+  else { initCards(); aguardarSessao(); }
 
   new MutationObserver(onThemeChange)
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
