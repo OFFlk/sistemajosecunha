@@ -622,6 +622,24 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 .nee-radio-item input[type="radio"]{ width:15px; height:15px; flex-shrink:0; accent-color:var(--pf-brand); cursor:pointer; margin:0; }
 .nee-radio-item.selected input[type="radio"]{ accent-color:var(--brand-fg,#fff); }
 
+/* Zona de perigo (mesmo desenho do .nee-block, em vermelho translúcido) e modais */
+.nee-block.danger{ border-color:rgba(185,28,28,.35); }
+.nee-block.danger .nee-header{ background:rgba(185,28,28,.06); }
+.dz-desc{ font-size:12px; color:var(--muted); margin-top:3px; font-weight:600; }
+.dz-btn{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; font-family:inherit; cursor:pointer; background:rgba(185,28,28,.10); border:1.5px solid rgba(185,28,28,.35); color:var(--danger); }
+.dz-btn:hover:not(:disabled){ background:rgba(185,28,28,.20); border-color:rgba(185,28,28,.60); }
+.dz-btn:disabled{ opacity:.5; cursor:not-allowed; }
+html[data-theme="dark"] .dz-btn{ color:#fca5a5; border-color:rgba(248,113,113,.45); }
+html[data-theme="dark"] .dz-btn:hover:not(:disabled){ background:rgba(248,113,113,.34); border-color:rgba(248,113,113,.70); color:#fecaca; }
+.cm-box{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px; max-width:440px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto; }
+.cm-titulo{ margin:0 0 6px; font-size:16px; font-weight:800; color:var(--text); }
+.cm-titulo.perigo{ color:var(--danger); }
+html[data-theme="dark"] .cm-titulo.perigo{ color:#fca5a5; }
+.cm-corpo{ margin:0 0 18px; font-size:13px; color:var(--muted); white-space:pre-line; line-height:1.5; }
+.cm-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.cm-ok{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; font-family:inherit; cursor:pointer; background:var(--pf-brand); border:1.5px solid var(--pf-brand); color:var(--brand-fg,#fff); }
+.cm-ok:hover{ filter:brightness(1.08); }
+
 /* Identificação do aluno (CPF / Nome) */
 .nee-block{ overflow:visible; }
 .nee-header{ border-radius:12px; }
@@ -651,7 +669,7 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 <main class="wrap">
 <section class="card card-destaque topo-destaque">
 <div class="card-head">
-<h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno.</span></span></h2>
+<h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno. Na edição, turma, ano e série ficam travados; para mudar o aluno de turma, use o botão “Trocar de turma” no fim da página.</span></span></h2>
 </div>
 <div class="inline">
 <div>
@@ -853,7 +871,6 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
         </div>
       </div>
     </div>
-\1 é mais definido aqui — vem da turma selecionada (cadastro de turma). -->
     <input type="hidden" id="turnoSelecionado" value="" />
     <input type="hidden" id="modeloEnsino" value="" />
     <small class="help" id="turnoMsg" aria-live="polite"></small>
@@ -1102,6 +1119,13 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
   // Some no refresh; não é armazenamento. Turmas e ano ativo vêm do Firestore a cada abertura.
   let CACHE = { turmas: [], anoAtivo: null, cidades: [] };
   window._bootPronto = new Promise(res => { window._bootOk = res; });
+  fetch('/municipios.json').then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(arr => {
+    window._cidadeBase = arr.map(([cidade, uf]) => ({ cidade, uf })).sort((a,b) => a.cidade.localeCompare(b.cidade, 'pt-BR'));
+    window._cidadeBaseKeys = new Set(arr.map(([c, u]) => String(c).toUpperCase() + '|' + u));
+  }).catch(e => {
+    console.error('Lista de municípios (/municipios.json) indisponível:', e);
+    setMsg('Lista de municípios indisponível: o autocomplete de cidade só sugere cidades já cadastradas.', 'warn');
+  });
   window._getCidadesConhecidas = () => CACHE.cidades;
   window._anoAtivoDefault = () => getAnoAtivoDefault();
 
@@ -1664,7 +1688,7 @@ function normSerie(s){
       alunoDoc = { alunoId, ...dadosAluno, cpfNum: cpfDigits, criadoEm: new Date().toISOString() };
       // Campos do histórico que o formulário do ano-ativo não tem: migram junto (nada se perde ao apagar dadosPessoais do elo)
       const dp = (ID.atas && ID.atas.elo && ID.atas.elo.dadosPessoais) || {};
-      ['rgCnTipo','rgCn','nis','nascimentoEstrangeiro'].forEach(k => {
+      ['nis','nascimentoEstrangeiro'].forEach(k => {
         if(dp[k] !== undefined && dp[k] !== '' && alunoDoc[k] === undefined) alunoDoc[k] = dp[k];
       });
     }
@@ -1923,31 +1947,27 @@ function normSerie(s){
   // corDestaque então.
   function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
     return new Promise((resolve) => {
-      const cor = corDestaque || '#b45309'; // amber-700
+      const perigo = corDestaque === 'danger';   // senão, cores da marca (tokens do tema)
       const backdrop = document.createElement('div');
       backdrop.className = 'modal-backdrop';
       backdrop.style.display = 'flex';
       backdrop.innerHTML =
-        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
-          `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
-            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-              `${_escHtml(textoConfirmar || 'Continuar')}`+
-            `</button>`+
+        `<div class="cm-box">`+
+          `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<p class="cm-corpo">${corpo || ''}</p>`+
+          `<div class="cm-acoes">`+
+            `<button type="button" class="nee-sim-nao" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" class="${perigo ? 'dz-btn' : 'cm-ok'}" id="_confirmModalOk">${_escHtml(textoConfirmar || 'Continuar')}</button>`+
           `</div>`+
         `</div>`;
       document.body.appendChild(backdrop);
-
-      function fechar(resultado){
-        backdrop.remove();
-        resolve(resultado);
-      }
+      function fechar(resultado){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(resultado); }
+      function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+      document.addEventListener('keydown', onKey);
       backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
       backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
       backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+      backdrop.querySelector('#_confirmModalCancelar').focus();   // lado seguro
     });
   }
 
@@ -2101,40 +2121,118 @@ function normSerie(s){
       const _acE1 = document.querySelector('#wzEtapa1 .actions-wizard');
       if(_acE1){
         const wrapEncerrar = document.createElement('div');
-        wrapEncerrar.style.cssText = 'width:100%;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;';
+        wrapEncerrar.style.cssText = 'width:100%;margin-top:10px;';
         wrapEncerrar.innerHTML =
-          '<details style="font-size:12px;color:var(--muted);">'+
-            '<summary style="cursor:pointer;font-weight:800;color:var(--danger,#b91c1c);">⚠️ Zona de perigo — Encerrar matrícula</summary>'+
-            '<div style="margin-top:8px;padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:10px;">'+
-              '<p style="margin:0 0 8px;font-size:12px;">Encerra a matrícula do aluno na turma atual. O cadastro do aluno é preservado e ele pode ser readmitido depois.</p>'+
-              '<button id="btnEncerrarMatricula" type="button" '+
-                'style="padding:7px 14px;border-radius:8px;font-size:12px;font-weight:800;'+
-                'background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.35);'+
-                'color:#b91c1c;cursor:pointer;font-family:\'Nunito\',sans-serif;">'+
-                '🚪 Encerrar matrícula'+
-              '</button>'+
+          '<div class="nee-block danger">'+
+            '<div class="nee-header" style="border-radius:12px 12px 0 0;border-bottom:1px solid rgba(185,28,28,.25);">'+
+              '<div><div class="nee-header-label">🔁 Trocar de turma</div>'+
+              '<div class="dz-desc">Encerra a matrícula atual como REMANEJADO e cria uma nova na turma escolhida, no mesmo ano.</div></div>'+
+              '<button id="btnTrocarTurma" type="button" class="dz-btn">Trocar de turma</button>'+
             '</div>'+
-          '</details>';
+            '<div class="nee-header" style="border-radius:0 0 12px 12px;">'+
+              '<div><div class="nee-header-label">🚪 Encerrar matrícula</div>'+
+              '<div class="dz-desc">Encerra a matrícula na turma atual. O cadastro do aluno é preservado e ele pode ser readmitido depois.</div></div>'+
+              '<button id="btnEncerrarMatricula" type="button" class="dz-btn">Encerrar matrícula</button>'+
+            '</div>'+
+          '</div>';
         _acE1.after(wrapEncerrar);
 
-        // ── Modal de encerramento (3 opções: Transferido / Desistente / Faleceu) ──
         const modalEncerrar = document.createElement('div');
         modalEncerrar.className = 'modal-backdrop';
         modalEncerrar.id = 'modalEncerrarMatricula';
         modalEncerrar.innerHTML =
-          '<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">'+
-            '<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Encerrar matrícula</h3>'+
-            '<p style="margin:0 0 16px;font-size:13px;color:var(--muted);">Selecione o motivo do encerramento:</p>'+
+          '<div class="cm-box" style="max-width:420px;">'+
+            '<h3 class="cm-titulo perigo">Encerrar matrícula</h3>'+
+            '<p class="cm-corpo" style="margin-bottom:12px;">Selecione o motivo do encerramento:</p>'+
             '<div style="display:flex;flex-direction:column;gap:8px;">'+
-              '<button type="button" class="btn ghost" data-situacao="TRANSFERIDO" style="justify-content:flex-start;">🔁 Transferido</button>'+
-              '<button type="button" class="btn ghost" data-situacao="DESISTENTE" style="justify-content:flex-start;">🚫 Desistente</button>'+
-              '<button type="button" class="btn ghost" data-situacao="FALECIDO" style="justify-content:flex-start;">🕊️ Faleceu</button>'+
+              '<button type="button" class="nee-sim-nao" data-situacao="TRANSFERIDO" style="text-align:left;border-radius:10px;">🔁 Transferido</button>'+
+              '<button type="button" class="nee-sim-nao" data-situacao="DESISTENTE" style="text-align:left;border-radius:10px;">🚫 Desistente</button>'+
+              '<button type="button" class="nee-sim-nao" data-situacao="FALECIDO" style="text-align:left;border-radius:10px;">🕊️ Faleceu</button>'+
             '</div>'+
-            '<div style="display:flex;justify-content:flex-end;margin-top:16px;">'+
-              '<button type="button" class="btn ghost" id="btnCancelarEncerramento">Cancelar</button>'+
-            '</div>'+
+            '<div class="cm-acoes"><button type="button" class="nee-sim-nao" id="btnCancelarEncerramento">Cancelar</button></div>'+
           '</div>';
         document.body.appendChild(modalEncerrar);
+
+        // ── Trocar de turma: encerra a matrícula atual (REMANEJADO) e cria a nova, tudo num batchWrite ──
+        const modalTrocar = document.createElement('div');
+        modalTrocar.className = 'modal-backdrop';
+        modalTrocar.id = 'modalTrocarTurma';
+        modalTrocar.innerHTML =
+          '<div class="cm-box" style="max-width:420px;">'+
+            '<h3 class="cm-titulo perigo">Trocar de turma</h3>'+
+            '<p class="cm-corpo" style="margin-bottom:12px;">Só aparecem turmas ativas do mesmo ano letivo da matrícula.</p>'+
+            '<label for="trocarTurma">Nova turma</label><select id="trocarTurma"></select>'+
+            '<label for="trocarSerie" style="display:block;margin-top:10px;">Série</label><select id="trocarSerie"></select>'+
+            '<div class="cm-acoes"><button type="button" class="nee-sim-nao" id="btnTrocarCancelar">Cancelar</button>'+
+            '<button type="button" class="dz-btn" id="btnTrocarOk">Trocar de turma</button></div>'+
+          '</div>';
+        document.body.appendChild(modalTrocar);
+        const _fecharTrocar = () => { modalTrocar.style.display = 'none'; };
+        document.getElementById('btnTrocarCancelar').addEventListener('click', _fecharTrocar);
+        modalTrocar.addEventListener('click', (ev) => { if(ev.target === modalTrocar) _fecharTrocar(); });
+        document.addEventListener('keydown', (ev) => { if(ev.key === 'Escape'){ _fecharTrocar(); modalEncerrar.style.display = 'none'; } });
+
+        document.getElementById('btnTrocarTurma').addEventListener('click', async () => {
+          const matId = window._modoEdicaoMatId;
+          if(!matId) return _toastErro('❌ Matrícula do aluno não identificada.');
+          try{
+            const mat = await window.DB.anoAtivoMatriculas.get(matId);
+            if(!mat || (mat.status || 'ATIVO').toUpperCase() !== 'ATIVO') return _toastAviso('⚠️ Só é possível trocar de turma numa matrícula ATIVA.');
+            const opcoes = getTurmas().filter(t => String(t.anoLetivo) === String(mat.anoLetivo) && t.turmaId !== mat.turmaId && (t.status || 'ATIVA').toUpperCase() !== 'INATIVA');
+            if(!opcoes.length) return _toastAviso('⚠️ Não há outra turma ativa em ' + mat.anoLetivo + '.');
+            const selT = document.getElementById('trocarTurma'), selS = document.getElementById('trocarSerie');
+            selT.innerHTML = opcoes.map(t => `<option value="${_escHtml(t.turmaId)}">${_escHtml(t.nome || t.turmaId)}</option>`).join('');
+            const fillSeries = () => {
+              const t = opcoes.find(x => x.turmaId === selT.value) || {};
+              const ss = [...new Set((Array.isArray(t.series) ? t.series : (t.serie ? [t.serie] : [])).map(normSerie).filter(Boolean))];
+              selS.innerHTML = (ss.length ? ss : ['—']).map(x => `<option value="${_escHtml(x)}">${_escHtml(x)}</option>`).join('');
+            };
+            selT.onchange = fillSeries; fillSeries();
+            modalTrocar._mat = mat; modalTrocar._opcoes = opcoes;
+            modalTrocar.style.display = 'flex';
+          }catch(e){ console.error('Erro ao abrir troca de turma:', e); _toastErro('❌ Erro ao carregar a matrícula: ' + (e && e.message ? e.message : e)); }
+        });
+
+        document.getElementById('btnTrocarOk').addEventListener('click', async () => {
+          const mat = modalTrocar._mat;
+          const t = (modalTrocar._opcoes || []).find(x => x.turmaId === document.getElementById('trocarTurma').value);
+          if(!mat || !t) return;
+          const serieSel = document.getElementById('trocarSerie').value;
+          const serie = serieSel === '—' ? '' : serieSel;
+          const btnOk = document.getElementById('btnTrocarOk');
+          try{
+            btnOk.disabled = true;
+            // re-checagem fresca, só das matrículas deste aluno
+            const todas = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', editId);
+            const atual = todas.find(m => m._id === mat._id);
+            if(!atual || (atual.status || 'ATIVO').toUpperCase() !== 'ATIVO') throw new Error('A matrícula atual já não está ativa. Recarregue a página.');
+            if(todas.some(m => m.turmaId === t.turmaId && String(m.anoLetivo) === String(mat.anoLetivo)))
+              throw new Error('Este aluno já tem matrícula nessa turma em ' + mat.anoLetivo + '. Use a readmissão.');
+            if(todas.some(m => m._id !== mat._id && String(m.anoLetivo) === String(mat.anoLetivo) && (m.status || 'ATIVO').toUpperCase() === 'ATIVO'))
+              throw new Error('Este aluno tem outra matrícula ATIVA em ' + mat.anoLetivo + '. Encerre-a antes.');
+            const ok = await _confirmModal({
+              titulo: '⚠️ Trocar de turma', corDestaque: 'danger', textoConfirmar: 'Sim, trocar',
+              corpo: `Mover "${_escHtml(aluno.nome || editId)}" para "${_escHtml(t.nome || t.turmaId)}" (${_escHtml(mat.anoLetivo)})?\n\nA matrícula atual será encerrada como REMANEJADO.`,
+            });
+            if(!ok) return;
+            const agora = new Date().toISOString();
+            const novoId = `MAT|${t.turmaId}|${editId}|${mat.anoLetivo}`;
+            let nova = { matriculaId: novoId, turmaId: t.turmaId, alunoId: editId, anoLetivo: mat.anoLetivo, serie,
+              turno: t.turno || '', modelo: mat.modelo || 'REGULAR', status: 'ATIVO', situacao: null, criadoEm: agora };
+            if(mat.fotoUrl){ nova.fotoUrl = mat.fotoUrl; nova.fotoFileId = mat.fotoFileId || null; }   // mesmo ano = mesmo arquivo no Cloudinary
+            if(window.MatriculaUtils) nova = window.MatriculaUtils.validarMatricula(nova);
+            await window.DB.batchWrite([
+              { col:'anoAtivoMatriculas', op:'update', id: mat._id, data: { status:'INATIVO', situacao:'REMANEJADO', encerradoEm: agora } },
+              { col:'anoAtivoMatriculas', op:'set',    id: novoId,  data: nova },
+            ]);
+            _fecharTrocar();
+            _toastSucesso('✅ Aluno trocado de turma. Redirecionando…');
+            setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
+          }catch(e){
+            console.error('Erro ao trocar de turma:', e);
+            _toastErro('❌ ' + (e && e.message ? e.message : e));
+          }finally{ btnOk.disabled = false; }
+        });
 
         function abrirModalEncerrar(){ modalEncerrar.style.display = 'flex'; }
         function fecharModalEncerrar(){ modalEncerrar.style.display = 'none'; }
@@ -2828,19 +2926,19 @@ function normSerie(s){
     let activeIdx = -1;
 
     function buildCidadeDB(){
-      const alunos = window._getCidadesConhecidas ? window._getCidadesConhecidas() : [];
-      const map = new Map();
-      alunos.forEach(a => {
-        const c = (a.naturalidadeCidade || '').trim();
-        const u = (a.naturalidadeUF     || '').trim().toUpperCase();
-        if(c && u) map.set(c.toUpperCase(), { cidade: c, uf: u });
+      const base = window._cidadeBase || [];
+      const keys = window._cidadeBaseKeys || new Set();
+      const conhecidos = window._getCidadesConhecidas ? window._getCidadesConhecidas() : [];
+      const extras = new Map();
+      conhecidos.forEach(a => {
+        const c = (a.naturalidadeCidade || '').trim(), u = (a.naturalidadeUF || '').trim().toUpperCase();
+        if(c && u && !keys.has(c.toUpperCase() + '|' + u)) extras.set(c.toUpperCase() + '|' + u, { cidade: c, uf: u });
         if(incluirCidadeEndereco){
-          const ce = (a.cidade || '').trim();
-          const ue = (a.endUF  || '').trim().toUpperCase();
-          if(ce && ue) map.set(ce.toUpperCase(), { cidade: ce, uf: ue });
+          const ce = (a.cidade || '').trim(), ue = (a.endUF || '').trim().toUpperCase();
+          if(ce && ue && !keys.has(ce.toUpperCase() + '|' + ue)) extras.set(ce.toUpperCase() + '|' + ue, { cidade: ce, uf: ue });
         }
       });
-      cidadeDB = Array.from(map.values()).sort((a,b) => a.cidade.localeCompare(b.cidade, 'pt-BR'));
+      cidadeDB = extras.size ? base.concat([...extras.values()]) : base;   // base é montada uma vez; sem reordenar a cada tecla
     }
 
     function norm(s){ return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
