@@ -2762,7 +2762,8 @@ function normSerie(s){
         ? selApoio.options[selApoio.selectedIndex].textContent
         : null;
       return {
-        deficiencia:        _neeE.def,
+        // Sem resposta (null) conta como "Não": só grava true quando marcou "Sim"
+        deficiencia:        _neeE.def === true,
         tea:                _neeE.tea,
         altasHabilidades:   _neeE.altas,
         defFisica:          _neeE.fisica,
@@ -2771,7 +2772,7 @@ function normSerie(s){
         defVisualTipo:      _neeE.visualSub,
         defAuditiva:        _neeE.auditiva,
         defAuditivaTipo:    _neeE.auditivaSub,
-        transtorno:         _neeE.trans,
+        transtorno:         _neeE.trans === true,
         discalculia:        _neeE.discalculia,
         disgrafia:          _neeE.disgrafia,
         dislalia:           _neeE.dislalia,
