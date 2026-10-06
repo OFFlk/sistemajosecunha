@@ -100,6 +100,8 @@
   .card-destaque .btn-outline:not(table .btn):hover:not(:disabled) {
     background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
   }
+  .card-destaque .aviso-warn { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd);
+                               border-left-color: var(--dest-fg); color: var(--dest-fg); }
   /* Danger (Excluir): de propósito SEM regra aqui — cai na própria
      .btn-danger global (vermelho sólido), igual ao "Remover" da tabela do
      card 4. Continua sendo um aviso de ação destrutiva mesmo dentro do
@@ -139,6 +141,16 @@
   .muted { color: var(--muted, #6b7280); }
 
   .warn { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.30); padding: 12px 14px; border-radius: 10px; font-size: 13px; }
+  /* Aviso de card (guia 1.9): sem fundo amarelo — herda o contexto; o sinal de atenção é o ⚠️/ℹ️ e a faixa esquerda. */
+  .aviso-warn { background: var(--chip); border: 1px solid var(--border, #ddd6fe);
+                border-left: 4px solid #d97706; color: var(--text, #1e1b4b);
+                padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; }
+  .aviso-warn a,
+  html[data-theme="dark"] .aviso-warn a,
+  html[data-theme="dark"] .aviso-warn a:hover { color: inherit; font-weight: 700; text-decoration: underline; }
+  .aviso-warn[hidden] { display: none; }
+  .aviso-warn .btn { margin-top: 10px; }
+  .tag-fora { display:block; margin-top:4px; font-size:11px; color: var(--muted, #6b7280); }
   .ok   { background: rgba(22,163,74,.10);  border: 1px solid rgba(22,163,74,.30);  padding: 12px 14px; border-radius: 10px; font-size: 13px; }
 
   /* ── Form ── */
@@ -241,8 +253,10 @@
       </div>
     </div>
     <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn btn-primary" onclick="salvarConfig()">Salvar configuração</button>
+      <button class="btn btn-primary" id="btnSalvarConfig" onclick="salvarConfig()">Salvar configuração</button>
     </div>
+
+    <div id="avisoPadrao" class="aviso-warn" style="margin-top:12px;" hidden></div>
 
     <div id="msg" style="margin-top:12px;"></div>
   </div>
@@ -314,10 +328,10 @@
         <label>Chave (id) *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Abreviatura da matéria. É exibida na visualização da ata dentro do sistema e em algumas exportações documentais.</span>
+            <span class="info-tip-bubble">Abreviatura da matéria. É exibida na visualização da ata dentro do sistema e em algumas exportações documentais. Só os códigos do catálogo do histórico (lp, mat, his, geo, cie, edf, art, er, ing) entram no Histórico Escolar.</span>
           </span>
         </label>
-        <input id="novaKey" placeholder="ex: ingles" />
+        <input id="novaKey" placeholder="ex: informatica" oninput="avisarMateriaFora()" />
       </div>
       <div>
         <label>Rótulo *
@@ -341,9 +355,10 @@
         </select>
       </div>
       <div style="display:flex; align-items:flex-end;">
-        <button class="btn btn-primary" style="width:100%;" onclick="adicionarColuna()">+ Adicionar matéria</button>
+        <button class="btn btn-primary" id="btnAddMateria" style="width:100%;" onclick="adicionarColuna()">+ Adicionar matéria</button>
       </div>
     </div>
+    <div id="avisoNovaMateria" class="aviso-warn" style="margin-top:12px;" hidden></div>
 
     <table>
       <thead>
@@ -381,6 +396,22 @@
 
 const PADRAO_ID = "padrao";
 
+/* Padrão oficial (documento do histórico escolar). A chave de cada matéria é o CÓDIGO que liga nota, carga horária e
+   placeholder do documento — por isso é igual em todo schema que descende do padrão e não muda.
+   Mesma definição em admin_escolas.html (atasSchemaPadraoInicial), que cria o doc "padrao" da escola. */
+const CATALOGO_PADRAO = [
+  { key:"lp",  label:"Português" },
+  { key:"edf", label:"Ed. Física" },
+  { key:"art", label:"Arte" },
+  { key:"mat", label:"Matemática" },
+  { key:"his", label:"História" },
+  { key:"geo", label:"Geografia" },
+  { key:"cie", label:"Ciências" },
+  { key:"er",  label:"Ensino Religioso" },
+  { key:"ing", label:"Língua Inglesa" }
+];
+const CODIGOS_CATALOGO = new Set(CATALOGO_PADRAO.map(c => c.key));
+
 /* =========================
    Default schema
 ========================= */
@@ -391,17 +422,7 @@ function getDefaultConfig() {
     serieAtiva: true,
     resultadoAtivo: true,
     ordenarPor: "nome",
-    colunas: [
-      { key:"port",  label:"Português",        type:"nota", enabled:true },
-      { key:"fis",   label:"Ed. Física",       type:"nota", enabled:true },
-      { key:"arte",  label:"Arte",             type:"nota", enabled:true },
-      { key:"mat",   label:"Matemática",       type:"nota", enabled:true },
-      { key:"hist",  label:"História",         type:"nota", enabled:true },
-      { key:"geo",   label:"Geografia",        type:"nota", enabled:true },
-      { key:"cien",  label:"Ciências",         type:"nota", enabled:true },
-      { key:"relig", label:"Ensino Religioso", type:"nota", enabled:true },
-      { key:"ing",   label:"Língua Inglesa",   type:"nota", enabled:true }
-    ]
+    colunas: CATALOGO_PADRAO.map(c => ({ key: c.key, label: c.label, type: "nota", enabled: true }))
   };
 }
 
@@ -470,6 +491,33 @@ function normalizeConfig(cfg) {
 let SCHEMAS = [];
 let CONFIG = null;
 
+// O padrão é imutável: só leitura nesta tela (para variações, Duplicar e editar a cópia).
+function bloqueado() { return !!CONFIG && CONFIG.id === PADRAO_ID; }
+
+function aplicarEstadoBloqueio() {
+  const b = bloqueado();
+  ["schemaNome","flagSerie","flagResultado","ordenacao","novaKey","novoLabel","novoTipo","btnAddMateria","btnSalvarConfig"]
+    .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = b; });
+
+  const av = document.getElementById("avisoPadrao");
+  if (!av) return;
+  if (!b) { av.hidden = true; av.innerHTML = ""; return; }
+  av.innerHTML = `🔒 O <b>schema padrão</b> segue o documento oficial do histórico escolar e <b>não pode ser editado nem excluído</b>. `
+    + `Para outras matérias ou ajustes, use <b>Duplicar</b> e edite a cópia.`;
+  av.hidden = false;
+}
+
+// Aviso ao digitar a chave de uma matéria nova: fora do catálogo = funciona na ata, mas não entra no histórico.
+function avisarMateriaFora() {
+  const el = document.getElementById("avisoNovaMateria");
+  if (!el) return;
+  const key = (document.getElementById("novaKey")?.value || "").trim().toLowerCase();
+  if (!key || CODIGOS_CATALOGO.has(key) || bloqueado()) { el.hidden = true; el.innerHTML = ""; return; }
+  el.innerHTML = `ℹ️ <b>${escapeHtml(key)}</b> não é um código do catálogo do histórico (${[...CODIGOS_CATALOGO].join(", ")}). `
+    + `A matéria funciona normalmente na ata, mas <b>não entra no Histórico Escolar</b>. Para entrar, use um desses códigos.`;
+  el.hidden = false;
+}
+
 function renderSchemaSelect() {
   const sel = document.getElementById("schemaSelect");
   if (!sel) return;
@@ -517,30 +565,39 @@ function render() {
 
   renderSchemaSelect();
 
+  const b = bloqueado();
+  const dis = b ? "disabled" : "";
   CONFIG.colunas.forEach((c, idx) => {
+    const noCatalogo = CODIGOS_CATALOGO.has(c.key);
+    const keyDis = (b || noCatalogo) ? "disabled" : "";
+    const keyTitle = noCatalogo ? ' title="Código do catálogo do histórico — não pode ser alterado"' : "";
+    const tag = (!b && !noCatalogo) ? '<span class="tag-fora">fora do histórico</span>' : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        <input type="checkbox" ${c.enabled ? "checked" : ""} onchange="toggleEnabled(${idx}, this.checked)" />
+        <input type="checkbox" ${c.enabled ? "checked" : ""} ${dis} onchange="toggleEnabled(${idx}, this.checked)" />
       </td>
-      <td><input value="${escapeAttr(c.key)}" onchange="editKey(${idx}, this.value)" /></td>
-      <td><input value="${escapeAttr(c.label)}" onchange="editLabel(${idx}, this.value)" /></td>
+      <td><input value="${escapeAttr(c.key)}" ${keyDis}${keyTitle} onchange="editKey(${idx}, this.value)" />${tag}</td>
+      <td><input value="${escapeAttr(c.label)}" ${dis} onchange="editLabel(${idx}, this.value)" /></td>
       <td>
-        <select onchange="editType(${idx}, this.value)">
+        <select ${dis} onchange="editType(${idx}, this.value)">
           <option value="nota" ${c.type==="nota"?"selected":""}>Nota</option>
           <option value="texto" ${c.type==="texto"?"selected":""}>Texto</option>
         </select>
       </td>
       <td>
         <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-          <button class="btn btn-gray" onclick="moveUp(${idx})">&#8593;</button>
-          <button class="btn btn-gray" onclick="moveDown(${idx})">&#8595;</button>
-          <button class="btn btn-danger" onclick="removeCol(${idx})">Remover</button>
+          <button class="btn btn-gray" ${dis} onclick="moveUp(${idx})">&#8593;</button>
+          <button class="btn btn-gray" ${dis} onclick="moveDown(${idx})">&#8595;</button>
+          <button class="btn btn-danger" ${dis} onclick="removeCol(${idx})">Remover</button>
         </div>
       </td>
     `;
     tb.appendChild(tr);
   });
+
+  aplicarEstadoBloqueio();
+  avisarMateriaFora();
 }
 
 function showMsg(html, kind="ok") {
@@ -550,11 +607,13 @@ function showMsg(html, kind="ok") {
 }
 
 function onToggleSerie() {
+  if (bloqueado()) return;
   CONFIG.serieAtiva = document.getElementById("flagSerie").value === "1";
   render();
 }
 
 async function salvarConfig() {
+  if (bloqueado()) { showMsg("⚠️ O schema padrão não pode ser editado. Use Duplicar para criar uma cópia editável.", "warn"); return; }
   CONFIG.nome = document.getElementById("schemaNome").value.trim() || CONFIG.nome;
   CONFIG.serieAtiva = document.getElementById("flagSerie").value === "1";
   CONFIG.resultadoAtivo = document.getElementById("flagResultado").value === "1";
@@ -624,6 +683,7 @@ async function excluirSchema() {
    Column operations
 ========================= */
 function adicionarColuna() {
+  if (bloqueado()) { showMsg("⚠️ O schema padrão não pode ser editado. Use Duplicar para criar uma cópia editável.", "warn"); return; }
   const key = document.getElementById("novaKey").value.trim().toLowerCase();
   const label = document.getElementById("novoLabel").value.trim();
   const type = document.getElementById("novoTipo").value;
@@ -638,12 +698,16 @@ function adicionarColuna() {
   document.getElementById("novoTipo").value = "nota";
 
   render();
-  showMsg("✅ Coluna adicionada. Clique em “Salvar configuração” para aplicar.", "ok");
+  const fora = !CODIGOS_CATALOGO.has(key);
+  showMsg("✅ Coluna adicionada. Clique em “Salvar configuração” para aplicar."
+    + (fora ? " ℹ️ Essa matéria não está no catálogo do histórico: aparece na ata, mas não entra no Histórico Escolar." : ""), "ok");
 }
 
-function toggleEnabled(i, val) { CONFIG.colunas[i].enabled = !!val; render(); }
+function toggleEnabled(i, val) { if (bloqueado()) return; CONFIG.colunas[i].enabled = !!val; render(); }
 
 function editKey(i, val) {
+  if (bloqueado()) return;
+  if (CODIGOS_CATALOGO.has(CONFIG.colunas[i].key)) { showMsg("⚠️ Esse é um código do catálogo do histórico e não pode ser alterado. Remova a matéria e adicione outra, se precisar.", "warn"); render(); return; }
   val = String(val||"").trim().toLowerCase();
   if (!val) return;
   if (!/^[a-z0-9_]+$/.test(val)) { showMsg("⚠️ Chave inválida.", "warn"); render(); return; }
@@ -653,22 +717,25 @@ function editKey(i, val) {
   render();
 }
 
-function editLabel(i, val) { val = String(val||"").trim(); if (!val) return; CONFIG.colunas[i].label = val; render(); }
-function editType(i, val)  { CONFIG.colunas[i].type = (val==="texto") ? "texto" : "nota"; render(); }
+function editLabel(i, val) { if (bloqueado()) return; val = String(val||"").trim(); if (!val) return; CONFIG.colunas[i].label = val; render(); }
+function editType(i, val)  { if (bloqueado()) return; CONFIG.colunas[i].type = (val==="texto") ? "texto" : "nota"; render(); }
 
 function removeCol(i) {
+  if (bloqueado()) return;
   if (!confirm("Remover essa coluna do schema? (não afeta turmas já salvas)")) return;
   CONFIG.colunas.splice(i, 1);
   render();
 }
 
 function moveUp(i) {
+  if (bloqueado()) return;
   if (i <= 0) return;
   [CONFIG.colunas[i-1], CONFIG.colunas[i]] = [CONFIG.colunas[i], CONFIG.colunas[i-1]];
   render();
 }
 
 function moveDown(i) {
+  if (bloqueado()) return;
   if (i >= CONFIG.colunas.length - 1) return;
   [CONFIG.colunas[i+1], CONFIG.colunas[i]] = [CONFIG.colunas[i], CONFIG.colunas[i+1]];
   render();
