@@ -3190,7 +3190,8 @@ function normSerie(s){
       const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup || !!ID.verificando);
       const ativo = ID.modo === 'cpf' ? $('fieldCpf') : $('fieldNome');
       wz.querySelectorAll('.grid-3 > .field, .foto-box, .actions-wizard .btn, .nee-block:not(.danger)').forEach(el => {
-        if(el.querySelector('#fieldCpf, #fieldNome')) return;   // o bloco de identificação nunca trava
+        if(el.closest('.ident-keep')) return;   // o seletor CPF/Nome (e seu bloco) nunca trava
+        if(el.matches('.nee-block') && el.parentElement && el.parentElement.closest('.field, .nee-block')) return;   // já travado pelo contêiner (evita opacidade dupla)
         if(el.classList.contains('ident-keep') || el === ativo || el.id === 'btnLimparCampos') return;
         el.classList.toggle('ident-trava', bloquear);
         if(bloquear) el.setAttribute('inert',''); else el.removeAttribute('inert');
