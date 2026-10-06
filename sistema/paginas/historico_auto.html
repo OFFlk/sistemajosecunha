@@ -496,7 +496,9 @@ function _showToast(msg, bg, shadow, duration){
 function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
 function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
 function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
-function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); const t=document.getElementById('_toastGlobal'); if(t) t.dataset.loading='1'; }
+// Fecha o toast só se ainda for o de "carregando" (não apaga um erro/aviso mostrado depois)
+function _toastFecharCarregando(){ const t=document.getElementById('_toastGlobal'); if(t && t.dataset.loading==='1') t.remove(); }
 // Ponto de entrada único: setMsg(texto, kind) — ok | warn | loading | err
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -825,6 +827,7 @@ async function selecionarAluno(key){
     setMsg('Não foi possível carregar as turmas deste aluno. Tente selecioná-lo de novo.', 'err'); return;
   }
   if(seq !== _selSeq) return;   // o usuário já clicou em outro aluno
+  _toastFecharCarregando();
   // dados lidos só deste aluno — as funções abaixo (getTurmaAlunoRowsFor/enrichAluno) continuam lendo de state.db
   state.db.turmasDB = turmas;
   state.db.alunosDB = _normalizarAlunosDB([{ alunoId:item.alunoId, nome:item.nome }]);
