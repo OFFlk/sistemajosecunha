@@ -16,6 +16,7 @@
 <!-- Scripts globais -->
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
+<script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
 <script src="../theme-colors.js"></script>
 
@@ -149,6 +150,9 @@
   html[data-theme="dark"] .aviso-warn a,
   html[data-theme="dark"] .aviso-warn a:hover { color: inherit; font-weight: 700; text-decoration: underline; }
   .aviso-warn[hidden] { display: none; }
+  @keyframes toastSubir { from{opacity:0;transform:translateX(-50%) translateY(16px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
+  .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
+  .modal-backdrop input { width:100%; }
   .aviso-warn .btn { margin-top: 10px; }
   .tag-fora { display:block; margin-top:4px; font-size:11px; color: var(--muted, #6b7280); }
   .ok   { background: rgba(22,163,74,.10);  border: 1px solid rgba(22,163,74,.30);  padding: 12px 14px; border-radius: 10px; font-size: 13px; }
@@ -236,7 +240,7 @@
     <h3 style="margin-top:0;">Configuração atual
       <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
-        <span class="info-tip-bubble wide">Schemas criados nessa página são listados na página de cadastro de turmas — com isso, é possível indicar qual schema de notas a turma cadastrada vai usar. Caso sua ata tenha matérias ou características diferentes do schema padrão que vem pré-selecionado, clique em "Novo schema" e crie um schema do zero, ou deixe selecionado "Padrão" no seletor abaixo e edite as informações nos cards seguintes desta página.</span>
+        <span class="info-tip-bubble wide">Schemas criados nessa página são listados na página de cadastro de turmas — com isso, é possível indicar qual schema de notas a turma cadastrada vai usar. Caso sua ata tenha matérias ou características diferentes do schema padrão que vem pré-selecionado, clique em "Novo schema" e crie um schema do zero, ou use "Duplicar" no schema padrão e edite a cópia nos cards seguintes desta página (o padrão em si não pode ser alterado).</span>
       </span>
     </h3>
 
@@ -258,7 +262,6 @@
 
     <div id="avisoPadrao" class="aviso-warn" style="margin-top:12px;" hidden></div>
 
-    <div id="msg" style="margin-top:12px;"></div>
   </div>
 
   <div class="card">
@@ -389,9 +392,9 @@
    Schema padrão = o doc de ID fixo "padrao" dentro de atasSchemas. Não
    existe mais "schema ativo" gravado no doc da escola: quem precisa do
    padrão procura o doc "padrao". Ele é criado com a escola (ou pelo botão
-   "Schema padrão" em admin_escolas) — esta página só lê e edita. Pode ser
-   editado, mas não excluído
-   (trava só na interface, de propósito — o banco fica livre).
+   "Schema padrão" em admin_escolas) — esta página só o lê. O padrão é imutável:
+   a tela o mostra travado (para variações, Duplicar) e o Firestore recusa update/delete
+   dele (firestore.rules → atasSchemas). As cópias são editáveis.
 ========================= */
 
 const PADRAO_ID = "padrao";
@@ -401,13 +404,13 @@ const PADRAO_ID = "padrao";
    Mesma definição em admin_escolas.html (atasSchemaPadraoInicial), que cria o doc "padrao" da escola. */
 const CATALOGO_PADRAO = [
   { key:"lp",  label:"Português" },
-  { key:"edf", label:"Ed. Física" },
+  { key:"edf", label:"E. Física" },
   { key:"art", label:"Arte" },
   { key:"mat", label:"Matemática" },
   { key:"his", label:"História" },
   { key:"geo", label:"Geografia" },
   { key:"cie", label:"Ciências" },
-  { key:"er",  label:"Ensino Religioso" },
+  { key:"er",  label:"E. Religioso" },
   { key:"ing", label:"Língua Inglesa" }
 ];
 const CODIGOS_CATALOGO = new Set(CATALOGO_PADRAO.map(c => c.key));
@@ -455,7 +458,7 @@ async function removeSchema(id) {
 function normalizeConfig(cfg) {
   const def = getDefaultConfig();
   const out = {
-    id: String(cfg?.id || cfg?.schemaId || "").trim(),
+    id: String(cfg?.id || cfg?._id || cfg?.schemaId || "").trim(),
     version: 1,
     nome: String(cfg?.nome ?? def.nome),
     serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
@@ -470,7 +473,7 @@ function normalizeConfig(cfg) {
     .map(c => ({
       key: String(c?.key ?? "").trim().toLowerCase(),
       label: String(c?.label ?? "").trim(),
-      type: (c?.type === "texto") ? "texto" : "nota",
+      type: (c?.type === "texto" && !CODIGOS_CATALOGO.has(String(c?.key ?? "").trim().toLowerCase())) ? "texto" : "nota",
       enabled: c?.enabled !== false
     }))
     .filter(c => c.key && c.label);
@@ -490,6 +493,26 @@ function normalizeConfig(cfg) {
 ========================= */
 let SCHEMAS = [];
 let CONFIG = null;
+let SAVED = {};   // id → cópia do último estado salvo (para detectar/descartar alterações não salvas)
+
+const _clone = (o) => JSON.parse(JSON.stringify(o));
+function marcarSalvo(cfg) { SAVED[cfg.id] = _clone(cfg); }
+
+// Estado que está na tela agora (campos do formulário + colunas), comparável ao último salvo
+function _estadoTela() {
+  return JSON.stringify({
+    nome: (document.getElementById("schemaNome")?.value || "").trim(),
+    serieAtiva: document.getElementById("flagSerie")?.value === "1",
+    resultadoAtivo: document.getElementById("flagResultado")?.value === "1",
+    ordenarPor: document.getElementById("ordenacao")?.value === "numero" ? "numero" : "nome",
+    colunas: CONFIG.colunas
+  });
+}
+function temAlteracaoNaoSalva() {
+  if (!CONFIG || bloqueado() || !SAVED[CONFIG.id]) return false;
+  const s = SAVED[CONFIG.id];
+  return _estadoTela() !== JSON.stringify({ nome: s.nome, serieAtiva: s.serieAtiva, resultadoAtivo: s.resultadoAtivo, ordenarPor: s.ordenarPor, colunas: s.colunas });
+}
 
 // O padrão é imutável: só leitura nesta tela (para variações, Duplicar e editar a cópia).
 function bloqueado() { return !!CONFIG && CONFIG.id === PADRAO_ID; }
@@ -543,6 +566,14 @@ function onSelectSchema(id) {
   const found = SCHEMAS.find(s => s.id === id);
   if (!found) return;
 
+  // Alterações não salvas do schema que está saindo são descartadas — avisa, para não parecer que ficaram guardadas.
+  if (CONFIG && found.id !== CONFIG.id && temAlteracaoNaoSalva()) {
+    const nomeSaindo = (document.getElementById("schemaNome")?.value || "").trim() || CONFIG.nome;
+    const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
+    if (idx >= 0) SCHEMAS[idx] = _clone(SAVED[CONFIG.id]);
+    setMsg(`Alterações não salvas em “${nomeSaindo}” foram descartadas.`, "warn");
+  }
+
   // Só troca o que está sendo visualizado/editado nesta tela — não mexe em
   // qual é o schema padrão (isso é fixo, ver PADRAO_ID).
   CONFIG = found;
@@ -580,7 +611,7 @@ function render() {
       <td><input value="${escapeAttr(c.key)}" ${keyDis}${keyTitle} onchange="editKey(${idx}, this.value)" />${tag}</td>
       <td><input value="${escapeAttr(c.label)}" ${dis} onchange="editLabel(${idx}, this.value)" /></td>
       <td>
-        <select ${dis} onchange="editType(${idx}, this.value)">
+        <select ${(b || noCatalogo) ? "disabled" : ""} onchange="editType(${idx}, this.value)">
           <option value="nota" ${c.type==="nota"?"selected":""}>Nota</option>
           <option value="texto" ${c.type==="texto"?"selected":""}>Texto</option>
         </select>
@@ -600,10 +631,111 @@ function render() {
   avisarMateriaFora();
 }
 
-function showMsg(html, kind="ok") {
-  const el = document.getElementById("msg");
-  el.className = kind === "ok" ? "ok" : "warn";
-  el.innerHTML = html;
+// Nome do schema: único por escola (sem diferenciar maiúsculas, acentos e espaços repetidos)
+function _nomeNorm(n) { return String(n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
+function nomeEmUso(nome, ignorarId) {
+  const n = _nomeNorm(nome);
+  return SCHEMAS.some(s => s.id !== ignorarId && _nomeNorm(s.nome) === n);
+}
+
+function falhaGravar(e, acao) {
+  console.error("schema_ata:", acao, e);
+  const perm = /permission|insufficient|denied/i.test(String(e?.code || e?.message || ""));
+  setMsg(perm ? `Sem permissão para ${acao}.` : `Não foi possível ${acao}. Verifique a conexão e tente de novo.`, "err");
+}
+
+// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
+
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+
+// ── Modais (substituem confirm()/prompt() nativos) ────────────────────
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function _modalBase({ titulo, corpoHtml, corDestaque, textoConfirmar, textoCancelar }, aoConfirmar){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,var(--card,#fff));border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<div style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpoHtml || ''}</div>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn btn-outline" id="_modalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_modalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${_escHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+    function onKey(ev){ if(ev.key === 'Escape') fechar(null); else if(ev.key === 'Enter') backdrop.querySelector('#_modalOk').click(); }
+    document.addEventListener('keydown', onKey);
+    backdrop.querySelector('#_modalOk').addEventListener('click', () => fechar(aoConfirmar(backdrop)));
+    backdrop.querySelector('#_modalCancelar').addEventListener('click', () => fechar(null));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(null); });
+    const inp = backdrop.querySelector('input'); if(inp){ inp.focus(); inp.select(); }
+  });
+}
+// confirmação sim/não → true | false
+async function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  const r = await _modalBase({ titulo, corpoHtml: _escHtml(corpo || ''), corDestaque, textoConfirmar, textoCancelar }, () => true);
+  return r === true;
+}
+// pede um texto → string (não vazia) | null
+function _promptModal({ titulo, rotulo, valor, textoConfirmar }){
+  return _modalBase({
+    titulo, textoConfirmar: textoConfirmar || 'Salvar',
+    corpoHtml: `${_escHtml(rotulo || '')}<input type="text" id="_modalInput" value="${_escHtml(valor || '')}" style="margin-top:8px;" />`
+  }, (bd) => (bd.querySelector('#_modalInput').value || '').trim() || null);
 }
 
 function onToggleSerie() {
@@ -613,62 +745,73 @@ function onToggleSerie() {
 }
 
 async function salvarConfig() {
-  if (bloqueado()) { showMsg("⚠️ O schema padrão não pode ser editado. Use Duplicar para criar uma cópia editável.", "warn"); return; }
-  CONFIG.nome = document.getElementById("schemaNome").value.trim() || CONFIG.nome;
+  if (bloqueado()) { setMsg("O schema padrão não pode ser editado. Use Duplicar para criar uma cópia editável.", "warn"); return; }
+  const nomeNovo = document.getElementById("schemaNome").value.trim() || CONFIG.nome;
+  if (nomeEmUso(nomeNovo, CONFIG.id)) { setMsg(`Já existe um schema chamado “${nomeNovo}”. Escolha outro nome.`, "err"); return; }
+  CONFIG.nome = nomeNovo;
   CONFIG.serieAtiva = document.getElementById("flagSerie").value === "1";
   CONFIG.resultadoAtivo = document.getElementById("flagResultado").value === "1";
   CONFIG.ordenarPor = document.getElementById("ordenacao").value === "numero" ? "numero" : "nome";
 
-  CONFIG = await saveSchema(CONFIG);
+  if (!CONFIG.colunas.length) { setMsg("O schema precisa ter ao menos uma matéria.", "err"); return; }
+
+  try {
+    CONFIG = await saveSchema(CONFIG);
+  } catch (e) { return falhaGravar(e, "salvar o schema"); }
 
   const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
   if (idx >= 0) SCHEMAS[idx] = CONFIG;
   else SCHEMAS.push(CONFIG);
+  marcarSalvo(CONFIG);
 
-  showMsg("✅ Schema atualizado e salvo. (Vale para turmas novas)", "ok");
+  setMsg("Schema atualizado e salvo. (Vale para turmas novas)", "ok");
   renderSchemaSelect();
   render();
 }
 
 async function novoSchema() {
-  const nome = prompt("Nome do novo schema:", "Novo schema");
+  const nome = await _promptModal({ titulo: "Novo schema", rotulo: "Nome do novo schema:", valor: "Novo schema", textoConfirmar: "Criar" });
   if (!nome) return;
+  if (nomeEmUso(nome)) { setMsg(`Já existe um schema chamado “${nome}”. Escolha outro nome.`, "err"); return; }
 
   const def = getDefaultConfig();
   def.id = uid();
   def.nome = nome.trim();
 
-  const salvo = await saveSchema(def);
-  SCHEMAS.push(salvo);
+  let salvo;
+  try { salvo = await saveSchema(def); } catch (e) { return falhaGravar(e, "criar o schema"); }
+  SCHEMAS.push(salvo); marcarSalvo(salvo);
   CONFIG = salvo; // só passa a exibir/editar o novo — não vira o padrão
 
   renderSchemaSelect();
   render();
-  showMsg("✅ Novo schema criado.", "ok");
+  setMsg("Novo schema criado.", "ok");
 }
 
 async function duplicarSchema() {
-  const nome = prompt("Nome do schema duplicado:", (CONFIG.nome || "Cópia") + " (cópia)");
+  const nome = await _promptModal({ titulo: "Duplicar schema", rotulo: "Nome do schema duplicado:", valor: (CONFIG.nome || "Cópia") + " (cópia)", textoConfirmar: "Duplicar" });
   if (!nome) return;
+  if (nomeEmUso(nome)) { setMsg(`Já existe um schema chamado “${nome}”. Escolha outro nome.`, "err"); return; }
 
   const copy = { ...CONFIG, id: uid(), nome: nome.trim() };
-  const salvo = await saveSchema(copy);
-  SCHEMAS.push(salvo);
+  let salvo;
+  try { salvo = await saveSchema(copy); } catch (e) { return falhaGravar(e, "duplicar o schema"); }
+  SCHEMAS.push(salvo); marcarSalvo(salvo);
   CONFIG = salvo; // só passa a exibir/editar a cópia — não vira o padrão
 
   renderSchemaSelect();
   render();
-  showMsg("✅ Schema duplicado.", "ok");
+  setMsg("Schema duplicado.", "ok");
 }
 
 async function excluirSchema() {
   if (CONFIG.id === PADRAO_ID) {
-    showMsg("⚠️ O schema padrão não pode ser excluído — ele é o que as turmas novas usam. Você pode editá-lo.", "warn");
+    setMsg("O schema padrão não pode ser excluído — ele é o que as turmas novas usam e não pode ser alterado nem excluído. Use Duplicar para criar uma variação.", "warn");
     return;
   }
-  if (!confirm(`Excluir o schema "${CONFIG.nome}"?`)) return;
+  if (!(await _confirmModal({ titulo: "Excluir schema", corpo: `Excluir o schema "${CONFIG.nome}"?\n\nTurmas já salvas não são afetadas.`, corDestaque: "#991b1b", textoConfirmar: "Excluir" }))) return;
 
-  await removeSchema(CONFIG.id);
+  try { await removeSchema(CONFIG.id); } catch (e) { return falhaGravar(e, "excluir o schema"); }
   SCHEMAS = SCHEMAS.filter(s => s.id !== CONFIG.id);
 
   // Volta a visualização pro schema padrão (não muda quem é o padrão em si)
@@ -676,53 +819,53 @@ async function excluirSchema() {
 
   renderSchemaSelect();
   render();
-  showMsg("✅ Schema excluído.", "ok");
+  setMsg("Schema excluído.", "ok");
 }
 
 /* =========================
    Column operations
 ========================= */
 function adicionarColuna() {
-  if (bloqueado()) { showMsg("⚠️ O schema padrão não pode ser editado. Use Duplicar para criar uma cópia editável.", "warn"); return; }
+  if (bloqueado()) { setMsg("O schema padrão não pode ser editado. Use Duplicar para criar uma cópia editável.", "warn"); return; }
   const key = document.getElementById("novaKey").value.trim().toLowerCase();
   const label = document.getElementById("novoLabel").value.trim();
   const type = document.getElementById("novoTipo").value;
 
-  if (!key || !label) { showMsg("⚠️ Informe a chave (id) e o rótulo.", "warn"); return; }
-  if (!/^[a-z0-9_]+$/.test(key)) { showMsg("⚠️ A chave deve usar apenas letras minúsculas, números e underscore.", "warn"); return; }
-  if (CONFIG.colunas.some(c => c.key === key)) { showMsg("⚠️ Já existe uma coluna com essa chave.", "warn"); return; }
+  if (!key || !label) { setMsg("Informe a chave (id) e o rótulo.", "err"); return; }
+  if (!/^[a-z0-9_]+$/.test(key)) { setMsg("A chave deve usar apenas letras minúsculas, números e underscore.", "err"); return; }
+  if (CONFIG.colunas.some(c => c.key === key)) { setMsg("Já existe uma coluna com essa chave.", "err"); return; }
 
-  CONFIG.colunas.push({ key, label, type: (type==="texto"?"texto":"nota"), enabled:true });
+  CONFIG.colunas.push({ key, label, type: (type==="texto" && !CODIGOS_CATALOGO.has(key) ? "texto" : "nota"), enabled:true });
   document.getElementById("novaKey").value = "";
   document.getElementById("novoLabel").value = "";
   document.getElementById("novoTipo").value = "nota";
 
   render();
   const fora = !CODIGOS_CATALOGO.has(key);
-  showMsg("✅ Coluna adicionada. Clique em “Salvar configuração” para aplicar."
-    + (fora ? " ℹ️ Essa matéria não está no catálogo do histórico: aparece na ata, mas não entra no Histórico Escolar." : ""), "ok");
+  setMsg("Coluna adicionada. Clique em “Salvar configuração” para aplicar."
+    + (fora ? " Obs.: essa matéria não está no catálogo do histórico — aparece na ata, mas não entra no Histórico Escolar." : ""), fora ? "warn" : "ok");
 }
 
 function toggleEnabled(i, val) { if (bloqueado()) return; CONFIG.colunas[i].enabled = !!val; render(); }
 
 function editKey(i, val) {
   if (bloqueado()) return;
-  if (CODIGOS_CATALOGO.has(CONFIG.colunas[i].key)) { showMsg("⚠️ Esse é um código do catálogo do histórico e não pode ser alterado. Remova a matéria e adicione outra, se precisar.", "warn"); render(); return; }
+  if (CODIGOS_CATALOGO.has(CONFIG.colunas[i].key)) { setMsg("Esse é um código do catálogo do histórico e não pode ser alterado. Remova a matéria e adicione outra, se precisar.", "warn"); render(); return; }
   val = String(val||"").trim().toLowerCase();
   if (!val) return;
-  if (!/^[a-z0-9_]+$/.test(val)) { showMsg("⚠️ Chave inválida.", "warn"); render(); return; }
+  if (!/^[a-z0-9_]+$/.test(val)) { setMsg("Chave inválida.", "err"); render(); return; }
   const dup = CONFIG.colunas.some((c, idx) => idx !== i && c.key === val);
-  if (dup) { showMsg("⚠️ Já existe outra coluna com essa chave.", "warn"); render(); return; }
+  if (dup) { setMsg("Já existe outra coluna com essa chave.", "err"); render(); return; }
   CONFIG.colunas[i].key = val;
   render();
 }
 
 function editLabel(i, val) { if (bloqueado()) return; val = String(val||"").trim(); if (!val) return; CONFIG.colunas[i].label = val; render(); }
-function editType(i, val)  { if (bloqueado()) return; CONFIG.colunas[i].type = (val==="texto") ? "texto" : "nota"; render(); }
+function editType(i, val)  { if (bloqueado()) return; if (CODIGOS_CATALOGO.has(CONFIG.colunas[i].key)) { setMsg("Matéria do catálogo do histórico precisa ser do tipo Nota.", "warn"); render(); return; } CONFIG.colunas[i].type = (val==="texto") ? "texto" : "nota"; render(); }
 
-function removeCol(i) {
+async function removeCol(i) {
   if (bloqueado()) return;
-  if (!confirm("Remover essa coluna do schema? (não afeta turmas já salvas)")) return;
+  if (!(await _confirmModal({ titulo: "Remover matéria", corpo: "Remover essa coluna do schema?\n\nNão afeta turmas já salvas.", textoConfirmar: "Remover" }))) return;
   CONFIG.colunas.splice(i, 1);
   render();
 }
@@ -762,6 +905,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   SCHEMAS = await loadSchemas();
+  SCHEMAS.forEach(marcarSalvo);
 
   // Trava: o "padrao" é criado com a escola (ou pelo botão "Schema padrão" em
   // admin_escolas). Sem ele a tela não tem o que editar — só avisa.
@@ -798,17 +942,6 @@ document.addEventListener("click", ()=>{
 
 <!-- header-logic: monta header, tema, chip e auth guard -->
 <script src="../header-logic.js"></script>
-
-<!-- Guard de role: apenas admin acessa esta página -->
-<script>
-document.addEventListener('auth:ready', function () {
-  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
-  var role = session ? String(session.role || '').trim().toLowerCase() : '';
-  if (role !== 'admin') {
-    window.location.replace('../index.html');
-  }
-});
-</script>
 
 </body>
 </html>
