@@ -1098,83 +1098,12 @@ html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); bord
 <!-- 2. Scripts específicos da página (wizard de cadastro + upload de documentos) -->
 <script>
 (function(){
-  // ---------- helpers ----------
-  const KEYS = {
-    turmas: "anoAtivoTurmasDB_v1",
-    alunos: "anoAtivoAlunosDB_v1",
-    mats: "anoAtivoMatriculasDB_v1",
-    anoAtual: "configAnoAtivoAtual_v1",
-    aluSeq: "anoAtivoAluSeq_v1"
-  };
-  // ---------- school scoping (namespacing) ----------
-  function _safeJSONParse(s, fb){ try{ return JSON.parse(s); }catch(_){ return fb; } }
-
-  function _getSession(){
-    try{
-      if(window.Auth && typeof Auth.getSession === 'function') return Auth.getSession();
-    }catch(_){}
-    return _safeJSONParse(localStorage.getItem('auth_session_v2') || 'null', null);
-  }
-
-  function _effectiveSchoolId(){
-    const s = _getSession();
-    let sid = (s && s.schoolId ? String(s.schoolId) : '').trim();
-    if(!sid) sid = 'ESCOLA_A';
-    if(sid.toUpperCase() === 'ADMIN'){
-      const active = (localStorage.getItem('admin_active_school_v1') || '').trim();
-      return active || 'ADMIN';
-    }
-    return sid;
-  }
-
-  const __SCHOOL_ID__ = _effectiveSchoolId();
-  const __PFX__ = 'schools:' + __SCHOOL_ID__ + ':';
-  const _k = (key) => __PFX__ + key;
-
-  function _lsGet(key){
-    const sk = _k(key);
-    let raw = localStorage.getItem(sk);
-    if(raw == null){
-      // migração suave: copia do legado (global) para o escopo da escola
-      const legacy = localStorage.getItem(key);
-      if(legacy != null){
-        localStorage.setItem(sk, legacy);
-        raw = legacy;
-      }
-    }
-    return raw;
-  }
-  function _lsSet(key, value){
-    localStorage.setItem(_k(key), value);
-    // Firestore em paralelo
-    try{
-      if(!window.DB||!window.Auth||!window.Auth.getSession()) return;
-      const _M={"anoAtivoTurmasDB_v1":"anoAtivoTurmas","anoAtivoAlunosDB_v1":"anoAtivoAlunos","anoAtivoMatriculasDB_v1":"anoAtivoMatriculas","configAnoAtivoAtual_v1":null};
-      const col=_M[key]; if(col===undefined) return;
-      if(col===null){ if(window.DB.escola) window.DB.escola.save({configAnoAtivo:value}).catch(()=>{}); return; }
-      const parsed=JSON.parse(value); const fc=window.DB[col]; if(!fc) return;
-      Array.isArray(parsed)?fc.saveAll(parsed).catch(()=>{}):fc.save(parsed).catch(()=>{});
-    }catch(_){}
-  }
-  function _lsRemove(key){ localStorage.removeItem(_k(key)); }
-
-
-  function safeParse(key, fallback){
-    try {
-      const raw = _lsGet(key);
-      if(!raw) return fallback;
-      const v = JSON.parse(raw);
-      // aceitar array ou objeto
-      if(Array.isArray(fallback) && v && !Array.isArray(v)) return Object.values(v);
-      return v;
-    } catch(e) {
-      return fallback;
-    }
-  }
-
-  function save(key, value){
-    _lsSet(key, JSON.stringify(value));
-  }
+  // ---------- estado em memória (NENHUM dado em localStorage) ----------
+  // Some no refresh; não é armazenamento. Turmas e ano ativo vêm do Firestore a cada abertura.
+  let CACHE = { turmas: [], anoAtivo: null, cidades: [] };
+  window._bootPronto = new Promise(res => { window._bootOk = res; });
+  window._getCidadesConhecidas = () => CACHE.cidades;
+  window._anoAtivoDefault = () => getAnoAtivoDefault();
 
   function stripNum(s){ return (s||"").toString().replace(/\D+/g,""); }
 
@@ -1277,20 +1206,7 @@ function normSerie(s){
 
   // nextAlunoId removido — use window.Identidade.findOrCreate() ou window.Identidade.proximoId()
 
-  function getTurmas(){
-    const turmas = safeParse(KEYS.turmas, []);
-    return Array.isArray(turmas) ? turmas : [];
-  }
-
-  function getAlunos(){
-    const alunos = safeParse(KEYS.alunos, []);
-    return Array.isArray(alunos) ? alunos : [];
-  }
-
-  function getMats(){
-    const mats = safeParse(KEYS.mats, []);
-    return Array.isArray(mats) ? mats : [];
-  }
+  function getTurmas(){ return CACHE.turmas; }
 
   function _validarEnderecoTudoOuNada(){
     const campos = {
@@ -1349,21 +1265,13 @@ function normSerie(s){
   const naturalidadeUF = document.getElementById("naturalidadeUF");
   const sexo = document.getElementById("sexo");
   const corRaca = document.getElementById("corRaca");
-  const tbody = document.getElementById("tbodyMatriculados") || document.createElement("tbody"); // tabela removida da página: o render grava num <tbody> solto até a fase de funções
 
   // ---------- init ----------
-  function updatePill(){
-    const turmas = getTurmas().length;
-    const alunos = getAlunos().length;
-    const mats = getMats().length;
-    if(pillStatus) pillStatus.textContent = `Banco: turmas ${turmas} • alunos ${alunos} • matrículas ${mats}`;
-  }
-
   function getAnoAtivoDefault(){
-    const v = safeParse(KEYS.anoAtual, null);
-    if(typeof v === "number") return v;
-    if(typeof v === "string" && v.trim()) return parseInt(v,10) || new Date().getFullYear();
-    return new Date().getFullYear();
+    let v = CACHE.anoAtivo;
+    if(v && typeof v === "object") v = v.anoAtivo ?? v.ano ?? v.anoLetivo ?? null;
+    const n = parseInt(v, 10);
+    return n > 0 ? n : new Date().getFullYear();
   }
 
   // Data de nascimento: avisa quando é irreal (futuro, posterior ao ano ativo ou com mais de 100 anos).
@@ -1543,58 +1451,6 @@ function normSerie(s){
     loadSerieOptionsForTurma(t, !!preserveSerieValue);
     _atualizarCamposStatusSituacao();
     _aplicarBloqueioPorTurma();
-  }
-
-  function renderMatriculados(){
-    const t = getSelectedTurma();
-    if(!t){
-      tbody.innerHTML = '<tr><td colspan="13" class="muted">Selecione uma turma para carregar.</td></tr>';
-      return;
-    }
-    const tid = t.turmaId || t.id;
-    const mats = getMats().filter(m => m && m.turmaId === tid);
-    const alunos = getAlunos();
-    const byId = new Map(alunos.map(a => [a.alunoId, a]));
-
-    if(mats.length === 0){
-      tbody.innerHTML = '<tr><td colspan="13" class="muted">Nenhum aluno matriculado nessa turma ainda.</td></tr>';
-      return;
-    }
-
-    // ordenar por série depois nome
-    mats.sort((a,b)=> {
-      const sa = normSerie(a.serie||"");
-      const sb = normSerie(b.serie||"");
-      if(sa !== sb) return sa.localeCompare(sb,"pt-BR");
-      const na = (byId.get(a.alunoId)?.nome)||"";
-      const nb = (byId.get(b.alunoId)?.nome)||"";
-      return na.localeCompare(nb,"pt-BR");
-    });
-
-    const rows = mats.filter(m => byId.has(m.alunoId)).map(m => {
-      const a = byId.get(m.alunoId) || {};
-      const nasc = a.dataNascimento || "";
-      const idade = (a.idade !== undefined && a.idade !== null && a.idade !== "") ? a.idade : calcAge(nasc);
-      const cpfFmt = formatCPF(a.cpf || "");
-      const cor = a.corRaca || a.corOuRaca || "";
-      return `<tr>
-        <td>${normSerie(m.serie || a.serie || "")}</td>
-        <td>${(a.nome||"").toString()}</td>
-        <td>${cpfFmt}</td>
-        <td>${nasc}</td>
-        <td>${idade!=="" ? idade : ""}</td>
-        <td>${(a.mae||"")}</td>
-        <td>${(a.pai||"")}</td>
-        <td>${(a.naturalidade||"")}</td>
-        <td>${(a.sexo||"")}</td>
-        <td>${(cor||"")}</td>
-        <td>${(m.turno||"")}</td>
-        <td>${(m.modelo||"REGULAR")}</td>
-        <td>${(m.status||"")}</td>
-      </tr>`;
-    }).join("");
-
-    tbody.innerHTML = rows;
   }
 
   function clearFields(){
@@ -1902,9 +1758,12 @@ function normSerie(s){
   document.getElementById("btnInserir").addEventListener("click", inserirAluno);
 
   async function _atualizarAluno(){
-    const alunoId       = window._modoEdicaoId;
-    const alunoOriginal = window._modoEdicaoAluno || {};
+    const alunoId = window._modoEdicaoId;
+    if((window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) === 'ADMIN')
+      return setMsg('Selecione uma escola no topo da página antes de salvar.', 'err');
 
+    const nome   = normalizeName(document.getElementById('nome')?.value || '');
+    const cpfNum = stripNum(document.getElementById('cpf')?.value || '');
     const dadosComp = {
       mae:          normalizeName(document.getElementById('mae')?.value || ''),
       pai:          (document.getElementById('paiNaoInformado')?.checked) ? '--' : normalizeName(document.getElementById('pai')?.value || ''),
@@ -1913,7 +1772,6 @@ function normSerie(s){
       corRaca:      (document.getElementById('corRaca')?.value || 'NÃO DECLARADA').trim(),
       naturalidadeCidade: normalizeCity(document.getElementById('naturalidadeCidade')?.value || ''),
       naturalidadeUF:     (document.getElementById('naturalidadeUF')?.value || '').trim().toUpperCase(),
-      turno:        (document.getElementById('turnoSelecionado')?.value || '').trim(),
       modeloEnsino: (document.getElementById('modeloEnsino')?.value || '').trim(),
       aee:          !!document.getElementById('aeeFrequenta')?.checked,
       ...(window._neeGetDados ? window._neeGetDados() : {}),
@@ -1930,6 +1788,8 @@ function normSerie(s){
     };
     dadosComp.naturalidade = dadosComp.naturalidadeCidade + '/' + dadosComp.naturalidadeUF;
 
+    if(!nome)                    return _toastErro('⚠️ Informe o nome do aluno.');
+    if(cpfNum.length !== 11 || !isValidCPF(cpfNum)) return _toastErro('⚠️ Informe um CPF válido.');
     if(!dadosComp.mae)           return _toastErro('⚠️ Informe o nome da mãe.');
     if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
     if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
@@ -1940,50 +1800,60 @@ function normSerie(s){
     const erroEndereco = _validarEnderecoTudoOuNada();
     if(erroEndereco) return _toastErro('⚠️ ' + erroEndereco);
 
+    const btn = document.getElementById('btnInserir');
+    let redirecionando = false;
     try{
+      if(btn) btn.disabled = true;
       setMsg('Salvando…','loading');
-      // fotoUrl/fotoFileId ficam de fora de propósito: quem controla esses dois
-      // campos é o módulo de foto (foto-aluno-js), que já salva no Firestore na
-      // hora em que a foto é trocada/removida. Se reenviássemos alunoOriginal
-      // inteiro aqui, o snapshot antigo (capturado quando a página abriu) sempre
-      // sobrescreveria a foto nova por cima — foi exatamente o bug relatado.
-      const { fotoUrl, fotoFileId, ...alunoOriginalSemFoto } = alunoOriginal;
-      const objParaSalvar = { _id: alunoId, alunoId, ...alunoOriginalSemFoto, ...dadosComp };
-      console.log('[DEBUG-FOTO] objeto que _atualizarAluno vai salvar (tem fotoUrl/fotoFileId?):', objParaSalvar);
-      console.log('[DEBUG-FOTO] alunoOriginal (snapshot capturado ao abrir a página) tinha fotoUrl:', alunoOriginal.fotoUrl);
-      await window.DB.anoAtivoAlunos.save(objParaSalvar);
 
-      // O campo "modelo" (Regular/Integral) que a pesquisa e os exports usam
-      // vive na MATRÍCULA (window.DB.anoAtivoMatriculas), não no cadastro do
-      // aluno — o cadastro guarda só um espelho em `modeloEnsino` pra
-      // reconstruir a tela quando você reabre a edição. Antes desta correção,
-      // trocar "Frequenta o Integral?" aqui só atualizava esse espelho, e a
-      // matrícula ficava com o valor antigo — por isso a pesquisa e o export
-      // continuavam mostrando o modelo anterior mesmo depois de salvar.
-      try{
-        const matsDoAluno = await window.DB.anoAtivoMatriculas.list();
-        const matAtual = matsDoAluno
-          .filter(m => m.alunoId === alunoId && (m.status || 'ATIVO').toUpperCase() === 'ATIVO')
-          .sort((a,b) => new Date(b.criadoEm||0) - new Date(a.criadoEm||0))[0];
-        if(matAtual && (matAtual.modelo||'REGULAR').toUpperCase() !== (dadosComp.modeloEnsino||'REGULAR').toUpperCase()){
-          let matriculaAtualizada = { ...matAtual, modelo: dadosComp.modeloEnsino || 'REGULAR' };
-          if(window.MatriculaUtils) matriculaAtualizada = window.MatriculaUtils.validarMatricula(matriculaAtualizada);
-          await window.DB.anoAtivoMatriculas.save(matriculaAtualizada);
+      // get() fresco: o snapshot de quando a página abriu pode estar velho
+      const original = await window.DB.anoAtivoAlunos.get(alunoId);
+      if(!original) throw new Error('Aluno não encontrado (pode ter sido apagado em outra aba).');
+
+      const mudouCpf  = stripNum(original.cpfNum || original.cpf || '') !== cpfNum;
+      const mudouNome = String(original.nome || '') !== nome;
+
+      if(mudouCpf){
+        const outros = (await window.DB.anoAtivoAlunos.whereEquals('cpfNum', cpfNum)).filter(a => a._id !== alunoId);
+        if(outros.length) throw new Error('Já existe outro aluno do ano-ativo com este CPF.');
+      }
+      let elo = null;
+      if(mudouCpf || mudouNome){
+        elo = await window.Identidade.buscarEloPorAnoAtivoId(alunoId);
+        if(mudouCpf){
+          const eloCpf = await window.Identidade.buscarEloPorCpf(cpfNum);
+          if(eloCpf && (!elo || eloCpf.atasId !== elo.atasId)) throw new Error('Este CPF já pertence a outro aluno do histórico.');
         }
-      }catch(e){ console.warn('Erro ao sincronizar modelo na matrícula:', e); }
+      }
+
+      // merge:true preserva o resto do doc (inclusive foto); só vai o que o formulário edita
+      const ops = [{ col:'anoAtivoAlunos', op:'set', id: alunoId,
+        data: { alunoId, ...dadosComp, nome, cpf: formatCPF(cpfNum), cpfNum } }];
+
+      // modelo (Regular/Integral) vive na matrícula aberta; update só desse campo não toca na foto
+      const matId = window._modoEdicaoMatId;
+      if(matId){
+        const mat = await window.DB.anoAtivoMatriculas.get(matId);
+        const novo = dadosComp.modeloEnsino || 'REGULAR';
+        if(mat && (mat.modelo || 'REGULAR').toUpperCase() !== novo.toUpperCase())
+          ops.push({ col:'anoAtivoMatriculas', op:'update', id: matId, data: { modelo: novo } });
+      }
+      if(elo && (mudouCpf || mudouNome)){
+        ops.push(window.Identidade.prepararElo({ atasId: elo.atasId, ...(mudouNome ? { nome } : {}), ...(mudouCpf ? { cpf: cpfNum } : {}) }));
+      }
+      await window.DB.batchWrite(ops);
 
       if(window.initDocs)        window.initDocs(alunoId);
       if(window.uploadDocsQueue) await window.uploadDocsQueue();
 
-      // Toast fixo visível em qualquer etapa
       _toastSucesso('✅ Dados atualizados com sucesso! Redirecionando…');
-
-      // Redireciona para pesquisa após 2s
+      redirecionando = true;
       setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
-
-    } catch(e){
+    }catch(e){
       console.error('Erro ao atualizar aluno:', e);
-      _toastErro('❌ Erro ao salvar: ' + e.message);
+      _toastErro('❌ Erro ao salvar: ' + (e && e.message ? e.message : e));
+    }finally{
+      if(btn && !redirecionando) btn.disabled = false;
     }
   }
 
@@ -2091,13 +1961,15 @@ function normSerie(s){
     const CAMPOS_TRAVADOS = ['cpf','nome'];
 
     async function ativarModoEdicao(){
-      await new Promise(res => {
-        if(window.DB) return res();
-        document.addEventListener('auth:ready', res, { once: true });
-      });
+      await window._bootPronto;   // turmas e ano ativo já carregados
 
       let aluno = null;
-      try { aluno = await window.DB.anoAtivoAlunos.get(editId); } catch(e){}
+      try { aluno = await window.DB.anoAtivoAlunos.get(editId); }
+      catch(e){
+        console.error('[edição] erro ao ler o aluno:', e);
+        _toastErro('❌ Erro ao carregar o aluno: ' + (e && e.message ? e.message : e));
+        return;
+      }
 
       // Içado pro escopo da função (era `let` dentro do try{} logo abaixo)
       // porque o módulo de foto (initFoto, mais abaixo) agora precisa do
@@ -2186,16 +2058,15 @@ function normSerie(s){
       try{
         const qsTurmaId   = params.get('turmaId');
         const qsAnoLetivo = params.get('anoLetivo');
-        const mats = await window.DB.anoAtivoMatriculas.list();
-        const matsDoAluno = mats.filter(m => m.alunoId === editId);
-
-        if(qsTurmaId){
-          matAluno = matsDoAluno.find(m =>
-            m.turmaId === qsTurmaId &&
-            (!qsAnoLetivo || String(m.anoLetivo) === String(qsAnoLetivo))
-          );
+        // matriculaId é determinístico (MAT|turma|aluno|ano): 1 leitura quando a pesquisa manda turma+ano
+        if(qsTurmaId && qsAnoLetivo){
+          matAluno = await window.DB.anoAtivoMatriculas.get(`MAT|${qsTurmaId}|${editId}|${qsAnoLetivo}`);
         }
-        if(!matAluno) matAluno = matsDoAluno[0]; // fallback: link direto sem esses params
+        if(!matAluno){   // fallback: só as matrículas deste aluno
+          const matsDoAluno = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', editId);
+          if(qsTurmaId) matAluno = matsDoAluno.find(m => m.turmaId === qsTurmaId && (!qsAnoLetivo || String(m.anoLetivo) === String(qsAnoLetivo)));
+          if(!matAluno) matAluno = matsDoAluno[0];
+        }
 
         if(matAluno && matAluno.turmaId){
           // Preenche o ano letivo ANTES de mexer na turma: loadTurmaOptions()
@@ -2215,13 +2086,14 @@ function normSerie(s){
               // Aguarda série ser carregada e seleciona
               setTimeout(() => {
                 const serieEl = document.getElementById('serieAluno');
-                if(serieEl && matAluno.serie) serieEl.value = matAluno.serie;
+                if(serieEl && matAluno.serie){ serieEl.value = matAluno.serie; serieEl.disabled = true; }
               }, 200);
             } else if(tentativas < 10){
               setTimeout(() => _tentarSetar(tentativas + 1), 300);
             }
           };
           _tentarSetar();
+          turmaSelect.disabled = true; anoLetivo.disabled = true;   // turma/ano/série não mudam na edição (o matriculaId depende deles)
         }
       }catch(e){ console.warn('[edição] Erro ao buscar matrícula:', e); }
 
@@ -2294,7 +2166,7 @@ function normSerie(s){
               // especificamente pela(s) matrícula(s) com status ATIVO e,
               // no caso (anômalo) de haver mais de uma, pegamos a mais
               // recente.
-              const matsDoAluno = (await window.DB.anoAtivoMatriculas.list()).filter(m => m.alunoId === editId);
+              const matsDoAluno = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', editId);
               const matsAtivas = matsDoAluno.filter(m => (m.status || 'ATIVO').toUpperCase() === 'ATIVO');
               const matAluno = matsAtivas.slice().sort((a, b) =>
                 new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0)
@@ -2409,11 +2281,7 @@ function normSerie(s){
 
       // Profissional de apoio — espera o <select> ser populado (busca
       // assíncrona no módulo de Funcionários) antes de marcar o valor salvo.
-      if(aluno.profissionalApoioId){
-        if(window._profissionaisApoioPromise) await window._profissionaisApoioPromise;
-        const selApoio = document.getElementById('neeProfissionalApoio');
-        if(selApoio) selApoio.value = aluno.profissionalApoioId;
-      }
+      if(window._carregarProfissionaisApoio) await window._carregarProfissionaisApoio(matAluno?.anoLetivo || getAnoAtivoDefault(), aluno.profissionalApoioId || '');
       if(window._neeAtualizarVisibilidadeApoio) window._neeAtualizarVisibilidadeApoio();
 
       // AEE
@@ -2450,6 +2318,8 @@ function normSerie(s){
 
       window._modoEdicaoId    = editId;
       window._modoEdicaoAluno = aluno;
+      window._modoEdicaoMatId = matAluno ? (matAluno._id || null) : null;
+      CACHE.cidades.push(aluno);   // alimenta o autocomplete de cidade
       if(window._identModoEdicao) window._identModoEdicao();
     }
 
@@ -2634,28 +2504,40 @@ function normSerie(s){
     // incluindo a especialidade de cada um.
     // Exposto como Promise em window para que o modo de edição possa esperar
     // o <select> estar populado antes de tentar marcar o valor salvo.
-    window._profissionaisApoioPromise = (async function _carregarProfissionaisApoio(){
+    let _apoioSeq = 0;
+    window._carregarProfissionaisApoio = function(ano, valorSalvo){
       const sel = document.getElementById('neeProfissionalApoio');
-      if(!sel) return;
-      try{
-        await new Promise(res => {
-          if(window.DB) return res();
-          document.addEventListener('auth:ready', res, { once: true });
-        });
-        if(!window.DB || !window.DB.funcionarios || !window.DB.funcionarios.list) return;
-        const todos = await window.DB.funcionarios.list();
-        const profissionaisApoio = (todos || [])
-          .filter(f => f.profissionalApoio === true)
-          .sort((a,b) => (a.nome||'').localeCompare(b.nome||''));
-        profissionaisApoio.forEach(f => {
-          const opt = document.createElement('option');
-          opt.value = f.funcId || f._id || '';
-          const funcaoLabel = f.funcao ? _cap(f.funcao.toLowerCase()) : '';
-          opt.textContent = funcaoLabel ? `${f.nome || 'Sem nome'} — ${funcaoLabel}` : (f.nome || 'Sem nome');
-          sel.appendChild(opt);
-        });
-      }catch(e){ console.warn('Erro ao carregar profissionais de apoio:', e); }
-    })();
+      if(!sel) return Promise.resolve();
+      const meu = ++_apoioSeq;
+      const add = f => {
+        const opt = document.createElement('option');
+        opt.value = f.funcId || f._id || '';
+        const funcaoLabel = f.funcao ? _cap(f.funcao.toLowerCase()) : '';
+        opt.textContent = funcaoLabel ? `${f.nome || 'Sem nome'} — ${funcaoLabel}` : (f.nome || 'Sem nome');
+        sel.appendChild(opt);
+      };
+      window._profissionaisApoioPromise = (async function(){
+        try{
+          await window._bootPronto;
+          // query pontual: só quem é profissional de apoio, no ano da turma (nunca a coleção inteira)
+          const lista = ano ? await window.DB.funcionarios.whereEquals('profissionalApoio', true, { and: [['anoLetivo', String(ano)]] }) : [];
+          let extra = null;
+          const manter = valorSalvo || sel.value;
+          if(manter && !lista.some(f => (f.funcId || f._id) === manter)){
+            extra = await window.DB.funcionarios.get(manter);   // apoio salvo de outro ano não pode sumir em silêncio
+          }
+          if(meu !== _apoioSeq) return;   // chegou uma chamada mais nova
+          while(sel.options.length > 1) sel.remove(1);
+          lista.sort((a,b) => (a.nome||'').localeCompare(b.nome||'')).forEach(add);
+          if(extra) add(extra);
+          if(manter) sel.value = manter;
+        }catch(e){
+          console.error('Erro ao carregar profissionais de apoio:', e);
+          _toastErro('❌ Não foi possível carregar os profissionais de apoio: ' + (e && e.message ? e.message : e));
+        }
+      })();
+      return window._profissionaisApoioPromise;
+    };
 
     window._neeSet = function(bloco, sim){
       _neeE[bloco] = sim;
@@ -2946,7 +2828,7 @@ function normSerie(s){
     let activeIdx = -1;
 
     function buildCidadeDB(){
-      const alunos = (typeof getAlunos === 'function') ? getAlunos() : [];
+      const alunos = window._getCidadesConhecidas ? window._getCidadesConhecidas() : [];
       const map = new Map();
       alunos.forEach(a => {
         const c = (a.naturalidadeCidade || '').trim();
@@ -3121,7 +3003,7 @@ function normSerie(s){
   turmaSelect.addEventListener("change", () => {
     setMsg("", "muted");
     refreshTurmaInfo();
-    renderMatriculados();
+    if(window._carregarProfissionaisApoio) window._carregarProfissionaisApoio((getSelectedTurma()||{}).anoLetivo);
   });
 
   // ── Identificação do aluno: CPF ou Nome ─────────────────────────────────
@@ -3422,7 +3304,6 @@ function normSerie(s){
     turmaSelect.value = "";
     if(!window._modoEdicaoId) loadSerieOptionsForTurma(null);
     turmaInfo.textContent = "";
-    tbody.innerHTML = '<tr><td colspan="13" class="muted">Selecione uma turma para carregar.</td></tr>';
     _atualizarCamposStatusSituacao();
     _aplicarBloqueioPorTurma();
   });
@@ -3435,36 +3316,33 @@ function normSerie(s){
         if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
         document.addEventListener('auth:ready', res, { once: true });
       });
-      const dados = await window.DB.loadAllAnoAtivo();
-      const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
-      if(sid){
-        const pre = k => `schools:${sid}:${k}`;
-        if(dados.turmasDB)     localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dados.turmasDB));
-        if(dados.alunosDB)     localStorage.setItem(pre('anoAtivoAlunosDB_v1'),     JSON.stringify(dados.alunosDB));
-        if(dados.matriculasDB) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dados.matriculasDB));
-        if(dados.dadosEscola?.configAnoAtivo)
-          localStorage.setItem(pre('configAnoAtivoAtual_v1'), JSON.stringify(dados.dadosEscola.configAnoAtivo));
-      }
-    }catch(e){ console.warn('Cadastro Ano Ativo — pré-carga Firestore:', e); }
+      // Só turmas + doc da escola. Aluno e matrícula nunca são carregados em bloco.
+      const [turmas, escola] = await Promise.all([window.DB.anoAtivoTurmas.list(), window.DB.escola.get()]);
+      CACHE.turmas = Array.isArray(turmas) ? turmas : [];
+      CACHE.anoAtivo = (escola && escola.configAnoAtivo != null) ? escola.configAnoAtivo : null;
 
-    anoLetivo.value = getAnoAtivoDefault();
-    if(pillAnoAtivo){ pillAnoAtivo.textContent = `ano ativo: ${anoLetivo.value || getAnoAtivoDefault()}`; }
-    updatePill();
-    loadTurmaOptions();
-    refreshTurmaInfo();
-    renderMatriculados();
-    try{   // pós-salvar (hard refresh): volta pra mesma turma e mostra o resultado
-      const ret = JSON.parse(sessionStorage.getItem('anoAtivoAluno:retomar') || 'null');
-      const tst = JSON.parse(sessionStorage.getItem('anoAtivoAluno:toast') || 'null');
-      sessionStorage.removeItem('anoAtivoAluno:retomar'); sessionStorage.removeItem('anoAtivoAluno:toast');
-      if(ret && ret.turmaId && [...turmaSelect.options].some(o => o.value === ret.turmaId)){
-        turmaSelect.value = ret.turmaId;
-        if(ret.ano) anoLetivo.value = ret.ano;
-        turmaSelect.dispatchEvent(new Event('change'));
-      }
-      if(tst && tst.msg) setMsg(tst.msg, tst.kind || 'ok');
-    }catch(e){ console.warn('retomada pós-salvar:', e); }
-    Loading.esconder();
+      anoLetivo.value = getAnoAtivoDefault();
+      if(pillAnoAtivo){ pillAnoAtivo.textContent = `ano ativo: ${anoLetivo.value || getAnoAtivoDefault()}`; }
+      loadTurmaOptions();
+      refreshTurmaInfo();
+      try{   // pós-salvar (hard refresh): volta pra mesma turma e mostra o resultado
+        const ret = JSON.parse(sessionStorage.getItem('anoAtivoAluno:retomar') || 'null');
+        const tst = JSON.parse(sessionStorage.getItem('anoAtivoAluno:toast') || 'null');
+        sessionStorage.removeItem('anoAtivoAluno:retomar'); sessionStorage.removeItem('anoAtivoAluno:toast');
+        if(ret && ret.turmaId && [...turmaSelect.options].some(o => o.value === ret.turmaId)){
+          turmaSelect.value = ret.turmaId;
+          if(ret.ano) anoLetivo.value = ret.ano;
+          turmaSelect.dispatchEvent(new Event('change'));
+        }
+        if(tst && tst.msg) setMsg(tst.msg, tst.kind || 'ok');
+      }catch(e){ console.warn('retomada pós-salvar:', e); }
+    }catch(e){
+      console.error('Cadastro Ano Ativo — erro ao carregar turmas/ano ativo:', e);
+      setMsg('Não foi possível carregar as turmas: ' + (e && e.message ? e.message : e), 'err');
+    }finally{
+      Loading.esconder();
+      if(window._bootOk) window._bootOk();
+    }
   })();
 
 })();
@@ -3704,10 +3582,12 @@ function normSerie(s){
     if(_fotoAlunoId) return;
     if(_fotoPendente && !_fotoPendente.reaproveitar) return;
     try{
-      const mats = await window.DB.anoAtivoMatriculas.list();
+      // só as matrículas deste aluno; vale a foto da matrícula mais próxima do ano ativo (empate: a mais nova)
+      const mats = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', String(alunoId));
+      const ref = Number((window._anoAtivoDefault && window._anoAtivoDefault()) || new Date().getFullYear());
       const maisRecente = mats
-        .filter(m => m.alunoId === String(alunoId) && m.fotoUrl)
-        .sort((a, b) => Number(b.anoLetivo) - Number(a.anoLetivo))[0];
+        .filter(m => m.fotoUrl)
+        .sort((a, b) => (Math.abs(Number(a.anoLetivo) - ref) - Math.abs(Number(b.anoLetivo) - ref)) || (Number(b.anoLetivo) - Number(a.anoLetivo)))[0];
       if(maisRecente){
         _fotoPendente = { reaproveitar: true, fotoUrl: maisRecente.fotoUrl, anoOrigem: maisRecente.anoLetivo };
         previewImg.src = maisRecente.fotoUrl;
