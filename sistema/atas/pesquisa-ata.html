@@ -108,6 +108,13 @@ html[data-theme="dark"] .btn.primary:hover {
   border-color: var(--brand-hover-d);
 }
 
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.chips:empty { display:none; }
+.chip { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--card-border); background:var(--chip-bg); color:var(--chip-color); padding:7px 12px; border-radius:999px; font-size:13px; font-weight:700; }
+.chip button { border:0; background:transparent; cursor:pointer; color:var(--chip-color); font-weight:900; font-size:14px; line-height:1; padding:0; }
+.serie-add-row { display:flex; gap:8px; align-items:stretch; }
+.serie-add-row select { flex:1; min-width:0; }
+
 /* .btn.ghost */
 .btn.ghost           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
 .btn.ghost:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
@@ -297,8 +304,11 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
       </div>
 
       <div class="field">
-        <label>Série (texto do cabeçalho)</label>
-        <input id="fSerie" type="text" placeholder="Ex: 3º e 4º ano">
+        <label for="selSerieAdd">Filtrar por série</label>
+        <div class="serie-add-row">
+          <select id="selSerieAdd"><option value="">(selecione)</option></select>
+          <button class="btn primary" id="btnAddSerie" type="button" style="white-space:nowrap;">+ Adicionar</button>
+        </div>
       </div>
 
       <div class="field">
@@ -307,8 +317,11 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
       </div>
     </div>
 
+    <div class="chips" id="chipsSeries"></div>
+
     <div class="filter-actions" style="display:flex; align-items:center; gap:2px;">
       <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
+      <button class="btn ghost" id="btnLimparFiltros" type="button" style="margin-left:6px; margin-right:6px; white-space:nowrap;">🧹 Limpar filtros</button>
       <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
         <span class="info-tip-bubble" id="dbInfoTip">carregando...</span>
@@ -670,6 +683,48 @@ function formatarListaBonita(arr) {
 /* =========================
    Render filtros
 ========================= */
+// Lista fixa = as séries que podem ser cadastradas (mesma de cadastro-turmas.html → serieOptions)
+const SERIES_FILTRO = [
+  "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
+  "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
+  "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano"
+];
+let seriesSelecionadas = [];
+
+// Chave de comparação: sem acento/caixa/ºª ("3º ano" ≡ "3 ano"; "3ª série" ≡ "3 serie")
+function serieChave(s) {
+  return norm(s).replace(/[ºª°]/g, "").replace(/\s+/g, " ").trim();
+}
+function seriesDaTurma(t) {
+  const arr = (Array.isArray(t.seriesTurma) && t.seriesTurma.length) ? t.seriesTurma
+            : (Array.isArray(t.series) && t.series.length) ? t.series
+            : String(t.serieTexto || "").split(/\s*(?:,|;|\be\b)\s*/i);
+  return new Set(arr.map(serieChave).filter(Boolean));
+}
+function preencherFiltroSerie() {
+  const sel = document.getElementById("selSerieAdd");
+  sel.innerHTML = '<option value="">(selecione)</option>' +
+    SERIES_FILTRO.map(x => `<option value="${x}">${x}</option>`).join("");
+}
+function renderChipsSeries() {
+  const box = document.getElementById("chipsSeries");
+  box.innerHTML = "";
+  seriesSelecionadas.forEach(sr => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.appendChild(document.createTextNode(sr + " "));
+    const b = document.createElement("button");
+    b.type = "button"; b.title = "Remover"; b.textContent = "×";
+    b.addEventListener("click", () => {
+      seriesSelecionadas = seriesSelecionadas.filter(x => x !== sr);
+      renderChipsSeries();
+      if (_jaFoiPesquisado) aplicarFiltros();
+    });
+    chip.appendChild(b);
+    box.appendChild(chip);
+  });
+}
+
 function preencherFiltroAno(turmas) {
   const sel = document.getElementById("fAno");
   const anos = Array.from(new Set(turmas.map(t => String(t.anoLetivo || "").trim()).filter(Boolean)))
@@ -909,14 +964,16 @@ function renderResumoTurma(t) {
 function aplicarFiltros() {
   const fAno = document.getElementById("fAno").value.trim();
   const fTurno = document.getElementById("fTurno").value.trim();
-  const fSerie = norm(document.getElementById("fSerie").value);
   const fBusca = norm(document.getElementById("fBusca").value);
 
   let lista = turmas.slice();
 
   if (fAno) lista = lista.filter(t => String(t.anoLetivo || "").trim() === fAno);
   if (fTurno) lista = lista.filter(t => String(t.turno || "").trim() === fTurno);
-  if (fSerie) lista = lista.filter(t => norm(t.serieTexto || "").includes(fSerie));
+  if (seriesSelecionadas.length) {
+    const alvo = seriesSelecionadas.map(serieChave);
+    lista = lista.filter(t => { const ds = seriesDaTurma(t); return alvo.some(x => ds.has(x)); });
+  }
 
   if (fBusca) {
     lista = lista.filter(t => {
@@ -1282,7 +1339,25 @@ async function carregar() {
 
   document.getElementById("fAno").onchange    = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
   document.getElementById("fTurno").onchange  = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
-  document.getElementById("fSerie").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
+  preencherFiltroSerie();
+  document.getElementById("btnAddSerie").onclick = function(){
+    const sel = document.getElementById("selSerieAdd");
+    const v = sel.value; if (!v) return;
+    if (!seriesSelecionadas.includes(v)) {
+      seriesSelecionadas.push(v);
+      renderChipsSeries();
+      if (_jaFoiPesquisado) aplicarFiltros();
+    }
+    sel.value = "";
+  };
+  document.getElementById("btnLimparFiltros").onclick = function(){
+    document.getElementById("fAno").value = "";
+    document.getElementById("fTurno").value = "";
+    document.getElementById("fBusca").value = "";
+    seriesSelecionadas = [];
+    renderChipsSeries();
+    if (_jaFoiPesquisado) aplicarFiltros();
+  };
   document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
 
   if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");

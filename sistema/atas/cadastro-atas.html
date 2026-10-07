@@ -1708,7 +1708,7 @@ async function _liberarTrocaDeTurma() {
   if (!turmaAtual || !_temAlteracoesNaoSalvas()) return true;
   const r = await _modalDadosNaoSalvos();
   if (r === 'cancelar') return false;
-  if (r === 'salvar') return !!(await salvarNoBanco());
+  if (r === 'salvar') return !!(await salvarNoBanco({ recarregar:false }));
   return true; // descartar — selecionarTurma() já reinicia tudo
 }
 
@@ -1861,7 +1861,11 @@ function _formularioAlunoTemConteudo() {
   return false;
 }
 
-async function salvarNoBanco() {
+let _recarregandoPosSalvar = false;
+// opts.recarregar (padrão true): após salvar TUDO com sucesso, faz hard refresh (limpa campos/tabela).
+// O "Salvar e continuar" da troca de turma passa { recarregar:false } pra seguir o fluxo sem recarregar.
+async function salvarNoBanco(opts) {
+  const recarregar = !(opts && opts.recarregar === false);
   // Trava do formulário em andamento: roda antes de qualquer outra coisa (inclusive
   // do "Salvando…") e vale também pro "Salvar e continuar" do modal de troca de turma.
   if (turmaAtual && _formularioAlunoTemConteudo()) {
@@ -1880,13 +1884,13 @@ async function salvarNoBanco() {
   const btnSalvar = document.querySelector('button[onclick="salvarNoBanco()"]');
   if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = 'Salvando…'; }
   try {
-    return await _salvarNoBancoInterno();
+    return await _salvarNoBancoInterno(recarregar);
   } finally {
-    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar no banco'; }
+    if (btnSalvar && !_recarregandoPosSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = 'Salvar no banco'; }
   }
 }
 
-async function _salvarNoBancoInterno() {
+async function _salvarNoBancoInterno(recarregar) {
   if (!turmaIdAtual || !turmaAtual) {
     _toastErro("⚠️ Selecione uma turma (ano + turma) antes de salvar.");
     return false;
@@ -1978,6 +1982,18 @@ async function _salvarNoBancoInterno() {
   if (resultadoScans && resultadoScans.erros.length) {
     falhas.push(`${resultadoScans.erros.length} scan(s) não enviado(s) — envie depois pela edição da ata (${resultadoScans.erros.join(' | ')})`);
   }
+  // Hard refresh (padrão do sistema, igual ao cadastro-aluno-ativo): só quando TUDO deu certo.
+  // Com falha parcial a página fica como está, pra você ver o erro e tentar de novo.
+  if (!falhas.length && recarregar) {
+    const msgOk = (resultadoScans && resultadoScans.enviados)
+      ? `Alunos e notas salvos. ${resultadoScans.enviados} scan(s) enviado(s).`
+      : 'Alunos e notas salvos.';
+    try { sessionStorage.setItem('atas:toast', JSON.stringify({ msg: msgOk, kind: 'ok' })); } catch(_) {}
+    _recarregandoPosSalvar = true;
+    window.location.reload();
+    return true;
+  }
+
   if (falhas.length) {
     setMsg('Turma salva, mas falhou: ' + falhas.join(' — '), 'err');
   } else if (resultadoScans && resultadoScans.enviados) {
@@ -2607,6 +2623,12 @@ document.addEventListener("DOMContentLoaded", () => {
       setMsg('Erro ao carregar a página — recarregue e tente de novo.', 'err');
     } finally {
       Loading.esconder();
+      // pós-salvar (hard refresh): mostra o resultado do save que causou o reload
+      try {
+        const tst = JSON.parse(sessionStorage.getItem('atas:toast') || 'null');
+        sessionStorage.removeItem('atas:toast');
+        if (tst && tst.msg) setMsg(tst.msg, tst.kind || 'ok');
+      } catch(_) {}
     }
   });
 });
