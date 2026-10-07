@@ -279,14 +279,7 @@ html[data-theme="dark"] .sort-control button:hover { background: var(--brand-d);
 .modal-body     { padding: 14px; }
 
 /* ── Toast ── */
-#toastGerarAta           { position: fixed; bottom: 24px; right: 24px; z-index: 9999; background: #0f172a; color: #f8fafc; border-radius: 16px; padding: 16px 20px 14px; box-shadow: 0 8px 32px rgba(0,0,0,.35); max-width: 320px; display: none; flex-direction: column; gap: 6px; font-size: 13px; }
-#toastGerarAta.visible   { display: flex; animation: slideUpToast .25s ease; }
 @keyframes slideUpToast  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-#toastGerarAta .toast-title { font-weight: 800; font-size: 14px; }
-#toastGerarAta .toast-sub   { color: #94a3b8; line-height: 1.4; font-size: 12px; }
-#toastGerarAta .toast-btn   { display: inline-block; background: var(--brand); color: #fff; border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; text-decoration: none; text-align: center; border: none; cursor: pointer; margin-top: 2px; align-self: flex-start; }
-#toastGerarAta .toast-close { position: absolute; top: 10px; right: 12px; background: transparent; border: none; color: #94a3b8; font-size: 16px; cursor: pointer; line-height: 1; }
-html[data-theme="dark"] #toastGerarAta { background: #0f172a; border: 1px solid rgba(148,163,184,0.20); box-shadow: 0 8px 32px rgba(0,0,0,.55); }
 
 /* ── Chips de turma ── */
 .turma-chips     { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
@@ -302,31 +295,6 @@ html[data-theme="dark"] .badge-integral { background: rgba(52,211,153,0.18); bor
 .ok   { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #16a34a; font-size: 14px; }
 html[data-theme="dark"] .ok { color: #4ade80; }
 
-/* ── Aviso amarelo do modal — dark mode ── */
-html[data-theme="dark"] #modalGerarAtaAviso {
-  background: rgba(251,191,36,0.12) !important;
-  border-color: rgba(251,191,36,0.30) !important;
-  color: #fcd34d !important;
-}
-
-/* ── Modal gerar ata — dark mode (inline styles override) ── */
-html[data-theme="dark"] #modalGerarAta > div {
-  background: var(--card-bg, #131c2e) !important;
-  border-color: var(--card-border, #2a3a5c) !important;
-}
-html[data-theme="dark"] #modalGerarAta select {
-  background: var(--field-bg, #0a1426) !important;
-  color: var(--ink) !important;
-  border-color: var(--field-border, #1e2540) !important;
-}
-html[data-theme="dark"] #modalGerarAtaCancelar {
-  background: rgba(148,163,184,0.10) !important;
-  border-color: rgba(148,163,184,0.25) !important;
-  color: #cbd5e1 !important;
-}
-html[data-theme="dark"] #modalGerarAtaCancelar:hover {
-  background: rgba(148,163,184,0.18) !important;
-}
 </style>
 
 <title>Ano Ativo • Pesquisa e Lista</title>
@@ -681,14 +649,6 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 /* =========================
    Helpers de persistência
 ========================= */
-function _salvarAnoAtivo(ano){
-  try{
-    if(window.DB?.escola && window.Auth?.getSession?.())
-      window.DB.escola.save({ configAnoAtivo: ano })
-        .catch(e=>console.warn('Firestore configAnoAtivo:', e));
-  }catch(e){}
-}
-
 /* =========================
    Util
 ========================= */
@@ -717,6 +677,12 @@ function _blocoStatusAtualizarVisibilidade(){
   const blocoPassado = document.getElementById('blocoStatusPassado');
   if(blocoAtivo)   blocoAtivo.style.display   = ehAtivo ? '' : 'none';
   if(blocoPassado) blocoPassado.style.display = ehAtivo ? 'none' : '';
+}
+function _rotuloSituacao(status, situacao){
+  const st = String(status||'ATIVO').toUpperCase(), sit = String(situacao||'').trim();
+  const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
+  if(ehAtivo && st === 'ATIVO') return 'Em curso';
+  return sit ? sit.charAt(0).toUpperCase() + sit.slice(1).toLowerCase() : 'Sem situação';
 }
 function _statusSituacaoFiltroAtual(){
   const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
@@ -801,13 +767,10 @@ function formatarDataBR(dataStr){
 let alunos = [];
 let turmas = [];
 let mats = [];
-let atasDB = [];
 let anoAtivo = "";
 let schoolsMap = {};        // schoolId → nome de exibição (só preenchido em modo "Todas as escolas")
 let modoTodasEscolas = false;
 let seriesSelecionadas = [];
-let __lastLoadAt = 0;
-const __MIN_REFRESH_MS = 5000;
 let currentSortField = 'nome';
 let currentSortOrder = 'asc';
 let alunosOrdenados = [];  // Lista ordenada para uso em tabela/export
@@ -850,12 +813,13 @@ async function carregarDB(){
     turmas = Array.isArray(dados.turmasDB)     ? dados.turmasDB     : [];
     schoolsMap = dados.schoolsMap || {};
     modoTodasEscolas = !!dados.schoolsMap;
-    const atasData = await window.DB.atas.list();
-    atasDB = Array.isArray(atasData) ? atasData : [];
-    anoAtivo = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+    const _cfg = dados.dadosEscola?.configAnoAtivo;
+    const _cfgV = (_cfg && typeof _cfg === 'object') ? (_cfg.anoAtivo ?? _cfg.ano ?? _cfg.anoLetivo) : _cfg;
+    anoAtivo = (_cfgV || '').toString().replace(/"/g,'').trim();
   }catch(e){
     console.warn('carregarDB Firestore:', e);
-    alunos=[]; turmas=[]; mats=[]; atasDB=[]; anoAtivo='';
+    alunos=[]; turmas=[]; mats=[]; anoAtivo='';
+    _toastErro('Erro ao carregar os dados. Recarregue a página.');
   }
 
   alunos = alunos.map(a => {
@@ -905,12 +869,11 @@ async function carregarDB(){
     mats = Array.from(seen.values());
   })();
 
-  if(!anoAtivo){
-    const anos = new Set();
-    mats.forEach(m => m.anoLetivo && anos.add(m.anoLetivo));
-    const arr = Array.from(anos).sort();
-    anoAtivo = arr.length ? arr[arr.length-1] : "";
-    if(anoAtivo) _salvarAnoAtivo(anoAtivo);
+  // Ano ativo vem só do módulo admin (configAnoAtivo). Único caso sem ano ativo
+  // por escola: "Todas as escolas" (ADMIN) — usa o maior ano das matrículas, sem gravar.
+  if(!anoAtivo && modoTodasEscolas){
+    const anos = Array.from(new Set(mats.map(m => m.anoLetivo).filter(Boolean))).sort();
+    anoAtivo = anos.length ? String(anos[anos.length-1]) : "";
   }
   lblAnoAtivo.textContent = anoAtivo || "—";
 
@@ -1197,8 +1160,9 @@ function _enriquecerComMeta(list){
     return {
       ...a,
       _turno:  (mat && mat.turno)  ? mat.turno.toUpperCase()  : (a.turno||''),
-      _status: (mat && mat.status) ? mat.status.toUpperCase() : (a.status||'ATIVO').toUpperCase(),
+      _status: (mat && mat.status) ? mat.status.toUpperCase() : 'ATIVO',
       _situacao: (mat && mat.situacao) ? mat.situacao.toUpperCase() : '',
+      _situacaoRotulo: _rotuloSituacao(mat && mat.status, mat && mat.situacao),
       _modelo: (mat && mat.modelo) ? mat.modelo.toUpperCase() : 'REGULAR',
       // A foto agora vive na MATRÍCULA (anoAtivoMatriculas), não mais no
       // documento do aluno — por isso sobrescreve fotoUrl/fotoFileId aqui
@@ -1234,17 +1198,11 @@ function alunosFiltradosPorTurmas(turmasScope){
       const atual = _matriculaAtualEntre(lista, ano);
       if(atual && turmaIds.has(atual.turmaId)) alunoIds.add(alunoId);
     });
-  } else {
-    alunos.forEach(a=>{
-      if((!ano || String(a.anoLetivo||ano) === ano) && (turmaIds.size===0 || turmaIds.has(a.turmaId||"")))
-        alunoIds.add(a.alunoId);
-    });
   }
   let list = alunos.filter(a=>a.alunoId && alunoIds.has(a.alunoId));
   list = list.map(a => {
-    if(a.serie) return a;
     const mat = _matriculaAtualEntre(matsPorAluno.get(a.alunoId) || [], ano);
-    return mat ? { ...a, serie: mat.serie || a.serie, turmaId: mat.turmaId || a.turmaId } : a;
+    return { ...a, serie: mat?.serie || '', turmaId: mat?.turmaId || '' };
   });
   const _seriesFiltroSet = new Set(seriesSelecionadas.map(s => normSerie(s)));
   if(_seriesFiltroSet.size > 0) list = list.filter(a => _seriesFiltroSet.has(normSerie(a.serie)));
@@ -1257,15 +1215,13 @@ function alunosFiltradosPorTurmas(turmasScope){
 function alunosFiltradosPorSeries(){
   const ano = anoSelecionadoOuAtivo();
   const seriesSel = seriesSelecionadasNorm();
-  let list = alunos.map(a => {
-    if(a.serie) return a;
-    const mat = _matriculaAtualEntre(mats.filter(m => m.alunoId === a.alunoId), ano);
-    return mat ? { ...a, serie: mat.serie || a.serie } : a;
+  const matsPorAluno = new Map();
+  mats.forEach(m => { if(!matsPorAluno.has(m.alunoId)) matsPorAluno.set(m.alunoId, []); matsPorAluno.get(m.alunoId).push(m); });
+  let list = [];
+  alunos.forEach(a => {
+    const mat = _matriculaAtualEntre(matsPorAluno.get(a.alunoId) || [], ano);
+    if(mat && (!ano || String(mat.anoLetivo) === String(ano))) list.push({ ...a, serie: mat.serie || '', turmaId: mat.turmaId || '' });
   });
-  if(ano){
-    const comMatNoAno = new Set(mats.filter(m => String(m.anoLetivo) === String(ano)).map(m => m.alunoId));
-    list = list.filter(a => String(a.anoLetivo||"") === String(ano) || comMatNoAno.has(a.alunoId));
-  }
   if(seriesSel.size) list = list.filter(a=>seriesSel.has(normSerie(a.serie)));
   list = _enriquecerComMeta(list);
   const _seen = new Set();
@@ -1337,15 +1293,6 @@ function atualizarListas(){
       const escolaBadgeTurma = (modoTodasEscolas && t.schoolId)
         ? `<span class="badge badge-neutral">🏫 ${escapeHtml(schoolsMap[t.schoolId] || t.schoolId)}</span>` : '';
 
-      // Gerar ata só faz sentido pra turma de ano JÁ ENCERRADO (ata de notas
-      // fechando o ano), e só enquanto ainda não existe uma ata gerada pra
-      // essa turma no módulo de atas — depois disso, a edição continua por lá.
-      const ehAnoAtivoDaTurma = String(t.anoLetivo).trim() === String(anoAtivo).trim();
-      const ataIdDaTurma = (t.turmaId || '').replace(/-AATIVO$/, '') + '-AATIVO';
-      const ataJaGerada = atasDB.some(x => (x.turmaId||x.id) === ataIdDaTurma);
-      const botaoGerarAta = (!ehAnoAtivoDaTurma && !ataJaGerada)
-        ? `<button type="button" class="btn primary small" onclick="gerarAtaDaTurma('${t.turmaId}')">📋 Gerar ata</button>`
-        : '';
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
         <div class="left" style="flex:1;min-width:0;">
@@ -1363,7 +1310,6 @@ function atualizarListas(){
           </div>
         </div>
         <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-          ${botaoGerarAta}
           <label class="check-all"><input type="checkbox" class="chkTurma" data-turma="${t.turmaId}"> Selecionar</label>
         </div>
       `;
@@ -1610,7 +1556,7 @@ async function abrirFichaAluno(alunoId){
       ${fotoHtml}
       <div>
         <b>${escapeHtml(a.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(a.alunoId||'—')}
-        &nbsp;•&nbsp; Situação: ${escapeHtml(a._status || a.status || 'ATIVO')}
+        &nbsp;•&nbsp; Situação: ${escapeHtml(a._situacaoRotulo || _rotuloSituacao(a._status, a._situacao))}
       </div>
     </div>`;
 
@@ -1740,8 +1686,9 @@ function enriquecerAlunos(lista){
       serie:      matSerie ? (matSerie.serie || a.serie) : a.serie,
       turmaId:    turmaIdResolvido,
       _turno:     (matMeta && matMeta.turno)  ? matMeta.turno.toUpperCase()  : (a.turno  || ''),
-      _status:    (matMeta && matMeta.status) ? matMeta.status.toUpperCase() : (a.status || 'ATIVO').toUpperCase(),
+      _status:    (matMeta && matMeta.status) ? matMeta.status.toUpperCase() : 'ATIVO',
       _situacao:  (matMeta && matMeta.situacao) ? matMeta.situacao.toUpperCase() : '',
+      _situacaoRotulo: _rotuloSituacao(matMeta && matMeta.status, matMeta && matMeta.situacao),
       _modelo:    (matMeta && matMeta.modelo) ? matMeta.modelo.toUpperCase() : 'REGULAR',
       _neeResumo: neeItens.join(', ') || '—',
     };
@@ -2333,7 +2280,7 @@ function exportFichasIndividuais(titulo, alunosList){
       { titulo: 'Matrícula', campos: [
         ['Turma', '_turmaNome'], ['Professor(a)', '_professorNome'],
         ['Turno', '_turno'], ['Modelo', '_modelo'],
-        ['Status', '_status'], ['Situação', '_situacao'],
+        ['Situação', '_situacaoRotulo'],
       ]},
       { titulo: 'Endereço', campos: [
         ['País', 'pais'], ['Zona', 'zona'], ['CEP', 'cep'],
@@ -2654,145 +2601,6 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 })();
 
 /* =========================
-   Auto refresh
-========================= */
-async function maybeAutoRefresh(){
-  const now = Date.now();
-  if(now - __lastLoadAt < __MIN_REFRESH_MS) return;
-  __lastLoadAt = now;
-  
-  // Salvar estado das checkboxes de turma e do ano selecionado antes de
-  // recarregar. carregarDB() reconstrói o <select> do ano do zero e
-  // sempre volta pro ano ativo (comportamento certo na PRIMEIRA carga da
-  // página) — mas aqui, no auto-refresh (troca de aba, Alt+Tab), isso
-  // descartava silenciosamente qualquer ano retroativo que o usuário
-  // tivesse selecionado, porque só a carga inicial chama
-  // restaurarEstadoPagina(); o auto-refresh nunca restaurava nada.
-  const turmasMarcadas = Array.from(document.querySelectorAll('.chkTurma:checked'))
-    .map(cb => cb.dataset.turma).filter(Boolean);
-  const anoAntesDoRefresh = selAno.value;
-  
-  await carregarDB(); renderChips();
-  if(anoAntesDoRefresh && Array.from(selAno.options).some(o => o.value === anoAntesDoRefresh)){
-    selAno.value = anoAntesDoRefresh;
-  }
-  if(_jaFoiPesquisado) {
-    atualizarListas();
-    // Restaurar checkboxes de turma após renderização
-    setTimeout(() => {
-      turmasMarcadas.forEach(turmaId => {
-        const cb = document.querySelector(`.chkTurma[data-turma="${turmaId}"]`);
-        if(cb){ cb.checked = true; }
-      });
-      if(turmasMarcadas.length){ syncCheckAllTurmas(); atualizarListaAlunos(); }
-    }, 100);
-  }
-}
-window.addEventListener("pageshow", ()=> maybeAutoRefresh());
-// focus removido: visibilitychange já cobre retorno de aba/janela
-document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") maybeAutoRefresh(); });
-
-/* =========================
-   Gerar ata
-========================= */
-function _lerTurmasAtas(){ return atasDB.slice(); }
-function _salvarTurmasAtas(lista){
-  atasDB = lista;
-  try{
-    if(window.DB?.turmas && window.Auth?.getSession?.())
-      window.DB.turmas.saveAll(lista).catch(e=>console.warn('Firestore turmasDB:', e));
-  }catch(e){ console.warn('_salvarTurmasAtas:', e); }
-}
-function _mostrarToast(title, sub, autoClose, ano){
-  const t = document.getElementById('toastGerarAta'); if(!t) return;
-  document.getElementById('toastTitle').textContent = title;
-  document.getElementById('toastSub').textContent   = sub;
-  const link = document.getElementById('toastLink');
-  if(link){ const base = '../atas/pesquisa-ata.html'; link.href = ano ? `${base}?ano=${encodeURIComponent(ano)}` : base; }
-  t.classList.add('visible');
-  if(autoClose) setTimeout(()=> t.classList.remove('visible'), autoClose);
-}
-async function _lerSchemas(){
-  try{ return await window.DB.schemas.listRules(); }catch(e){ console.warn('Erro ao carregar schemas:', e); return []; }
-}
-function _getActiveSchemaId(){ return localStorage.getItem('turmasSchemaActiveId_v1') || ''; }
-function _schemaPreviewText(schema){
-  if(!schema) return '';
-  return (schema.colunas||[]).filter(c=>c.enabled!==false).map(c=>c.label||c.key).join(' • ') || '(sem colunas)';
-}
-
-async function gerarAtaDaTurma(turmaId){
-  const turmaAA = turmas.find(t => t.turmaId === turmaId);
-  if(!turmaAA){ setMsg('Turma não encontrada.', 'err'); return; }
-  const matsDestaT = mats.filter(m => m.turmaId === turmaId);
-  const alunosDestaT = matsDestaT.map(m => {
-    const alu = alunos.find(a => (a.alunoId||a.id) === m.alunoId) || {};
-    return { nome: alu.nomeOficial || alu.nome || m.nomeRaw || '', alunoId: m.alunoId || '', serie: m.serie || (Array.isArray(turmaAA.series) ? turmaAA.series[0] : '') || '', resultado: '' };
-  }).filter(a => a.nome);
-  const ataId = (turmaAA.turmaId || turmaId).replace(/-AATIVO$/, '') + '-AATIVO';
-  const atasDBLocal = _lerTurmasAtas();
-  const idxExist = atasDBLocal.findIndex(t => (t.turmaId||t.id) === ataId);
-  const ataExist = idxExist >= 0 ? atasDBLocal[idxExist] : null;
-  const qtdNotas = ataExist ? (ataExist.alunos||[]).filter(a => Object.values(a).some(v => v && v !== '' && v !== a.nome && v !== a.alunoId && v !== a.serie)).length : 0;
-  const schemas = await _lerSchemas();
-  const activeId = ataExist?.schemaId || _getActiveSchemaId();
-  const sel = document.getElementById('modalSchemaSelect');
-  sel.innerHTML = '<option value="">(usar colunas padrão — sem schema)</option>';
-  schemas.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id || s.nome || ''; opt.textContent = s.nome + (s.id === activeId ? ' ⭐ padrão' : '');
-    if(s.id === activeId) opt.selected = true; sel.appendChild(opt);
-  });
-  function atualizarPreview(){
-    const s = schemas.find(x => (x.id||x.nome) === sel.value);
-    document.getElementById('modalSchemaPreview').textContent = s ? 'Colunas: ' + _schemaPreviewText(s) : 'Sem schema — usará as colunas padrão do sistema.';
-  }
-  sel.onchange = atualizarPreview; atualizarPreview();
-  const series = Array.isArray(turmaAA.series) ? turmaAA.series : (turmaAA.serie ? [turmaAA.serie] : []);
-  const serieTexto = series.join(' e ') || turmaAA.nome || '—';
-  document.getElementById('modalGerarAtaTitulo').textContent = `📋 Gerar ata — ${turmaAA.nome || serieTexto} (${turmaAA.anoLetivo||'—'})`;
-  document.getElementById('modalGerarAtaSub').textContent = `${alunosDestaT.length} aluno(s) serão incluídos.`;
-  const aviso = document.getElementById('modalGerarAtaAviso');
-  if(ataExist){
-    aviso.style.display = 'block';
-    aviso.textContent = qtdNotas ? `⚠️ Esta turma já tem uma ata (${ataId}). ${qtdNotas} aluno(s) têm notas — serão preservadas.` : `Esta turma já tem uma ata (${ataId}). Ela será atualizada com a lista atual de alunos.`;
-    if(ataExist.schemaId){ const opt = [...sel.options].find(o => o.value === ataExist.schemaId); if(opt){ sel.value = ataExist.schemaId; atualizarPreview(); } }
-    document.getElementById('modalGerarAtaConfirmar').textContent = '📋 Atualizar ata';
-  } else {
-    aviso.style.display = 'none';
-    document.getElementById('modalGerarAtaConfirmar').textContent = '📋 Gerar ata';
-  }
-  const modal = document.getElementById('modalGerarAta');
-  modal.style.display = 'flex';
-  document.getElementById('modalGerarAtaCancelar').onclick = () => { modal.style.display='none'; };
-  modal.onclick = (e) => { if(e.target === modal) modal.style.display='none'; };
-  document.getElementById('modalGerarAtaConfirmar').onclick = () => {
-    modal.style.display = 'none';
-    const schemaId = sel.value, schema = schemas.find(s => (s.id||s.nome) === schemaId) || null;
-    _executarGerarAta(turmaAA, alunosDestaT, ataId, serieTexto, series, atasDBLocal, idxExist, ataExist, qtdNotas, schemaId, schema);
-  };
-}
-
-function _executarGerarAta(turmaAA, alunosDestaT, ataId, serieTexto, series, atasDBArr, idxExist, ataExist, qtdNotas, schemaId, schema){
-  const ataObj = {
-    id: ataId, turmaId: ataId, aba: '', anoLetivo: String(turmaAA.anoLetivo || ''),
-    turno: turmaAA.turno || '', nome: turmaAA.nome || serieTexto, serie: serieTexto,
-    serieTexto, professor: turmaAA.professor || '', series, origem: 'ano-ativo',
-    schemaId: schemaId || '', schemaSnapshot: schema || null, criadoEm: new Date().toISOString(), alunos: [],
-  };
-  if(ataExist){
-    const notasMap = {};
-    (ataExist.alunos||[]).forEach(a => { if(a.alunoId) notasMap[a.alunoId] = a; });
-    ataObj.alunos = alunosDestaT.map(a => { const exist = notasMap[a.alunoId]; return exist ? {...exist, nome: a.nome || exist.nome, serie: a.serie || exist.serie} : a; });
-    atasDBArr[idxExist] = ataObj;
-  } else { ataObj.alunos = alunosDestaT; atasDBArr.push(ataObj); }
-  _salvarTurmasAtas(atasDBArr);
-  _mostrarToast(ataExist ? '📋 Ata atualizada!' : '📋 Ata criada!',
-    `${turmaAA.nome || serieTexto} (${turmaAA.anoLetivo||'—'}) → ${alunosDestaT.length} aluno(s) • Schema: ${schema ? schema.nome : 'padrão'}.`,
-    12000, turmaAA.anoLetivo || '');
-}
-
-/* =========================
    Salvar/Restaurar estado da página
 ========================= */
 function salvarEstadoPagina(){
@@ -2909,7 +2717,11 @@ function restaurarEstadoPagina(){
 ========================= */
 (async function init(){
   await carregarDB();
-  __lastLoadAt = Date.now(); // setado antes de restaurar para bloquear maybeAutoRefresh imediato
+  if(!anoAtivo){
+    listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
+    listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
+    Loading.esconder(); return;
+  }
   
   // Tentar restaurar estado salvo
   const estadoRestaurado = restaurarEstadoPagina();
@@ -2932,7 +2744,7 @@ function restaurarEstadoPagina(){
   window.addEventListener('beforeunload', ()=>{
     // Só salva se estiver indo para a página de edição
     const destino = document.__pesquisaDestino || '';
-    if(destino.includes('editar-aluno-ativo')) salvarEstadoPagina();
+    if(destino.includes('cadastro-aluno-ativo') || destino.includes('readmitir-aluno')) salvarEstadoPagina();
     else sessionStorage.removeItem('pesquisaAnoAtivoEstado');
   });
   Loading.esconder();
@@ -2940,41 +2752,6 @@ function restaurarEstadoPagina(){
 
 })();
 </script>
-
-<!-- Modal: schema para gerar ata -->
-<div id="modalGerarAta" style="display:none;position:fixed;inset:0;z-index:9998;
-  background:rgba(15,23,42,.65);backdrop-filter:blur(3px);
-  align-items:center;justify-content:center;padding:16px;">
-  <div style="background:var(--card-bg,#fff);border-radius:18px;border:1px solid var(--card-border);
-    box-shadow:0 24px 48px rgba(0,0,0,.25);max-width:460px;width:100%;padding:28px 28px 22px;">
-    <h3 style="margin:0 0 6px;font-size:17px;" id="modalGerarAtaTitulo">📋 Gerar ata</h3>
-    <p style="margin:0 0 18px;font-size:13px;color:var(--muted);" id="modalGerarAtaSub"></p>
-    <label style="font-size:12px;font-weight:700;display:block;margin-bottom:6px;">Schema de disciplinas</label>
-    <select id="modalSchemaSelect"
-      style="width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--card-border);
-             font-size:14px;background:var(--card-bg);color:var(--ink);margin-bottom:6px;"></select>
-    <div id="modalSchemaPreview" style="font-size:12px;color:var(--muted);margin-bottom:18px;min-height:18px;"></div>
-    <div id="modalGerarAtaAviso"
-      style="display:none;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;
-             padding:10px 14px;font-size:13px;color:#92400e;margin-bottom:16px;"></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button type="button" id="modalGerarAtaCancelar"
-        style="padding:9px 18px;border-radius:10px;border:1.5px solid var(--card-border);
-               background:var(--card-bg);cursor:pointer;font-size:13px;font-weight:700;">Cancelar</button>
-      <button type="button" id="modalGerarAtaConfirmar"
-        style="padding:9px 18px;border-radius:10px;border:none;
-               background:#8b1a1a;color:#fff;cursor:pointer;font-size:13px;font-weight:700;">📋 Gerar ata</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div id="toastGerarAta" style="position:fixed;">
-  <button class="toast-close" onclick="document.getElementById('toastGerarAta').classList.remove('visible')">✕</button>
-  <div class="toast-title" id="toastTitle">📋 Ata salva!</div>
-  <div class="toast-sub" id="toastSub">Vá até a área de atas para inserir ou editar as notas e nomes.</div>
-  <a class="toast-btn" href="../atas/pesquisa-ata.html" id="toastLink">Ver na pesquisa de atas →</a>
-</div>
 
 </body>
 </html>
