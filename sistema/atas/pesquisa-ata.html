@@ -108,10 +108,13 @@ html[data-theme="dark"] .btn.primary:hover {
   border-color: var(--brand-hover-d);
 }
 
-.chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.filters { align-items:start; }
+#campoSerie { min-width:0; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .chips:empty { display:none; }
-.chip { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--card-border); background:var(--chip-bg); color:var(--chip-color); padding:7px 12px; border-radius:999px; font-size:13px; font-weight:700; }
-.chip button { border:0; background:transparent; cursor:pointer; color:var(--chip-color); font-weight:900; font-size:14px; line-height:1; padding:0; }
+/* cores FIXAS: iguais no tema claro e no escuro (não usam --brand/--chip-*) */
+.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #c7d2fe; background:#e0e7ff; color:#312e81; padding:5px 10px; border-radius:999px; font-size:12.5px; font-weight:700; max-width:100%; }
+.chip button { border:0; background:transparent; cursor:pointer; color:#312e81; font-weight:900; font-size:14px; line-height:1; padding:0; }
 .serie-add-row { display:flex; gap:8px; align-items:stretch; }
 .serie-add-row select { flex:1; min-width:0; }
 
@@ -303,12 +306,13 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
         </select>
       </div>
 
-      <div class="field">
+      <div class="field" id="campoSerie">
         <label for="selSerieAdd">Filtrar por série</label>
         <div class="serie-add-row">
           <select id="selSerieAdd"><option value="">(selecione)</option></select>
           <button class="btn primary" id="btnAddSerie" type="button" style="white-space:nowrap;">+ Adicionar</button>
         </div>
+        <div class="chips" id="chipsSeries"></div>
       </div>
 
       <div class="field">
@@ -316,8 +320,6 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
         <input id="fBusca" type="text" placeholder="Procura por aba, arquivo, série ou aluno...">
       </div>
     </div>
-
-    <div class="chips" id="chipsSeries"></div>
 
     <div class="filter-actions" style="display:flex; align-items:center; gap:2px;">
       <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
@@ -343,7 +345,7 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
       <div class="aluno-search-actions">
         <label class="aluno-search-checkbox">
           <input type="checkbox" id="alunoParcial" checked>
-          Buscar por parte do nome
+          Início do nome (desmarque para nome exato)
         </label>
         <button class="btn primary" type="button" onclick="pesquisarAluno()">Pesquisar</button>
         <button class="btn secondary" type="button" onclick="limparPesquisaAluno()">Limpar</button>
@@ -725,14 +727,30 @@ function renderChipsSeries() {
   });
 }
 
-function preencherFiltroAno(turmas) {
+// Anos do filtro: lista fixa (ano seguinte → ANO_MIN_ATAS), pra NÃO precisar ler as turmas só pra montar o select.
+const ANO_MIN_ATAS = 2000;
+function preencherFiltroAno() {
   const sel = document.getElementById("fAno");
-  const anos = Array.from(new Set(turmas.map(t => String(t.anoLetivo || "").trim()).filter(Boolean)))
-    .sort((a,b)=>b.localeCompare(a,'pt-BR')); // decrescente — ano mais recente primeiro
-
-  const atual = sel.value;
+  const anos = [];
+  for (let a = new Date().getFullYear() + 1; a >= ANO_MIN_ATAS; a--) anos.push(String(a));
   sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
-  sel.value = anos.includes(atual) ? atual : "";
+}
+
+// Busca no Firestore SÓ o que os filtros pedem (ano/turno viram query; o resto filtra no cliente).
+// Cache por sessão da página: repetir a mesma pesquisa não lê de novo.
+const _cacheBuscaTurmas = new Map();
+async function buscarTurmasNoBanco() {
+  const ano = document.getElementById("fAno").value.trim();
+  const turno = document.getElementById("fTurno").value.trim();
+  const chave = ano + "|" + turno;
+  if (_cacheBuscaTurmas.has(chave)) return _cacheBuscaTurmas.get(chave);
+  let r;
+  if (ano && turno)  r = await DB.turmas.whereEquals("anoLetivo", ano, { and: [["turno", turno]] });
+  else if (ano)      r = await DB.turmas.whereEquals("anoLetivo", ano);
+  else if (turno)    r = await DB.turmas.whereEquals("turno", turno);
+  else               r = await DB.turmas.list();   // "Todos" sem filtro: leitura completa, só porque você pediu
+  _cacheBuscaTurmas.set(chave, r);
+  return r;
 }
 
 /* =========================
@@ -814,6 +832,23 @@ function renderListaTurmas(lista) {
 /* =========================
    Selecionar turma
 ========================= */
+// Abre uma turma que pode não estar na lista atual (ex.: vinda da pesquisa por aluno): lê só ela (1 leitura).
+async function abrirTurmaPorId(id) {
+  if (!turmas.some(t => (t.id || t._id || t.turmaId) === id)) {
+    try {
+      const t = await DB.turmas.get(id);
+      if (!t) { setMsg("Turma não encontrada.", "err"); return; }
+      turmasTodas.push(t);
+      recomputarTurmasBase();
+    } catch(e) {
+      console.warn("[pesquisa-ata] abrirTurmaPorId:", e);
+      setMsg("Não foi possível abrir a turma. Tente novamente.", "err"); return;
+    }
+  }
+  selecionarTurma(id);
+}
+window.abrirTurmaPorId = abrirTurmaPorId;
+
 function selecionarTurma(id) {
   turmaSelecionada = turmas.find(t => (t.id || t._id || t.turmaId) === id) || null;
 
@@ -962,14 +997,10 @@ function renderResumoTurma(t) {
    Aplicar filtros
 ========================= */
 function aplicarFiltros() {
-  const fAno = document.getElementById("fAno").value.trim();
-  const fTurno = document.getElementById("fTurno").value.trim();
   const fBusca = norm(document.getElementById("fBusca").value);
 
   let lista = turmas.slice();
 
-  if (fAno) lista = lista.filter(t => String(t.anoLetivo || "").trim() === fAno);
-  if (fTurno) lista = lista.filter(t => String(t.turno || "").trim() === fTurno);
   if (seriesSelecionadas.length) {
     const alvo = seriesSelecionadas.map(serieChave);
     lista = lista.filter(t => { const ds = seriesDaTurma(t); return alvo.some(x => ds.has(x)); });
@@ -1310,35 +1341,41 @@ async function carregar() {
     });
 
     await carregarCatalogoNomes();
-
-    turmasTodas = (window.DB && window.DB.turmas && typeof window.DB.turmas.list === "function")
-      ? await window.DB.turmas.list()
-      : [];
   }catch(e){
-    console.warn('[pesquisa-ata] Falha ao carregar turmas do Firestore:', e);
-    turmasTodas = [];
-    falhaTurmas = true; // distinto de "carregou certinho e não tem turma nenhuma"
+    console.warn('[pesquisa-ata] Falha na inicialização:', e);
+    falhaTurmas = true;
   }
 
   recomputarTurmasBase();
 
   document.getElementById("dbInfoTip").textContent =
-    `${turmas.length} turma(s) — aperte em "Pesquisar" para exibir todas ou selecione um filtro.`;
+    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano e o turno escolhidos. Sem ano nem turno, a pesquisa lê todas as turmas.`;
 
-  preencherFiltroAno(turmas);
+  preencherFiltroAno();
 
   document.getElementById("listaTurmas").innerHTML =
-    `<div class="list-item"><span class="muted">Clique em <b>🔍 Pesquisar</b> para carregar as turmas.</span></div>`;
+    `<div class="list-item"><span class="muted">Escolha os filtros e clique em <b>🔍 Pesquisar</b>.</span></div>`;
   document.getElementById("detalhesVazio").style.display = "block";
   document.getElementById("detalhesBox").style.display = "none";
 
-  document.getElementById("btnPesquisar").onclick = function(){
-    _jaFoiPesquisado = true;
-    aplicarFiltros();
+  document.getElementById("btnPesquisar").onclick = async function(){
+    const btn = this, box = document.getElementById("listaTurmas");
+    btn.disabled = true;
+    box.innerHTML = `<div class="list-item"><span class="muted">Buscando turmas…</span></div>`;
+    try {
+      turmasTodas = await buscarTurmasNoBanco();
+      recomputarTurmasBase();
+      _jaFoiPesquisado = true;
+      aplicarFiltros();
+    } catch(e) {
+      console.warn("[pesquisa-ata] Falha ao buscar turmas:", e);
+      box.innerHTML = `<div class="list-item"><span class="muted">Não foi possível buscar as turmas agora.</span></div>`;
+      setMsg("Não foi possível buscar as turmas. Tente novamente.", "err");
+    } finally {
+      btn.disabled = false;
+    }
   };
-
-  document.getElementById("fAno").onchange    = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
-  document.getElementById("fTurno").onchange  = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
+  // Ano e turno só valem ao clicar em Pesquisar (viram consulta ao banco). Série e busca geral refinam o que já foi buscado.
   preencherFiltroSerie();
   document.getElementById("btnAddSerie").onclick = function(){
     const sel = document.getElementById("selSerieAdd");
@@ -1356,7 +1393,7 @@ async function carregar() {
     document.getElementById("fBusca").value = "";
     seriesSelecionadas = [];
     renderChipsSeries();
-    if (_jaFoiPesquisado) aplicarFiltros();
+    if (_jaFoiPesquisado) aplicarFiltros();   // só reaplica sobre o já buscado; para nova consulta, clique em Pesquisar
   };
   document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
 
@@ -1409,7 +1446,10 @@ document.addEventListener("DOMContentLoaded", carregar);
     if (out) out.innerHTML = "";
   };
 
-  window.pesquisarAluno = function(){
+  let _alunoSeq = 0;
+  // Consulta direcionada (sem baixar turmas): alunos-atas por prefixo do nome → matrículas desses alunos.
+  // Custo ≈ alunos encontrados (máx. 10) + matrículas deles. A turma só é lida quando você clica em "Abrir".
+  window.pesquisarAluno = async function(){
     const qEl = document.getElementById("alunoQuery");
     const parcialEl = document.getElementById("alunoParcial");
     const out = document.getElementById("alunoResultados");
@@ -1420,59 +1460,63 @@ document.addEventListener("DOMContentLoaded", carregar);
     }
 
     const termo = normNome(qEl.value);
-    const parcial = !!(parcialEl && parcialEl.checked);
+    const prefixo = !!(parcialEl && parcialEl.checked);   // marcado: início do nome; desmarcado: nome exato
 
     if (!termo) { setMsg("Digite o nome do aluno.", "err"); return; }
-
-    if (typeof window.obterTurmas !== "function") {
-      setMsg("Erro: turmas ainda não carregadas.", "err");
-      return;
+    if (termo.length < 3) { setMsg("Digite ao menos 3 letras do nome.", "err"); return; }
+    if (!(window.Identidade && Identidade.buscarAtasPorNome && window.DB && DB.matriculas && DB.matriculas.whereIn)) {
+      setMsg("Erro: módulo de busca indisponível.", "err"); return;
     }
 
-    const db = window.obterTurmas();
-    const achados = [];
+    const seq = ++_alunoSeq;
+    out.innerHTML = `<div class="aluno-not-found">Buscando…</div>`;
+    try {
+      const LIMITE = 10;
+      let alunos = await Identidade.buscarAtasPorNome(termo, LIMITE + 1);
+      const temMais = alunos.length > LIMITE;
+      alunos = alunos.slice(0, LIMITE);
+      if (!prefixo) alunos = alunos.filter(a => normNome(a.nome) === termo);
+      const mats = alunos.length ? await DB.matriculas.whereIn("alunoId", alunos.map(a => a.alunoId)) : [];
+      if (seq !== _alunoSeq) return;
 
-    for (const t of (db || [])){
-      const alunos = Array.isArray(t?.alunos) ? t.alunos : [];
-      for (const a of alunos){
-        const nomeA = normNome(window.nomeAtual ? window.nomeAtual(a) : a?.nome);
-        if (!nomeA) continue;
-        const ok = parcial ? nomeA.includes(termo) : (nomeA === termo);
-        if (!ok) continue;
-        achados.push({
-          aluno: window.nomeAtual ? window.nomeAtual(a) : (a?.nome || ""),
-          ano: t?.anoLetivo || "",
-          serie: a?.serie || t?.serieTexto || "",
-          turno: t?.turno || "",
-          id: t?.id || t?._id || t?.turmaId || ""
-        });
+      const nomePorId = new Map(alunos.map(a => [a.alunoId, a.nome]));
+      const achados = mats.map(m => ({
+        aluno: nomePorId.get(m.alunoId) || m.nomeRaw || "",
+        ano: m.anoLetivo || "",
+        serie: m.serie || "",
+        resultado: m.resultado || "",
+        id: m.turmaId || ""
+      })).filter(h => h.id);
+
+      if (!achados.length){
+        out.innerHTML = `<div class="aluno-not-found">
+          Nenhuma ocorrência encontrada para <b>${escapeHtml(qEl.value)}</b>.
+        </div>`;
+        return;
       }
-    }
 
-    if (!achados.length){
-      out.innerHTML = `<div class="aluno-not-found">
-        Nenhuma ocorrência encontrada para <b>${escapeHtml(qEl.value)}</b>.
-      </div>`;
-      return;
-    }
+      achados.sort((x,y)=>{
+        const ax = parseInt(String(x.ano||"0"),10) || 0;
+        const ay = parseInt(String(y.ano||"0"),10) || 0;
+        if (ax !== ay) return ax - ay;
+        return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
+      });
 
-    achados.sort((x,y)=>{
-      const ax = parseInt(String(x.ano||"0"),10) || 0;
-      const ay = parseInt(String(y.ano||"0"),10) || 0;
-      if (ax !== ay) return ax - ay;
-      return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
-    });
-
-    out.innerHTML = achados.map(h => `
+      out.innerHTML = achados.map(h => `
       <div class="aluno-result-row">
         <div class="aluno-result-info">
-          <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — ${escapeHtml(h.turno || "?")} — <span style="font-weight:700;">${escapeHtml(h.aluno || "")}</span></div>
+          <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — <span style="font-weight:700;">${escapeHtml(h.aluno)}</span>${h.resultado ? " — " + escapeHtml(h.resultado) : ""}</div>
         </div>
         <div class="aluno-result-actions">
-          <button class="btn ghost small" type="button" onclick="(window.selecionarTurma||function(){setMsg('Função Abrir não encontrada.','err');})('${h.id}')">Abrir</button>
+          <button class="btn ghost small" type="button" onclick="abrirTurmaPorId('${escapeHtml(h.id)}')">Abrir</button>
         </div>
       </div>
-    `).join("");
+    `).join("") + (temMais ? `<div class="aluno-not-found">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
+    } catch(e) {
+      if (seq !== _alunoSeq) return;
+      console.warn("[pesquisa-ata] pesquisarAluno:", e);
+      out.innerHTML = `<div class="aluno-not-found">Não foi possível pesquisar agora. Tente novamente.</div>`;
+    }
   };
 
   document.addEventListener("DOMContentLoaded", function(){
