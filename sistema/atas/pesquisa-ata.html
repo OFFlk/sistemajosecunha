@@ -685,11 +685,12 @@ function formatarListaBonita(arr) {
 /* =========================
    Render filtros
 ========================= */
-// Lista fixa = as séries que podem ser cadastradas (mesma de cadastro-turmas.html → serieOptions)
+// Lista fixa = as séries que podem ser cadastradas (IDÊNTICA a cadastro-turmas.html → serieOptions)
 const SERIES_FILTRO = [
   "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
   "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
-  "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano"
+  "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano",
+  "Multisseriada"
 ];
 let seriesSelecionadas = [];
 
@@ -729,10 +730,28 @@ function renderChipsSeries() {
 
 // Anos do filtro: lista fixa (ano seguinte → ANO_MIN_ATAS), pra NÃO precisar ler as turmas só pra montar o select.
 const ANO_MIN_ATAS = 2000;
-function preencherFiltroAno() {
+// Índice de anos (schools/{escola}.atasIndice.anos): 1 leitura do doc da escola, mantido por cadastro-turmas
+// (acrescenta ao salvar) e gestao-atas (reconstruir). Devolve null se faltar/falhar → usa a lista fixa.
+async function carregarAnosDoIndice() {
+  try {
+    const esc = await DB.escola.get();
+    const lista = esc && esc.atasIndice && esc.atasIndice.anos;
+    if (Array.isArray(lista)) {
+      const anos = lista.map(String).filter(a => /^\d{4}$/.test(a)).sort((x, y) => y.localeCompare(x));
+      if (anos.length) return anos;
+    }
+  } catch (e) {
+    console.warn("[pesquisa-ata] Falha ao ler o índice de anos:", e);
+  }
+  return null;
+}
+function preencherFiltroAno(anosIndice) {
   const sel = document.getElementById("fAno");
-  const anos = [];
-  for (let a = new Date().getFullYear() + 1; a >= ANO_MIN_ATAS; a--) anos.push(String(a));
+  let anos = anosIndice;
+  if (!anos || !anos.length) {
+    anos = [];
+    for (let a = new Date().getFullYear() + 1; a >= ANO_MIN_ATAS; a--) anos.push(String(a));
+  }
   sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
 }
 
@@ -745,8 +764,17 @@ async function buscarTurmasNoBanco() {
   const chave = ano + "|" + turno;
   if (_cacheBuscaTurmas.has(chave)) return _cacheBuscaTurmas.get(chave);
   let r;
-  if (ano && turno)  r = await DB.turmas.whereEquals("anoLetivo", ano, { and: [["turno", turno]] });
-  else if (ano)      r = await DB.turmas.whereEquals("anoLetivo", ano);
+  if (ano) {
+    // anoLetivo pode estar gravado como texto OU número (cadastro-atas grava texto, cadastro-turmas grava número):
+    // duas consultas em paralelo, juntadas sem repetir. Cada turma tem o ano de um tipo só → mesmas leituras de uma consulta única.
+    const extra = turno ? { and: [["turno", turno]] } : {};
+    const [porTexto, porNumero] = await Promise.all([
+      DB.turmas.whereEquals("anoLetivo", ano, extra),
+      DB.turmas.whereEquals("anoLetivo", Number(ano), extra)
+    ]);
+    const vistos = new Set();
+    r = [...porTexto, ...porNumero].filter(t => !vistos.has(t._id) && vistos.add(t._id));
+  }
   else if (turno)    r = await DB.turmas.whereEquals("turno", turno);
   else               r = await DB.turmas.list();   // "Todos" sem filtro: leitura completa, só porque você pediu
   _cacheBuscaTurmas.set(chave, r);
@@ -1349,9 +1377,9 @@ async function carregar() {
   recomputarTurmasBase();
 
   document.getElementById("dbInfoTip").textContent =
-    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano e o turno escolhidos. Sem ano nem turno, a pesquisa lê todas as turmas.`;
+    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano e o turno escolhidos. Sem ano nem turno, a pesquisa lê todas as turmas. Os anos do filtro vêm do índice mantido em Gestão de Atas.`;
 
-  preencherFiltroAno();
+  preencherFiltroAno(await carregarAnosDoIndice());
 
   document.getElementById("listaTurmas").innerHTML =
     `<div class="list-item"><span class="muted">Escolha os filtros e clique em <b>🔍 Pesquisar</b>.</span></div>`;
