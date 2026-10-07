@@ -699,6 +699,7 @@ function _statusSituacaoFiltroAtual(){
   const naoConcluintes = document.getElementById('chkNaoConcluintes')?.checked;
   const selVal = document.getElementById('selSituacaoPassado')?.value || '';
   const grupo = naoConcluintes ? ['TRANSFERIDO','DESISTENTE','FALECIDO'] : ['APROVADO','REPROVADO'];
+  if(selVal === '__SEM__') return { status: '', situacao: '', situacaoIn: null, semSituacao: true };
   return { status: '', situacao: selVal, situacaoIn: selVal ? null : grupo };
 }
 function _atualizarOpcoesSituacaoPassado(){
@@ -710,10 +711,12 @@ function _atualizarOpcoesSituacaoPassado(){
     ? `<option value="">Todas (não concluíram)</option>
        <option value="TRANSFERIDO">Transferido</option>
        <option value="DESISTENTE">Desistente</option>
-       <option value="FALECIDO">Faleceu</option>`
+       <option value="FALECIDO">Faleceu</option>
+       <option value="__SEM__">Sem situação (pendentes)</option>`
     : `<option value="">Todas (concluíram o ano)</option>
        <option value="APROVADO">Aprovado</option>
-       <option value="REPROVADO">Reprovado</option>`;
+       <option value="REPROVADO">Reprovado</option>
+       <option value="__SEM__">Sem situação (pendentes)</option>`;
   // Mantém o valor escolhido se ele ainda existir entre as novas opções
   sel.value = [...sel.options].some(o => o.value === valorAtual) ? valorAtual : '';
 }
@@ -801,28 +804,12 @@ const btnToggleSort = document.getElementById("btnToggleSort");
 /* =========================
    Carregar DB
 ========================= */
-async function carregarDB(){
-  try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
-    const dados = await window.DB.loadAllAnoAtivo();
-    alunos = Array.isArray(dados.alunosDB)     ? dados.alunosDB     : [];
-    mats   = Array.isArray(dados.matriculasDB) ? dados.matriculasDB : [];
-    turmas = Array.isArray(dados.turmasDB)     ? dados.turmasDB     : [];
-    schoolsMap = dados.schoolsMap || {};
-    modoTodasEscolas = !!dados.schoolsMap;
-    const _cfg = dados.dadosEscola?.configAnoAtivo;
-    const _cfgV = (_cfg && typeof _cfg === 'object') ? (_cfg.anoAtivo ?? _cfg.ano ?? _cfg.anoLetivo) : _cfg;
-    anoAtivo = (_cfgV || '').toString().replace(/"/g,'').trim();
-  }catch(e){
-    console.warn('carregarDB Firestore:', e);
-    alunos=[]; turmas=[]; mats=[]; anoAtivo='';
-    _toastErro('Erro ao carregar os dados. Recarregue a página.');
-  }
-
-  alunos = alunos.map(a => {
+/* Leitura sob demanda: matrículas só do ano selecionado, alunos só das turmas marcadas */
+let _semEscola = false, _listaTok = 0;
+const _matsPorAno = new Map();
+let _alunosCarregados = new Set();
+function _normalizarAlunos(lista){
+  return lista.map(a => {
     const idadeRaw = (a.idade || a.IDADE || "").toString().trim();
     const nasc     = (a.dataNascimento || a["DATA DE NASCIMENTO"] || a.nascimento || a.NASC || "").trim();
     return {
@@ -840,6 +827,64 @@ async function carregarDB(){
       idade:          idadeRaw || calcIdade(nasc), // calculado uma única vez no carregamento
     };
   });
+}
+function _dedupMats(arr){
+  const seen = new Map();
+  arr.forEach(m => {
+    const key = `${m.turmaId}|${m.alunoId}|${m.anoLetivo}`;
+    if(!seen.has(key)){ seen.set(key, m); }
+    else { const prev = seen.get(key); if(!prev.serie && m.serie) seen.set(key, m); }
+  });
+  return Array.from(seen.values());
+}
+async function garantirMatsDoAno(ano){
+  ano = String(ano || '').trim();
+  if(!ano){ mats = []; return; }
+  if(!_matsPorAno.has(ano)){
+    const vals = isNaN(Number(ano)) ? [ano] : [ano, Number(ano)];   // anoLetivo pode estar como texto ou número
+    _matsPorAno.set(ano, _dedupMats(await window.DB.anoAtivoMatriculas.whereIn('anoLetivo', vals)));
+  }
+  mats = _matsPorAno.get(ano);
+}
+async function garantirAlunos(ids){
+  const falt = Array.from(new Set(ids)).filter(id => id && !_alunosCarregados.has(id));
+  if(!falt.length) return;
+  const r = await window.DB.anoAtivoAlunos.whereIn('alunoId', falt);
+  alunos = alunos.concat(_normalizarAlunos(r));
+  falt.forEach(id => _alunosCarregados.add(id));
+}
+let _qtCache = { ref: null, map: null };
+function _qtdTurma(turmaId){
+  if(_qtCache.ref !== mats){
+    const ano = anoSelecionadoOuAtivo(), mp = new Map();
+    turmas.forEach(t => mp.set(t.turmaId, _matsAtuaisDaTurma(t.turmaId, ano).length));
+    _qtCache = { ref: mats, map: mp };
+  }
+  return _qtCache.map.get(turmaId) || 0;
+}
+
+async function carregarDB(){
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+    if(window.Auth.getActiveSchoolId?.() === 'ADMIN'){ _semEscola = true; return; }
+    const [turmasDB, dadosEscola] = await Promise.all([window.DB.anoAtivoTurmas.list(), window.DB.escola.get()]);
+    const dados = { dadosEscola };
+    alunos = []; mats = []; _alunosCarregados = new Set(); _matsPorAno.clear();
+    turmas = Array.isArray(turmasDB) ? turmasDB : [];
+    schoolsMap = {}; modoTodasEscolas = false;
+    const _cfg = dados.dadosEscola?.configAnoAtivo;
+    const _cfgV = (_cfg && typeof _cfg === 'object') ? (_cfg.anoAtivo ?? _cfg.ano ?? _cfg.anoLetivo) : _cfg;
+    anoAtivo = (_cfgV || '').toString().replace(/"/g,'').trim();
+  }catch(e){
+    console.warn('carregarDB Firestore:', e);
+    alunos=[]; turmas=[]; mats=[]; anoAtivo='';
+    _toastErro('Erro ao carregar os dados. Recarregue a página.');
+  }
+
+  alunos = _normalizarAlunos(alunos);
 
   turmas = turmas.map(t => ({
     ...t,
@@ -858,17 +903,6 @@ async function carregarDB(){
     status:    (m.status || "ATIVO").toString().trim().toUpperCase()
   }));
 
-  // Deduplicar matrículas
-  (function(){
-    const seen = new Map();
-    mats.forEach(m => {
-      const key = `${m.turmaId}|${m.alunoId}|${m.anoLetivo}`;
-      if(!seen.has(key)){ seen.set(key, m); }
-      else { const prev = seen.get(key); if(!prev.serie && m.serie) seen.set(key, m); }
-    });
-    mats = Array.from(seen.values());
-  })();
-
   // Ano ativo vem só do módulo admin (configAnoAtivo). Único caso sem ano ativo
   // por escola: "Todas as escolas" (ADMIN) — usa o maior ano das matrículas, sem gravar.
   if(!anoAtivo && modoTodasEscolas){
@@ -878,7 +912,7 @@ async function carregarDB(){
   lblAnoAtivo.textContent = anoAtivo || "—";
 
   const anosSet = new Set();
-  mats.forEach(m => m.anoLetivo && anosSet.add(m.anoLetivo));
+  turmas.forEach(t => t.anoLetivo && anosSet.add(String(t.anoLetivo)));
   if(anoAtivo) anosSet.add(anoAtivo);
   const anos = Array.from(anosSet).filter(Boolean).sort((a,b)=>Number(a)-Number(b));
   selAno.innerHTML = "";
@@ -907,7 +941,8 @@ async function carregarDB(){
   selSerieAdd.innerHTML = '<option value="">(selecione)</option>';
   seriesOrdenadas.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; selSerieAdd.appendChild(o); });
 
-  lblDb.textContent = `DB Ano Ativo: turmas=${turmas.length} • alunos=${alunos.length} • matrículas=${mats.length}`;
+  try{ await garantirMatsDoAno(anoSelecionadoOuAtivo()); }catch(e){ console.warn('matrículas:', e); _toastErro('Erro ao carregar as matrículas do ano.'); }
+  lblDb.textContent = `DB Ano Ativo: turmas=${turmas.length} • matrículas do ano=${mats.length}`;
 }
 
 function ordenarSeries(arr){
@@ -974,9 +1009,7 @@ function sortTurmas(lista){
       return normText(a.nome||'').localeCompare(normText(b.nome||''));
     }
     if(crit === 'alunos'){
-      const qa = mats.filter(m => m.turmaId === a.turmaId).length;
-      const qb = mats.filter(m => m.turmaId === b.turmaId).length;
-      return qb - qa; // maior primeiro
+      return _qtdTurma(b.turmaId) - _qtdTurma(a.turmaId); // maior primeiro
     }
     if(crit === 'turno'){
       const order = ['MATUTINO','VESPERTINO','NOTURNO',''];
@@ -1041,7 +1074,8 @@ function _aplicarFiltrosComuns(list){
   if(turnoFiltro) list = list.filter(a => (a._turno||'').toUpperCase() === turnoFiltro);
   const modeloFiltro = _modeloFiltroAtual();
   if(modeloFiltro) list = list.filter(a => (a._modelo||'REGULAR').toUpperCase() === modeloFiltro);
-  const { status: statusFiltro, situacao: situacaoFiltro, situacaoIn } = _statusSituacaoFiltroAtual();
+  const { status: statusFiltro, situacao: situacaoFiltro, situacaoIn, semSituacao } = _statusSituacaoFiltroAtual();
+  if(semSituacao) list = list.filter(a => !(a._situacao||''));
   if(statusFiltro) list = list.filter(a => (a._status||'ATIVO') === statusFiltro);
   if(situacaoFiltro) list = list.filter(a => (a._situacao||'') === situacaoFiltro);
   else if(situacaoIn) list = list.filter(a => situacaoIn.includes(a._situacao||''));
@@ -1364,11 +1398,23 @@ function syncCheckAllAlunos(){
 }
 
 function atualizarListaAlunos(){ _atualizarListaAlunos(); }
-function _atualizarListaAlunos(_tScope){
+async function _atualizarListaAlunos(_tScope){
   const tScope = _tScope || turmasFiltradas();
   const turmaIdsMarcadas = turmaIdsSelecionadasNoDOM();
   const tMarcadas = tScope.filter(t=>turmaIdsMarcadas.has(t.turmaId));
   const modo = modoFiltroAtual();
+  const tok = ++_listaTok;
+  if(modo !== "serie" && !tMarcadas.length){
+    alunosOrdenados = []; countAlunos.textContent = "—";
+    listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">Selecione uma ou mais turmas (ou marque <b>Todos</b>) para ver os alunos.</div>`;
+    return;
+  }
+  listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">Carregando alunos…</div>`;
+  try{
+    const idsT = new Set(tMarcadas.map(t => t.turmaId));
+    await garantirAlunos(mats.filter(m => modo === "serie" || idsT.has(m.turmaId)).map(m => m.alunoId));
+  }catch(e){ console.warn('alunos:', e); _toastErro('Erro ao carregar os alunos.'); return; }
+  if(tok !== _listaTok) return;   // outra seleção chegou depois
   let aScope = [];
   if(modo === "turma"){
     aScope = alunosFiltradosPorTurmas(tMarcadas.length ? tMarcadas : tScope);
@@ -1661,8 +1707,10 @@ modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) moda
 ========================= */
 function enriquecerAlunos(lista){
   const ano = anoSelecionadoOuAtivo();
+  const _mpa = new Map();
+  mats.forEach(m => { if(!_mpa.has(m.alunoId)) _mpa.set(m.alunoId, []); _mpa.get(m.alunoId).push(m); });
   return lista.map(a => {
-    const matsDoAluno = mats.filter(m => m.alunoId === a.alunoId);
+    const matsDoAluno = _mpa.get(a.alunoId) || [];
     const matMeta = _matriculaAtualEntre(matsDoAluno, ano);
     const matSerie = (!a.serie) ? matMeta : null;
     // turmaId: usa o da matrícula do ano correto se existir, senão mantém o que vier no objeto
@@ -2432,7 +2480,11 @@ document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   atualizarListas();
 });
 inpBusca.addEventListener("input", ()=>{ atualizarListaAlunos(); });
-selAno.addEventListener("change", ()=>{ _jaFoiPesquisado = true; _blocoStatusAtualizarVisibilidade(); atualizarListas(); });
+selAno.addEventListener("change", async ()=>{
+  _jaFoiPesquisado = true;
+  try{ await garantirMatsDoAno(selAno.value || anoAtivo); }catch(e){ console.warn(e); _toastErro('Erro ao carregar as matrículas do ano.'); return; }
+  _blocoStatusAtualizarVisibilidade(); atualizarListas();
+});
 document.getElementById("selTurno").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 document.getElementById("selModelo").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
@@ -2717,13 +2769,19 @@ function restaurarEstadoPagina(){
 ========================= */
 (async function init(){
   await carregarDB();
+  if(_semEscola){
+    listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">Selecione uma escola no cabeçalho para pesquisar. Os dados de todas as escolas ficam na gestão do ano ativo.</div>`;
+    listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
+    Loading.esconder(); return;
+  }
   if(!anoAtivo){
     listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
     listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
     Loading.esconder(); return;
   }
   
-  // Tentar restaurar estado salvo
+  // Tentar restaurar estado salvo (matrículas do ano salvo precisam estar carregadas antes)
+  try{ const _e = JSON.parse(sessionStorage.getItem('pesquisaAnoAtivoEstado')||'null'); if(_e && _e.anoSelecionado) await garantirMatsDoAno(_e.anoSelecionado); }catch(e){ console.warn(e); }
   const estadoRestaurado = restaurarEstadoPagina();
   
   if(!estadoRestaurado){
