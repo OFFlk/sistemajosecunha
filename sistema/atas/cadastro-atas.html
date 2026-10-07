@@ -802,6 +802,16 @@ function dedupSeries(lista) {
 
 let seriesTurma = [];
 
+// Séries reais que um aluno pode ter (sem "Multisseriada"). Numa turma multisseriada o aluno pode ser de QUALQUER uma delas.
+// Mantenha IDÊNTICA a cadastro-turmas.html (serieOptions) e pesquisa-ata.html (SERIES_FILTRO), menos "Multisseriada".
+const SERIES_REAIS = [
+  "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
+  "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
+  "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano"
+];
+function _ehSerieMulti(s) { return /multi\s*s?seriad/.test(normalizarSerieChave(s)); }
+function _turmaEhMultisseriada() { return (seriesTurma || []).some(_ehSerieMulti); }
+
 function formatarListaBonita(arr) {
   if (!arr || arr.length === 0) return "";
   if (arr.length === 1) return arr[0];
@@ -823,7 +833,9 @@ function atualizarSelectSerieAluno() {
     return;
   }
 
-  const listaUnica = dedupSeries(seriesTurma);
+  // Turma multisseriada: o aluno pode ser de qualquer série real; senão, só das séries da turma.
+  const listaTurma = dedupSeries(seriesTurma);
+  const listaUnica = listaTurma.some(_ehSerieMulti) ? SERIES_REAIS.slice() : listaTurma;
 
   selAluno.innerHTML =
     [`<option value="">Selecione...</option>`]
@@ -870,7 +882,7 @@ function limparCamposAluno() {
     const ultimaSerie = serieEl.value; // guarda antes de re-render
     atualizarSelectSerieAluno();
     // se turma é multiseriada, restaura a última escolha; se único, já fica selecionado
-    if (seriesTurma.length > 1 && ultimaSerie) serieEl.value = ultimaSerie;
+    if ((seriesTurma.length > 1 || _turmaEhMultisseriada()) && ultimaSerie) serieEl.value = ultimaSerie;
   }
 
   for (const c of colAtivas) {
@@ -1092,7 +1104,7 @@ async function adicionarAluno() {
   if (schema.serieAtiva) {
     const serieEl = $("serie");
     if (seriesTurma.length === 0) { _toastErro("⚠️ Defina a(s) série(s) da turma no cabeçalho antes de adicionar alunos."); return; }
-    if (!serieEl || !serieEl.value) { _toastErro("⚠️ Selecione a série do aluno (limitada pela série da turma)."); return; }
+    if (!serieEl || !serieEl.value) { _toastErro(_turmaEhMultisseriada() ? "⚠️ Selecione a série do aluno." : "⚠️ Selecione a série do aluno (limitada pela série da turma)."); return; }
   }
 
   // Dedup cadastro manual × tabela: mesmo nome já lançado nesta turma → confirma.
@@ -2144,6 +2156,11 @@ function avaliarTrajetoria(ultimo, novo) {
   const sufixoGap = gapIncomum ? ` (intervalo de ${gap} anos também é incomum — esperado 1 a 3)` : '';
   if (categoria === 'LIVRE') {
     return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) sem resultado conclusivo (${ultimo.resultado || 'Não informado'}) — série não conferida${sufixoGap}` };
+  }
+  // Multisseriada é série válida, mas não tem número: a progressão não dá pra conferir sozinha.
+  const _ehMulti = (x) => /MULTI\s*S?SERIAD/.test(normalizarTxt(x));
+  if (_ehMulti(ultimo.serieDisplay) || _ehMulti(novo.serieDisplay)) {
+    return { status:'amarelo', motivo:`série multisseriada — a progressão de série não pode ser conferida automaticamente${sufixoGap}` };
   }
   const serieUltima = _parseSerieCanonica(ultimo.serieDisplay);
   const serieNova   = _parseSerieCanonica(novo.serieDisplay);
