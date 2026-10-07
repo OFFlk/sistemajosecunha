@@ -318,9 +318,9 @@ html[data-theme="dark"] .ok { color: #4ade80; }
       </div>
 
       <div class="field stack">
-        <label for="inpBusca">Buscar aluno (nome ou ID)</label>
+        <label for="inpBusca">Buscar aluno (nome ou CPF)</label>
         <div style="display:flex;gap:8px;align-items:stretch;">
-          <input id="inpBusca" type="text" placeholder="Ex.: 000, Maria, ALU-000123..." style="flex:1;"/>
+          <input id="inpBusca" type="text" placeholder="Nome (mín. 4 letras, início do nome) ou CPF" style="flex:1;"/>
           <button class="btn primary" id="btnAtualizar" style="white-space:nowrap;flex-shrink:0;">🔍 Pesquisar</button>
           <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;">🧹 Limpar filtros</button>
           <div class="pill pill-ano-ativo" style="flex-shrink:0;margin-left:auto;">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
@@ -424,6 +424,7 @@ html[data-theme="dark"] .ok { color: #4ade80; }
             </div>
 
             <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+              <button type="button" class="btn primary" id="btnPesquisarAvancada" style="font-size:12px;padding:6px 14px;margin-right:8px;">🔍 Pesquisar</button>
               <button type="button" class="btn ghost" id="btnFecharPesquisaAvancada" style="font-size:12px;padding:6px 14px;">Fechar</button>
             </div>
           </div>
@@ -806,6 +807,7 @@ const btnToggleSort = document.getElementById("btnToggleSort");
 ========================= */
 /* Leitura sob demanda: matrículas só do ano selecionado, alunos só das turmas marcadas */
 let _semEscola = false, _listaTok = 0;
+let _busca = null;   // { ids:Set } quando há busca por nome/CPF ou pesquisa avançada; null = fluxo por turma
 const _matsPorAno = new Map();
 let _alunosCarregados = new Set();
 function _normalizarAlunos(lista){
@@ -852,6 +854,56 @@ async function garantirAlunos(ids){
   const r = await window.DB.anoAtivoAlunos.whereIn('alunoId', falt);
   alunos = alunos.concat(_normalizarAlunos(r));
   falt.forEach(id => _alunosCarregados.add(id));
+}
+
+/* Buscas por consulta (só rodam ao clicar em Pesquisar / Enter) */
+async function _idsPorTexto(termo){
+  const t = termo.trim();
+  const dig = t.replace(/\D/g, '');
+  let r = [];
+  if(dig.length === 11 && /^[\d.\-\s]+$/.test(t)){            // CPF exato, com ou sem pontuação
+    const fmt = dig.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    const [a, b] = await Promise.all([
+      window.DB.anoAtivoAlunos.whereEquals('cpfNum', dig, { limit: 1 }),
+      window.DB.anoAtivoAlunos.whereEquals('cpf', fmt, { limit: 1 })   // docs antigos sem cpfNum
+    ]);
+    r = [...a, ...b];
+  } else {
+    const nome = t.toUpperCase().replace(/\s+/g, ' ');
+    if(nome.replace(/[^A-ZÀ-Ü]/g, '').length < 4) return null;
+    r = await window.DB.anoAtivoAlunos.whereRange('nome', nome, nome + '\uf8ff', { limit: 50 });
+  }
+  return new Set(r.map(x => x.alunoId || x._id));
+}
+async function _idsAvancada(){
+  const chk = id => document.getElementById(id)?.checked;
+  if(chk('chkReadmissao')){   // inativos do ano já estão nas matrículas carregadas
+    return new Set(mats.filter(m => String(m.status||'ATIVO').toUpperCase() === 'INATIVO').map(m => m.alunoId));
+  }
+  const marcados = sel => Array.from(document.querySelectorAll(sel + ':checked')).map(c => c.value);
+  let campos = [];   // consulta só o 1º grupo marcado; os demais refinam localmente (E entre grupos)
+  if(chk('chkFiltroAee')) campos = ['aee'];
+  else if(chk('chkFiltroDef')) campos = marcados('.filtroDefItem').length ? marcados('.filtroDefItem') : ['deficiencia'];
+  else if(chk('chkFiltroTrans')) campos = marcados('.filtroTransItem').length ? marcados('.filtroTransItem') : ['transtorno'];
+  if(!campos.length) return null;
+  const res = await Promise.all(campos.map(k => window.DB.anoAtivoAlunos.whereEquals(k, true)));
+  return new Set(res.flat().map(x => x.alunoId || x._id));
+}
+async function pesquisarPorTexto(){
+  const termo = inpBusca.value.trim();
+  if(!termo){ _busca = null; _jaFoiPesquisado = true; atualizarListas(); return; }
+  try{
+    const ids = await _idsPorTexto(termo);
+    if(!ids){ _toastErro('Digite ao menos 4 letras do início do nome, ou o CPF completo.'); return; }
+    _busca = { ids }; _jaFoiPesquisado = true; atualizarListaAlunos();
+  }catch(e){ console.warn(e); _toastErro('Erro na busca.'); }
+}
+async function pesquisarAvancada(){
+  try{
+    const ids = await _idsAvancada();
+    if(!ids){ _toastErro('Marque ao menos um filtro para pesquisar.'); return false; }
+    _busca = { ids }; _jaFoiPesquisado = true; atualizarListaAlunos(); return true;
+  }catch(e){ console.warn(e); _toastErro('Erro na pesquisa avançada.'); return false; }
 }
 let _qtCache = { ref: null, map: null };
 function _qtdTurma(turmaId){
@@ -1102,8 +1154,6 @@ function _aplicarFiltrosComuns(list){
     list = list.filter(a => a.aee === true);
   }
 
-  const q = normText(inpBusca.value.trim());
-  if(q) list = list.filter(a=> normText(`${a.nome} ${a.alunoId} ${a.cpf} ${a.serie}`).includes(q));
   return list;
 }
 
@@ -1375,7 +1425,7 @@ function _bindCliqueSelecao(container, checkboxSelector){
 
 function bindTurmaSelectionHandlers(){
   document.querySelectorAll('.chkTurma').forEach(c=>{
-    c.addEventListener('change', ()=>{ syncCheckAllTurmas(); atualizarListaAlunos(); });
+    c.addEventListener('change', ()=>{ _busca = null; syncCheckAllTurmas(); atualizarListaAlunos(); });
   });
   _bindCliqueSelecao(listaTurmas, '.chkTurma');
   syncCheckAllTurmas();
@@ -1404,7 +1454,8 @@ async function _atualizarListaAlunos(_tScope){
   const tMarcadas = tScope.filter(t=>turmaIdsMarcadas.has(t.turmaId));
   const modo = modoFiltroAtual();
   const tok = ++_listaTok;
-  if(modo !== "serie" && !tMarcadas.length){
+  const busca = _busca;
+  if(!busca && modo !== "serie" && !tMarcadas.length){
     alunosOrdenados = []; countAlunos.textContent = "—";
     listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">Selecione uma ou mais turmas (ou marque <b>Todos</b>) para ver os alunos.</div>`;
     return;
@@ -1412,11 +1463,13 @@ async function _atualizarListaAlunos(_tScope){
   listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">Carregando alunos…</div>`;
   try{
     const idsT = new Set(tMarcadas.map(t => t.turmaId));
-    await garantirAlunos(mats.filter(m => modo === "serie" || idsT.has(m.turmaId)).map(m => m.alunoId));
+    await garantirAlunos(busca ? Array.from(busca.ids) : mats.filter(m => modo === "serie" || idsT.has(m.turmaId)).map(m => m.alunoId));
   }catch(e){ console.warn('alunos:', e); _toastErro('Erro ao carregar os alunos.'); return; }
   if(tok !== _listaTok) return;   // outra seleção chegou depois
   let aScope = [];
-  if(modo === "turma"){
+  if(busca){
+    aScope = alunosFiltradosPorSeries().filter(a => busca.ids.has(a.alunoId));
+  } else if(modo === "turma"){
     aScope = alunosFiltradosPorTurmas(tMarcadas.length ? tMarcadas : tScope);
   } else if(modo === "serie"){
     aScope = alunosFiltradosPorSeries();
@@ -1547,7 +1600,7 @@ async function _atualizarListaAlunos(_tScope){
    Selecionar todos
 ========================= */
 function setAllCheckboxes(selector, checked){ document.querySelectorAll(selector).forEach(c=>{ c.checked = checked; }); }
-chkAllTurmas.addEventListener("change", ()=>{ setAllCheckboxes(".chkTurma", chkAllTurmas.checked); syncCheckAllTurmas(); atualizarListaAlunos(); });
+chkAllTurmas.addEventListener("change", ()=>{ _busca = null; setAllCheckboxes(".chkTurma", chkAllTurmas.checked); syncCheckAllTurmas(); atualizarListaAlunos(); });
 chkAllAlunos.addEventListener("change", ()=>{ setAllCheckboxes(".chkAluno", chkAllAlunos.checked); syncCheckAllAlunos(); });
 
 /* =========================
@@ -2450,14 +2503,18 @@ function turmasSelecionadas(){
 }
 
 let _jaFoiPesquisado = false;
-document.getElementById("btnAtualizar").addEventListener("click", ()=>{ _jaFoiPesquisado = true; atualizarListas(); });
+document.getElementById("btnAtualizar").addEventListener("click", pesquisarPorTexto);
 document.querySelectorAll('input[name="modoFiltro"]').forEach(r=>{ r.addEventListener("change", ()=>{ atualizarListaAlunos(); }); });
 document.getElementById("btnAddSerie").addEventListener("click", ()=>{
   const v = normSerie(selSerieAdd.value); if(!v) return;
   if(!seriesSelecionadas.includes(v)){ seriesSelecionadas.push(v); renderChips(); atualizarListas(); }
   selSerieAdd.value = "";
 });
+document.getElementById("btnPesquisarAvancada").addEventListener("click", async ()=>{
+  if(await pesquisarAvancada()) document.getElementById("btnFecharPesquisaAvancada")?.click();
+});
 document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
+  _busca = null;
   inpBusca.value = "";
   document.getElementById("selTurno").value = "";
   document.getElementById("selModelo").value = "";
@@ -2479,9 +2536,9 @@ document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   renderChips();
   atualizarListas();
 });
-inpBusca.addEventListener("input", ()=>{ atualizarListaAlunos(); });
+inpBusca.addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); pesquisarPorTexto(); } });
 selAno.addEventListener("change", async ()=>{
-  _jaFoiPesquisado = true;
+  _jaFoiPesquisado = true; _busca = null;
   try{ await garantirMatsDoAno(selAno.value || anoAtivo); }catch(e){ console.warn(e); _toastErro('Erro ao carregar as matrículas do ano.'); return; }
   _blocoStatusAtualizarVisibilidade(); atualizarListas();
 });
@@ -2490,7 +2547,6 @@ document.getElementById("selModelo").addEventListener("change", ()=>{ atualizarL
 document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
   const sel = document.getElementById("selSituacao");
   if(sel) sel.style.display = e.target.checked ? "" : "none";
-  atualizarListaAlunos();
 });
 document.getElementById("selSituacao").addEventListener("change", ()=>{ atualizarListaAlunos(); });
 document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
@@ -2527,23 +2583,17 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
 
   document.getElementById("chkFiltroAee").addEventListener("change", ()=>{
     atualizarBadge();
-    atualizarListaAlunos();
   });
 
   document.getElementById("chkFiltroDef").addEventListener("change", function(){
     document.getElementById("subFiltroDef").style.display = this.checked ? "flex" : "none";
     if(!this.checked) document.querySelectorAll(".filtroDefItem").forEach(c=>c.checked=false);
     atualizarBadge();
-    atualizarListaAlunos();
   });
   document.getElementById("chkFiltroTrans").addEventListener("change", function(){
     document.getElementById("subFiltroTrans").style.display = this.checked ? "flex" : "none";
     if(!this.checked) document.querySelectorAll(".filtroTransItem").forEach(c=>c.checked=false);
     atualizarBadge();
-    atualizarListaAlunos();
-  });
-  document.querySelectorAll(".filtroDefItem, .filtroTransItem").forEach(c=>{
-    c.addEventListener("change", ()=>{ atualizarListaAlunos(); });
   });
   // A readmissão também conta pro badge (o listener de filtro dela já existe acima)
   document.getElementById("chkReadmissao").addEventListener("change", atualizarBadge);
