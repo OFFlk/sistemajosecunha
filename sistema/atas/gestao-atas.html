@@ -207,6 +207,10 @@ select.sel-padrao option { background: var(--card-bg, #fff); color: var(--text, 
   white-space:normal; cursor:default;
 }
 .info-tip.open .info-tip-bubble{ display:block; }
+
+/* chips do índice de anos — cores FIXAS (iguais nos dois temas) */
+.chips-anos { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+.chip-ano { display:inline-flex; align-items:center; border:1px solid #c7d2fe; background:#e0e7ff; color:#312e81; padding:5px 11px; border-radius:999px; font-size:12.5px; font-weight:800; }
 </style>
 </head>
 <body>
@@ -240,6 +244,22 @@ select.sel-padrao option { background: var(--card-bg, #fff); color: var(--text, 
     <p class="muted">Gerenciamento de schema — crie, edite ou apague schemas de atas!</p>
     <div class="row-btns">
       <a class="btn btn-primary" href="../atas/schema_ata.html">🧩 Gerenciar schemas</a>
+    </div>
+  </div>
+
+  <!-- ── ÍNDICE DE ANOS ── -->
+  <div class="card">
+    <h3 style="margin-top:0;">📅 Índice de anos (pesquisa de atas)
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas carregadas nesta tela (não faz leitura extra) e também remove anos que não têm mais turma. Se acabou de cadastrar turmas, clique em "Recarregar" antes.</span>
+      </span>
+    </h3>
+    <p class="muted">Anos que aparecem hoje no filtro de ano da pesquisa de atas.</p>
+    <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
+    <p class="muted" id="indiceAnosInfo" style="margin:4px 0 12px;"></p>
+    <div class="row-btns">
+      <button class="btn btn-primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
     </div>
   </div>
 
@@ -540,6 +560,7 @@ async function inicializar() {
 
   atualizarStats();
   renderTabelaTurmas();
+  carregarIndiceAnos();   // 1 leitura do doc da escola (não bloqueia)
   // Contraste do card de destaque agora é centralizado em theme-colors.js
   // (ver guia-migracao-contraste-theme-colors.md, Parte 1). O próprio
   // theme-colors.js já reage sozinho ao evento 'colorchange'; esta chamada
@@ -590,7 +611,120 @@ async function recarregar() {
   }
   atualizarStats();
   renderTabelaTurmas();
+  carregarIndiceAnos();
   if (!falhou) setMsg('Dados recarregados.', 'ok');
+}
+
+/* =============================================
+   ÍNDICE DE ANOS  (schools/{escola}.atasIndice.anos)
+   Alimenta o select de ano da pesquisa de atas. O cadastro-turmas
+   acrescenta (arrayUnion) a cada turma salva; aqui é a reconstrução
+   manual, a partir das turmas JÁ carregadas na tela (0 leituras extras).
+============================================= */
+let _indiceAnos = null;          // null = não foi possível ler; [] = vazio
+let _indiceAtualizadoEm = '';
+
+function _anosDasTurmas(turmas) {
+  const set = new Set(); let invalidas = 0;
+  for (const t of turmas) {
+    if (String(t.status || 'ATIVA').toUpperCase() === 'INATIVA') continue;   // igual à pesquisa: inativa não conta
+    const a = String(t.anoLetivo ?? '').trim();
+    if (/^\d{4}$/.test(a)) set.add(a); else invalidas++;
+  }
+  return { anos: [...set].sort((x, y) => y.localeCompare(x)), invalidas };   // mais recente primeiro
+}
+
+function _renderIndiceAnos() {
+  const box = document.getElementById('indiceAnosBox');
+  const info = document.getElementById('indiceAnosInfo');
+  if (!box || !info) return;
+  if (_indiceAnos === null) {
+    box.innerHTML = '<span class="muted">Não foi possível ler o índice.</span>';
+    info.textContent = '';
+    return;
+  }
+  if (!_indiceAnos.length) {
+    box.innerHTML = '<span class="muted">Índice vazio — a pesquisa usa a lista fixa de anos até você reconstruir.</span>';
+    info.textContent = '';
+    return;
+  }
+  box.innerHTML = _indiceAnos.map(a => `<span class="chip-ano">${_escHtml(a)}</span>`).join('');
+  let quando = '';
+  if (_indiceAtualizadoEm) {
+    const d = new Date(_indiceAtualizadoEm);
+    if (!isNaN(d)) quando = ' · última reconstrução em ' + d.toLocaleString('pt-BR');
+  }
+  info.textContent = _indiceAnos.length + ' ano(s)' + quando;
+}
+
+async function carregarIndiceAnos() {
+  try {
+    const esc = await window.DB.escola.get();
+    const idx = esc && esc.atasIndice;
+    _indiceAnos = Array.isArray(idx && idx.anos) ? idx.anos.map(String).sort((x, y) => y.localeCompare(x)) : [];
+    _indiceAtualizadoEm = (idx && idx.atualizadoEm) || '';
+  } catch (e) {
+    console.warn('[carregarIndiceAnos]', e);
+    _indiceAnos = null;
+  }
+  _renderIndiceAnos();
+}
+
+async function reconstruirIndiceAnos() {
+  const btn = document.getElementById('btnReconstruirAnos');
+  const turmas = lerTurmasDB();
+  if (!turmas.length) {
+    setMsg('Nenhuma turma carregada — o índice não foi alterado. Clique em "Recarregar" e tente de novo.', 'warn');
+    return;
+  }
+  const schoolId = String((window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId()) || '').trim();
+  if (!schoolId || schoolId.toUpperCase() === 'ADMIN' || !window.Auth || !Auth.db) {
+    setMsg('Selecione uma escola antes de reconstruir o índice.', 'err');
+    return;
+  }
+
+  const { anos: novos, invalidas } = _anosDasTurmas(turmas);
+  const atual = _indiceAnos || [];
+  const adicionados = novos.filter(a => !atual.includes(a));
+  const removidos = atual.filter(a => !novos.includes(a));
+
+  if (_indiceAnos !== null && !adicionados.length && !removidos.length) {
+    setMsg('O índice já está atualizado — nada a gravar.', 'ok');
+    return;
+  }
+
+  const linhas = [
+    `Turmas consideradas: ${turmas.length}`,
+    `Anos encontrados: ${novos.length ? novos.join(', ') : 'nenhum'}`,
+    ''
+  ];
+  if (_indiceAnos === null) linhas.push('Não foi possível ler o índice atual; ele será substituído por esta lista.');
+  if (adicionados.length) linhas.push(`Serão adicionados: ${adicionados.join(', ')}`);
+  if (removidos.length) linhas.push(`Serão removidos: ${removidos.join(', ')}`);
+  if (invalidas) linhas.push('', `${invalidas} turma(s) sem ano válido (4 dígitos) foram ignoradas.`);
+
+  const ok = await _confirmModal({
+    titulo: 'Reconstruir índice de anos?',
+    corpo: linhas.join('\n'),
+    corDestaque: '#4338ca',
+    textoConfirmar: 'Reconstruir'
+  });
+  if (!ok) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Gravando…'; }
+  try {
+    await Auth.db.collection('schools').doc(schoolId)
+      .set({ atasIndice: { anos: novos, atualizadoEm: new Date().toISOString() } }, { merge: true });
+    _indiceAnos = novos;
+    _indiceAtualizadoEm = new Date().toISOString();
+    _renderIndiceAnos();
+    setMsg(`Índice reconstruído (${novos.length} ano(s)).`, 'ok');
+  } catch (e) {
+    console.warn('[reconstruirIndiceAnos]', e);
+    setMsg('Não foi possível gravar o índice. Tente novamente.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Reconstruir índice'; }
+  }
 }
 
 /* =============================================
