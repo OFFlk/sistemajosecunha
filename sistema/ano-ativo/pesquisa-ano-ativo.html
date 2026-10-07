@@ -320,7 +320,7 @@ html[data-theme="dark"] .ok { color: #4ade80; }
       <div class="field stack">
         <label for="inpBusca">Buscar aluno (nome ou CPF)</label>
         <div style="display:flex;gap:8px;align-items:stretch;">
-          <input id="inpBusca" type="text" placeholder="Nome (mín. 4 letras, início do nome) ou CPF" style="flex:1;"/>
+          <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF" style="flex:1;"/>
           <button class="btn primary" id="btnAtualizar" style="white-space:nowrap;flex-shrink:0;">🔍 Pesquisar</button>
           <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;">🧹 Limpar filtros</button>
           <div class="pill pill-ano-ativo" style="flex-shrink:0;margin-left:auto;">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
@@ -772,8 +772,6 @@ let alunos = [];
 let turmas = [];
 let mats = [];
 let anoAtivo = "";
-let schoolsMap = {};        // schoolId → nome de exibição (só preenchido em modo "Todas as escolas")
-let modoTodasEscolas = false;
 let seriesSelecionadas = [];
 let currentSortField = 'nome';
 let currentSortOrder = 'asc';
@@ -851,7 +849,13 @@ async function garantirMatsDoAno(ano){
 async function garantirAlunos(ids){
   const falt = Array.from(new Set(ids)).filter(id => id && !_alunosCarregados.has(id));
   if(!falt.length) return;
-  const r = await window.DB.anoAtivoAlunos.whereIn('alunoId', falt);
+  const lotes = [];
+  for(let i = 0; i < falt.length; i += 10) lotes.push(falt.slice(i, i + 10));
+  let r = [];
+  for(let i = 0; i < lotes.length; i += 10){     // até 10 consultas em paralelo por onda
+    const ondas = await Promise.all(lotes.slice(i, i + 10).map(l => window.DB.anoAtivoAlunos.whereIn('alunoId', l)));
+    r = r.concat(ondas.flat());
+  }
   alunos = alunos.concat(_normalizarAlunos(r));
   falt.forEach(id => _alunosCarregados.add(id));
 }
@@ -870,8 +874,8 @@ async function _idsPorTexto(termo){
     r = [...a, ...b];
   } else {
     const nome = t.toUpperCase().replace(/\s+/g, ' ');
-    if(nome.replace(/[^A-ZÀ-Ü]/g, '').length < 4) return null;
-    r = await window.DB.anoAtivoAlunos.whereRange('nome', nome, nome + '\uf8ff', { limit: 50 });
+    if(nome.replace(/[^A-ZÀ-Ü]/g, '').length < 3) return null;
+    r = await window.DB.anoAtivoAlunos.whereRange('nome', nome, nome + '\uf8ff', { limit: 50 });   // só início do nome
   }
   return new Set(r.map(x => x.alunoId || x._id));
 }
@@ -894,7 +898,7 @@ async function pesquisarPorTexto(){
   if(!termo){ _busca = null; _jaFoiPesquisado = true; atualizarListas(); return; }
   try{
     const ids = await _idsPorTexto(termo);
-    if(!ids){ _toastErro('Digite ao menos 4 letras do início do nome, ou o CPF completo.'); return; }
+    if(!ids){ _toastErro('Digite ao menos 3 letras do início do nome, ou o CPF completo.'); return; }
     _busca = { ids }; _jaFoiPesquisado = true; atualizarListaAlunos();
   }catch(e){ console.warn(e); _toastErro('Erro na busca.'); }
 }
@@ -926,7 +930,6 @@ async function carregarDB(){
     const dados = { dadosEscola };
     alunos = []; mats = []; _alunosCarregados = new Set(); _matsPorAno.clear();
     turmas = Array.isArray(turmasDB) ? turmasDB : [];
-    schoolsMap = {}; modoTodasEscolas = false;
     const _cfg = dados.dadosEscola?.configAnoAtivo;
     const _cfgV = (_cfg && typeof _cfg === 'object') ? (_cfg.anoAtivo ?? _cfg.ano ?? _cfg.anoLetivo) : _cfg;
     anoAtivo = (_cfgV || '').toString().replace(/"/g,'').trim();
@@ -955,12 +958,6 @@ async function carregarDB(){
     status:    (m.status || "ATIVO").toString().trim().toUpperCase()
   }));
 
-  // Ano ativo vem só do módulo admin (configAnoAtivo). Único caso sem ano ativo
-  // por escola: "Todas as escolas" (ADMIN) — usa o maior ano das matrículas, sem gravar.
-  if(!anoAtivo && modoTodasEscolas){
-    const anos = Array.from(new Set(mats.map(m => m.anoLetivo).filter(Boolean))).sort();
-    anoAtivo = anos.length ? String(anos[anos.length-1]) : "";
-  }
   lblAnoAtivo.textContent = anoAtivo || "—";
 
   const anosSet = new Set();
@@ -1374,8 +1371,6 @@ function atualizarListas(){
       const profTxt   = turmaOriginal.professor || t.professor || "";
       const qtdIntegral = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
       const modeloBadge = qtdIntegral > 0 ? `<span class="badge badge-integral">📚 ${qtdIntegral} integral</span>` : '';
-      const escolaBadgeTurma = (modoTodasEscolas && t.schoolId)
-        ? `<span class="badge badge-neutral">🏫 ${escapeHtml(schoolsMap[t.schoolId] || t.schoolId)}</span>` : '';
 
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
@@ -1387,7 +1382,6 @@ function atualizarListas(){
               <span class="badge">👥 ${qtdAlunos} aluno(s)</span>
               <span class="badge">📚 ${seriesTxt}</span>
               ${modeloBadge}
-              ${escolaBadgeTurma}
             </div>
             ${profTxt ? `<div class="turma-chips-row"><span class="badge badge-neutral badge-prof">👩‍🏫 ${profTxt}</span></div>` : ""}
             <div class="turma-chips-row"><span class="badge badge-neutral">ID: ${t.turmaId||"—"}</span></div>
@@ -1521,8 +1515,6 @@ async function _atualizarListaAlunos(_tScope){
       const neeBadge = neeList.length > 0
         ? `<span class="badge" style="background:rgba(124,58,237,0.10);border-color:rgba(124,58,237,0.30);color:#6d28d9;">♿ ${neeList.join(', ')}</span>`
         : '';
-      const escolaBadgeAluno = (modoTodasEscolas && a.schoolId)
-        ? `<span class="badge badge-neutral">🏫 ${escapeHtml(schoolsMap[a.schoolId] || a.schoolId)}</span>` : '';
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
         <div class="left">
@@ -1531,7 +1523,6 @@ async function _atualizarListaAlunos(_tScope){
             <div style="display:flex;flex-wrap:wrap;gap:6px;">
               <span class="badge">${a.alunoId || "—"}</span>
               <span class="badge">📚 ${a.serie || "—"}</span>
-              ${escolaBadgeAluno}
             </div>
           </div>
           <div class="meta" style="margin-top:6px;display:block;">
@@ -2005,19 +1996,13 @@ function _ordenarAlunosPedagogico(lista){
   });
 }
 
-// Carrega dados da escola (Firestore → localStorage fallback)
+// Carrega dados da escola (Firestore)
 async function _carregarDadosEscola(){
   try{
     if(window.DB && window.DB.escola && window.DB.escola.get){
       const e = await window.DB.escola.get();
       if(e && e.nome) return e;
     }
-  }catch(_){}
-  try{
-    const schoolId = window.Auth?.getActiveSchoolId?.() || '';
-    const key = schoolId ? `schools:${schoolId}:dadosEscola` : 'dadosEscola';
-    const cached = localStorage.getItem(key);
-    if(cached) return JSON.parse(cached);
   }catch(_){}
   return null;
 }
@@ -2141,14 +2126,12 @@ function _buildFilename(prefixo, escola){
   // Usa exatamente a mesma lógica do header-logic.js: matched.displayName
   function _getSchoolDisplayName(){
     try{
-      const s = window.Auth?.getSession?.() || JSON.parse(localStorage.getItem('auth_session_v2')||'null');
+      const s = window.Auth?.getSession?.();
       if(!s) return null;
-      const schools = (window.Auth?.listSchools?.() || JSON.parse(localStorage.getItem('auth_schools_v1')||'[]'));
-      const effective = (s.schoolId||'').toString().toUpperCase() === 'ADMIN'
-        ? (localStorage.getItem('admin_active_school_v1')||'').trim() || 'ADMIN'
-        : (s.schoolId||'').toString();
-      const matched = schools.find(x => (x.schoolId||x.id||'').toString() === effective);
-      return matched ? (matched.displayName || matched.name || matched.nome || '').toString().trim() : null;
+      if(s.schoolName) return s.schoolName;     // usuário comum: o Auth já grava o nome na sessão
+      const sid = window.Auth?.getActiveSchoolId?.() || '';
+      const m = (window.Auth?.listSchools?.() || []).find(x => String(x.schoolId || x.id || '') === sid);
+      return m ? String(m.displayName || m.name || m.nome || '').trim() : null;
     }catch(_){ return null; }
   }
 
@@ -2856,7 +2839,7 @@ function restaurarEstadoPagina(){
     else sessionStorage.removeItem('pesquisaAnoAtivoEstado');
   });
   Loading.esconder();
-})();
+})().catch(e => { console.error('init:', e); _toastErro('Erro ao iniciar a página.'); Loading.esconder(); });
 
 })();
 </script>
