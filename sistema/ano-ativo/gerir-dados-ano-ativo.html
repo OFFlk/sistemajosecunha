@@ -254,10 +254,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
         <div id="previewAlunoMats" style="margin-top:8px;"></div>
         <div id="previewAlunoDocs" style="margin-top:8px;"></div>
         <div id="previewAlunoFoto" style="margin-top:8px;"></div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" id="chkApagarCatalogo" style="width:auto;margin:0;">
-          <span id="chkApagarCatalogoTxt">Também remover do catálogo/atas (coleção <code>alunos</code>)</span>
-        </label>
+        <div id="previewAlunoElo" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
           <button class="btn btn-danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
         </div>
@@ -1012,44 +1009,61 @@ async function importarJSON(event) {
 /* =============================================
    EXCLUSÃO PONTUAL — ALUNO
 ============================================= */
-let _alunoParaExcluir = null; // { aluno, mats, docs, noCatalogo }
+let _alunoParaExcluir = null; // { aluno, alunoId, mats, elos, docs, fotos }
+
+function escolaSelecionada() {
+  const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+  if (!sid || String(sid).toUpperCase() === 'ADMIN') {
+    setMsg('Selecione uma escola (você está em "Todas as escolas").', 'err');
+    return false;
+  }
+  return true;
+}
+
+async function _apagarArquivoRemoto(fileId, resourceType, rotulo, logId) {
+  try {
+    const r = await fetch('/api/drive-delete', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId, resourceType: resourceType || 'image' }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'erro desconhecido');
+    logEl(`  ✅ ${rotulo} apagado.`, logId);
+  } catch (e) {
+    logEl(`  ⚠️ Falha ao apagar ${rotulo}: ${e.message}`, logId);
+  }
+}
 
 async function buscarAlunoExcluir() {
   if (!IS_ADMIN) return;
-  const alunoId = document.getElementById('inpAlunoIdExcluir').value.trim();
+  const idDigitado = document.getElementById('inpAlunoIdExcluir').value.trim();
   document.getElementById('previewAluno').style.display = 'none';
   clearLogEl('logExcluirAluno');
   _alunoParaExcluir = null;
 
-  if (!alunoId) { logEl('⚠️ Informe o alunoId.', 'logExcluirAluno'); setMsg('Informe o alunoId.', 'warn'); return; }
+  if (!idDigitado) { logEl('⚠️ Informe o alunoId.', 'logExcluirAluno'); setMsg('Informe o alunoId.', 'warn'); return; }
 
   const btn = document.getElementById('btnBuscarAluno');
   btn.disabled = true; btn.textContent = 'Buscando...';
 
   try {
     await waitAuth();
-    const [alunos, mats] = await Promise.all([
-      window.DB.anoAtivoAlunos.list(),
-      window.DB.anoAtivoMatriculas.list(),
-    ]);
+    if (!escolaSelecionada()) return;
 
-    const aluno = alunos.find(a => (a.alunoId || a._id) === alunoId);
+    // Leituras pontuais: 1 aluno + as matrículas e os elos dele (nunca a coleção inteira)
+    const aluno = await window.DB.anoAtivoAlunos.get(idDigitado);
     if (!aluno) {
-      logEl(`❌ Nenhum aluno encontrado com alunoId "${alunoId}" em anoAtivoAlunos.`, 'logExcluirAluno');
-      setMsg(`Nenhum aluno encontrado com alunoId "${alunoId}".`, 'err');
+      logEl(`❌ Nenhum aluno encontrado com alunoId "${idDigitado}" em anoAtivoAlunos.`, 'logExcluirAluno');
+      setMsg(`Nenhum aluno encontrado com alunoId "${idDigitado}".`, 'err');
       return;
     }
+    const alunoId = aluno.alunoId || aluno._id || idDigitado;
+    const [matsDoAluno, elos] = await Promise.all([
+      window.DB.anoAtivoMatriculas.whereEquals('alunoId', alunoId),
+      window.DB.alunos.whereEquals('anoAtivoId', alunoId),
+    ]);
 
-    const matsDoAluno = mats.filter(m => m.alunoId === alunoId);
-
-    // Catálogo/atas — não trava a busca se falhar, só perde essa informação
-    let noCatalogo = false;
-    try {
-      await window.Identidade.pronto;
-      noCatalogo = window.Identidade.lerTodos().some(a => a.alunoId === alunoId);
-    } catch (e) { /* segue sem essa info */ }
-
-    // Documentos anexados — idem
+    // Documentos anexados — não trava a busca se falhar, só perde essa informação
     let docs = [];
     try {
       const r = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(alunoId)}`);
@@ -1057,7 +1071,10 @@ async function buscarAlunoExcluir() {
       if (r.ok) docs = d.files || [];
     } catch (e) { /* segue sem essa info */ }
 
-    _alunoParaExcluir = { aluno, mats: matsDoAluno, docs, noCatalogo };
+    // A foto vive na matrícula (uma por ano); fotoFileId do aluno é só legado
+    const fotos = Array.from(new Set([...matsDoAluno.map(m => m.fotoFileId), aluno.fotoFileId].filter(Boolean)));
+
+    _alunoParaExcluir = { aluno, alunoId, mats: matsDoAluno, elos, docs, fotos };
 
     const info = document.getElementById('previewAlunoInfo');
     info.className = 'migr-item warn';
@@ -1068,7 +1085,7 @@ async function buscarAlunoExcluir() {
     const matsEl = document.getElementById('previewAlunoMats');
     if (matsDoAluno.length) {
       matsEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">${matsDoAluno.length} matrícula(s) serão apagadas:</b>` +
-        matsDoAluno.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Ano ${esc(m.anoLetivo||'?')} · Turma ${esc(m.turmaId||'—')} · ${esc(m.status||'ATIVO')}${m.situacao ? ' ('+esc(m.situacao)+')' : ''}</div>`).join('');
+        matsDoAluno.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Ano ${esc(m.anoLetivo || '?')} · Turma ${esc(m.turmaId || '—')} · ${esc(m.status || 'ATIVO')}${m.situacao ? ' · ' + esc(m.situacao) : ''}</div>`).join('');
     } else {
       matsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhuma matrícula encontrada pra esse aluno.</div>`;
     }
@@ -1082,21 +1099,19 @@ async function buscarAlunoExcluir() {
     }
 
     const fotoEl = document.getElementById('previewAlunoFoto');
-    if (aluno.fotoFileId) {
-      fotoEl.innerHTML = `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Avatar (foto) do aluno — ${esc(aluno.fotoFileId)}</div>`;
+    if (fotos.length) {
+      fotoEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">${fotos.length} avatar(es) (foto) serão apagados:</b>` +
+        fotos.map(f => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> ${esc(f)}</div>`).join('');
     } else {
       fotoEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum avatar cadastrado pra esse aluno.</div>`;
     }
 
-    const chk = document.getElementById('chkApagarCatalogo');
-    const chkTxt = document.getElementById('chkApagarCatalogoTxt');
-    chk.checked = false;
-    if (noCatalogo) {
-      chk.disabled = false;
-      chkTxt.innerHTML = 'Também remover do catálogo/atas (coleção <code>alunos</code>)';
+    const eloEl = document.getElementById('previewAlunoElo');
+    if (elos.length) {
+      eloEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">${elos.length} vínculo(s) com o módulo de Atas (coleção <code>alunos</code>) serão apagados:</b>` +
+        elos.map(e => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> ${esc(e._id || e.id || '?')}${e.atasId ? ' <span class="muted">(aluno em Atas: ' + esc(e.atasId) + ' — não é apagado)</span>' : ''}</div>`).join('');
     } else {
-      chk.disabled = true;
-      chkTxt.innerHTML = '<span class="muted">Não há registro deste aluno no catálogo/atas — nada a remover desse lado.</span>';
+      eloEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Sem vínculo com o módulo de Atas.</div>`;
     }
 
     document.getElementById('previewAluno').style.display = 'block';
@@ -1112,18 +1127,17 @@ async function buscarAlunoExcluir() {
 
 async function executarExclusaoAluno() {
   if (!IS_ADMIN || !_alunoParaExcluir) return;
-  const { aluno, mats, docs } = _alunoParaExcluir;
-  const alunoId = aluno.alunoId || aluno._id;
-  const apagarCatalogo = document.getElementById('chkApagarCatalogo').checked;
+  const { aluno, alunoId, mats, elos, docs, fotos } = _alunoParaExcluir;
 
   const confirmou = await _confirmModal({
     titulo: '⚠️ Excluir aluno definitivamente',
     corDestaque: '#b91c1c',
     corpo: `Excluir definitivamente o aluno "${aluno.nome || alunoId}"?\n\n` +
       `- ${mats.length} matrícula(s)\n` +
+      `- ${elos.length} vínculo(s) com o módulo de Atas\n` +
       `- ${docs.length} documento(s) anexado(s)\n` +
-      (apagarCatalogo ? '- Registro no catálogo/atas\n' : '') +
-      `\nEsta ação NÃO PODE ser desfeita.`,
+      `- ${fotos.length} avatar(es)\n` +
+      `\nO aluno em Atas (se existir) não é apagado.\nEsta ação NÃO PODE ser desfeita.`,
     textoConfirmar: 'Sim, excluir',
   });
   if (!confirmou) return;
@@ -1137,50 +1151,19 @@ async function executarExclusaoAluno() {
   try {
     logEl(`Excluindo aluno ${alunoId}...`, 'logExcluirAluno');
 
-    for (const m of mats) {
-      await window.DB.anoAtivoMatriculas.remove(m._id);
-      logEl(`  ✅ Matrícula ${m._id} apagada.`, 'logExcluirAluno');
-    }
+    // Firestore primeiro, de forma atômica: matrículas + elos + aluno no mesmo lote.
+    // Só se der certo é que os arquivos externos (Cloudinary) são apagados.
+    const ops = [
+      ...mats.map(m => ({ col: 'anoAtivoMatriculas', op: 'delete', id: m._id })),
+      ...elos.map(e => ({ col: 'alunos', op: 'delete', id: e._id || e.id })),
+      { col: 'anoAtivoAlunos', op: 'delete', id: alunoId },
+    ];
+    if (ops.length > 500) throw new Error(`Registros demais para um único lote (${ops.length}; máximo 500). Nada foi apagado.`);
+    await window.DB.batchWrite(ops);
+    logEl(`  ✅ ${mats.length} matrícula(s), ${elos.length} vínculo(s) e os dados pessoais apagados.`, 'logExcluirAluno');
 
-    await window.DB.anoAtivoAlunos.remove(alunoId);
-    logEl(`  ✅ Dados pessoais apagados (anoAtivoAlunos).`, 'logExcluirAluno');
-
-    if (apagarCatalogo) {
-      try {
-        await window.Identidade.remover(alunoId);
-        logEl(`  ✅ Registro removido do catálogo/atas.`, 'logExcluirAluno');
-      } catch (e) {
-        logEl(`  ⚠️ Falha ao remover do catálogo: ${e.message}`, 'logExcluirAluno');
-      }
-    }
-
-    for (const f of docs) {
-      try {
-        const r = await fetch('/api/drive-delete', {
-          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileId: f.fileId, resourceType: f.resourceType || 'image' }),
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'erro desconhecido');
-        logEl(`  ✅ Documento "${f.label || f.fileName}" apagado.`, 'logExcluirAluno');
-      } catch (e) {
-        logEl(`  ⚠️ Falha ao apagar documento "${f.label || f.fileName}": ${e.message}`, 'logExcluirAluno');
-      }
-    }
-
-    if (aluno.fotoFileId) {
-      try {
-        const r = await fetch('/api/drive-delete', {
-          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileId: aluno.fotoFileId, resourceType: 'image' }),
-        });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || 'erro desconhecido');
-        logEl(`  ✅ Avatar apagado (${aluno.fotoFileId}).`, 'logExcluirAluno');
-      } catch (e) {
-        logEl(`  ⚠️ Falha ao apagar avatar: ${e.message}`, 'logExcluirAluno');
-      }
-    }
+    for (const f of docs) await _apagarArquivoRemoto(f.fileId, f.resourceType, `Documento "${f.label || f.fileName}"`, 'logExcluirAluno');
+    for (const id of fotos) await _apagarArquivoRemoto(id, 'image', `Avatar (${id})`, 'logExcluirAluno');
 
     logEl('', 'logExcluirAluno');
     logEl('🎉 Exclusão concluída.', 'logExcluirAluno');
