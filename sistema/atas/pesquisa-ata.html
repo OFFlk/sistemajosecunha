@@ -721,7 +721,6 @@ function renderChipsSeries() {
     b.addEventListener("click", () => {
       seriesSelecionadas = seriesSelecionadas.filter(x => x !== sr);
       renderChipsSeries();
-      if (_jaFoiPesquisado) aplicarFiltros();
     });
     chip.appendChild(b);
     box.appendChild(chip);
@@ -1024,13 +1023,16 @@ function renderResumoTurma(t) {
 /* =========================
    Aplicar filtros
 ========================= */
+// Filtros de série e busca geral "valem" só no clique em Pesquisar: aqui fica o retrato deles naquele momento.
+// Assim, mexer nos campos (como ano e turno) não muda a lista até você pesquisar de novo; reordenar a lista não troca os filtros.
+let _filtrosAplicados = { series: [], busca: "" };
 function aplicarFiltros() {
-  const fBusca = norm(document.getElementById("fBusca").value);
+  const fBusca = _filtrosAplicados.busca;
 
   let lista = turmas.slice();
 
-  if (seriesSelecionadas.length) {
-    const alvo = seriesSelecionadas.map(serieChave);
+  if (_filtrosAplicados.series.length) {
+    const alvo = _filtrosAplicados.series.map(serieChave);
     lista = lista.filter(t => { const ds = seriesDaTurma(t); return alvo.some(x => ds.has(x)); });
   }
 
@@ -1393,6 +1395,7 @@ async function carregar() {
     try {
       turmasTodas = await buscarTurmasNoBanco();
       recomputarTurmasBase();
+      _filtrosAplicados = { series: seriesSelecionadas.slice(), busca: norm(document.getElementById("fBusca").value) };
       _jaFoiPesquisado = true;
       aplicarFiltros();
     } catch(e) {
@@ -1403,7 +1406,7 @@ async function carregar() {
       btn.disabled = false;
     }
   };
-  // Ano e turno só valem ao clicar em Pesquisar (viram consulta ao banco). Série e busca geral refinam o que já foi buscado.
+  // TODOS os filtros (ano, turno, série, busca geral) só valem ao clicar em Pesquisar.
   preencherFiltroSerie();
   document.getElementById("btnAddSerie").onclick = function(){
     const sel = document.getElementById("selSerieAdd");
@@ -1411,7 +1414,6 @@ async function carregar() {
     if (!seriesSelecionadas.includes(v)) {
       seriesSelecionadas.push(v);
       renderChipsSeries();
-      if (_jaFoiPesquisado) aplicarFiltros();
     }
     sel.value = "";
   };
@@ -1420,10 +1422,10 @@ async function carregar() {
     document.getElementById("fTurno").value = "";
     document.getElementById("fBusca").value = "";
     seriesSelecionadas = [];
-    renderChipsSeries();
-    if (_jaFoiPesquisado) aplicarFiltros();   // só reaplica sobre o já buscado; para nova consulta, clique em Pesquisar
+    renderChipsSeries();   // só limpa os campos; a lista só muda ao clicar em Pesquisar
   };
-  document.getElementById("fBusca").oninput   = function(){ if(_jaFoiPesquisado) aplicarFiltros(); };
+  // Busca geral: Enter equivale a clicar em Pesquisar (digitar não refiltra sozinho)
+  document.getElementById("fBusca").onkeydown = function(ev){ if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("btnPesquisar").click(); } };
 
   if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
 
