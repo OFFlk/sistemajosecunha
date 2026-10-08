@@ -1744,7 +1744,7 @@ function normSerie(s){
       }
     }
     let novaMatricula = {
-      matriculaId, turmaId: tid, alunoId, anoLetivo: ano, serie, turno,
+      matriculaId, turmaId: tid, alunoId, anoLetivo: Number(ano), serie, turno,
       modelo: modelo || 'REGULAR',
       status: anoEhAtivo ? 'ATIVO' : 'INATIVO',
       situacao: anoEhAtivo ? null : situacaoEscolhida,
@@ -2168,7 +2168,7 @@ function normSerie(s){
           '<div class="nee-block danger">'+
             '<div class="nee-header dz-row" style="border-radius:12px 12px 0 0;border-bottom:1px solid rgba(185,28,28,.25);">'+
               '<div><div class="nee-header-label">🔁 Trocar de turma</div>'+
-              '<div class="dz-desc">Encerra a matrícula atual como REMANEJADO e cria uma nova na turma escolhida, no mesmo ano. O modelo de ensino deve ser informado de novo, na edição do aluno já na turma nova.</div></div>'+
+              '<div class="dz-desc">Move o aluno para outra turma do mesmo ano. A matrícula atual deixa de existir e a nova mantém a data de cadastro e a foto. Para voltar, basta trocar de turma de novo.</div></div>'+
               '<button id="btnTrocarTurma" type="button" class="dz-btn">Trocar de turma</button>'+
             '</div>'+
             '<div class="nee-header dz-row" style="border-radius:0 0 12px 12px;">'+
@@ -2195,7 +2195,7 @@ function normSerie(s){
           '</div>';
         document.body.appendChild(modalEncerrar);
 
-        // ── Trocar de turma: encerra a matrícula atual (REMANEJADO) e cria a nova, tudo num batchWrite ──
+        // ── Trocar de turma: apaga a matrícula atual e cria a nova (herda criadoEm e foto), tudo num batchWrite ──
         const modalTrocar = document.createElement('div');
         modalTrocar.className = 'modal-backdrop';
         modalTrocar.id = 'modalTrocarTurma';
@@ -2255,17 +2255,17 @@ function normSerie(s){
               throw new Error('Este aluno tem outra matrícula ATIVA em ' + mat.anoLetivo + '. Encerre-a antes.');
             const ok = await _confirmModal({
               titulo: '⚠️ Trocar de turma', textoConfirmar: 'Sim, trocar',
-              corpo: `Mover "${_escHtml(aluno.nome || editId)}" para "${_escHtml(t.nome || t.turmaId)}" (${_escHtml(mat.anoLetivo)})?\n\nA matrícula atual será encerrada como REMANEJADO.`,
+              corpo: `Mover "${_escHtml(aluno.nome || editId)}" para "${_escHtml(t.nome || t.turmaId)}" (${_escHtml(mat.anoLetivo)})?\n\nA matrícula atual será substituída pela nova.`,
             });
             if(!ok) return;
             const agora = new Date().toISOString();
             const novoId = `MAT|${t.turmaId}|${editId}|${mat.anoLetivo}`;
-            let nova = { matriculaId: novoId, turmaId: t.turmaId, alunoId: editId, anoLetivo: mat.anoLetivo, serie,
-              turno: t.turno || '', modelo: mat.modelo || 'REGULAR', status: 'ATIVO', situacao: null, criadoEm: agora };
+            let nova = { matriculaId: novoId, turmaId: t.turmaId, alunoId: editId, anoLetivo: Number(mat.anoLetivo), serie,
+              turno: t.turno || '', modelo: mat.modelo || 'REGULAR', status: 'ATIVO', situacao: null, criadoEm: mat.criadoEm || agora };
             if(mat.fotoUrl){ nova.fotoUrl = mat.fotoUrl; nova.fotoFileId = mat.fotoFileId || null; }   // mesmo ano = mesmo arquivo no Cloudinary
             if(window.MatriculaUtils) nova = window.MatriculaUtils.validarMatricula(nova);
             await window.DB.batchWrite([
-              { col:'anoAtivoMatriculas', op:'update', id: mat._id, data: { status:'INATIVO', situacao:'REMANEJADO', encerradoEm: agora } },
+              { col:'anoAtivoMatriculas', op:'delete', id: mat._id },
               { col:'anoAtivoMatriculas', op:'set',    id: novoId,  data: nova },
             ]);
             _fecharTrocar();
