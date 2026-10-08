@@ -126,13 +126,6 @@ th.th-nome{ width:220px; }
 td.col-nome{ text-align:left; padding-left:8px; word-break:break-word; }
 th.th-nota, td.col-nota{ width:42px; font-size:11px; }
 
-/* Séries */
-.series-wrap{ display:flex; flex-direction:column; gap:8px; min-height:44px; }
-.series-linha{ display:flex; gap:8px; align-items:center; }
-.series-linha select{ flex:1; padding:10px 12px; font-size:14px; border:1px solid var(--field-border); border-radius:10px; background:var(--field-bg); color:var(--ink); outline:none; font-family:'Nunito',sans-serif; transition:border-color 0.15s, box-shadow 0.15s; }
-.series-linha select:focus{ border-color:var(--brand,#7c3aed); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
-html[data-theme="dark"] .series-linha select{ background:var(--field-bg); border-color:var(--field-border); color:var(--ink); }
-.preview-serie{ font-size:13px; color:var(--muted); margin-top:6px; }
 
 /* Avisos */
 .aviso-warn{ background:var(--chip-bg,#f5f3ff); border:1px solid var(--chip-border,#ddd6fe); border-left:4px solid #d97706; padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; color:var(--ink); }
@@ -271,8 +264,6 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
 .info-tip.open .info-tip-bubble{ display:block; }
 /* Variante larga: dicas mais longas em cards com espaço sobrando. */
 .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
-/* Variante alinhada à direita: ícone perto da borda direita do container. */
-.info-tip-bubble.align-right{ left:auto; right:0; }
 
 </style>
 <script src="../db.firebase.js"></script>
@@ -375,12 +366,12 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
     <div class="actions actions-split">
       <div class="actions-group">
         <button class="btn btn-primary" onclick="adicionarAluno()">Adicionar / Atualizar</button>
-        <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()" style="display:none">📄 Scans</button>
+        <button class="btn btn-secondary" id="btnContinuarScans" onclick="toggleScans()">📄 Scans</button>
         <button class="btn btn-primary" onclick="salvarNoBanco()">Salvar no banco</button>
       </div>
       <div class="actions-group">
         <button class="btn btn-secondary" id="btnImportarAta" onclick="abrirImportAta()">📥 Importar desta ata</button>
-        <button class="btn btn-secondary" id="btnDescartar" onclick="descartarAlteracoes()" title="Descarta o que ainda não foi salvo e volta ao que está no banco">↩️ Descartar alterações</button>
+        <button class="btn btn-secondary" onclick="descartarAlteracoes()" title="Descarta o que ainda não foi salvo e volta ao que está no banco">↩️ Descartar alterações</button>
       </div>
     </div>
 
@@ -400,139 +391,6 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
    Helpers
 ========================= */
 const $ = (id) => document.getElementById(id);
-
-/* =========================
-   DB por escola (schoolId)
-   - grava tudo em localStorage no formato: schools:<schoolId>:<chave>
-   - evita vazamento de dados entre escolas
-========================= */
-const DB = (() => {
-  const SESSION_KEY = "auth_session_v2";
-  const ADMIN_ACTIVE_SCHOOL_KEY = "admin_active_school_v1";
-
-  const SAFE_KEYS = new Set([
-    "turmasDB",
-    "alunosDB",
-    "alunosAliasesDB",
-    "atasDB",
-    "matriculasDB",
-    "turmasMetaDB",
-    "dadosEscola"
-  ]);
-
-  function safeParse(raw){
-    try{ return JSON.parse(raw); }catch{ return null; }
-  }
-
-  function getSession(){
-    try{
-      if (window.Auth && typeof Auth.getSession === "function") return Auth.getSession();
-    }catch{}
-    return safeParse(localStorage.getItem(SESSION_KEY));
-  }
-
-  function activeSchoolId(){
-    const s = getSession();
-    const sid = String(s?.schoolId || "").trim().toUpperCase();
-    if (sid === "ADMIN"){
-      const picked = String(localStorage.getItem(ADMIN_ACTIVE_SCHOOL_KEY) || "").trim().toUpperCase();
-      return picked || "ADMIN";
-    }
-    return sid;
-  }
-
-  function key(baseKey){
-    const sid = activeSchoolId();
-    if (!sid) return null;
-    return `schools:${sid}:${baseKey}`;
-  }
-
-  function migrateIfNeeded(baseKey){
-    if (!SAFE_KEYS.has(baseKey)) return;
-    const scoped = key(baseKey);
-    if (!scoped) return;
-    if (localStorage.getItem(scoped) !== null) return;
-
-    const legacy = localStorage.getItem(baseKey);
-    if (legacy === null) return;
-
-    localStorage.setItem(scoped, legacy);
-    // não remove legado para não quebrar páginas antigas
-  }
-
-  function read(baseKey, fallback){
-    migrateIfNeeded(baseKey);
-    const k = key(baseKey);
-    if (!k) return fallback;
-    const v = safeParse(localStorage.getItem(k));
-    return (v === null || v === undefined) ? fallback : v;
-  }
-
-  function write(baseKey, value){
-    const k = key(baseKey);
-    if (!k){
-      _toastErro("❌ Sua conta não está vinculada a uma escola (schoolId). Peça ao admin para configurar.");
-      return false;
-    }
-    localStorage.setItem(k, JSON.stringify(value));
-    return true;
-  }
-
-  function remove(baseKey){
-    const k = key(baseKey);
-    if (!k) return false;
-    localStorage.removeItem(k);
-    return true;
-  }
-
-  // Intercepta write para também persistir no Firestore em paralelo
-  const FIRESTORE_MAP = {
-    turmasDB:       'turmas',
-    alunosDB:       'alunos',
-    alunosAliasesDB:'matriculas',
-    atasDB:         'atas',
-    matriculasDB:   'matriculas',
-    dadosEscola:    null, // tratado separadamente via DB.escola.save()
-  };
-
-  function writeFirestore(baseKey, value){
-    try{
-      if(!window.DB || !window.Auth || !window.Auth.getSession()) return;
-      const colName = FIRESTORE_MAP[baseKey];
-      if(colName === undefined) return; // chave não mapeada
-      if(colName === null){
-        // dadosEscola → DB.escola.save()
-        if(baseKey === 'dadosEscola' && window.DB.escola)
-          DB.escola.save(value).catch(e=>console.warn('Firestore dadosEscola:', e));
-        return;
-      }
-      const col = window.DB[colName];
-      if(!col) return;
-      // Remove undefined recursivamente (Firebase rejeita undefined)
-      function limparUndef(v){
-        if(Array.isArray(v)) return v.map(limparUndef);
-        if(v !== null && typeof v === 'object')
-          return Object.fromEntries(Object.entries(v).filter(([,x])=>x!==undefined).map(([k,x])=>[k,limparUndef(x)]));
-        return v;
-      }
-      const clean = limparUndef(value);
-      // Array → saveAll; objeto → save
-      if(Array.isArray(clean)){
-        col.saveAll(clean).catch(e=>console.warn(`Firestore ${colName} saveAll:`, e));
-      } else {
-        col.save(clean).catch(e=>console.warn(`Firestore ${colName} save:`, e));
-      }
-    }catch(e){ console.warn('writeFirestore erro:', e); }
-  }
-
-  function writeBoth(baseKey, value){
-    const ok = write(baseKey, value);   // localStorage síncrono
-    if(ok) writeFirestore(baseKey, value); // Firestore assíncrono
-    return ok;
-  }
-
-  return { read, write: writeBoth, remove, key, activeSchoolId };
-})();
 
 /* =========================
    Schema (Admin -> Cadastro)
@@ -622,7 +480,7 @@ function renderFormularioDinamico() {
         <label>Nome do aluno *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble wide">Digite ao menos 4 letras do início do nome do aluno e clique em Buscar. O sistema mostra todos os alunos cadastrados que começam com essas letras. Ao selecionar um resultado, é criado um vínculo com esse aluno — o que facilita a exportação de documentos, a conferência de dados e buscas futuras. Se nenhum resultado for selecionado, o aluno recebe um ID único, que poderá ser vinculado em cadastros futuros.</span>
+            <span class="info-tip-bubble wide">Digite ao menos 3 letras do início do nome do aluno e clique em Buscar. O sistema mostra todos os alunos cadastrados que começam com essas letras. Ao selecionar um resultado, é criado um vínculo com esse aluno — o que facilita a exportação de documentos, a conferência de dados e buscas futuras. Se nenhum resultado for selecionado, o aluno recebe um ID único, que poderá ser vinculado em cadastros futuros.</span>
           </span>
         </label>
         <div style="display:flex; gap:6px;">
@@ -928,8 +786,6 @@ async function excluirAlunoEmEdicao() {
       const mid = idMatriculaFrom(turmaIdAtual, alunoId);
       if (window.DB?.matriculas?.remove) {
         await window.DB.matriculas.remove(mid);
-      } else {
-        console.warn('[excluirAlunoEmEdicao] window.DB.matriculas.remove não encontrado — confirme o nome do método em db.firebase.js.');
       }
 
       // Mantém ultimoAnoRegistro do catálogo (alunos-atas) coerente após a
@@ -1013,7 +869,7 @@ async function buscarCandidatosAluno() {
   const nomeEl = $("nome");
   if (!nomeEl) return;
   const nome = nomeEl.value.trim();
-  if (!nome) { _toastErro("⚠️ Digite o nome antes de buscar."); return; }
+  if (nome.length < 3) { _toastErro("⚠️ Digite ao menos 3 letras do nome antes de buscar."); return; }
   if (!window.Identidade) { _toastErro("❌ identidade-aluno.js não carregado."); return; }
 
   const wrap = $("nomeCandidatosWrap");
@@ -1244,29 +1100,12 @@ function editarAluno(i) {
 }
 
 /* =========================
-   DB local (turmasDB)
+   Turmas (Firestore)
 ========================= */
-// ── Firebase: lerTurmasDB / salvarTurmasDB ──
-let _turmasCache = null;
-
-async function lerTurmasDB() {
-  if (_turmasCache) return _turmasCache;
-  try {
-    _turmasCache = await window.DB.turmas.list();
-    return _turmasCache;
-  } catch(e) {
-    console.warn('[lerTurmasDB]', e);
-    return [];
-  }
-}
-
-function _invalidarCacheTurmas() { _turmasCache = null; }
-
 async function salvarTurmasDB(turmaObj) {
   try {
     const limpo = limparUndefined(turmaObj);
     await window.DB.turmas.save(limpo);
-    _invalidarCacheTurmas();
   } catch(e) {
     console.error('[salvarTurmasDB]', e);
     throw e;
@@ -1583,7 +1422,6 @@ async function selecionarTurma(turmaId) {
     renderTheadDinamico();
     atualizarTabela();
     habilitarFormAluno(false);
-    if (window.initScans) window.initScans("", false);
     return;
   }
 
@@ -1593,7 +1431,7 @@ async function selecionarTurma(turmaId) {
   turmaAtual = turma;
   turmaIdAtual = turmaId;
 
-  SCHEMA_ATIVO = turma.schemaSnapshot ? normalizeSchema(turma.schemaSnapshot) : normalizeSchema(getDefaultConfig());
+  SCHEMA_ATIVO = normalizeSchema(turma.schemaSnapshot);
 
   renderFormularioDinamico();
   renderTheadDinamico();
@@ -1610,7 +1448,7 @@ async function selecionarTurma(turmaId) {
   atualizarInfoTurmaSelecionada();
   habilitarFormAluno(true);
 
-  if (window.initScans) window.initScans(turmaId, true);
+  if (window.initScans) window.initScans(turmaId);
 }
 
 /** Pré-seleciona ano+turma a partir de um turmaId (deep-link, ex.: ?turma=ID). */
@@ -2329,7 +2167,7 @@ function _importExtrairLinhas(matriz, rHead, colMap, schema) {
 // que só existia por causa do processamento multi-aba).
 async function _importAnalisarCatalogo(linhas, onProgresso) {
   // Usa o cache de turmas que a página já carregou no boot (e que o save
-  // atualiza em memória) em vez de lerTurmasDB(), que fazia uma leitura
+  // atualiza em memória) em vez de reler a coleção, que faria uma leitura
   // COMPLETA da coleção de turmas a cada import — e devolvia [] em silêncio
   // se falhasse (trajetória saía toda 🟢 sem comparar nada).
   const turmasDB = TURMAS_CACHE_ATAS;
@@ -2631,8 +2469,8 @@ document.addEventListener("DOMContentLoaded", () => {
       renderTheadDinamico();
       habilitarFormAluno(false);
 
-      // deep-link opcional: ?turma=ID (aceita ?edit=ID também, por compat)
-      const turmaParam = getQueryParam("turma") || getQueryParam("edit");
+      // deep-link opcional: ?turma=ID
+      const turmaParam = getQueryParam("turma");
       if (turmaParam) await selecionarTurmaPorId(turmaParam, /* travarSelects */ true);
 
     } catch(e) {
@@ -2652,7 +2490,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </script>
 
-<script id="atas-scans-js">
+<script>
 (function(){
   const API_UPLOAD = '/api/atas-upload';
   const API_LIST   = '/api/atas-list';
@@ -2728,7 +2566,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ÚNICA mudança de feedback: 'loading'/'ok'/'err' agora vão pro toast da
   // página (o texto inline ficava dentro do card de scans, que pode estar
   // fechado). Os textos e todos os pontos de chamada continuam os originais.
-  // Sem kind → segue inline como antes (só o aviso "💡 Salve a turma primeiro").
+  // Sem kind → segue inline como antes (só o aviso "💡 Selecione ano e turma…").
   function setStatus(kind, text){
     if (kind === 'loading') { _toastCarregando(text); return; }
     if (kind === 'ok')      { _toastSucesso(text);    return; }
@@ -2856,24 +2694,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return { enviados: enviados.length, erros };
   };
 
-  window.initScans = function(turmaId, modoEdit){
+  window.initScans = function(turmaId){
     if(!turmaId) return;
     _turmaId = String(turmaId);
-    if(modoEdit) _carregarScans();
     // Carrega os scans em segundo plano, mas só ABRE o card quando o usuário
     // clicar no botão "📄 Scans" (toggleScans → mostrarScansAviso).
-    // No modo criação, oculta o botão até a turma ser salva.
-    if(!modoEdit){
-      const btn = document.getElementById('btnContinuarScans');
-      if(btn) btn.style.display = 'none';
-    }
+    _carregarScans();
   };
 
-  // Chamado pelo botão "Scans" no modo criação (antes de salvar)
+  // Chamado pelo botão "📄 Scans": abre o card (o envio só precisa de uma turma selecionada)
   window.mostrarScansAviso = function(){
     mostrarScans();
     if(!_turmaId){
-      setStatus('', '💡 Salve a turma primeiro para habilitar o envio de scans.');
+      setStatus('', '💡 Selecione ano e turma para habilitar o envio de scans.');
     }
   };
 
@@ -3077,19 +2910,6 @@ document.addEventListener("DOMContentLoaded", () => {
       dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); adicionarArquivos(e.dataTransfer.files); });
     }
 
-    // Modo edição: mostra card e carrega scans automaticamente
-    const params = new URLSearchParams(window.location.search);
-    const editId = params.get('edit');
-    if(editId){
-      // Modo edição: mostra o botão e carrega scans
-      const btn = document.getElementById('btnContinuarScans');
-      if(btn) btn.style.display = '';
-      window.initScans(editId, true);
-    } else {
-      // Modo criação: mostra botão "Scans"
-      const btn = document.getElementById('btnContinuarScans');
-      if(btn) btn.style.display = '';
-    }
   });
 })();
 </script>
