@@ -298,6 +298,43 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
     </div>
   </div>
 
+  <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secGerarAta')">
+      <h3 style="margin-top:0;">📜 Gerar ata de turma (módulo de Atas)</h3>
+      <span class="sec-toggle collapsed" id="togSecGerarAta">▼</span>
+    </div>
+    <div class="sec-body collapsed" id="secGerarAta">
+      <p class="muted">
+        Cria no módulo de Atas a turma e a ata de uma turma do ano-ativo, com os alunos matriculados, o schema escolhido
+        e as notas em branco. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas.
+        Cada turma só pode ser gerada <b>uma vez</b>; para gerar de novo, apague a turma em Gestão de Atas.
+        Alunos sem vínculo (elo) recebem um ID novo no módulo de Atas — a união dos IDs é feita na página de IDs.
+      </p>
+      <div class="row-btns">
+        <button class="btn btn-gray" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
+      </div>
+
+      <div id="gaForm" style="display:none;margin-top:14px;">
+        <label class="muted" for="gaTurma">Turma do ano-ativo</label>
+        <select id="gaTurma" onchange="gaResetPlano()"
+          style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
+        <label class="muted" for="gaSchema">Schema da ata</label>
+        <select id="gaSchema" onchange="gaResetPlano()"
+          style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
+        <div class="row-btns" style="margin-top:0;">
+          <button class="btn btn-outline" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
+        </div>
+      </div>
+
+      <div id="gaPreview" style="display:none;margin-top:14px;"></div>
+      <div class="row-btns" id="gaGerarWrap" style="display:none;">
+        <button class="btn btn-primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
+      </div>
+      <div class="console" id="logGerarAta" style="display:none;"></div>
+    </div>
+  </div>
+
   <!-- ── EXPORTAR ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secExport')">
@@ -1265,6 +1302,401 @@ async function executarExclusaoTurma() {
     setMsg('Erro durante a exclusão: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
+  }
+}
+
+/* =============================================
+   GERAR ATA DE TURMA (ano-ativo → módulo de Atas)
+   Grava, num único batchWrite: turmas, atas, matriculas (módulo de Atas)
+   e alunos-atas (só alunos sem elo). Os docs de turmas/atas levam
+   `anoAtivoTurmaId` (id da turma de origem): é a trava contra gerar 2x.
+============================================= */
+const GA = { turmas: [], schemas: [], anoAtivo: null, plano: null, ocupado: false };
+const GA_LOG = 'logGerarAta';
+
+const GA_RESULTADO = { APROVADO: 'AP', REPROVADO: 'REP', TRANSFERIDO: 'TRA', FALECIDO: 'FAL', DESISTENTE: 'DEST' };
+const GA_TURNOS    = { MAT: 'MATUTINO', VES: 'VESPERTINO', NOT: 'NOTURNO', INT: 'INTEGRAL' };
+
+// chave normalizada (ano-ativo) → texto da série no módulo de Atas. G1–G5 não existem lá (bloqueiam).
+const GA_SERIES = (function () {
+  const m = { 'ALFABETIZACAO': 'Alfabetização', 'MULTISERIADA': 'Multisseriada', 'MULTISSERIADA': 'Multisseriada' };
+  for (let n = 1; n <= 5; n++) m['EIXO ' + n] = 'Eixo ' + n;
+  for (let n = 1; n <= 9; n++) m[n + 'º ANO'] = n + 'º ano';
+  return m;
+})();
+
+function gaNorm(s) {
+  return String(s || '').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[°˚]/g, 'º').replace(/\s+/g, ' ');
+}
+function gaSerieAtas(s) { return GA_SERIES[gaNorm(s)] || null; }
+function gaTurnoFull(t) {
+  const k = String(t || '').trim().toUpperCase().slice(0, 3);
+  return GA_TURNOS[k] || null;
+}
+// mesmas regras de id do cadastro-turmas.html (módulo de Atas)
+function gaSlugSerie(s) {
+  return String(s || '').trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ºª]/g, '').replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');
+}
+function gaBaseId(ano, turnoFull, seriesAtas) {
+  const slug = seriesAtas.map(gaSlugSerie).filter(Boolean).join('+') || 'SEM_SERIE';
+  return `ATUR-ATAS|${ano}|${turnoFull.slice(0, 3)}|${slug}`;
+}
+function gaSameBase(base, id) { return !!id && (id === base || String(id).startsWith(base + '|')); }
+function gaIndexToLetters(n) {
+  let x = n, out = '';
+  while (true) { out = String.fromCharCode(65 + (x % 26)) + out; x = Math.floor(x / 26) - 1; if (x < 0) break; }
+  return out;
+}
+function gaLettersToIndex(s) {
+  const str = String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (!str) return null;
+  let n = 0;
+  for (let i = 0; i < str.length; i++) n = n * 26 + (str.charCodeAt(i) - 64);
+  return n - 1;
+}
+// 1ª turma da base fica sem letra; a partir da 2ª, próxima letra livre (não renomeia as existentes)
+function gaEscolherId(base, existentes) {
+  const same = (existentes || []).filter(t => gaSameBase(base, t && t.turmaId));
+  if (!same.length) return base;
+  const usados = new Set();
+  for (const t of same) {
+    if (t.turmaId === base) usados.add(0);
+    else { const ix = gaLettersToIndex(String(t.turmaId).slice(base.length + 1)); if (ix !== null) usados.add(ix); }
+  }
+  let n = 0; while (usados.has(n)) n++;
+  return base + '|' + gaIndexToLetters(n);
+}
+async function gaBuscarIdLivre(base) {
+  const existentes = await window.DB.turmas.whereRange('turmaId', base, base + '\uf8ff');
+  return gaEscolherId(base, existentes);
+}
+// mesmo formato que o cadastro-turmas grava em schemaSnapshot
+function gaNormalizeSchema(cfg) {
+  const out = {
+    id: String((cfg && (cfg.id || cfg.schemaId)) || '').trim(),
+    version: 1,
+    nome: String((cfg && cfg.nome) != null ? cfg.nome : ''),
+    serieAtiva: cfg && cfg.serieAtiva !== undefined ? !!cfg.serieAtiva : true,
+    resultadoAtivo: cfg && cfg.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : true,
+    ordenarPor: (cfg && cfg.ordenarPor === 'numero') ? 'numero' : 'nome',
+    colunas: Array.isArray(cfg && cfg.colunas) ? cfg.colunas : [],
+  };
+  out.colunas = out.colunas
+    .map(c => ({
+      key: String((c && c.key) != null ? c.key : '').trim().toLowerCase(),
+      label: String((c && c.label) != null ? c.label : '').trim(),
+      type: (c && c.type === 'texto') ? 'texto' : 'nota',
+      enabled: !(c && c.enabled === false),
+    }))
+    .filter(c => c.key && c.label);
+  const vistos = new Set();
+  out.colunas = out.colunas.filter(c => { if (vistos.has(c.key)) return false; vistos.add(c.key); return true; });
+  return out;
+}
+function gaAnoAtivoDe(escola) {
+  let v = escola && escola.configAnoAtivo;
+  if (v && typeof v === 'object') v = v.anoAtivo ?? v.ano ?? v.anoLetivo ?? null;
+  const n = parseInt(v, 10);
+  return n > 0 ? n : new Date().getFullYear();
+}
+
+// critérios de elegibilidade que não precisam de leitura extra
+function gaMotivos(t) {
+  const m = [];
+  const ano = Number(t.anoLetivo);
+  if (!ano) m.push('sem ano letivo');
+  else if (ano === GA.anoAtivo) m.push('é do ano ativo');
+  if (!String(t.nome || '').trim()) m.push('sem nome');
+  if (!gaTurnoFull(t.turno)) m.push('sem turno');
+  const series = Array.isArray(t.series) ? t.series.filter(Boolean) : [];
+  if (!series.length) m.push('sem série');
+  else {
+    const ruins = series.filter(s => !gaSerieAtas(s));
+    if (ruins.length) m.push('série sem equivalente em Atas: ' + ruins.join(', '));
+  }
+  return m;
+}
+
+function gaResetPlano() {
+  GA.plano = null;
+  document.getElementById('gaPreview').style.display = 'none';
+  document.getElementById('gaGerarWrap').style.display = 'none';
+}
+
+async function gaCarregar() {
+  if (!IS_ADMIN || GA.ocupado) return;
+  const btn = document.getElementById('btnGaCarregar');
+  btn.disabled = true;
+  clearLogEl(GA_LOG);
+  gaResetPlano();
+  try {
+    await waitAuth();
+    const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+    if (!sid || String(sid).toUpperCase() === 'ADMIN') {
+      setMsg('Selecione uma escola para gerar atas (você está em "Todas as escolas").', 'err');
+      return;
+    }
+    const [turmas, schemas, escola] = await Promise.all([
+      window.DB.anoAtivoTurmas.list(), window.DB.atasSchemas.list(), window.DB.escola.get(),
+    ]);
+    GA.anoAtivo = gaAnoAtivoDe(escola);
+    GA.turmas = Array.isArray(turmas) ? turmas.slice() : [];
+    GA.schemas = (Array.isArray(schemas) ? schemas : []).map(gaNormalizeSchema).filter(s => s.id);
+    GA.schemas.sort((a, b) => (b.id === 'padrao') - (a.id === 'padrao') || a.nome.localeCompare(b.nome, 'pt-BR'));
+    GA.turmas.sort((a, b) => (Number(b.anoLetivo) || 0) - (Number(a.anoLetivo) || 0) ||
+      String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+
+    const selT = document.getElementById('gaTurma');
+    selT.innerHTML = '';
+    let elegiveis = 0;
+    GA.turmas.forEach(t => {
+      const id = t.turmaId || t._id;
+      const motivos = gaMotivos(t);
+      const o = document.createElement('option');
+      o.value = id;
+      o.textContent = `${t.nome || id} · ${t.anoLetivo || '?'} · ${t.turno || '?'} · ${(t.series || []).join('+') || '?'}` +
+        (motivos.length ? ` — indisponível (${motivos.join('; ')})` : '');
+      o.disabled = motivos.length > 0;
+      if (!motivos.length) elegiveis++;
+      selT.appendChild(o);
+    });
+    const primeira = Array.from(selT.options).find(o => !o.disabled);
+    if (primeira) selT.value = primeira.value;
+
+    const selS = document.getElementById('gaSchema');
+    selS.innerHTML = '';
+    GA.schemas.forEach(s => {
+      const o = document.createElement('option');
+      o.value = s.id; o.textContent = s.nome || s.id;
+      selS.appendChild(o);
+    });
+    if (GA.schemas.some(s => s.id === 'padrao')) selS.value = 'padrao';
+
+    document.getElementById('gaForm').style.display = (GA.turmas.length && GA.schemas.length) ? 'block' : 'none';
+    logEl(`Ano ativo: ${GA.anoAtivo} · ${GA.turmas.length} turma(s), ${elegiveis} elegível(is) · ${GA.schemas.length} schema(s).`, GA_LOG);
+    if (!GA.schemas.length) setMsg('Nenhum schema encontrado em atasSchemas. O schema padrão precisa existir.', 'err');
+    else if (!GA.schemas.some(s => s.id === 'padrao')) setMsg('O schema "padrao" não foi encontrado.', 'err');
+    else if (!elegiveis) setMsg('Nenhuma turma elegível para gerar ata.', 'warn');
+  } catch (e) {
+    console.error('[gaCarregar]', e);
+    logEl('❌ ' + (e.message || e), GA_LOG);
+    setMsg('Erro ao carregar: ' + (e.message || e), 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function gaTravaJaGerada(turmaIdAnoAtivo) {
+  const [a, b] = await Promise.all([
+    window.DB.turmas.whereEquals('anoAtivoTurmaId', turmaIdAnoAtivo, { limit: 1 }),
+    window.DB.atas.whereEquals('anoAtivoTurmaId', turmaIdAnoAtivo, { limit: 1 }),
+  ]);
+  const achada = (a && a[0]) || (b && b[0]);
+  return achada ? String(achada.turmaId || achada.id || achada._id || '?') : null;
+}
+
+async function gaAnalisar() {
+  if (!IS_ADMIN || GA.ocupado) return;
+  const btn = document.getElementById('btnGaAnalisar');
+  gaResetPlano();
+  clearLogEl(GA_LOG);
+  const turmaId = document.getElementById('gaTurma').value;
+  const schemaId = document.getElementById('gaSchema').value;
+  const turma = GA.turmas.find(t => (t.turmaId || t._id) === turmaId);
+  const schema = GA.schemas.find(s => s.id === schemaId);
+  if (!turma || !schema) return setMsg('Escolha a turma e o schema.', 'err');
+
+  const bloquear = (msg) => { logEl('⛔ ' + msg, GA_LOG); setMsg(msg, 'err'); };
+  btn.disabled = true;
+  try {
+    const motivos = gaMotivos(turma);
+    if (motivos.length) return bloquear('Turma indisponível: ' + motivos.join('; ') + '.');
+    const cols = schema.colunas.filter(c => c.enabled);
+    if (!cols.length) return bloquear('O schema escolhido não tem colunas habilitadas.');
+
+    logEl('Verificando se a turma já foi gerada…', GA_LOG);
+    const ja = await gaTravaJaGerada(turmaId);
+    if (ja) return bloquear(`Esta turma já foi gerada no módulo de Atas (${ja}). Para gerar de novo, apague-a em Gestão de Atas.`);
+
+    logEl('Lendo matrículas, alunos e vínculos…', GA_LOG);
+    const mats = await window.DB.anoAtivoMatriculas.whereEquals('turmaId', turmaId);
+    const porAluno = new Map();
+    mats.forEach(m => { if (m && m.alunoId && !porAluno.has(m.alunoId)) porAluno.set(m.alunoId, m); });
+    if (!porAluno.size) return bloquear('A turma não tem alunos matriculados.');
+    const ids = Array.from(porAluno.keys());
+
+    const [alunos, elos] = await Promise.all([
+      window.DB.anoAtivoAlunos.whereIn('alunoId', ids),
+      window.DB.alunos.whereIn('anoAtivoId', ids),
+    ]);
+    const alunoPorId = new Map(alunos.map(a => [a.alunoId || a._id, a]));
+    const semCadastro = ids.filter(id => !alunoPorId.has(id));
+    if (semCadastro.length) return bloquear(`Matrícula(s) sem cadastro de aluno: ${semCadastro.slice(0, 5).join(', ')}${semCadastro.length > 5 ? '…' : ''}.`);
+    const atasPorAnoAtivo = new Map();
+    elos.forEach(e => { if (e && e.anoAtivoId && e.atasId && !atasPorAnoAtivo.has(e.anoAtivoId)) atasPorAnoAtivo.set(e.anoAtivoId, e.atasId); });
+
+    const seriesAtas = turma.series.filter(Boolean).map(gaSerieAtas);
+    const ano = Number(turma.anoLetivo);
+    const turnoFull = gaTurnoFull(turma.turno);
+    const base = gaBaseId(ano, turnoFull, seriesAtas);
+    const turmaIdAtas = await gaBuscarIdLivre(base);
+
+    const rows = ids.map(id => {
+      const a = alunoPorId.get(id), m = porAluno.get(id);
+      const serie = gaSerieAtas(m.serie) || (seriesAtas.length === 1 ? seriesAtas[0] : '');
+      const resultado = GA_RESULTADO[gaNorm(m.situacao)] || '';
+      const atasId = atasPorAnoAtivo.get(id) || null;
+      return { anoAtivoId: id, nome: String(a.nome || '').trim(), serie, resultado, atasId, novo: !atasId };
+    }).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+
+    const novos = rows.filter(r => r.novo).length;
+    const totalOps = 2 + novos + rows.length;
+    if (totalOps > 500) return bloquear(`Turma grande demais para um único lote (${totalOps} operações; máximo 500).`);
+
+    GA.plano = { turma, turmaId, ano, turnoFull, seriesAtas, schema, cols, base, turmaIdAtas, rows, novos, totalOps };
+    gaRenderPreview();
+    logEl('✅ Análise pronta. Confira a prévia e clique em "Gerar ata".', GA_LOG);
+  } catch (e) {
+    console.error('[gaAnalisar]', e);
+    logEl('❌ ' + (e.message || e), GA_LOG);
+    setMsg('Erro na análise: ' + (e.message || e), 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function gaRenderPreview() {
+  const p = GA.plano;
+  const semSit = p.rows.filter(r => !r.resultado).length;
+  const reaproveitados = p.rows.length - p.novos;
+  const linhas = p.rows.slice(0, 60).map(r =>
+    `<tr><td>${esc(r.nome)}</td><td>${esc(r.serie || '—')}</td><td>${esc(r.resultado || '—')}</td>` +
+    `<td>${r.novo ? '<span class="badge warn">ID novo</span>' : `<span class="badge ok">${esc(r.atasId)}</span>`}</td></tr>`).join('');
+  const el = document.getElementById('gaPreview');
+  el.innerHTML =
+    `<div class="migr-item ok"><span class="badge ok">TURMA</span> <b>${esc(p.turma.nome)}</b> · ${p.ano} · ${esc(p.turnoFull)} · ${esc(p.seriesAtas.join(' + '))}</div>` +
+    `<div class="muted" style="margin:6px 0;">Id no módulo de Atas: <b>${esc(p.turmaIdAtas)}</b> · schema: <b>${esc(p.schema.nome || p.schema.id)}</b> (${p.cols.length} coluna(s))</div>` +
+    `<div class="stats-row">` +
+    `<div class="stat-box"><div class="stat-num">${p.rows.length}</div><div class="stat-lbl">alunos</div></div>` +
+    `<div class="stat-box"><div class="stat-num">${reaproveitados}</div><div class="stat-lbl">com elo (reaproveitam ID)</div></div>` +
+    `<div class="stat-box"><div class="stat-num">${p.novos}</div><div class="stat-lbl">IDs novos</div></div>` +
+    `<div class="stat-box"><div class="stat-num">${semSit}</div><div class="stat-lbl">sem situação</div></div></div>` +
+    `<div style="max-height:260px;overflow:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;font-size:13px;">` +
+    `<thead><tr style="text-align:left;"><th>Nome</th><th>Série</th><th>Resultado</th><th>ID em Atas</th></tr></thead><tbody>${linhas}</tbody></table>` +
+    (p.rows.length > 60 ? `<div class="muted">… e mais ${p.rows.length - 60} aluno(s).</div>` : '') + `</div>`;
+  el.style.display = 'block';
+  document.getElementById('gaGerarWrap').style.display = 'flex';
+}
+
+async function gaReservarIds(n) {
+  if (!n) return [];
+  if (window.Identidade && typeof Identidade.reservarBlocoIds === 'function') return Identidade.reservarBlocoIds(n);
+  const ids = [];
+  for (let i = 0; i < n; i++) ids.push(await Identidade.proximoId());   // sequencial (transações no mesmo contador)
+  return ids;
+}
+
+async function gaGerar() {
+  if (!IS_ADMIN || GA.ocupado || !GA.plano) return;
+  const p = GA.plano;
+  const ok = await _confirmModal({
+    titulo: '📜 Gerar ata no módulo de Atas',
+    corDestaque: '#7c3aed',
+    corpo: `Gerar a ata da turma "${p.turma.nome}" (${p.ano})?\n\n` +
+      `- ${p.rows.length} aluno(s), ${p.novos} com ID novo em Atas\n` +
+      `- Schema: ${p.schema.nome || p.schema.id}\n\n` +
+      `Para refazer depois, será preciso apagar a turma em Gestão de Atas.`,
+    textoConfirmar: 'Gerar ata',
+  });
+  if (!ok) return;
+
+  GA.ocupado = true;
+  const btn = document.getElementById('btnGaGerar');
+  btn.disabled = true; btn.textContent = 'Gerando…';
+  try {
+    // Revalida o que pode ter mudado entre a análise e o clique
+    const ja = await gaTravaJaGerada(p.turmaId);
+    if (ja) { logEl(`⛔ Já gerada por outro acesso (${ja}).`, GA_LOG); setMsg('Esta turma já foi gerada. Nada foi gravado.', 'err'); gaResetPlano(); return; }
+    p.turmaIdAtas = await gaBuscarIdLivre(p.base);
+
+    // IDs novos: só depois de tudo validado. Numa nova tentativa, os já reservados são reaproveitados.
+    const semId = p.rows.filter(r => r.novo && !r.atasId);
+    if (semId.length) {
+      logEl(`Reservando ${semId.length} ID(s) de aluno…`, GA_LOG);
+      const ids = await gaReservarIds(semId.length);
+      semId.forEach((r, i) => { r.atasId = ids[i]; });
+    }
+
+    const agora = new Date().toISOString();
+    const ataId = 'ATA|' + p.turmaIdAtas;
+    const serieTexto = p.seriesAtas.join(' + ');
+    const alunosAta = p.rows.map(r => {
+      const linha = { alunoId: r.atasId, nome: r.nome, serie: r.serie, resultado: r.resultado };
+      p.cols.forEach(c => { linha[c.key] = ''; });
+      return linha;
+    });
+    const comuns = {
+      turmaId: p.turmaIdAtas, turno: p.turnoFull, serieTexto, seriesTurma: p.seriesAtas,
+      criadoEm: agora, atualizadoEm: agora,
+      schemaId: p.schema.id, schemaSnapshot: p.schema,
+      origemArquivo: 'MANUAL', aba: 'MANUAL',
+      anoAtivoTurmaId: p.turmaId,
+    };
+    const ops = [
+      { col: 'turmas', op: 'set', id: p.turmaIdAtas, data: {
+          ...comuns, id: p.turmaIdAtas, nome: p.turma.nome, anoLetivo: p.ano,
+          series: p.seriesAtas, alunos: alunosAta } },
+      { col: 'atas', op: 'set', id: ataId, data: { ...comuns, id: ataId, anoLetivo: String(p.ano) } },
+      ...p.rows.filter(r => r.novo).map(r => ({ col: 'alunos-atas', op: 'set', id: r.atasId,
+        data: Identidade.normalizarAtas({ alunoId: r.atasId, nome: r.nome, ultimoAnoRegistro: p.ano, criadoEm: agora, atualizadoEm: agora }) })),
+      ...p.rows.map(r => {
+        const id = `MAT|${p.turmaIdAtas}|${r.atasId}`;
+        return { col: 'matriculas', op: 'set', id, data: {
+          id, alunoId: r.atasId, anoLetivo: p.ano, ataId, nomeRaw: r.nome,
+          resultado: r.resultado, serie: r.serie, turmaId: p.turmaIdAtas } };
+      }),
+    ];
+
+    logEl(`Gravando ${ops.length} documento(s) num único lote…`, GA_LOG);
+    await window.DB.batchWrite(ops);
+
+    const idx = await gaRegistrarAnoNoIndice(p.ano);
+    logEl(`✅ Ata gerada: ${p.turmaIdAtas}`, GA_LOG);
+    logEl(`   ${p.rows.length} aluno(s) · ${p.novos} novo(s) em alunos-atas · ${p.rows.length - p.novos} reaproveitado(s) por elo`, GA_LOG);
+    if (idx && idx.ok === false) logEl(`⚠️ Turma gravada, mas o índice de anos não foi atualizado (${idx.motivo}).`, GA_LOG);
+    _toastSucesso('Ata gerada com sucesso.');
+    gaResetPlano();
+  } catch (e) {
+    console.error('[gaGerar]', e);
+    logEl('❌ Falha ao gerar: ' + (e.message || e) + '\nNada foi gravado nas coleções de Atas (os IDs já reservados serão reaproveitados numa nova tentativa).', GA_LOG);
+    setMsg('Falha ao gerar a ata: ' + (e.message || e), 'err');
+  } finally {
+    GA.ocupado = false;
+    btn.disabled = false; btn.textContent = '📜 Gerar ata';
+  }
+}
+
+// mesmo comportamento do cadastro-turmas: só acrescenta ao índice se ele já existir; falha não desfaz a turma
+async function gaRegistrarAnoNoIndice(ano) {
+  try {
+    const schoolId = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+    if (!window.Auth || !Auth.db || !schoolId || String(schoolId).toUpperCase() === 'ADMIN') return { ok: false, motivo: 'nenhuma escola ativa' };
+    const FV = (typeof firebase !== 'undefined' && firebase.firestore) ? firebase.firestore.FieldValue : null;
+    if (!FV) return { ok: false, motivo: 'SDK do Firestore indisponível' };
+    const ref = Auth.db.collection('schools').doc(schoolId);
+    const snap = await ref.get();
+    const anos = snap.exists ? ((snap.data().atasIndice || {}).anos) : null;
+    if (!Array.isArray(anos) || !anos.length) return { ok: true, pulado: true };
+    if (anos.map(String).includes(String(ano))) return { ok: true, pulado: true };
+    await ref.set({ atasIndice: { anos: FV.arrayUnion(String(ano)) } }, { merge: true });
+    return { ok: true };
+  } catch (e) {
+    console.error('[gaRegistrarAnoNoIndice]', e);
+    return { ok: false, motivo: (e && (e.code || e.message)) || 'erro desconhecido' };
   }
 }
 </script>
