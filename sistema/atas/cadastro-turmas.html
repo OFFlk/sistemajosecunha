@@ -641,13 +641,41 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     else filtroLista.value = "";
   }
 
-  // Mesma lista que a Atas já usa hoje (SERIES_PADRAO em cadastro-atas.html)
+  // Lista fixa de séries. Mantenha IDÊNTICA em pesquisa-ata.html (SERIES_FILTRO).
   function serieOptions(){
     return [
       "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
       "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
-      "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano"
+      "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano",
+      "Multisseriada"
     ];
+  }
+
+  // Índice de anos (schools/{escola}.atasIndice.anos): alimenta o select de ano da pesquisa de atas
+  // sem precisar ler as turmas. Só ACRESCENTA ao índice se ele já existir (criado em Gestão de Atas → Reconstruir):
+  // criar aqui deixaria um índice parcial, que esconderia os outros anos da pesquisa.
+  // Falha aqui NÃO desfaz a turma. Devolve { ok, motivo?, pulado? }.
+  async function registrarAnoNoIndice(ano){
+    try{
+      const schoolId = window.Auth && window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId();
+      if(!window.Auth || !window.Auth.db || !schoolId || String(schoolId).toUpperCase() === "ADMIN")
+        return { ok:false, motivo:"nenhuma escola ativa" };
+      // `firebase` é global (como em db.firebase.js), mas pode não ser propriedade de window — usar o nome direto.
+      const FV = (typeof firebase !== "undefined" && firebase.firestore) ? firebase.firestore.FieldValue : null;
+      if(!FV) return { ok:false, motivo:"SDK do Firestore indisponível" };
+
+      const ref = window.Auth.db.collection("schools").doc(schoolId);
+      const snap = await ref.get();
+      const anos = snap.exists ? ((snap.data().atasIndice || {}).anos) : null;
+      if(!Array.isArray(anos) || !anos.length) return { ok:true, pulado:true };   // índice ainda não criado
+      if(anos.map(String).includes(String(ano)))   return { ok:true, pulado:true };   // já está lá: nada a gravar
+
+      await ref.set({ atasIndice: { anos: FV.arrayUnion(String(ano)) } }, { merge: true });
+      return { ok:true };
+    }catch(e){
+      console.error("[registrarAnoNoIndice]", e);
+      return { ok:false, motivo: (e && (e.code || e.message)) || "erro desconhecido" };
+    }
   }
   function fillSerieSelect(){
     const sel = $("serieSelect");
@@ -1048,6 +1076,11 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       return;
     }
 
+    // Índice de anos (select da pesquisa de atas). Falha aqui NÃO desfaz a turma, mas avisa.
+    const idx = await registrarAnoNoIndice(ano);
+    const indiceOk = idx.ok;
+    const avisoIndice = `Turma salva, mas o índice de anos da pesquisa não pôde ser atualizado (${idx.motivo}).`;
+
     // EDIÇÃO: hard refresh. A página fica estática depois de salvar, então
     // recarrega do zero; a confirmação é guardada e exibida após o reload.
     if(ehEdicao){
@@ -1055,8 +1088,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       guardarMsgPosReload(
         idMudou
           ? `Turma salva. O ID mudou de ${oldId} para ${turmaId} — os alunos já lançados continuam no ID antigo.`
-          : "Turma salva!",
-        idMudou ? "warn" : "ok"
+          : (indiceOk ? "Turma salva!" : avisoIndice),
+        (idMudou || !indiceOk) ? "warn" : "ok"
       );
       window.location.reload();
       return;
@@ -1071,6 +1104,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     updateDbInfo();
     if(!okReload){
       setMsg("Turma salva, mas não foi possível atualizar a lista — recarregue a página.", "err");
+    } else if(!indiceOk){
+      setMsg(avisoIndice, "warn");
     } else {
       setMsg("Turma salva!", "ok");
     }
