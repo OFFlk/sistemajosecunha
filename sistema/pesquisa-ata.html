@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="../icon.png" type="image/png"/>
+
+<!-- Tema antecipado (manter — evita flash de tema errado) -->
+<script>
+(function(){
+  var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
+  var theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
+<!-- Firebase / Auth / DB -->
+<script src="../loading-overlay.js"></script>
+<script src="../auth.firebase.js"></script>
+<script src="../db.firebase.js"></script>
+<script src="../identidade-aluno.js"></script>
+<script src="../theme-colors.js"></script>
+
+<!-- PDF (exportar diretamente da pesquisa) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Fontes -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- Estilos -->
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/pesquisa.css">
+
+<style>
+/* ── Variáveis que esta página sobrescreve ── */
+:root {
+  --card-bg:             #ffffff;
+  --card-border:         var(--brand-border, #ddd6fe);
+  --field-bg:            #ffffff;
+  --field-border:        var(--brand-border, #ddd6fe);
+  --shadow:              0 4px 20px rgba(0,0,0,0.06);
+  --danger:              #b91c1c;
+  --chip-neutral-bg:     #f3f4f6;
+  --chip-neutral-border: #d1d5db;
+  --chip-neutral-color:  #4b5563;
+}
+html[data-theme="dark"] {
+  --card-bg:             #131c2e;
+  --card-border:         #2a3a5c;
+  --field-bg:            #0a1426;
+  --field-border:        #1e2540;
+  --shadow:              0 4px 24px rgba(0,0,0,0.4);
+  --chip-neutral-bg:     rgba(148,163,184,0.15);
+  --chip-neutral-border: rgba(148,163,184,0.3);
+  --chip-neutral-color:  #cbd5e1;
+}
+
+/* ── Aperfeiçoamentos do .btn ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s, opacity 0.18s;
+  white-space: nowrap;
+}
+.btn:active { opacity: 0.85; }
+
+/* .btn base (sem modificador) */
+.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger) {
+  background: var(--chip-bg);
+  border-color: var(--card-border);
+  color: var(--chip-color);
+}
+.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger):hover {
+  background: var(--brand-faded);
+  border-color: var(--brand-hover);
+  color: var(--brand-text);
+}
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger) {
+  background: rgba(148,163,184,0.10);
+  border-color: rgba(148,163,184,0.25);
+  color: #cbd5e1;
+}
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger):hover {
+  background: var(--brand-faded-d);
+  border-color: var(--brand-border-d);
+  color: var(--brand-text-d);
+}
+
+/* .btn.primary dark */
+html[data-theme="dark"] .btn.primary {
+  background: var(--brand-d);
+  border-color: var(--brand-d);
+  color: var(--brand-fg, #fff);
+}
+html[data-theme="dark"] .btn.primary:hover {
+  background: var(--brand-hover-d);
+  border-color: var(--brand-hover-d);
+}
+
+.filters { align-items:start; }
+#campoSerie { min-width:0; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.chips:empty { display:none; }
+/* cores FIXAS: iguais no tema claro e no escuro (não usam --brand/--chip-*) */
+.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #c7d2fe; background:#e0e7ff; color:#312e81; padding:5px 10px; border-radius:999px; font-size:12.5px; font-weight:700; max-width:100%; }
+.chip button { border:0; background:transparent; cursor:pointer; color:#312e81; font-weight:900; font-size:14px; line-height:1; padding:0; }
+.serie-add-row { display:flex; gap:8px; align-items:stretch; }
+.serie-add-row select { flex:1; min-width:0; }
+
+/* .btn.ghost */
+.btn.ghost           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
+.btn.ghost:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
+html[data-theme="dark"] .btn.ghost       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
+html[data-theme="dark"] .btn.ghost:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
+
+/* .btn.secondary */
+.btn.secondary           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
+.btn.secondary:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
+html[data-theme="dark"] .btn.secondary       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
+html[data-theme="dark"] .btn.secondary:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
+
+/* .btn.danger */
+.btn.danger          { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
+.btn.danger:hover    { background: rgba(185,28,28,0.18); border-color: rgba(185,28,28,0.55); }
+html[data-theme="dark"] .btn.danger       { background: rgba(185,28,28,0.15); border-color: rgba(239,68,68,0.40); color: #fca5a5; }
+html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); border-color: rgba(239,68,68,0.65); }
+
+/* .btn.small */
+.btn.small { padding: 6px 11px; font-size: 12px; }
+
+/* ── Título TURMAS clicável (ordenador) ── */
+#sidebarTitulo {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#sidebarTitulo:hover { opacity: 0.75; }
+#sortIndicator {
+  font-size: 11px;
+  opacity: 0.6;
+  transition: transform 0.2s;
+}
+
+/* ── Sidebar expandida: compacta ao máximo ── */
+.layout-expandido #card-esquerda .list-item .item-meta {
+  display: none !important; /* oculta metadados extras */
+}
+.layout-expandido #card-esquerda .list-item .badges-row {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.layout-expandido #card-esquerda .list-item .badges-row .badge {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  font-size: 10px;
+  padding: 1px 5px;
+}
+
+/* ── Cards mesma altura no estado normal ── */
+#container.split.layout-normal {
+  align-items: stretch;
+}
+#container.split.layout-normal #card-esquerda,
+#container.split.layout-normal #card-direita {
+  align-self: stretch;
+}
+
+/* ── Hover do list-item no estado normal ── */
+#card-esquerda .list-item:not(.selected):hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  cursor: pointer;
+}
+
+/* ── Checkbox da pesquisa por aluno ── */
+.aluno-search-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.aluno-search-checkbox input {
+  cursor: pointer;
+  accent-color: var(--brand);
+}
+
+/* ── Card de destaque na cor do usuário (mesmo mecanismo de gestão-atas) ── */
+.card.card-destaque {
+  background: var(--btn-home-bg);
+  border-color: var(--btn-home-border);
+  --dest-fg: #ffffff;
+  --dest-btn-bg: rgba(255,255,255,0.16);
+  --dest-btn-bd: rgba(255,255,255,0.55);
+  --dest-btn-hover: rgba(255,255,255,0.26);
+}
+html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg: #1e293b;
+  --dest-btn-bg: rgba(15,23,42,0.08);
+  --dest-btn-bd: rgba(15,23,42,0.35);
+  --dest-btn-hover: rgba(15,23,42,0.14);
+}
+.card-destaque .section-title { color: var(--dest-fg); }
+.card-destaque .muted { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+.card-destaque label { color: var(--dest-fg); }
+.card-destaque .aluno-search-checkbox { color: var(--dest-fg); }
+.card-destaque .btn {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
+}
+.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+/* Sem isto, "html[data-theme=dark] .btn.primary" (mais específico) vence e o
+   botão "Pesquisar" volta pra cor de marca padrão — ilegível sobre o card
+   já colorido pela cor do usuário no tema escuro. */
+html[data-theme="dark"] .card-destaque .btn { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+
+/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
+   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
+   próprio .info-tip-bubble, junto de onde é usado. Bloco pensado pra ser
+   copiado igual em outras páginas do módulo quando entrarem na fila. ===== */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); padding:10px 12px; border-radius:10px;
+  background:var(--card-bg); border:1.5px solid var(--card-border); color:#1e293b;
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
+  white-space:normal; cursor:default;
+}
+html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
+.info-tip.open .info-tip-bubble{ display:block; }
+/* Dentro de um card de destaque, o ícone acompanha o texto do card
+   (var(--dest-fg), já ajustado por ThemeColors.ajustarContraste()) — igual
+   aos outros elementos do card. O balão NÃO herda isso (cor fixa acima),
+   pra continuar legível em qualquer fundo. */
+.card-destaque .info-tip{ color: var(--dest-fg); }
+
+/* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
+@keyframes toastSubir {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; z-index: 50;
+}
+</style>
+
+<title>Pesquisa de Atas</title>
+</head>
+
+<body>
+
+<div id="header-placeholder"></div>
+
+
+<!-- ============================================================
+     CONTEÚDO PRINCIPAL
+============================================================ -->
+<div class="wrap">
+
+  <!-- Filtros -->
+  <div class="card card-destaque">
+    <p class="section-title">Filtros</p>
+
+    <div class="filters">
+      <div class="field">
+        <label>Ano letivo</label>
+        <select id="fAno">
+          <option value="">Todos</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Turno</label>
+        <select id="fTurno">
+          <option value="">Todos</option>
+          <option>MATUTINO</option>
+          <option>VESPERTINO</option>
+          <option>NOTURNO</option>
+        </select>
+      </div>
+
+      <div class="field" id="campoSerie">
+        <label for="selSerieAdd">Filtrar por série</label>
+        <div class="serie-add-row">
+          <select id="selSerieAdd"><option value="">(selecione)</option></select>
+          <button class="btn primary" id="btnAddSerie" type="button" style="white-space:nowrap;">+ Adicionar</button>
+        </div>
+        <div class="chips" id="chipsSeries"></div>
+      </div>
+
+      <div class="field">
+        <label>Busca geral</label>
+        <input id="fBusca" type="text" placeholder="Procura por aba, arquivo, série ou aluno...">
+      </div>
+    </div>
+
+    <div class="filter-actions" style="display:flex; align-items:center; gap:2px;">
+      <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
+      <button class="btn ghost" id="btnLimparFiltros" type="button" style="margin-left:6px; margin-right:6px; white-space:nowrap;">🧹 Limpar filtros</button>
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble" id="dbInfoTip">carregando...</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Pesquisa por aluno -->
+  <div class="card">
+    <div class="card-head">
+      <p class="section-title">Pesquisa por aluno</p>
+      <a class="btn ghost" href="historico-aluno.html">👤 Pesquisar notas por aluno</a>
+    </div>
+    <div class="aluno-search-row">
+      <div class="field">
+        <label>Nome do aluno</label>
+        <input id="alunoQuery" type="text" placeholder="Ex: José da Silva">
+      </div>
+      <div class="aluno-search-actions">
+        <label class="aluno-search-checkbox">
+          <input type="checkbox" id="alunoParcial" checked>
+          Início do nome (desmarque para nome exato)
+        </label>
+        <button class="btn primary" type="button" onclick="pesquisarAluno()">Pesquisar</button>
+        <button class="btn secondary" type="button" onclick="limparPesquisaAluno()">Limpar</button>
+      </div>
+    </div>
+    <div id="alunoResultados"></div>
+  </div>
+
+  <!-- Split: Turmas + Detalhes -->
+<div id="container" class="split layout-normal">
+
+  <!-- Lista de turmas -->
+  <div id="card-esquerda" class="card">
+    <p class="section-title" id="sidebarTitulo" title="Clique para ordenar as turmas">TURMAS <span id="sortIndicator">↑</span></p>
+    <div id="listaTurmas" class="list">
+      <div class="list-item">
+        <span class="muted">Nenhuma turma carregada.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detalhes da turma -->
+  <div id="card-direita" class="card">
+    <p class="section-title">Detalhes</p>
+
+      <div id="detalhesVazio" class="muted">
+        Selecione uma turma na lista para ver os alunos.
+      </div>
+
+      <div id="detalhesBox">
+        <div class="muted" id="detalhesMeta"></div>
+
+        <div class="detalhe-actions">
+          <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
+          <div style="position:relative;display:inline-block;" id="wrapExportAta">
+            <button class="btn primary" type="button" id="btnAtaExportar">Exportar ▾</button>
+            <div id="dropExportAta" style="display:none;position:absolute;left:0;top:calc(100% + 6px);
+              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
+              box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:180px;padding:6px 0;
+              flex-direction:column;">
+              <button class="btn" id="btnExportAtaPdf" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Exportar PDF</button>
+              <button class="btn" id="btnExportAtaCsv" type="button"
+                style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 Exportar CSV</button>
+            </div>
+          </div>
+          <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
+          <button class="btn secondary small" type="button" onclick="fecharTurma()" style="margin-left:auto;">✕ Fechar</button>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr id="theadAlunosRow">
+                <th>Nº</th><th>Nome</th><th>Série</th>
+                <th>Port</th><th>Mat</th><th>Hist</th><th>Geo</th>
+                <th>Ciên</th><th>Ed.Fís</th><th>Arte</th><th>Rel</th><th>Ing</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody id="tAlunos"></tbody>
+          </table>
+        </div>
+
+        <div class="summary" id="resumoTurma"></div>
+
+      </div><!-- /detalhesBox -->
+    </div>
+
+  </div><!-- /split -->
+
+</div><!-- /wrap -->
+
+
+<!-- ============================================================
+     SCRIPTS — sempre no final do body
+     (ordem: header-logic → lógica da página)
+============================================================ -->
+
+<!-- 1. header-logic (monta header, tema, chip, auth guard) -->
+<script src="../header-logic.js"></script>
+
+
+<!-- SCRIPT 3 — DB por escola (Namespacing) + lógica principal da página -->
+<script>
+/* =========================
+   Toasts padronizados + modal de confirmação (ver guia-toasts.md)
+========================= */
+function _showToast(msg, bg, shadow, duration){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.style.cssText =
+    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
+    `display:flex;align-items:center;gap:12px;`+
+    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
+    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
+    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
+    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  const span = document.createElement('span');
+  span.textContent = msg;
+  span.style.cssText = 'flex:1;line-height:1.4;';
+  toast.appendChild(span);
+  const btnClose = document.createElement('button');
+  btnClose.type = 'button';
+  btnClose.textContent = '✕';
+  btnClose.setAttribute('aria-label','Fechar aviso');
+  btnClose.style.cssText =
+    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
+    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
+    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
+  btnClose.onclick = () => toast.remove();
+  toast.appendChild(btnClose);
+  document.body.appendChild(toast);
+  // duration 0 = fica até virar outro toast ou ser fechado (usado só pelo "carregando")
+  if (duration !== 0) setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+}
+function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
+function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
+function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+function _toastCarregando(msg){
+  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 0);
+  const t = document.getElementById('_toastGlobal');
+  if(t) t.dataset.loading = '1';
+}
+// Remove o toast atual SÓ se ele for um "carregando" — nunca apaga um
+// sucesso/erro/aviso que tenha aparecido no meio do caminho.
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.dataset.loading === '1') t.remove();
+}
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else {
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    _toastAviso(t);
+  }
+}
+window.addEventListener('unhandledrejection', (ev) => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.dataset.loading === '1'){
+    console.error('[unhandledrejection]', ev.reason);
+    setMsg('Algo deu errado — veja o console.', 'err');
+  }
+});
+
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise((resolve) => {
+    const cor = corDestaque || '#b45309';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.style.display = 'flex';
+    backdrop.innerHTML =
+      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
+        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
+            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
+            `${_escHtml(textoConfirmar || 'Continuar')}`+
+          `</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    function fechar(resultado){ backdrop.remove(); resolve(resultado); }
+    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
+    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+  });
+}
+
+/* =========================
+   Permissões
+========================= */
+const _session = (window.Auth && typeof Auth.getSession === 'function')
+  ? Auth.getSession()
+  : null;
+const _podeEditar = !!_session && _session.role === 'admin';
+
+/* =========================
+   Dados: Firestore é a única fonte
+   (sem localStorage como cache — mesmo padrão adotado em
+   gestao-atas.html: localStorage usado como "guarda pra acessar
+   depois" já causou bug real de quota estourada travando o
+   salvamento de verdade no Firestore. turmas/atas/matriculas
+   não são mais coleções separadas: o dado de atas mora só em
+   turmas.alunos[], gravado por gestao-atas.html.)
+========================= */
+
+/* =========================
+   Catálogo de identidade (nome oficial por alunoId)
+   O nome gravado dentro de turma.alunos[].nome é o texto cru
+   do momento do import — se o aluno for fundido/corrigido depois
+   (idaluno.html), esse campo embutido fica desatualizado. O nome
+   correto pra exibir é sempre o do catálogo, por alunoId.
+========================= */
+let _mapaNomes = new Map(); // alunoId -> nome oficial
+
+// Nomes atualizados: o catálogo inteiro NÃO é mais carregado (Identidade v2 não tem lerTodos).
+// Ao abrir uma turma, busca o nome oficial só dos alunos DELA (1 leitura por aluno em alunos-atas) e guarda em memória
+// da página; alunos já consultados não são lidos de novo. Devolve true se algum nome mudou em relação ao gravado na turma.
+const _nomesConsultados = new Set();
+async function carregarNomesDaTurma(turma){
+  if (!(window.Identidade && typeof window.Identidade.buscarAtasPorId === "function")) return false;
+  const alunos = (turma && turma.alunos) || [];
+  const ids = [...new Set(alunos.map(a => a && a.alunoId).filter(Boolean))].filter(id => !_nomesConsultados.has(id));
+  if (!ids.length) return false;
+  try {
+    const docs = await Promise.all(ids.map(id => Identidade.buscarAtasPorId(id)));
+    docs.forEach((d, i) => {
+      _nomesConsultados.add(ids[i]);
+      if (d && d.nome) _mapaNomes.set(ids[i], d.nome);
+    });
+  } catch (e) {
+    console.warn("[pesquisa-ata] Falha ao buscar nomes atualizados:", e);
+    setMsg("Não foi possível conferir os nomes atualizados desta turma — os nomes exibidos são os gravados na turma.", "warn");
+    return false;
+  }
+  return alunos.some(a => a && a.alunoId && _mapaNomes.get(a.alunoId) && _mapaNomes.get(a.alunoId) !== a.nome);
+}
+
+function nomeAtual(aluno){
+  if (!aluno) return "";
+  const oficial = aluno.alunoId ? _mapaNomes.get(aluno.alunoId) : null;
+  return oficial || aluno.nome || "";
+}
+
+/* =========================
+   Estado
+========================= */
+let turmas = [];
+let turmasTodas = []; // todas as turmas carregadas, antes do filtro ativa/inativa
+let turmaSelecionada = null;
+let alunosView = [];
+
+// Exposto pra script isolado de "Pesquisa por aluno" (abaixo, no fim do arquivo)
+// Busca sempre em TODAS as turmas (ativas + inativas), igual ao comportamento
+// original — o filtro de "Inativas" só afeta a lista principal, não essa busca.
+window.obterTurmas = () => turmasTodas;
+window.nomeAtual = nomeAtual;
+
+/* =========================
+   Utilitários
+========================= */
+// Mantém o filtro "só turmas ativas" que já era o padrão (checkbox desmarcado);
+// só a opção de ALTERNAR pra ver as inativas foi removida (legada).
+// Schema da turma (schemaSnapshot, gravado no doc da turma na criação — ver
+// cadastro-atas.html). Mesmos defaults/normalização usados no resto do
+// módulo, pra não divergir do que outras páginas consideram "schema padrão".
+function getDefaultConfig() {
+  return {
+    version: 1,
+    nome: "Padrão (arquivo original)",
+    serieAtiva: true,
+    resultadoAtivo: true,
+    ordenarPor: "nome",
+    colunas: [
+      { key:"lp",  label:"Português",      type:"nota", enabled:true },
+      { key:"edf", label:"E. Física",      type:"nota", enabled:true },
+      { key:"art", label:"Arte",           type:"nota", enabled:true },
+      { key:"mat", label:"Matemática",     type:"nota", enabled:true },
+      { key:"his", label:"História",       type:"nota", enabled:true },
+      { key:"geo", label:"Geografia",      type:"nota", enabled:true },
+      { key:"cie", label:"Ciências",       type:"nota", enabled:true },
+      { key:"er",  label:"E. Religioso",   type:"nota", enabled:true },
+      { key:"ing", label:"Língua Inglesa", type:"nota", enabled:true }
+    ]
+  };
+}
+function normalizeSchema(cfg) {
+  const def = getDefaultConfig();
+  const out = {
+    id: String(cfg?.id || cfg?.schemaId || "").trim() || "",
+    version: 1,
+    nome: String(cfg?.nome ?? def.nome),
+    serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
+    resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+    ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
+    colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+  };
+  out.colunas = out.colunas
+    .map(c => ({
+      key: String(c?.key ?? "").trim().toLowerCase(),
+      label: String(c?.label ?? "").trim(),
+      type: (c?.type === "texto") ? "texto" : "nota",
+      enabled: c?.enabled !== false
+    }))
+    .filter(c => c.key && c.label);
+  const seen = new Set();
+  out.colunas = out.colunas.filter(c => {
+    if (seen.has(c.key)) return false;
+    seen.add(c.key);
+    return true;
+  });
+  return out;
+}
+function getColunasAtivas(schema) {
+  return (schema?.colunas || []).filter(c => c.enabled);
+}
+// Schema de verdade da turma selecionada (schemaSnapshot) — cai no schema
+// padrão só se a turma não tiver nenhum salvo (legado/turma antiga).
+function schemaDaTurmaSelecionada() {
+  return normalizeSchema(turmaSelecionada?.schemaSnapshot || getDefaultConfig());
+}
+function renderTheadAlunos(schema) {
+  const tr = document.getElementById("theadAlunosRow");
+  if (!tr) return;
+  const colAtivas = getColunasAtivas(schema);
+  let html = `<th>Nº</th><th>Nome</th>`;
+  if (schema.serieAtiva) html += `<th>Série</th>`;
+  // O ID (key) é usado em vez do nome completo (label) de propósito: o campo
+  // de ID já tem limite de caracteres na criação do schema, então a coluna
+  // fica curta e a tabela não desconfigura o layout da página.
+  for (const c of colAtivas) html += `<th>${_escHtml(c.key)}</th>`;
+  if (schema.resultadoAtivo) html += `<th>Resultado</th>`;
+  tr.innerHTML = html;
+}
+
+function recomputarTurmasBase() {
+  turmas = turmasTodas.filter(t => String(t.status || "ATIVA").toUpperCase() !== "INATIVA");
+}
+
+function norm(v) {
+  return String(v ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function formatarListaBonita(arr) {
+  if (!arr || arr.length === 0) return "";
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return `${arr[0]} e ${arr[1]}`;
+  return `${arr.slice(0, -1).join(", ")} e ${arr[arr.length - 1]}`;
+}
+
+/* =========================
+   Render filtros
+========================= */
+// Lista fixa = as séries que podem ser cadastradas (IDÊNTICA a cadastro-turmas.html → serieOptions)
+const SERIES_FILTRO = [
+  "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3", "Eixo 4", "Eixo 5",
+  "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
+  "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano",
+  "Multisseriada"
+];
+let seriesSelecionadas = [];
+
+// Chave de comparação: sem acento/caixa/ºª ("3º ano" ≡ "3 ano"; "3ª série" ≡ "3 serie")
+function serieChave(s) {
+  return norm(s).replace(/[ºª°]/g, "").replace(/\s+/g, " ").trim();
+}
+function seriesDaTurma(t) {
+  const arr = (Array.isArray(t.seriesTurma) && t.seriesTurma.length) ? t.seriesTurma
+            : (Array.isArray(t.series) && t.series.length) ? t.series
+            : String(t.serieTexto || "").split(/\s*(?:,|;|\be\b)\s*/i);
+  return new Set(arr.map(serieChave).filter(Boolean));
+}
+function preencherFiltroSerie() {
+  const sel = document.getElementById("selSerieAdd");
+  sel.innerHTML = '<option value="">(selecione)</option>' +
+    SERIES_FILTRO.map(x => `<option value="${x}">${x}</option>`).join("");
+}
+function renderChipsSeries() {
+  const box = document.getElementById("chipsSeries");
+  box.innerHTML = "";
+  seriesSelecionadas.forEach(sr => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.appendChild(document.createTextNode(sr + " "));
+    const b = document.createElement("button");
+    b.type = "button"; b.title = "Remover"; b.textContent = "×";
+    b.addEventListener("click", () => {
+      seriesSelecionadas = seriesSelecionadas.filter(x => x !== sr);
+      renderChipsSeries();
+    });
+    chip.appendChild(b);
+    box.appendChild(chip);
+  });
+}
+
+// Anos do filtro: lista fixa (ano seguinte → ANO_MIN_ATAS), pra NÃO precisar ler as turmas só pra montar o select.
+const ANO_MIN_ATAS = 2000;
+// Índice de anos (schools/{escola}.atasIndice.anos): 1 leitura do doc da escola, mantido por cadastro-turmas
+// (acrescenta ao salvar) e gestao-atas (reconstruir). Devolve null se faltar/falhar → usa a lista fixa.
+async function carregarAnosDoIndice() {
+  try {
+    const esc = await DB.escola.get();
+    const lista = esc && esc.atasIndice && esc.atasIndice.anos;
+    if (Array.isArray(lista)) {
+      const anos = lista.map(String).filter(a => /^\d{4}$/.test(a)).sort((x, y) => y.localeCompare(x));
+      if (anos.length) return anos;
+    }
+  } catch (e) {
+    console.warn("[pesquisa-ata] Falha ao ler o índice de anos:", e);
+  }
+  return null;
+}
+function preencherFiltroAno(anosIndice) {
+  const sel = document.getElementById("fAno");
+  let anos = anosIndice;
+  if (!anos || !anos.length) {
+    anos = [];
+    for (let a = new Date().getFullYear() + 1; a >= ANO_MIN_ATAS; a--) anos.push(String(a));
+  }
+  sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
+}
+
+// Busca no Firestore SÓ o que os filtros pedem (ano/turno viram query; o resto filtra no cliente).
+// Reaproveita o que já foi lido na sessão (ver _coberta): busca igual ou mais estreita que uma anterior não lê o banco.
+// Memória da página (variáveis JS — nada no localStorage; some ao recarregar a aba):
+// _memoria = turmas já lidas nesta sessão; _buscasFeitas = "regiões" já lidas por inteiro.
+// Antes de ir ao banco, vê se alguma região já lida COBRE a busca atual (ela é igual ou menos restritiva):
+// se cobre, filtra da memória e não lê nada.
+const _memoria = new Map();
+const _buscasFeitas = [];
+function _coberta(q) {
+  return _buscasFeitas.some(p =>
+    (!p.ano   || p.ano   === q.ano) &&
+    (!p.turno || p.turno === q.turno) &&
+    (!p.series.length || (q.series.length > 0 && q.series.every(x => p.series.includes(x))))
+  );
+}
+function _passaNaBusca(t, q) {
+  if (q.ano   && String(t.anoLetivo ?? "").trim() !== q.ano) return false;
+  if (q.turno && String(t.turno ?? "") !== q.turno) return false;
+  if (q.series.length) {
+    const ds = Array.isArray(t.series) ? t.series : [];
+    if (!q.series.some(x => ds.includes(x))) return false;
+  }
+  return true;
+}
+
+// Consulta direta em schools/{escola}/turmas com os filtros que o Firestore sabe fazer no servidor:
+// ano (==), turno (==) e série (array-contains-any no campo `series`, gravado pelo cadastro-turmas).
+// Se o Firestore pedir índice composto (failed-precondition), repete SEM a série e a série é filtrada no cliente.
+async function _consultaTurmas({ ano, turno, series }) {
+  const sid = window.Auth.getActiveSchoolId();
+  if (!sid) throw new Error("Nenhuma escola ativa.");
+  const montar = (comSeries) => {
+    let q = window.Auth.db.collection("schools").doc(sid).collection("turmas");
+    if (ano !== undefined) q = q.where("anoLetivo", "==", ano);
+    if (turno) q = q.where("turno", "==", turno);
+    if (comSeries && series && series.length) q = q.where("series", "array-contains-any", series);
+    return q;
+  };
+  let snap;
+  try {
+    snap = await montar(true).get();
+  } catch (e) {
+    if (e && e.code === "failed-precondition" && series && series.length) {
+      console.warn("[pesquisa-ata] A consulta com série precisa de índice composto; filtrando a série no cliente.", e.message);
+      snap = await montar(false).get();
+    } else { throw e; }
+  }
+  return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+}
+
+// Busca no Firestore SÓ o que os filtros pedem: ano, turno e série viram consulta. Sem nenhum dos três, lê tudo (pedido explícito).
+async function buscarTurmasNoBanco() {
+  const ano = document.getElementById("fAno").value.trim();
+  const turno = document.getElementById("fTurno").value.trim();
+  const series = seriesSelecionadas.slice();
+  const q = { ano, turno, series };
+  if (_coberta(q)) return [..._memoria.values()].filter(t => _passaNaBusca(t, q));   // 0 leituras
+  let r;
+  if (ano) {
+    // anoLetivo pode estar gravado como texto OU número: duas consultas em paralelo, juntadas sem repetir.
+    // Cada turma tem o ano de um tipo só → mesmas leituras de uma consulta única.
+    const [porTexto, porNumero] = await Promise.all([
+      _consultaTurmas({ ano, turno, series }),
+      _consultaTurmas({ ano: Number(ano), turno, series })
+    ]);
+    const vistos = new Set();
+    r = [...porTexto, ...porNumero].filter(t => !vistos.has(t._id) && vistos.add(t._id));
+  }
+  else if (turno || series.length) r = await _consultaTurmas({ turno, series });
+  else               r = await DB.turmas.list();   // nenhum filtro: leitura completa, só porque você pediu
+  r.forEach(t => _memoria.set(t._id, t));
+  _buscasFeitas.push(q);
+  return r;
+}
+
+/* =========================
+   Render lista de turmas
+========================= */
+
+/* ── Ordenação de turmas por série (numérica) + ano letivo (desc) ── */
+function numSerie(serie) {
+  // Extrai o primeiro número da série para ordenação numérica
+  // Ex: "1ª série" → 1, "9º ano" → 9, "Alfabetização" → 0
+  const m = String(serie || '').match(/\d+/);
+  return m ? parseInt(m[0]) : 0;
+}
+
+function ordenarTurmas(lista) {
+  return lista.slice().sort((a, b) => {
+    const anoA = String(a.anoLetivo || '');
+    const anoB = String(b.anoLetivo || '');
+    // ordena por ano letivo conforme _ordemAsc
+    const cmpAno = _ordemAsc
+      ? anoA.localeCompare(anoB, 'pt-BR')   // crescente: mais antigo primeiro
+      : anoB.localeCompare(anoA, 'pt-BR');   // decrescente: mais recente primeiro
+    if (cmpAno !== 0) return cmpAno;
+    // desempata por número de série (sempre crescente)
+    const nA = numSerie(a.serieTexto || (a.seriesTurma && a.seriesTurma[0]) || '');
+    const nB = numSerie(b.serieTexto || (b.seriesTurma && b.seriesTurma[0]) || '');
+    return nA - nB;
+  });
+}
+
+function renderListaTurmas(lista) {
+  const box = document.getElementById("listaTurmas");
+  box.innerHTML = "";
+
+  if (!lista.length) {
+    box.innerHTML = `<div class="list-item"><span class="muted">Nenhuma turma encontrada com os filtros.</span></div>`;
+    return;
+  }
+
+  lista.forEach(t => {
+    const tid = t.id || t._id || t.turmaId;
+    const div = document.createElement("div");
+    div.className = "list-item";
+    div.dataset.turmaId = tid;
+    div.addEventListener("click", () => selecionarTurma(tid));
+
+    const serieTxt = t.serieTexto || (t.seriesTurma && t.seriesTurma.length ? formatarListaBonita(t.seriesTurma) : "");
+    const anoTxt = t.anoLetivo ? String(t.anoLetivo) : "?";
+    const turnoTxt = t.turno || "?";
+    const alunosTxt = (t.alunos?.length ?? 0) + " aluno(s)";
+
+    const abaUpper = String(t.aba || "").trim().toUpperCase();
+    const titulo = (t.aba && !["MANUAL","CADASTRO"].includes(abaUpper))
+      ? t.aba
+      : `${serieTxt || "Turma"}${t.anoLetivo ? " " + t.anoLetivo : ""}`.trim();
+
+    div.innerHTML = `
+      <div class="left">
+        <div>
+          <b>${_escHtml(titulo || "Turma")}</b>
+        </div>
+        <div class="badges-row">
+          <span class="badge">${_escHtml(anoTxt)}</span>
+          <span class="badge badge-serie">${_escHtml(serieTxt || "?")}</span>
+        </div>
+        <div class="muted item-meta">
+          ${_escHtml(turnoTxt)} · ${_escHtml(alunosTxt)}
+        </div>
+      </div>
+      <div class="right" onclick="event.stopPropagation()">
+        <button class="btn primary small" type="button" onclick="selecionarTurma('${tid}')">Abrir</button>
+      </div>
+    `;
+
+    box.appendChild(div);
+  });
+}
+
+/* =========================
+   Selecionar turma
+========================= */
+// Abre uma turma que pode não estar na lista atual (ex.: vinda da pesquisa por aluno): lê só ela (1 leitura).
+async function abrirTurmaPorId(id) {
+  if (!turmas.some(t => (t.id || t._id || t.turmaId) === id)) {
+    try {
+      const t = await DB.turmas.get(id);
+      if (!t) { setMsg("Turma não encontrada.", "err"); return; }
+      turmasTodas.push(t);
+      recomputarTurmasBase();
+    } catch(e) {
+      console.warn("[pesquisa-ata] abrirTurmaPorId:", e);
+      setMsg("Não foi possível abrir a turma. Tente novamente.", "err"); return;
+    }
+  }
+  selecionarTurma(id);
+}
+window.abrirTurmaPorId = abrirTurmaPorId;
+
+function selecionarTurma(id) {
+  turmaSelecionada = turmas.find(t => (t.id || t._id || t.turmaId) === id) || null;
+
+  document.getElementById("detalhesVazio").style.display = turmaSelecionada ? "none" : "block";
+  document.getElementById("detalhesBox").style.display = turmaSelecionada ? "block" : "none";
+
+  if (!turmaSelecionada) return;
+
+
+  // 🔥 ATIVA MODO EXPANDIDO (ADICIONADO)
+
+  const serieTxt = turmaSelecionada.serieTexto ||
+    (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "?");
+
+  document.getElementById("detalhesMeta").innerHTML =
+    `<b>${_escHtml(turmaSelecionada.aba || turmaSelecionada.nome || "Turma")}</b><br>` +
+    `ID: ${_escHtml(turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId || "?")}<br>` +
+    (turmaSelecionada.origemArquivo ? `Arquivo: ${_escHtml(turmaSelecionada.origemArquivo)}<br>` : '') +
+    `Ano: <b>${_escHtml(turmaSelecionada.anoLetivo || "?")}</b> · Turno: <b>${_escHtml(turmaSelecionada.turno || "?")}</b> · Série: <b>${_escHtml(serieTxt)}</b>`;
+
+  const btnEditarTurma = document.getElementById('btnEditarTurma');
+  if(btnEditarTurma) btnEditarTurma.style.display = _podeEditar ? 'inline-flex' : 'none';
+
+  renderTheadAlunos(schemaDaTurmaSelecionada());
+  alunosView = (turmaSelecionada.alunos || []).slice();
+  renderAlunos(alunosView);
+
+  document.getElementById("fAluno").value = "";
+  document.getElementById("fAluno").oninput = () => {
+    const q = norm(document.getElementById("fAluno").value);
+    const filtrados = alunosView.filter(a => norm(nomeAtual(a)).includes(q));
+    renderAlunos(filtrados);
+  };
+
+  renderResumoTurma(turmaSelecionada);
+
+  // Ativa modo expandido
+  const container = document.getElementById("container");
+  if (container) {
+    container.classList.remove("layout-normal");
+    container.classList.add("layout-expandido");
+  }
+
+  // Destaca item selecionado na sidebar
+  document.querySelectorAll("#listaTurmas .list-item").forEach(el => {
+    el.classList.toggle("selected", el.dataset.turmaId === id);
+  });
+
+  // Nomes oficiais (IDaluno): a tabela já está na tela com o nome gravado; se algum mudou, redesenha.
+  const _turmaDosNomes = turmaSelecionada;
+  carregarNomesDaTurma(_turmaDosNomes).then(mudou => {
+    if (!mudou || turmaSelecionada !== _turmaDosNomes) return;
+    const q = norm(document.getElementById("fAluno").value);
+    renderAlunos(q ? alunosView.filter(a => norm(nomeAtual(a)).includes(q)) : alunosView);
+  });
+}
+
+
+/* =========================
+   Fechar turma
+========================= */
+function fecharTurma() {
+  turmaSelecionada = null;
+
+  document.getElementById("detalhesVazio").style.display = "block";
+  document.getElementById("detalhesBox").style.display = "none";
+
+  const container = document.getElementById("container");
+  if (container) {
+    container.classList.remove("layout-expandido");
+    container.classList.add("layout-normal");
+  }
+
+  document.querySelectorAll("#listaTurmas .list-item").forEach(el => {
+    el.classList.remove("selected");
+  });
+}
+
+
+/* =========================
+   Editar turma selecionada
+========================= */
+function editarTurmaSelecionada() {
+  if (!turmaSelecionada) {
+    setMsg("Nenhuma turma selecionada.", "err");
+    return;
+  }
+  
+  const turmaId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
+  if (!turmaId) {
+    setMsg("ID da turma não encontrado.", "err");
+    return;
+  }
+  
+  // Redireciona pra edição de alunos/notas da ata, já travado nesta turma
+  // (cadastro-atas.html trava os selects de ano/turma quando vem via ?turma=).
+  // Antes apontava pro arquivo antigo cadastro-turma.html (pré-divisão do
+  // módulo em cadastro-turmas.html + cadastro-atas.html) — retirado de uso.
+  window.location.href = `cadastro-atas.html?turma=${encodeURIComponent(turmaId)}`;
+}
+
+/* =========================
+   Render alunos
+========================= */
+function renderAlunos(lista) {
+  const tbody = document.getElementById("tAlunos");
+  tbody.innerHTML = "";
+
+  const schema = schemaDaTurmaSelecionada();
+  const colAtivas = getColunasAtivas(schema);
+
+  lista.forEach((a, idx) => {
+    const tr = document.createElement("tr");
+    let html = `
+      <td class="num-col">${idx+1}</td>
+      <td class="nome-aluno">${_escHtml(nomeAtual(a))}</td>
+    `;
+    if (schema.serieAtiva) html += `<td>${a.serie || ""}</td>`;
+    for (const c of colAtivas) html += `<td>${a[c.key] ?? "--"}</td>`;
+    if (schema.resultadoAtivo) html += `<td>${a.resultado ?? "Não informado"}</td>`;
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+}
+
+/* =========================
+   Resumo
+========================= */
+function contarResultados(alunos) {
+  const cont = {};
+  for (const a of alunos) {
+    const r = (a.resultado || "Não informado").trim();
+    cont[r] = (cont[r] || 0) + 1;
+  }
+  return cont;
+}
+
+function renderResumoTurma(t) {
+  const alunos = t.alunos || [];
+  const cont = contarResultados(alunos);
+
+  const linhas = [];
+  linhas.push(`Turma: ${t.aba || "?"}`);
+  linhas.push(`Ano: ${t.anoLetivo || "?"} | Turno: ${t.turno || "?"} | Série: ${t.serieTexto || "?"}`);
+  linhas.push(`Alunos: ${alunos.length}`);
+  linhas.push("");
+  linhas.push("Resultados:");
+  Object.keys(cont).sort().forEach(k => linhas.push(`- ${k}: ${cont[k]}`));
+
+  document.getElementById("resumoTurma").textContent = linhas.join("\n");
+}
+
+/* =========================
+   Aplicar filtros
+========================= */
+// Filtros de série e busca geral "valem" só no clique em Pesquisar: aqui fica o retrato deles naquele momento.
+// Assim, mexer nos campos (como ano e turno) não muda a lista até você pesquisar de novo; reordenar a lista não troca os filtros.
+let _filtrosAplicados = { series: [], busca: "" };
+function aplicarFiltros() {
+  const fBusca = _filtrosAplicados.busca;
+
+  let lista = turmas.slice();
+
+  if (_filtrosAplicados.series.length) {
+    const alvo = _filtrosAplicados.series.map(serieChave);
+    lista = lista.filter(t => { const ds = seriesDaTurma(t); return alvo.some(x => ds.has(x)); });
+  }
+
+  if (fBusca) {
+    lista = lista.filter(t => {
+      const base =
+        norm(t.aba || "") + " " +
+        norm(t.origemArquivo || "") + " " +
+        norm(t.serieTexto || "") + " " +
+        norm(t.turno || "") + " " +
+        norm(t.anoLetivo || "");
+      if (base.includes(fBusca)) return true;
+      return (t.alunos || []).some(a => norm(nomeAtual(a)).includes(fBusca));
+    });
+  }
+
+  renderListaTurmas(ordenarTurmas(lista));
+}
+
+/* =========================
+   Exportar PDF
+========================= */
+// Nome de arquivo compartilhado por PDF e CSV: pelo identificador da turma
+// (série + ano + turno), não por "aba" — em turmas criadas manualmente (não
+// importadas de planilha) esse campo guarda a ORIGEM do cadastro ("MANUAL"),
+// não um nome, e o arquivo saía "ata_MANUAL.pdf" pra qualquer turma cadastrada
+// assim. "aba" só entra como último recurso se os três campos vierem vazios.
+function _nomeArquivoAta(turma, extensao){
+  const serieTxt = turma.serieTexto ||
+    (turma.seriesTurma?.length ? formatarListaBonita(turma.seriesTurma) : "");
+  const idPartes = [serieTxt, turma.anoLetivo || "", turma.turno || ""].filter(Boolean).join("_");
+  const safe = String(idPartes || turma.aba || "turma")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
+  return `ATA_${safe}.${extensao}`;
+}
+
+async function carregarDadosEscola() {
+  const padrao = { nome: "Nome da Escola", endereco: "Endereço da Escola", escudo: "" };
+  try {
+    // DB.escola é documento único (.get()/.save()), não coleção — .list() não
+    // existe nessa API. Era por isso que o PDF sempre saía com o texto de
+    // exemplo: a chamada abaixo nunca existiu de verdade, então a função caía
+    // direto no "padrao" em silêncio (o catch nem chegava a disparar).
+    if (window.DB && window.DB.escola && typeof window.DB.escola.get === "function") {
+      const d = await window.DB.escola.get();
+      if (d) return {
+        nome: d.nome || padrao.nome,
+        endereco: d.endereco || padrao.endereco,
+        escudo: d.escudo || "",
+        cidade: d.cidade || d.municipio || "",
+        uf: d.uf || d.UF || "",
+        inep: d.inep || d.codigoInep || "",
+        email: d.email || "",
+        telefone: d.telefone || d.tel || "",
+      };
+    }
+  } catch (e) {
+    console.warn("[pesquisa-ata] Falha ao carregar dados da escola:", e);
+  }
+  return padrao;
+}
+
+// Dropdown "Exportar" (mesmo padrão de abrir/fechar do pesquisa-ano-ativo.html).
+// Só o PDF está ligado a uma função de verdade — o CSV fica "disabled" no
+// HTML até a análise do schema definir as colunas; por isso não tem
+// addEventListener aqui (não há handler nenhum pra escrever ainda).
+(function(){
+  const btn  = document.getElementById("btnAtaExportar");
+  const drop = document.getElementById("dropExportAta");
+  if (!btn || !drop) return;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const aberto = drop.style.display !== "none";
+    drop.style.display = aberto ? "none" : "flex";
+  });
+  document.addEventListener("click", () => { drop.style.display = "none"; });
+  drop.addEventListener("click", (e) => { e.stopPropagation(); });
+
+  document.getElementById("btnExportAtaPdf").addEventListener("click", () => {
+    drop.style.display = "none";
+    exportarPDFDaTurma();
+  });
+  document.getElementById("btnExportAtaCsv").addEventListener("click", () => {
+    drop.style.display = "none";
+    exportarCSVDaTurma();
+  });
+})();
+
+async function exportarPDFDaTurma() {
+  if (!turmaSelecionada) return;
+
+  setMsg('Gerando PDF…', 'loading');
+  try{
+    await _exportarPDFDaTurmaInterno();
+    // Sem toast de sucesso: o próprio download que o navegador abre já é a
+    // confirmação. Só limpa o "carregando" (sem apagar um erro que apareça
+    // por outro motivo enquanto isso).
+    _toastLimpar();
+  }catch(e){
+    console.error('[pesquisa-ata] Falha ao gerar PDF:', e);
+    setMsg('Erro ao gerar o PDF — tente novamente.', 'err');
+  }
+}
+
+// Cabeçalho institucional (logo + nome + endereço + linha separadora),
+// mesmo layout de pesquisa-ano-ativo. Retorna o Y onde o conteúdo pode
+// começar. unit "pt" (não "mm") — igual ao resto do módulo de export.
+function _desenharCabecalhoEscolaAta(doc, escola, titulo, pageWidth){
+  const L = 28, R = pageWidth - 28;
+  let y = 20;
+
+  let logoW = 0;
+  if (escola && escola.escudo) {
+    try { const s = 48; doc.addImage(escola.escudo, "PNG", L, y, s, s); logoW = s + 10; } catch {}
+  }
+
+  const tx = L + logoW;
+  if (escola && escola.nome) {
+    doc.setFontSize(13); doc.setFont(undefined, "bold"); doc.setTextColor(11,63,191);
+    doc.text(String(escola.nome).toUpperCase(), tx, y + 13);
+
+    doc.setFont(undefined, "normal"); doc.setTextColor(60);
+    let subY = y + 24;
+    const partes = [];
+    if (escola.endereco) partes.push(escola.endereco);
+    const cidade = [escola.cidade, escola.uf].filter(Boolean).join("/");
+    if (cidade) partes.push(cidade);
+    if (escola.inep) partes.push(`INEP: ${escola.inep}`);
+    if (escola.email) partes.push(`E-mail: ${escola.email}`);
+    if (escola.telefone) partes.push(`Tel: ${escola.telefone}`);
+    if (partes.length) {
+      doc.setFontSize(8);
+      const linha = doc.splitTextToSize(partes.join("  •  "), R - tx - 10);
+      doc.text(linha, tx, subY);
+      subY += linha.length * 10;
+    }
+    y = Math.max(y + 50, subY + 4);
+  } else {
+    y += (logoW ? 52 : 0);
+  }
+
+  doc.setDrawColor(11,63,191); doc.setLineWidth(1.2);
+  doc.line(L, y, R, y);
+  y += 8;
+
+  doc.setFontSize(12); doc.setFont(undefined, "bold"); doc.setTextColor(20);
+  doc.text(titulo, L, y + 9);
+  doc.setFont(undefined, "normal"); doc.setTextColor(0);
+  y += 20;
+
+  return y;
+}
+
+// Largura de coluna: Nº fixo e estreito (aprovado como está). Nome é
+// FLEXÍVEL — absorve o que sobrar depois de todas as outras colunas, pra a
+// tabela sempre bater exatamente com as margens da linha azul do cabeçalho,
+// em vez de sobrar espaço em branco à direita. Série e Resultado são
+// calculados pelo texto real (cabeçalho/valores), então cada um usa só o
+// espaço que precisa. Colunas de matéria: largura AINDA fixa em 44pt — não
+// mexida agora de propósito, aguardando avaliação com o ID (key) no lugar
+// do nome completo (label) antes de decidir se precisa encolher mais.
+function _montarColumnStylesAta(doc, schema, colAtivas, alunos, larguraDisponivel){
+  const styles = {};
+  const larguras = [];
+  let i = 0;
+
+  styles[i] = { cellWidth: 26, halign: "center" }; larguras.push(26); i++; // Nº
+
+  const nomeIdx = i; i++; // preenchido por último, com o espaço restante
+
+  if (schema.serieAtiva) {
+    doc.setFont(undefined, "bold"); doc.setFontSize(9);
+    let maxTxt = doc.getTextWidth("Série");
+    doc.setFont(undefined, "normal");
+    for (const a of alunos) maxTxt = Math.max(maxTxt, doc.getTextWidth(String(a.serie ?? "")));
+    const w = Math.ceil(maxTxt) + 12; // ~6pt de cada lado
+    styles[i] = { cellWidth: w, halign: "center" }; larguras.push(w); i++;
+  }
+
+  for (const c of colAtivas) {
+    const w = c.type === "texto" ? 80 : 44; // inalterado — ver comentário acima
+    styles[i] = { cellWidth: w, halign: "center" }; larguras.push(w); i++;
+  }
+
+  if (schema.resultadoAtivo) {
+    doc.setFont(undefined, "bold"); doc.setFontSize(9);
+    const textW = doc.getTextWidth("Resultado");
+    doc.setFont(undefined, "normal");
+    // Bug real (confirmado rodando o autoTable de verdade, não só calculando
+    // no papel): um cellPadding customizado em columnStyles é aplicado no
+    // CORPO da célula, mas é IGNORADO no CABEÇALHO — o cabeçalho sempre usa o
+    // padding padrão da tabela (5pt de cada lado, top-level `styles.cellPadding`
+    // logo abaixo). A versão anterior calculava a largura assumindo 2pt de
+    // padding em vez dos 5pt que o cabeçalho de fato usa, então sobrava só
+    // ~0.7pt de área de texto — o suficiente pra qualquer arredondamento de
+    // fonte empurrar "Resultado" pra 2 linhas.
+    // Sem cellPadding customizado aqui: a coluna usa o padding padrão, igual
+    // a todas as outras, e a largura é calculada em cima desse padding real
+    // (5pt de cada lado) + 3pt de folga (testado contra o autoTable real:
+    // o mínimo que não quebra linha é 53pt pra "Resultado" nesta fonte).
+    const PAD_PADRAO = 5;
+    const SAFETY_MARGIN = 3;
+    const w = Math.ceil(textW) + PAD_PADRAO * 2 + SAFETY_MARGIN;
+    styles[i] = { cellWidth: w, halign: "center" };
+    larguras.push(w); i++;
+  }
+
+  const somaOutras = larguras.reduce((a,b) => a+b, 0);
+  const MIN_NOME = 90; // piso pra schemas com muitas colunas não espremerem o nome a zero
+  styles[nomeIdx] = { cellWidth: Math.max(MIN_NOME, larguraDisponivel - somaOutras), halign: "left" };
+
+  return styles;
+}
+
+async function _exportarPDFDaTurmaInterno() {
+  const { jsPDF } = window.jspdf;
+  // Paisagem: tabelas de ata têm muitas colunas e sobra pouco espaço na
+  // vertical — perder altura de página compensa mais do que ganhar largura.
+  const doc = new jsPDF({ orientation: "l", unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const escola = await carregarDadosEscola();
+
+  const serieTxt = turmaSelecionada.serieTexto ||
+    (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "");
+  const ano   = turmaSelecionada.anoLetivo || "";
+  const turno = turmaSelecionada.turno || "";
+
+  let y = _desenharCabecalhoEscolaAta(doc, escola, "ATA DE RESULTADOS FINAIS", pageWidth);
+
+  doc.setFontSize(10);
+  doc.text(`ANO: ${ano}`, 28, y);
+  doc.text(`SÉRIE: ${serieTxt}`, 160, y);
+  doc.text(`TURNO: ${turno}`, 320, y);
+  y += 14;
+
+  const alunos = turmaSelecionada.alunos || [];
+  const schemaPdf = schemaDaTurmaSelecionada();
+  const colAtivasPdf = getColunasAtivas(schemaPdf);
+
+  const headPdf = ["Nº","Nome"];
+  if (schemaPdf.serieAtiva) headPdf.push("Série");
+  // ID da matéria (key), não o nome completo (label) — mesmo motivo da
+  // tabela em tela: o label estourava a largura da coluna.
+  colAtivasPdf.forEach(c => headPdf.push(c.key));
+  if (schemaPdf.resultadoAtivo) headPdf.push("Resultado");
+
+  doc.autoTable({
+    startY: y,
+    styles: { fontSize: 9, cellPadding: {top:4,bottom:4,left:5,right:5}, overflow: "linebreak", lineColor: [210,220,240], lineWidth: 0.3 },
+    headStyles: { fillColor: [11,63,191], textColor: 255, fontStyle: "bold", fontSize: 9, halign: "center" },
+    alternateRowStyles: { fillColor: [243,246,255] },
+    bodyStyles: { textColor: [30,30,50] },
+    columnStyles: _montarColumnStylesAta(doc, schemaPdf, colAtivasPdf, alunos, pageWidth - 28 - 28),
+    margin: { left: 28, right: 28 },
+    head: [headPdf],
+    body: alunos.map((a,i)=>{
+      const linha = [i+1, nomeAtual(a)];
+      if (schemaPdf.serieAtiva) linha.push(a.serie);
+      colAtivasPdf.forEach(c => linha.push(a[c.key]));
+      if (schemaPdf.resultadoAtivo) linha.push(a.resultado);
+      return linha;
+    })
+  });
+
+  doc.save(_nomeArquivoAta(turmaSelecionada, "pdf"));
+}
+
+/* =========================
+   Exportar CSV
+   Mesmo formato do CSV completo de pesquisa-ano-ativo.html: separador ";",
+   linhas terminadas em "\r\n", tudo entre aspas (com "" pra aspas internas)
+   e BOM UTF-8 no início — é o que faz o Excel em pt-BR abrir já em colunas,
+   com acentuação correta, em vez de tudo numa coluna só ou com "?" no lugar
+   de acento.
+   Colunas seguem o schema real da turma (mesma fonte que a tela e o PDF:
+   schemaDaTurmaSelecionada()), não um layout fixo — cabeçalho de matéria usa
+   o "key" (ID curto), não o "label" completo, pelo mesmo motivo do PDF: são
+   os nomes de coluna que a escola já reconhece pelo schema, e mantém as três
+   saídas (tela, PDF, CSV) consistentes entre si.
+========================= */
+async function exportarCSVDaTurma() {
+  if (!turmaSelecionada) return;
+  try {
+    _exportarCSVDaTurmaInterno();
+  } catch (e) {
+    console.error('[pesquisa-ata] Falha ao gerar CSV:', e);
+    setMsg('Erro ao gerar o CSV — tente novamente.', 'err');
+  }
+}
+
+function _exportarCSVDaTurmaInterno() {
+  const alunos = turmaSelecionada.alunos || [];
+  const schema = schemaDaTurmaSelecionada();
+  const colAtivas = getColunasAtivas(schema);
+
+  const header = ["Nº", "Nome"];
+  if (schema.serieAtiva) header.push("Série");
+  colAtivas.forEach(c => header.push(c.key));
+  if (schema.resultadoAtivo) header.push("Resultado");
+
+  const linhas = [header, ...alunos.map((a, i) => {
+    const linha = [i + 1, nomeAtual(a)];
+    if (schema.serieAtiva) linha.push(a.serie ?? "");
+    colAtivas.forEach(c => linha.push(a[c.key] ?? ""));
+    if (schema.resultadoAtivo) linha.push(a.resultado ?? "Não informado");
+    return linha;
+  })];
+
+  const csv = linhas
+    .map(cols => cols.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';'))
+    .join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = _nomeArquivoAta(turmaSelecionada, "csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/* =========================
+   Boot
+========================= */
+async function carregar() {
+  let falhaTurmas = false;
+  try{
+    await new Promise(res=>{
+      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+      document.addEventListener('auth:ready', res, {once:true});
+    });
+
+  }catch(e){
+    console.warn('[pesquisa-ata] Falha na inicialização:', e);
+    falhaTurmas = true;
+  }
+
+  recomputarTurmasBase();
+
+  document.getElementById("dbInfoTip").textContent =
+    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano, o turno e a série escolhidos (só as turmas que casam são lidas). A busca geral refina o que já foi buscado e não reduz leituras. Sem ano, turno nem série, a pesquisa lê todas as turmas. Os anos do filtro vêm do índice mantido em Gestão de Atas.`;
+
+  preencherFiltroAno(await carregarAnosDoIndice());
+
+  document.getElementById("listaTurmas").innerHTML =
+    `<div class="list-item"><span class="muted">Escolha os filtros e clique em <b>🔍 Pesquisar</b>.</span></div>`;
+  document.getElementById("detalhesVazio").style.display = "block";
+  document.getElementById("detalhesBox").style.display = "none";
+
+  document.getElementById("btnPesquisar").onclick = async function(){
+    const btn = this, box = document.getElementById("listaTurmas");
+    // A busca geral é texto livre (inclui nomes de alunos dentro da turma): o Firestore não filtra isso no servidor.
+    // Ela só refina turmas já buscadas por ano/turno/série — sozinha, obrigaria ler o banco inteiro.
+    const _temFiltroServidor = document.getElementById("fAno").value.trim() || document.getElementById("fTurno").value.trim() || seriesSelecionadas.length;
+    if (norm(document.getElementById("fBusca").value) && !_temFiltroServidor) {
+      box.innerHTML = `<div class="list-item"><span class="muted">A busca geral refina turmas já filtradas. Escolha ao menos um <b>ano</b>, <b>turno</b> ou <b>série</b> — ou use a <b>Pesquisa por aluno</b> para achar um nome.</span></div>`;
+      setMsg("Escolha ano, turno ou série para usar a busca geral.", "warn");
+      return;
+    }
+    btn.disabled = true;
+    box.innerHTML = `<div class="list-item"><span class="muted">Buscando turmas…</span></div>`;
+    try {
+      turmasTodas = await buscarTurmasNoBanco();
+      recomputarTurmasBase();
+      _filtrosAplicados = { series: seriesSelecionadas.slice(), busca: norm(document.getElementById("fBusca").value) };
+      _jaFoiPesquisado = true;
+      aplicarFiltros();
+    } catch(e) {
+      console.warn("[pesquisa-ata] Falha ao buscar turmas:", e);
+      box.innerHTML = `<div class="list-item"><span class="muted">Não foi possível buscar as turmas agora.</span></div>`;
+      setMsg("Não foi possível buscar as turmas. Tente novamente.", "err");
+    } finally {
+      btn.disabled = false;
+    }
+  };
+  // TODOS os filtros (ano, turno, série, busca geral) só valem ao clicar em Pesquisar.
+  preencherFiltroSerie();
+  document.getElementById("btnAddSerie").onclick = function(){
+    const sel = document.getElementById("selSerieAdd");
+    const v = sel.value; if (!v) return;
+    if (!seriesSelecionadas.includes(v)) {
+      seriesSelecionadas.push(v);
+      renderChipsSeries();
+    }
+    sel.value = "";
+  };
+  document.getElementById("btnLimparFiltros").onclick = function(){
+    document.getElementById("fAno").value = "";
+    document.getElementById("fTurno").value = "";
+    document.getElementById("fBusca").value = "";
+    seriesSelecionadas = [];
+    renderChipsSeries();   // só limpa os campos; a lista só muda ao clicar em Pesquisar
+  };
+  // Busca geral: Enter equivale a clicar em Pesquisar (digitar não refiltra sozinho)
+  document.getElementById("fBusca").onkeydown = function(ev){ if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("btnPesquisar").click(); } };
+
+  if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
+
+  if (window.ThemeColors) ThemeColors.ajustarContraste();
+
+  // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+  document.addEventListener("click", ()=>{
+    document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+  });
+
+  Loading.esconder();
+}
+
+let _jaFoiPesquisado = false;
+let _ordemAsc = false; // false = mais recente primeiro (padrão)
+
+// Loading gerenciado por loading-overlay.js
+
+document.addEventListener("DOMContentLoaded", carregar);
+</script>
+
+
+
+<!-- SCRIPT 5 — Pesquisa por aluno (bloco isolado) -->
+<script>
+(function(){
+  function normNome(s){
+    return String(s || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+  }
+
+  function escapeHtml(s){
+    return String(s||"")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  window.limparPesquisaAluno = function(){
+    const q = document.getElementById("alunoQuery");
+    const out = document.getElementById("alunoResultados");
+    if (q) q.value = "";
+    if (out) out.innerHTML = "";
+  };
+
+  let _alunoSeq = 0;
+  // Consulta direcionada (sem baixar turmas): alunos-atas por prefixo do nome → matrículas desses alunos.
+  // Custo ≈ alunos encontrados (máx. 10) + matrículas deles. A turma só é lida quando você clica em "Abrir".
+  window.pesquisarAluno = async function(){
+    const qEl = document.getElementById("alunoQuery");
+    const parcialEl = document.getElementById("alunoParcial");
+    const out = document.getElementById("alunoResultados");
+
+    if (!qEl || !out) {
+      setMsg("Erro: área de pesquisa do aluno não encontrada na página.", "err");
+      return;
+    }
+
+    const termo = normNome(qEl.value);
+    const prefixo = !!(parcialEl && parcialEl.checked);   // marcado: início do nome; desmarcado: nome exato
+
+    if (!termo) { setMsg("Digite o nome do aluno.", "err"); return; }
+    if (termo.length < 3) { setMsg("Digite ao menos 3 letras do nome.", "err"); return; }
+    if (!(window.Identidade && Identidade.buscarAtasPorNome && window.DB && DB.matriculas && DB.matriculas.whereIn)) {
+      setMsg("Erro: módulo de busca indisponível.", "err"); return;
+    }
+
+    const seq = ++_alunoSeq;
+    out.innerHTML = `<div class="aluno-not-found">Buscando…</div>`;
+    try {
+      const LIMITE = 10;
+      let alunos = await Identidade.buscarAtasPorNome(termo, LIMITE + 1);
+      const temMais = alunos.length > LIMITE;
+      alunos = alunos.slice(0, LIMITE);
+      if (!prefixo) alunos = alunos.filter(a => normNome(a.nome) === termo);
+      const mats = alunos.length ? await DB.matriculas.whereIn("alunoId", alunos.map(a => a.alunoId)) : [];
+      if (seq !== _alunoSeq) return;
+
+      const nomePorId = new Map(alunos.map(a => [a.alunoId, a.nome]));
+      const achados = mats.map(m => ({
+        aluno: nomePorId.get(m.alunoId) || m.nomeRaw || "",
+        ano: m.anoLetivo || "",
+        serie: m.serie || "",
+        resultado: m.resultado || "",
+        id: m.turmaId || ""
+      })).filter(h => h.id);
+
+      if (!achados.length){
+        out.innerHTML = `<div class="aluno-not-found">
+          Nenhuma ocorrência encontrada para <b>${escapeHtml(qEl.value)}</b>.
+        </div>`;
+        return;
+      }
+
+      achados.sort((x,y)=>{
+        const ax = parseInt(String(x.ano||"0"),10) || 0;
+        const ay = parseInt(String(y.ano||"0"),10) || 0;
+        if (ax !== ay) return ax - ay;
+        return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
+      });
+
+      out.innerHTML = achados.map(h => `
+      <div class="aluno-result-row">
+        <div class="aluno-result-info">
+          <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — <span style="font-weight:700;">${escapeHtml(h.aluno)}</span>${h.resultado ? " — " + escapeHtml(h.resultado) : ""}</div>
+        </div>
+        <div class="aluno-result-actions">
+          <button class="btn ghost small" type="button" onclick="abrirTurmaPorId('${escapeHtml(h.id)}')">Abrir</button>
+        </div>
+      </div>
+    `).join("") + (temMais ? `<div class="aluno-not-found">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
+    } catch(e) {
+      if (seq !== _alunoSeq) return;
+      console.warn("[pesquisa-ata] pesquisarAluno:", e);
+      out.innerHTML = `<div class="aluno-not-found">Não foi possível pesquisar agora. Tente novamente.</div>`;
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", function(){
+    const inp = document.getElementById("alunoQuery");
+    if (!inp) return;
+    inp.addEventListener("keydown", function(ev){
+      if (ev.key === "Enter"){
+        ev.preventDefault();
+        if (typeof window.pesquisarAluno === "function") window.pesquisarAluno();
+      }
+    });
+  });
+})();
+
+// Clique no título TURMAS → alterna ordem (recente/antigo)
+document.getElementById("sidebarTitulo").addEventListener("click", () => {
+  _ordemAsc = !_ordemAsc;
+  const ind = document.getElementById("sortIndicator");
+  if (ind) ind.textContent = _ordemAsc ? "↓" : "↑";
+  if (_jaFoiPesquisado) aplicarFiltros();
+});
+</script>
+
+</body>
+</html>
