@@ -577,12 +577,14 @@ function validarBackupAnoAtivo(dump) {
     if (!Array.isArray(dump[k])) return `campo ${k} ausente ou inválido.`;
   }
   const idDe = (d) => String((d && (d.turmaId || d._id || d.id)) || '');
-  const turmaRuim = dump.turmasDB.find(t => !/^ATUR\|/.test(idDe(t)));
-  if (turmaRuim) return `turma com id fora do padrão do ano-ativo ("${idDe(turmaRuim) || 'sem id'}"; esperado ATUR|…).`;
+  // Ids que são do módulo de Atas (ATUR-ATAS|…, ATA|…) nunca entram aqui. Outros ids (ATUR|…, docs especiais como TURMA_INATIVA) passam.
+  const ehDeAtas = (id) => /^(ATUR-ATAS|ATA)\|/.test(String(id || ''));
+  const turmaRuim = dump.turmasDB.find(t => !idDe(t) || ehDeAtas(idDe(t)));
+  if (turmaRuim) return `turma com id inválido ou do módulo de Atas ("${idDe(turmaRuim) || 'sem id'}").`;
   const alunoRuim = dump.alunosDB.find(a => !(a && (a.alunoId || a._id)));
   if (alunoRuim) return 'há aluno sem alunoId.';
-  const matRuim = dump.matriculasDB.find(m => !(m && (m._id || m.matriculaId || m.id) && /^ATUR\|/.test(String(m.turmaId || ''))));
-  if (matRuim) return `matrícula inválida (turmaId "${(matRuim && matRuim.turmaId) || 'sem turmaId'}"; esperado ATUR|…).`;
+  const matRuim = dump.matriculasDB.find(m => !(m && (m._id || m.matriculaId || m.id) && m.turmaId) || ehDeAtas(m.turmaId) || /^MAT\|ATUR-ATAS\|/.test(String(m._id || m.matriculaId || m.id)));
+  if (matRuim) return `matrícula inválida ou do módulo de Atas (turmaId "${(matRuim && matRuim.turmaId) || 'sem turmaId'}").`;
   return '';
 }
 
