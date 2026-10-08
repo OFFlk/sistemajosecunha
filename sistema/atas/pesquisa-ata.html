@@ -757,25 +757,53 @@ function preencherFiltroAno(anosIndice) {
 // Busca no Firestore SÓ o que os filtros pedem (ano/turno viram query; o resto filtra no cliente).
 // Cache por sessão da página: repetir a mesma pesquisa não lê de novo.
 const _cacheBuscaTurmas = new Map();
+
+// Consulta direta em schools/{escola}/turmas com os filtros que o Firestore sabe fazer no servidor:
+// ano (==), turno (==) e série (array-contains-any no campo `series`, gravado pelo cadastro-turmas).
+// Se o Firestore pedir índice composto (failed-precondition), repete SEM a série e a série é filtrada no cliente.
+async function _consultaTurmas({ ano, turno, series }) {
+  const sid = window.Auth.getActiveSchoolId();
+  if (!sid) throw new Error("Nenhuma escola ativa.");
+  const montar = (comSeries) => {
+    let q = window.Auth.db.collection("schools").doc(sid).collection("turmas");
+    if (ano !== undefined) q = q.where("anoLetivo", "==", ano);
+    if (turno) q = q.where("turno", "==", turno);
+    if (comSeries && series && series.length) q = q.where("series", "array-contains-any", series);
+    return q;
+  };
+  let snap;
+  try {
+    snap = await montar(true).get();
+  } catch (e) {
+    if (e && e.code === "failed-precondition" && series && series.length) {
+      console.warn("[pesquisa-ata] A consulta com série precisa de índice composto; filtrando a série no cliente.", e.message);
+      snap = await montar(false).get();
+    } else { throw e; }
+  }
+  return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+}
+
+// Busca no Firestore SÓ o que os filtros pedem: ano, turno e série viram consulta. Sem nenhum dos três, lê tudo (pedido explícito).
+// Cache por sessão da página: repetir a mesma combinação não lê de novo.
 async function buscarTurmasNoBanco() {
   const ano = document.getElementById("fAno").value.trim();
   const turno = document.getElementById("fTurno").value.trim();
-  const chave = ano + "|" + turno;
+  const series = seriesSelecionadas.slice();
+  const chave = [ano, turno, series.slice().sort().join(",")].join("|");
   if (_cacheBuscaTurmas.has(chave)) return _cacheBuscaTurmas.get(chave);
   let r;
   if (ano) {
-    // anoLetivo pode estar gravado como texto OU número (cadastro-atas grava texto, cadastro-turmas grava número):
-    // duas consultas em paralelo, juntadas sem repetir. Cada turma tem o ano de um tipo só → mesmas leituras de uma consulta única.
-    const extra = turno ? { and: [["turno", turno]] } : {};
+    // anoLetivo pode estar gravado como texto OU número: duas consultas em paralelo, juntadas sem repetir.
+    // Cada turma tem o ano de um tipo só → mesmas leituras de uma consulta única.
     const [porTexto, porNumero] = await Promise.all([
-      DB.turmas.whereEquals("anoLetivo", ano, extra),
-      DB.turmas.whereEquals("anoLetivo", Number(ano), extra)
+      _consultaTurmas({ ano, turno, series }),
+      _consultaTurmas({ ano: Number(ano), turno, series })
     ]);
     const vistos = new Set();
     r = [...porTexto, ...porNumero].filter(t => !vistos.has(t._id) && vistos.add(t._id));
   }
-  else if (turno)    r = await DB.turmas.whereEquals("turno", turno);
-  else               r = await DB.turmas.list();   // "Todos" sem filtro: leitura completa, só porque você pediu
+  else if (turno || series.length) r = await _consultaTurmas({ turno, series });
+  else               r = await DB.turmas.list();   // nenhum filtro: leitura completa, só porque você pediu
   _cacheBuscaTurmas.set(chave, r);
   return r;
 }
@@ -1379,7 +1407,7 @@ async function carregar() {
   recomputarTurmasBase();
 
   document.getElementById("dbInfoTip").textContent =
-    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano e o turno escolhidos. Sem ano nem turno, a pesquisa lê todas as turmas. Os anos do filtro vêm do índice mantido em Gestão de Atas.`;
+    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano, o turno e a série escolhidos (só as turmas que casam são lidas). A busca geral refina o que já foi buscado e não reduz leituras. Sem ano, turno nem série, a pesquisa lê todas as turmas. Os anos do filtro vêm do índice mantido em Gestão de Atas.`;
 
   preencherFiltroAno(await carregarAnosDoIndice());
 
@@ -1390,6 +1418,14 @@ async function carregar() {
 
   document.getElementById("btnPesquisar").onclick = async function(){
     const btn = this, box = document.getElementById("listaTurmas");
+    // A busca geral é texto livre (inclui nomes de alunos dentro da turma): o Firestore não filtra isso no servidor.
+    // Ela só refina turmas já buscadas por ano/turno/série — sozinha, obrigaria ler o banco inteiro.
+    const _temFiltroServidor = document.getElementById("fAno").value.trim() || document.getElementById("fTurno").value.trim() || seriesSelecionadas.length;
+    if (norm(document.getElementById("fBusca").value) && !_temFiltroServidor) {
+      box.innerHTML = `<div class="list-item"><span class="muted">A busca geral refina turmas já filtradas. Escolha ao menos um <b>ano</b>, <b>turno</b> ou <b>série</b> — ou use a <b>Pesquisa por aluno</b> para achar um nome.</span></div>`;
+      setMsg("Escolha ano, turno ou série para usar a busca geral.", "warn");
+      return;
+    }
     btn.disabled = true;
     box.innerHTML = `<div class="list-item"><span class="muted">Buscando turmas…</span></div>`;
     try {
