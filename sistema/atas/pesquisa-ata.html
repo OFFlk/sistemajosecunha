@@ -553,21 +553,27 @@ const _podeEditar = !!_session && _session.role === 'admin';
 ========================= */
 let _mapaNomes = new Map(); // alunoId -> nome oficial
 
-async function carregarCatalogoNomes(){
-  try{
-    if (window.Identidade && window.Identidade.pronto) await window.Identidade.pronto;
-    const lista = (window.Identidade && typeof window.Identidade.lerTodos === "function")
-      ? window.Identidade.lerTodos() : [];
-    _mapaNomes = new Map(lista.map(a => [a.alunoId, a.nome || a.nomeOficial || ""]));
-  }catch(e){
-    console.warn("[pesquisa-ata] Falha ao carregar catálogo de identidade:", e);
-    _mapaNomes = new Map();
-    // Não bloqueia a página — sem catálogo, nomeAtual() cai no aluno.nome bruto,
-    // que só fica desatualizado se o aluno foi corrigido/fundido depois em
-    // idaluno.html (o vínculo em si continua correto). Risco raro, mas silencioso
-    // sem este aviso.
-    setMsg("Não foi possível carregar o catálogo de nomes atualizados — nomes exibidos podem estar desatualizados para algum aluno corrigido recentemente.", "warn");
+// Nomes atualizados: o catálogo inteiro NÃO é mais carregado (Identidade v2 não tem lerTodos).
+// Ao abrir uma turma, busca o nome oficial só dos alunos DELA (1 leitura por aluno em alunos-atas) e guarda em memória
+// da página; alunos já consultados não são lidos de novo. Devolve true se algum nome mudou em relação ao gravado na turma.
+const _nomesConsultados = new Set();
+async function carregarNomesDaTurma(turma){
+  if (!(window.Identidade && typeof window.Identidade.buscarAtasPorId === "function")) return false;
+  const alunos = (turma && turma.alunos) || [];
+  const ids = [...new Set(alunos.map(a => a && a.alunoId).filter(Boolean))].filter(id => !_nomesConsultados.has(id));
+  if (!ids.length) return false;
+  try {
+    const docs = await Promise.all(ids.map(id => Identidade.buscarAtasPorId(id)));
+    docs.forEach((d, i) => {
+      _nomesConsultados.add(ids[i]);
+      if (d && d.nome) _mapaNomes.set(ids[i], d.nome);
+    });
+  } catch (e) {
+    console.warn("[pesquisa-ata] Falha ao buscar nomes atualizados:", e);
+    setMsg("Não foi possível conferir os nomes atualizados desta turma — os nomes exibidos são os gravados na turma.", "warn");
+    return false;
   }
+  return alunos.some(a => a && a.alunoId && _mapaNomes.get(a.alunoId) && _mapaNomes.get(a.alunoId) !== a.nome);
 }
 
 function nomeAtual(aluno){
@@ -971,6 +977,14 @@ function selecionarTurma(id) {
   // Destaca item selecionado na sidebar
   document.querySelectorAll("#listaTurmas .list-item").forEach(el => {
     el.classList.toggle("selected", el.dataset.turmaId === id);
+  });
+
+  // Nomes oficiais (IDaluno): a tabela já está na tela com o nome gravado; se algum mudou, redesenha.
+  const _turmaDosNomes = turmaSelecionada;
+  carregarNomesDaTurma(_turmaDosNomes).then(mudou => {
+    if (!mudou || turmaSelecionada !== _turmaDosNomes) return;
+    const q = norm(document.getElementById("fAluno").value);
+    renderAlunos(q ? alunosView.filter(a => norm(nomeAtual(a)).includes(q)) : alunosView);
   });
 }
 
@@ -1419,7 +1433,6 @@ async function carregar() {
       document.addEventListener('auth:ready', res, {once:true});
     });
 
-    await carregarCatalogoNomes();
   }catch(e){
     console.warn('[pesquisa-ata] Falha na inicialização:', e);
     falhaTurmas = true;
