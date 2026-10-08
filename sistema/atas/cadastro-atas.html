@@ -62,12 +62,17 @@ html[data-theme="dark"] {
 /* Card — padding e margin específicos desta página */
 .card { padding: 20px; margin-bottom: 16px; }
 
-/* Botão secundário */
+/* Botão secundário (outline).
+   Texto usa --brand-text / --brand-text-d (tons pensados para TEXTO) e não
+   --brand / --brand-d, que são tons de preenchimento sólido: em Azul, Verde,
+   Azul Escuro etc. o --brand-d é escuro de propósito e o texto some no tema
+   escuro (e no claro, em paleta clara como a Tan). A borda no escuro usa
+   --brand-border-d, que é visível sobre fundo escuro em toda paleta. */
 .btn.btn-secondary, button.btn-secondary, button.btn.btn-secondary {
-  background: transparent; border: 1.5px solid var(--brand, #7c3aed); color: var(--brand, #7c3aed);
+  background: transparent; border: 1.5px solid var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
 }
 .btn.btn-secondary:hover, button.btn-secondary:hover { background: var(--brand-faded, #f5f3ff); }
-html[data-theme="dark"] .btn.btn-secondary, html[data-theme="dark"] button.btn-secondary { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
+html[data-theme="dark"] .btn.btn-secondary, html[data-theme="dark"] button.btn-secondary { border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
 html[data-theme="dark"] .btn.btn-secondary:hover { background: var(--brand-faded-d, rgba(124,58,237,0.2)); }
 
 /* Botão danger outline */
@@ -538,8 +543,7 @@ function renderFormularioDinamico() {
   // sozinho no fim da grade de notas, vermelho, pra não ser clicado por engano.
   html += `
     <div class="campo" id="wrapExcluirAluno" style="display:none; grid-column:1/-1; align-items:flex-start;">
-      <button type="button" id="btnExcluirAluno" class="btn" onclick="excluirAlunoEmEdicao()"
-              style="background:#991b1b;border-color:#991b1b;color:#fff;">
+      <button type="button" id="btnExcluirAluno" class="btn btn-danger" onclick="excluirAlunoEmEdicao()">
         🗑️ Excluir aluno desta turma
       </button>
     </div>
