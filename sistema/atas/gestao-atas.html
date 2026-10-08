@@ -553,8 +553,10 @@ async function inicializar() {
       // Mantém TODAS as turmas no cache local (não esconde as suspeitas) —
       // elas são marcadas visualmente na tabela e continuam selecionáveis para apagar.
       _mem[dbKey('turmasDB')] = todasFirestore;
+      _cargaTurmasFalhou = false;
     }
   } catch(e) {
+    _cargaTurmasFalhou = true;
     setMsg('Sem conexão com Firestore — usando cache local.', 'warn');
   }
 
@@ -609,6 +611,7 @@ async function recarregar() {
     falhou = true;
     setMsg('Sem conexão com Firestore — usando cache local.', 'warn');
   }
+  _cargaTurmasFalhou = falhou;
   atualizarStats();
   renderTabelaTurmas();
   carregarIndiceAnos();
@@ -622,6 +625,7 @@ async function recarregar() {
    manual, a partir das turmas JÁ carregadas na tela (0 leituras extras).
 ============================================= */
 let _indiceAnos = null;          // null = não foi possível ler; [] = vazio
+let _cargaTurmasFalhou = false;  // true = a última leitura das turmas falhou (diferente de "não há turmas")
 let _indiceAtualizadoEm = '';
 
 function _anosDasTurmas(turmas) {
@@ -644,7 +648,7 @@ function _renderIndiceAnos() {
     return;
   }
   if (!_indiceAnos.length) {
-    box.innerHTML = '<span class="muted">Índice vazio — a pesquisa usa a lista fixa de anos até você reconstruir.</span>';
+    box.innerHTML = '<span class="muted">Índice vazio — a pesquisa usa a lista fixa de anos.</span>';
     info.textContent = '';
     return;
   }
@@ -673,8 +677,10 @@ async function carregarIndiceAnos() {
 async function reconstruirIndiceAnos() {
   const btn = document.getElementById('btnReconstruirAnos');
   const turmas = lerTurmasDB();
-  if (!turmas.length) {
-    setMsg('Nenhuma turma carregada — o índice não foi alterado. Clique em "Recarregar" e tente de novo.', 'warn');
+  // Só bloqueia se a LEITURA falhou (não dá pra saber quais anos existem). Zero turmas com leitura ok é válido:
+  // o índice deve ficar vazio (ex.: depois de "Apagar turmas").
+  if (_cargaTurmasFalhou) {
+    setMsg('Não foi possível carregar as turmas — o índice não foi alterado. Clique em "Recarregar" e tente de novo.', 'warn');
     return;
   }
   const schoolId = String((window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId()) || '').trim();
@@ -698,6 +704,7 @@ async function reconstruirIndiceAnos() {
     `Anos encontrados: ${novos.length ? novos.join(', ') : 'nenhum'}`,
     ''
   ];
+  if (!turmas.length) linhas.push('Nenhuma turma no banco: o índice ficará vazio e a pesquisa usará a lista fixa de anos.');
   if (_indiceAnos === null) linhas.push('Não foi possível ler o índice atual; ele será substituído por esta lista.');
   if (adicionados.length) linhas.push(`Serão adicionados: ${adicionados.join(', ')}`);
   if (removidos.length) linhas.push(`Serão removidos: ${removidos.join(', ')}`);

@@ -644,7 +644,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   // Lista fixa de séries. Mantenha IDÊNTICA em pesquisa-ata.html (SERIES_FILTRO).
   function serieOptions(){
     return [
-      "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3", "Eixo 4", "Eixo 5",
+      "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
       "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
       "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano",
       "Multisseriada"
@@ -652,7 +652,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   }
 
   // Índice de anos (schools/{escola}.atasIndice.anos): alimenta o select de ano da pesquisa de atas
-  // sem precisar ler as turmas. Só ACRESCENTA ao índice se ele já existir (criado em Gestão de Atas → Reconstruir):
+  // sem precisar ler as turmas. Só ACRESCENTA ao índice se ele já existir (criado em Gestão de Atas → Reconstruir, mesmo que vazio):
   // criar aqui deixaria um índice parcial, que esconderia os outros anos da pesquisa.
   // Falha aqui NÃO desfaz a turma. Devolve { ok, motivo?, pulado? }.
   async function registrarAnoNoIndice(ano){
@@ -666,9 +666,11 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 
       const ref = window.Auth.db.collection("schools").doc(schoolId);
       const snap = await ref.get();
-      const anos = snap.exists ? ((snap.data().atasIndice || {}).anos) : null;
-      if(!Array.isArray(anos) || !anos.length) return { ok:true, pulado:true };   // índice ainda não criado
-      if(anos.map(String).includes(String(ano)))   return { ok:true, pulado:true };   // já está lá: nada a gravar
+      const idx = snap.exists ? snap.data().atasIndice : null;
+      // "Criado" = reconstruído em Gestão de Atas (tem atualizadoEm). Pode estar vazio de propósito (sem turmas no banco).
+      if(!idx || !idx.atualizadoEm) return { ok:true, pulado:true };               // índice ainda não criado
+      const anos = Array.isArray(idx.anos) ? idx.anos.map(String) : [];
+      if(anos.includes(String(ano))) return { ok:true, pulado:true };              // já está lá: nada a gravar
 
       await ref.set({ atasIndice: { anos: FV.arrayUnion(String(ano)) } }, { merge: true });
       return { ok:true };
