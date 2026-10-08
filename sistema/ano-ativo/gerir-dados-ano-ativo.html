@@ -160,73 +160,11 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
       <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas (nova coleção)</div></div>
       <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos cadastrados</div></div>
       <div class="stat-box"><div class="stat-num" id="statMatriculas">—</div><div class="stat-lbl">Matrículas</div></div>
-      <div class="stat-box"><div class="stat-num" id="statLegado">—</div><div class="stat-lbl">Turmas legadas (coleção antiga)</div></div>
     </div>
     <div class="row-btns" style="margin-top:14px;">
       <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
     </div>
     <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
-  </div>
-
-  <!-- ── MIGRAÇÃO ── -->
-  <div class="card">
-    <div class="sec-header" onclick="toggleSec('secMigrar')">
-      <h3 style="margin-top:0;">🚚 Migrar turmas para a nova coleção</h3>
-      <span class="sec-toggle" id="togSecMigrar">▼</span>
-    </div>
-    <div class="sec-body" id="secMigrar">
-      <p class="muted">
-        Move as turmas do ano-ativo que ainda estão na coleção <b>turmas</b> (legada, compartilhada)
-        para a coleção exclusiva <b>anoAtivoTurmas</b>. Após a migração, os documentos originais
-        são removidos da coleção antiga. <b>Faça um backup antes de prosseguir.</b>
-      </p>
-
-      <div class="row-btns">
-        <button class="btn btn-gray"    id="btnAnalisar"  onclick="analisarMigracao()">🔍 Analisar</button>
-        <button class="btn btn-primary" id="btnMigrar"    onclick="executarMigracao()" disabled>🚚 Migrar agora</button>
-      </div>
-
-      <div id="migrPreview" style="display:none; margin-top:14px;">
-        <b id="migrResumo" style="display:block; margin-bottom:10px;"></b>
-        <div id="migrLista"></div>
-        <div class="progress-wrap" id="migrProgressWrap" style="display:none;">
-          <div class="progress-bar" id="migrProgressBar"></div>
-        </div>
-      </div>
-
-      <div class="console" id="logMigrar" style="display:none;"></div>
-    </div>
-  </div>
-
-  <!-- ── MIGRAÇÃO DE ALUNOS E MATRÍCULAS ── -->
-  <div class="card">
-    <div class="sec-header" onclick="toggleSec('secMigrarAlunos')">
-      <h3 style="margin-top:0;">👥 Migrar alunos e matrículas para as novas coleções</h3>
-      <span class="sec-toggle" id="togSecMigrarAlunos">▼</span>
-    </div>
-    <div class="sec-body" id="secMigrarAlunos">
-      <p class="muted">
-        Copia os alunos e matrículas da coleção legada (<b>alunos</b> / <b>matriculas</b>) para as
-        coleções exclusivas do ano-ativo (<b>anoAtivoAlunos</b> / <b>anoAtivoMatriculas</b>).
-        São copiados apenas registros vinculados às turmas já presentes em <b>anoAtivoTurmas</b>.
-        Os documentos originais <b>não são removidos</b> da coleção legada (operação segura).
-      </p>
-
-      <div class="row-btns">
-        <button class="btn btn-gray"    id="btnAnalisarAlunos"  onclick="analisarMigracaoAlunos()">🔍 Analisar</button>
-        <button class="btn btn-primary" id="btnMigrarAlunos"    onclick="executarMigracaoAlunos()" disabled>👥 Migrar alunos e matrículas</button>
-      </div>
-
-      <div id="migrAlunosPreview" style="display:none; margin-top:14px;">
-        <b id="migrAlunosResumo" style="display:block; margin-bottom:10px;"></b>
-        <div id="migrAlunosLista"></div>
-        <div class="progress-wrap" id="migrAlunosProgressWrap" style="display:none;">
-          <div class="progress-bar" id="migrAlunosProgressBar"></div>
-        </div>
-      </div>
-
-      <div class="console" id="logMigrarAlunos" style="display:none;"></div>
-    </div>
   </div>
 
   <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
@@ -340,9 +278,8 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
     </div>
     <div class="sec-body" id="secExport">
       <p class="muted">
-        Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON.
-        Inclui tanto a coleção nova (<b>anoAtivoTurmas</b>) quanto as turmas legadas ainda
-        em <b>turmas</b> que pertencem ao ano-ativo, para garantir que nada se perca.
+        Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON
+        (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).
       </p>
       <div class="row-btns">
         <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
@@ -358,8 +295,9 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
     </div>
     <div class="sec-body" id="secImport">
       <p class="muted">
-        Restaura um backup gerado por esta página. Os dados são inseridos na coleção
-        <b>anoAtivoTurmas</b>. Documentos com o mesmo ID são atualizados; novos são adicionados.
+        Restaura um backup gerado por esta página, gravando em <b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b>
+        e <b>anoAtivoMatriculas</b>. Documentos com o mesmo ID são atualizados; novos são adicionados.
+        Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.
       </p>
       <div class="row-btns">
         <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
@@ -389,8 +327,6 @@ document.addEventListener('auth:ready', function () {
   if (!IS_ADMIN) {
     document.getElementById('avisoReadonly').style.display = 'flex';
     [
-      'btnAnalisar', 'btnMigrar',
-      'btnAnalisarAlunos', 'btnMigrarAlunos',
       'btnExportJSON', 'lblImportJSON',
       'btnBuscarAluno', 'btnExcluirAluno',
       'btnBuscarTurma', 'btnExcluirTurma'
@@ -398,10 +334,6 @@ document.addEventListener('auth:ready', function () {
       const el = document.getElementById(id);
       if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
     });
-    window.executarMigracao       = () => {};
-    window.executarMigracaoAlunos = () => {};
-    window.analisarMigracao       = () => {};
-    window.analisarMigracaoAlunos = () => {};
     window.exportarJSON           = () => {};
     window.importarJSON           = () => {};
     window.buscarAlunoExcluir       = () => {};
@@ -424,19 +356,6 @@ function waitAuth() {
 }
 
 /* =============================================
-   IDENTIFICAR TURMA DO ANO-ATIVO
-   (inverso do ehTurmaDeAtas do gerir-dados.html)
-============================================= */
-function ehTurmaDeAnoAtivo(t) {
-  const origem = String(t.origemArquivo || '').trim();
-  const aba    = String(t.aba || '').trim().toUpperCase();
-  // Turmas de atas têm origemArquivo (nome do xlsx) ou aba com nome de planilha
-  if (origem && origem !== '—') return false;
-  if (aba && !['MANUAL','CADASTRO',''].includes(aba)) return false;
-  return true;
-}
-
-/* =============================================
    INIT
 ============================================= */
 function logEl(msg, id) {
@@ -455,26 +374,23 @@ async function inicializar() {
   logEl('Carregando dados do Firestore...', 'logGeral');
   await waitAuth();
 
+  const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+  if (!sid || String(sid).toUpperCase() === 'ADMIN') {
+    ['statTurmas', 'statAlunos', 'statMatriculas'].forEach(id => { document.getElementById(id).textContent = '—'; });
+    logEl('⚠️ Nenhuma escola selecionada ("Todas as escolas"). Escolha uma escola para ver os números e usar as ferramentas.', 'logGeral');
+    return;
+  }
+
   try {
-    const [novas, alunos, mats, legadas] = await Promise.all([
+    const [novas, alunos, mats] = await Promise.all([
       window.DB.anoAtivoTurmas.list(),
       window.DB.anoAtivoAlunos.list(),
       window.DB.anoAtivoMatriculas.list(),
-      window.DB.turmas.list(),
     ]);
 
-    const legadasAnoAtivo = legadas.filter(ehTurmaDeAnoAtivo);
-
-    document.getElementById('statTurmas').textContent    = novas.length;
-    document.getElementById('statAlunos').textContent    = alunos.length;
+    document.getElementById('statTurmas').textContent     = novas.length;
+    document.getElementById('statAlunos').textContent     = alunos.length;
     document.getElementById('statMatriculas').textContent = mats.length;
-    document.getElementById('statLegado').textContent    = legadasAnoAtivo.length;
-
-    if (legadasAnoAtivo.length > 0) {
-      logEl(`⚠️ ${legadasAnoAtivo.length} turma(s) do ano-ativo ainda na coleção legada. Use "Migrar" para movê-las.`, 'logGeral');
-    } else {
-      logEl('✅ Nenhuma turma legada encontrada. Migração já concluída ou não necessária.', 'logGeral');
-    }
 
     logEl('✅ Pronto.', 'logGeral');
   } catch(e) {
@@ -603,303 +519,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 }
 
 /* =============================================
-   MIGRAÇÃO
+   EXPORTAR JSON
 ============================================= */
-let _turmasParaMigrar = [];
-
-async function analisarMigracao() {
-  if (!IS_ADMIN) return;
-  clearLogEl('logMigrar');
-  document.getElementById('migrPreview').style.display = 'none';
-  document.getElementById('btnMigrar').disabled = true;
-
-  const btnAn = document.getElementById('btnAnalisar');
-  btnAn.disabled = true; btnAn.textContent = 'Analisando...';
-
-  try {
-    await waitAuth();
-    const todas = await window.DB.turmas.list();
-    _turmasParaMigrar = todas.filter(ehTurmaDeAnoAtivo);
-
-    // Verifica quais já existem na coleção nova (por id)
-    const jaExistem = await window.DB.anoAtivoTurmas.list();
-    const idsNovos  = new Set(jaExistem.map(t => t._id || t.id || t.turmaId));
-
-    const novas      = _turmasParaMigrar.filter(t => !idsNovos.has(t._id || t.id || t.turmaId));
-    const duplicadas = _turmasParaMigrar.filter(t =>  idsNovos.has(t._id || t.id || t.turmaId));
-
-    document.getElementById('migrPreview').style.display = 'block';
-    document.getElementById('migrResumo').textContent =
-      `${_turmasParaMigrar.length} turma(s) legada(s) encontrada(s) — ${novas.length} nova(s) · ${duplicadas.length} já existente(s) na coleção nova`;
-
-    const lista = document.getElementById('migrLista');
-    lista.innerHTML = '';
-
-    for (const t of novas) {
-      const div = document.createElement('div');
-      div.className = 'migr-item ok';
-      div.innerHTML = `<span class="badge ok">MOVER</span> <b>${esc(t.nome||t.id||'?')}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')}`;
-      lista.appendChild(div);
-    }
-
-    for (const t of duplicadas) {
-      const div = document.createElement('div');
-      div.className = 'migr-item warn';
-      div.innerHTML = `<span class="badge warn">JÁ EXISTE</span> <b>${esc(t.nome||t.id||'?')}</b> — será ignorada (não duplicada)`;
-      lista.appendChild(div);
-    }
-
-    if (!_turmasParaMigrar.length) {
-      lista.innerHTML = '<div class="migr-item"><span class="muted">Nenhuma turma do ano-ativo encontrada na coleção legada.</span></div>';
-    }
-
-    logEl(`Análise concluída: ${_turmasParaMigrar.length} turma(s) para migrar.`, 'logMigrar');
-    if (_turmasParaMigrar.length > 0) document.getElementById('btnMigrar').disabled = false;
-
-  } catch(e) {
-    logEl('❌ Erro na análise: ' + e.message, 'logMigrar');
-    setMsg('Erro na análise: ' + e.message, 'err');
-  } finally {
-    btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
-  }
-}
-
-async function executarMigracao() {
-  if (!IS_ADMIN || !_turmasParaMigrar.length) return;
-
-  const confirmou = await _confirmModal({
-    titulo: '⚠️ Confirmar migração',
-    corpo: `Migrar ${_turmasParaMigrar.length} turma(s) de "turmas" → "anoAtivoTurmas" e removê-las da coleção antiga?\n\nEsta ação não pode ser desfeita. Faça um backup antes.`,
-    textoConfirmar: 'Sim, migrar',
-  });
-  if (!confirmou) return;
-
-  setMsg('Migrando turmas…', 'loading');
-
-  const btnMig = document.getElementById('btnMigrar');
-  const btnAn  = document.getElementById('btnAnalisar');
-  btnMig.disabled = true; btnMig.textContent = 'Migrando...';
-  btnAn.disabled  = true;
-
-  const wrap = document.getElementById('migrProgressWrap');
-  const bar  = document.getElementById('migrProgressBar');
-  wrap.style.display = 'block'; bar.style.width = '0%';
-
-  clearLogEl('logMigrar');
-  logEl(`Iniciando migração de ${_turmasParaMigrar.length} turma(s)...`, 'logMigrar');
-
-  let ok = 0, erros = 0;
-
-  for (let i = 0; i < _turmasParaMigrar.length; i++) {
-    const t = _turmasParaMigrar[i];
-    const fid = t._id || t.id || t.turmaId;
-    const nome = t.nome || fid || '?';
-
-    try {
-      // 1. Salva na coleção nova
-      const { _id, ...dados } = t;
-      await window.DB.anoAtivoTurmas.save({ _id: fid, ...dados });
-
-      // 2. Remove da coleção legada
-      await window.DB.turmas.remove(fid);
-
-      logEl(`  ✅ "${nome}" migrada.`, 'logMigrar');
-      ok++;
-    } catch(e) {
-      logEl(`  ❌ "${nome}" — erro: ${e.message}`, 'logMigrar');
-      erros++;
-    }
-
-    bar.style.width = Math.round(((i + 1) / _turmasParaMigrar.length) * 100) + '%';
-  }
-
-  logEl('', 'logMigrar');
-  logEl(`Migração concluída: ${ok} turma(s) migrada(s) · ${erros} erro(s).`, 'logMigrar');
-  if (erros > 0) setMsg(`Migração concluída com ${erros} erro(s) — ${ok} turma(s) migrada(s).`, ok > 0 ? 'warn' : 'err');
-  else setMsg(`${ok} turma(s) migrada(s) com sucesso!`, 'ok');
-
-  _turmasParaMigrar = [];
-  document.getElementById('btnMigrar').disabled = true;
-  btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
-  btnMig.textContent = '🚚 Migrar agora';
-
-  // Atualiza stats
-  await inicializar();
-}
-
-/* =============================================
-   MIGRAÇÃO DE ALUNOS E MATRÍCULAS
-============================================= */
-let _alunosParaMigrar     = [];
-let _matriculasParaMigrar = [];
-
-async function analisarMigracaoAlunos() {
-  if (!IS_ADMIN) return;
-  clearLogEl('logMigrarAlunos');
-  document.getElementById('migrAlunosPreview').style.display = 'none';
-  document.getElementById('btnMigrarAlunos').disabled = true;
-  _alunosParaMigrar = [];
-  _matriculasParaMigrar = [];
-
-  const btnAn = document.getElementById('btnAnalisarAlunos');
-  btnAn.disabled = true; btnAn.textContent = 'Analisando...';
-
-  try {
-    await waitAuth();
-
-    // Carrega tudo em paralelo
-    const [turmasNovas, alunosLeg, matsLeg, alunosNovos, matsNovas] = await Promise.all([
-      window.DB.anoAtivoTurmas.list(),
-      window.DB.alunos.list(),
-      window.DB.matriculas.list(),
-      window.DB.anoAtivoAlunos.list(),
-      window.DB.anoAtivoMatriculas.list(),
-    ]);
-
-    // IDs das turmas já na nova coleção — só migramos vínculos dessas turmas
-    const turmaIdsNovos = new Set(turmasNovas.map(t => t.turmaId || t._id || t.id).filter(Boolean));
-
-    if (turmaIdsNovos.size === 0) {
-      logEl('⚠️ Nenhuma turma encontrada em anoAtivoTurmas. Migre as turmas primeiro.', 'logMigrarAlunos');
-      setMsg('Nenhuma turma encontrada em anoAtivoTurmas. Migre as turmas primeiro.', 'warn');
-      btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
-      return;
-    }
-
-    // Matrículas legadas vinculadas às turmas do ano-ativo
-    const matsVinculadas = matsLeg.filter(m => {
-      const tid = m.turmaId || m.turma || '';
-      return turmaIdsNovos.has(tid);
-    });
-
-    // alunoIds que aparecem nessas matrículas
-    const alunoIdsNecessarios = new Set(matsVinculadas.map(m => m.alunoId || m.aluno).filter(Boolean));
-
-    // Alunos legados que precisamos migrar
-    const alunosVinculados = alunosLeg.filter(a => {
-      const aid = a.alunoId || a._id || a.id || '';
-      return alunoIdsNecessarios.has(aid);
-    });
-
-    // Filtra o que já existe nas novas coleções (evita duplicar)
-    const alunoIdsJaExistem = new Set(alunosNovos.map(a => a.alunoId || a._id || a.id).filter(Boolean));
-    const matKeysJaExistem  = new Set(matsNovas.map(m => `${m.turmaId}|${m.alunoId}`));
-
-    _alunosParaMigrar     = alunosVinculados.filter(a => !alunoIdsJaExistem.has(a.alunoId || a._id || a.id));
-    _matriculasParaMigrar = matsVinculadas.filter(m => !matKeysJaExistem.has(`${m.turmaId||m.turma}|${m.alunoId||m.aluno}`));
-
-    const jaExistemAlunos = alunosVinculados.length - _alunosParaMigrar.length;
-    const jaExistemMats   = matsVinculadas.length   - _matriculasParaMigrar.length;
-
-    document.getElementById('migrAlunosPreview').style.display = 'block';
-    document.getElementById('migrAlunosResumo').textContent =
-      `${alunosVinculados.length} aluno(s) e ${matsVinculadas.length} matrícula(s) vinculados às turmas do ano-ativo — ` +
-      `${_alunosParaMigrar.length} aluno(s) novo(s) · ${jaExistemAlunos} já existente(s) | ` +
-      `${_matriculasParaMigrar.length} matrícula(s) nova(s) · ${jaExistemMats} já existente(s)`;
-
-    const lista = document.getElementById('migrAlunosLista');
-    lista.innerHTML = '';
-
-    // Exibe resumo por turma
-    const countPorTurma = {};
-    matsVinculadas.forEach(m => {
-      const tid = m.turmaId || m.turma || '?';
-      countPorTurma[tid] = (countPorTurma[tid] || 0) + 1;
-    });
-    turmasNovas.forEach(t => {
-      const tid = t.turmaId || t._id || t.id;
-      const qty = countPorTurma[tid] || 0;
-      if (qty === 0) return;
-      const div = document.createElement('div');
-      div.className = 'migr-item ok';
-      div.innerHTML = `<span class="badge ok">COPIAR</span> <b>${esc(t.nome||tid)}</b> — ${qty} matrícula(s)`;
-      lista.appendChild(div);
-    });
-
-    if (_alunosParaMigrar.length === 0 && _matriculasParaMigrar.length === 0) {
-      lista.innerHTML = '<div class="migr-item ok"><span class="badge ok">✅</span> Todos os alunos e matrículas já estão nas novas coleções!</div>';
-    }
-
-    logEl(`Análise: ${_alunosParaMigrar.length} aluno(s) e ${_matriculasParaMigrar.length} matrícula(s) para copiar.`, 'logMigrarAlunos');
-    if (_alunosParaMigrar.length > 0 || _matriculasParaMigrar.length > 0) {
-      document.getElementById('btnMigrarAlunos').disabled = false;
-    }
-
-  } catch(e) {
-    logEl('❌ Erro na análise: ' + e.message, 'logMigrarAlunos');
-    setMsg('Erro na análise: ' + e.message, 'err');
-  } finally {
-    btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
-  }
-}
-
-async function executarMigracaoAlunos() {
-  if (!IS_ADMIN) return;
-  if (!_alunosParaMigrar.length && !_matriculasParaMigrar.length) return;
-
-  const confirmou = await _confirmModal({
-    titulo: '⚠️ Confirmar cópia',
-    corpo: `Copiar ${_alunosParaMigrar.length} aluno(s) e ${_matriculasParaMigrar.length} matrícula(s) para as novas coleções?\n\nOs dados originais NÃO serão removidos. Esta operação é segura.`,
-    textoConfirmar: 'Sim, copiar',
-  });
-  if (!confirmou) return;
-
-  setMsg('Copiando alunos e matrículas…', 'loading');
-
-  const btnMig = document.getElementById('btnMigrarAlunos');
-  const btnAn  = document.getElementById('btnAnalisarAlunos');
-  btnMig.disabled = true; btnMig.textContent = 'Migrando...';
-  btnAn.disabled  = true;
-
-  const wrap = document.getElementById('migrAlunosProgressWrap');
-  const bar  = document.getElementById('migrAlunosProgressBar');
-  wrap.style.display = 'block'; bar.style.width = '0%';
-
-  clearLogEl('logMigrarAlunos');
-
-  const total = _alunosParaMigrar.length + _matriculasParaMigrar.length;
-  let feito = 0;
-
-  try {
-    // --- Copia alunos em lote ---
-    if (_alunosParaMigrar.length) {
-      logEl(`Copiando ${_alunosParaMigrar.length} aluno(s)...`, 'logMigrarAlunos');
-      await window.DB.anoAtivoAlunos.saveAll(_alunosParaMigrar);
-      feito += _alunosParaMigrar.length;
-      bar.style.width = Math.round((feito / total) * 100) + '%';
-      logEl(`  ✅ ${_alunosParaMigrar.length} aluno(s) copiados.`, 'logMigrarAlunos');
-    }
-
-    // --- Copia matrículas em lote ---
-    if (_matriculasParaMigrar.length) {
-      logEl(`Copiando ${_matriculasParaMigrar.length} matrícula(s)...`, 'logMigrarAlunos');
-      await window.DB.anoAtivoMatriculas.saveAll(_matriculasParaMigrar);
-      feito += _matriculasParaMigrar.length;
-      bar.style.width = '100%';
-      logEl(`  ✅ ${_matriculasParaMigrar.length} matrícula(s) copiadas.`, 'logMigrarAlunos');
-    }
-
-    logEl('', 'logMigrarAlunos');
-    logEl('🎉 Migração concluída! Alunos e matrículas agora estão nas novas coleções.', 'logMigrarAlunos');
-    setMsg('Alunos e matrículas migrados com sucesso!', 'ok');
-
-    _alunosParaMigrar = [];
-    _matriculasParaMigrar = [];
-    document.getElementById('btnMigrarAlunos').disabled = true;
-
-    // Atualiza stats
-    await inicializar();
-
-  } catch(e) {
-    logEl('❌ Erro durante a migração: ' + e.message, 'logMigrarAlunos');
-    setMsg('Erro durante a migração: ' + e.message, 'err');
-  } finally {
-    btnAn.disabled = false; btnAn.textContent = '🔍 Analisar';
-    btnMig.textContent = '👥 Migrar alunos e matrículas';
-  }
-}
-
-
 async function exportarJSON() {
   if (!IS_ADMIN) return;
 
@@ -909,22 +530,18 @@ async function exportarJSON() {
 
   try {
     await waitAuth();
-    const [turmasDB, alunosDB, matriculasDB, legadas] = await Promise.all([
+    if (!escolaSelecionada()) return;   // sem escola, o backup sairia vazio sem aviso
+    const [turmasDB, alunosDB, matriculasDB] = await Promise.all([
       window.DB.anoAtivoTurmas.list(),
       window.DB.anoAtivoAlunos.list(),
       window.DB.anoAtivoMatriculas.list(),
-      window.DB.turmas.list(),
     ]);
-
-    // Inclui legadas do ano-ativo no backup para não perder nada
-    const legadasAnoAtivo = legadas.filter(ehTurmaDeAnoAtivo);
 
     const payload = {
       exportadoEm: new Date().toISOString(),
       versao: 1,
       modulo: 'ano-ativo',
       turmasDB,
-      turmasLegadasDB: legadasAnoAtivo,
       alunosDB,
       matriculasDB,
     };
@@ -935,7 +552,7 @@ async function exportarJSON() {
       'application/json'
     );
 
-    logEl(`✅ JSON exportado: ${turmasDB.length} turma(s) + ${legadasAnoAtivo.length} legada(s).`, 'logGeral');
+    logEl(`✅ JSON exportado: ${turmasDB.length} turma(s) · ${alunosDB.length} aluno(s) · ${matriculasDB.length} matrícula(s).`, 'logGeral');
     setMsg('Backup exportado com sucesso!', 'ok');
   } catch(e) {
     logEl('❌ Erro ao exportar: ' + e.message, 'logGeral');
@@ -948,6 +565,27 @@ async function exportarJSON() {
 /* =============================================
    IMPORTAR JSON
 ============================================= */
+// Valida o backup ANTES de gravar qualquer coisa. Devolve '' se estiver ok, ou o motivo da recusa.
+function validarBackupAnoAtivo(dump) {
+  if (!dump || typeof dump !== 'object' || Array.isArray(dump)) return 'o arquivo não é um backup válido.';
+  if (dump.modulo !== 'ano-ativo') {
+    return dump.modulo
+      ? `este backup é de outro módulo ("${dump.modulo}"). Só backups gerados por esta página são aceitos.`
+      : 'o arquivo não tem a marca do módulo ("modulo": "ano-ativo"). Só backups gerados por esta página são aceitos.';
+  }
+  for (const k of ['turmasDB', 'alunosDB', 'matriculasDB']) {
+    if (!Array.isArray(dump[k])) return `campo ${k} ausente ou inválido.`;
+  }
+  const idDe = (d) => String((d && (d.turmaId || d._id || d.id)) || '');
+  const turmaRuim = dump.turmasDB.find(t => !/^ATUR\|/.test(idDe(t)));
+  if (turmaRuim) return `turma com id fora do padrão do ano-ativo ("${idDe(turmaRuim) || 'sem id'}"; esperado ATUR|…).`;
+  const alunoRuim = dump.alunosDB.find(a => !(a && (a.alunoId || a._id)));
+  if (alunoRuim) return 'há aluno sem alunoId.';
+  const matRuim = dump.matriculasDB.find(m => !(m && (m._id || m.matriculaId || m.id) && /^ATUR\|/.test(String(m.turmaId || ''))));
+  if (matRuim) return `matrícula inválida (turmaId "${(matRuim && matRuim.turmaId) || 'sem turmaId'}"; esperado ATUR|…).`;
+  return '';
+}
+
 async function importarJSON(event) {
   if (!IS_ADMIN) return;
   const file = event.target.files?.[0];
@@ -961,24 +599,23 @@ async function importarJSON(event) {
     if (lblImp) { lblImp.style.pointerEvents = 'none'; lblImp.style.opacity = '0.5'; }
 
     try {
-      const dump = JSON.parse(reader.result);
+      let dump;
+      try { dump = JSON.parse(reader.result); }
+      catch (e) { logEl('❌ O arquivo não é um JSON válido.', 'logImport'); setMsg('O arquivo não é um JSON válido.', 'err'); return; }
 
-      // Valida que é um backup do ano-ativo
-      if (!Array.isArray(dump.turmasDB)) {
-        logEl('❌ JSON inválido: campo turmasDB ausente.', 'logImport');
-        setMsg('JSON inválido: campo turmasDB ausente.', 'err');
+      const motivo = validarBackupAnoAtivo(dump);
+      if (motivo) {
+        logEl('⛔ Importação recusada: ' + motivo + ' Nada foi gravado.', 'logImport');
+        setMsg('Importação recusada: ' + motivo, 'err');
         return;
-      }
-      if (dump.modulo && dump.modulo !== 'ano-ativo') {
-        logEl('⚠️ Atenção: este backup parece ser de outro módulo ("' + dump.modulo + '"). Continuando mesmo assim...', 'logImport');
-        setMsg('Este backup parece ser de outro módulo ("' + dump.modulo + '"). Continuando mesmo assim...', 'warn');
       }
 
       await waitAuth();
+      if (!escolaSelecionada()) return;
 
-      const turmas     = dump.turmasDB     || [];
-      const alunos     = dump.alunosDB     || [];
-      const matriculas = dump.matriculasDB || [];
+      const turmas     = dump.turmasDB;
+      const alunos     = dump.alunosDB;
+      const matriculas = dump.matriculasDB;
 
       logEl(`Importando: ${turmas.length} turma(s) · ${alunos.length} aluno(s) · ${matriculas.length} matrícula(s)...`, 'logImport');
       setMsg('Importando backup…', 'loading');
@@ -1185,7 +822,7 @@ async function executarExclusaoAluno() {
 /* =============================================
    EXCLUSÃO PONTUAL — TURMA
 ============================================= */
-let _turmaParaExcluir = null; // { turma, mats }
+let _turmaParaExcluir = null; // { turma, turmaId, mats, fotos }
 
 async function buscarTurmaExcluir() {
   if (!IS_ADMIN) return;
@@ -1201,20 +838,19 @@ async function buscarTurmaExcluir() {
 
   try {
     await waitAuth();
-    const [turmas, mats] = await Promise.all([
-      window.DB.anoAtivoTurmas.list(),
-      window.DB.anoAtivoMatriculas.list(),
-    ]);
+    if (!escolaSelecionada()) return;
 
-    const turma = turmas.find(t => (t.turmaId || t._id) === turmaId);
+    // Leituras pontuais: a turma e as matrículas dela (nunca as coleções inteiras)
+    const turma = await window.DB.anoAtivoTurmas.get(turmaId);
     if (!turma) {
       logEl(`❌ Nenhuma turma encontrada com turmaId "${turmaId}" em anoAtivoTurmas.`, 'logExcluirTurma');
       setMsg(`Nenhuma turma encontrada com turmaId "${turmaId}".`, 'err');
       return;
     }
-
-    const matsDaTurma = mats.filter(m => m.turmaId === turmaId);
-    _turmaParaExcluir = { turma, mats: matsDaTurma };
+    const matsDaTurma = await window.DB.anoAtivoMatriculas.whereEquals('turmaId', turmaId);
+    // A foto vive na matrícula: apagar a matrícula sem apagar o arquivo deixaria mídia órfã no Cloudinary
+    const fotos = Array.from(new Set(matsDaTurma.map(m => m.fotoFileId).filter(Boolean)));
+    _turmaParaExcluir = { turma, turmaId: turma.turmaId || turma._id || turmaId, mats: matsDaTurma, fotos };
 
     const info = document.getElementById('previewTurmaInfo');
     info.className = 'migr-item warn';
@@ -1223,9 +859,12 @@ async function buscarTurmaExcluir() {
     const matsEl = document.getElementById('previewTurmaMats');
     if (matsDaTurma.length) {
       matsEl.innerHTML = `<b style="display:block;margin-bottom:6px;font-size:13px;">⚠️ ${matsDaTurma.length} matrícula(s) apontam pra essa turma e também serão apagadas:</b>` +
-        matsDaTurma.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Aluno ${esc(m.alunoId||'—')} · Ano ${esc(m.anoLetivo||'?')} · ${esc(m.status||'ATIVO')}</div>`).join('');
+        matsDaTurma.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Aluno ${esc(m.alunoId || '—')} · Ano ${esc(m.anoLetivo || '?')} · ${esc(m.status || 'ATIVO')}${m.fotoFileId ? ' · com avatar' : ''}</div>`).join('');
     } else {
       matsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhuma matrícula aponta pra essa turma.</div>`;
+    }
+    if (fotos.length) {
+      matsEl.innerHTML += `<div class="migr-item danger" style="margin-top:8px;"><span class="badge danger">APAGAR</span> ${fotos.length} avatar(es) dessas matrículas (Cloudinary)</div>`;
     }
 
     document.getElementById('previewTurma').style.display = 'block';
@@ -1241,15 +880,15 @@ async function buscarTurmaExcluir() {
 
 async function executarExclusaoTurma() {
   if (!IS_ADMIN || !_turmaParaExcluir) return;
-  const { turma, mats } = _turmaParaExcluir;
-  const turmaId = turma.turmaId || turma._id;
+  const { turma, turmaId, mats, fotos } = _turmaParaExcluir;
 
   const confirmou = await _confirmModal({
     titulo: '⚠️ Excluir turma definitivamente',
     corDestaque: '#b91c1c',
     corpo: `Excluir definitivamente a turma "${turma.nome || turmaId}"?\n\n` +
-      `- ${mats.length} matrícula(s) que apontam pra ela\n\n` +
-      `Esta ação NÃO PODE ser desfeita.`,
+      `- ${mats.length} matrícula(s) que apontam pra ela\n` +
+      `- ${fotos.length} avatar(es) dessas matrículas\n\n` +
+      `Os alunos (dados pessoais) não são apagados.\nEsta ação NÃO PODE ser desfeita.`,
     textoConfirmar: 'Sim, excluir',
   });
   if (!confirmou) return;
@@ -1263,13 +902,23 @@ async function executarExclusaoTurma() {
   try {
     logEl(`Excluindo turma ${turmaId}...`, 'logExcluirTurma');
 
-    for (const m of mats) {
-      await window.DB.anoAtivoMatriculas.remove(m._id);
-      logEl(`  ✅ Matrícula ${m._id} apagada.`, 'logExcluirTurma');
-    }
+    // Atômico: matrículas + turma no mesmo lote. Arquivos externos só depois que isso der certo.
+    const ops = [
+      ...mats.map(m => ({ col: 'anoAtivoMatriculas', op: 'delete', id: m._id })),
+      { col: 'anoAtivoTurmas', op: 'delete', id: turmaId },
+    ];
+    if (ops.length > 500) throw new Error(`Registros demais para um único lote (${ops.length}; máximo 500). Nada foi apagado.`);
+    await window.DB.batchWrite(ops);
+    logEl(`  ✅ ${mats.length} matrícula(s) e a turma apagadas.`, 'logExcluirTurma');
 
-    await window.DB.anoAtivoTurmas.remove(turmaId);
-    logEl(`  ✅ Turma apagada (anoAtivoTurmas).`, 'logExcluirTurma');
+    for (const id of fotos) {
+      // Só apaga o arquivo se nenhuma outra matrícula ainda aponta para ele
+      let emUso = false;
+      try { emUso = (await window.DB.anoAtivoMatriculas.whereEquals('fotoFileId', id, { limit: 1 })).length > 0; }
+      catch (e) { emUso = true; logEl(`  ⚠️ Não foi possível checar o uso do avatar ${id}; mantido por segurança.`, 'logExcluirTurma'); }
+      if (emUso) { logEl(`  ℹ️ Avatar ${id} mantido (ainda usado por outra matrícula).`, 'logExcluirTurma'); continue; }
+      await _apagarArquivoRemoto(id, 'image', `Avatar (${id})`, 'logExcluirTurma');
+    }
 
     logEl('', 'logExcluirTurma');
     logEl('🎉 Exclusão concluída.', 'logExcluirTurma');
