@@ -755,8 +755,29 @@ function preencherFiltroAno(anosIndice) {
 }
 
 // Busca no Firestore SÓ o que os filtros pedem (ano/turno viram query; o resto filtra no cliente).
-// Cache por sessão da página: repetir a mesma pesquisa não lê de novo.
-const _cacheBuscaTurmas = new Map();
+// Reaproveita o que já foi lido na sessão (ver _coberta): busca igual ou mais estreita que uma anterior não lê o banco.
+// Memória da página (variáveis JS — nada no localStorage; some ao recarregar a aba):
+// _memoria = turmas já lidas nesta sessão; _buscasFeitas = "regiões" já lidas por inteiro.
+// Antes de ir ao banco, vê se alguma região já lida COBRE a busca atual (ela é igual ou menos restritiva):
+// se cobre, filtra da memória e não lê nada.
+const _memoria = new Map();
+const _buscasFeitas = [];
+function _coberta(q) {
+  return _buscasFeitas.some(p =>
+    (!p.ano   || p.ano   === q.ano) &&
+    (!p.turno || p.turno === q.turno) &&
+    (!p.series.length || (q.series.length > 0 && q.series.every(x => p.series.includes(x))))
+  );
+}
+function _passaNaBusca(t, q) {
+  if (q.ano   && String(t.anoLetivo ?? "").trim() !== q.ano) return false;
+  if (q.turno && String(t.turno ?? "") !== q.turno) return false;
+  if (q.series.length) {
+    const ds = Array.isArray(t.series) ? t.series : [];
+    if (!q.series.some(x => ds.includes(x))) return false;
+  }
+  return true;
+}
 
 // Consulta direta em schools/{escola}/turmas com os filtros que o Firestore sabe fazer no servidor:
 // ano (==), turno (==) e série (array-contains-any no campo `series`, gravado pelo cadastro-turmas).
@@ -784,13 +805,12 @@ async function _consultaTurmas({ ano, turno, series }) {
 }
 
 // Busca no Firestore SÓ o que os filtros pedem: ano, turno e série viram consulta. Sem nenhum dos três, lê tudo (pedido explícito).
-// Cache por sessão da página: repetir a mesma combinação não lê de novo.
 async function buscarTurmasNoBanco() {
   const ano = document.getElementById("fAno").value.trim();
   const turno = document.getElementById("fTurno").value.trim();
   const series = seriesSelecionadas.slice();
-  const chave = [ano, turno, series.slice().sort().join(",")].join("|");
-  if (_cacheBuscaTurmas.has(chave)) return _cacheBuscaTurmas.get(chave);
+  const q = { ano, turno, series };
+  if (_coberta(q)) return [..._memoria.values()].filter(t => _passaNaBusca(t, q));   // 0 leituras
   let r;
   if (ano) {
     // anoLetivo pode estar gravado como texto OU número: duas consultas em paralelo, juntadas sem repetir.
@@ -804,7 +824,8 @@ async function buscarTurmasNoBanco() {
   }
   else if (turno || series.length) r = await _consultaTurmas({ turno, series });
   else               r = await DB.turmas.list();   // nenhum filtro: leitura completa, só porque você pediu
-  _cacheBuscaTurmas.set(chave, r);
+  r.forEach(t => _memoria.set(t._id, t));
+  _buscasFeitas.push(q);
   return r;
 }
 
