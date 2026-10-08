@@ -1378,7 +1378,9 @@ function normSerie(s){
       return;
     }
 
-    wrapPadrao.style.display = '';
+    // na edição só existe a situação da matrícula aberta; a "padrão" só vale para cadastro novo
+    const emEdicao = new URLSearchParams(window.location.search).has('editar');
+    wrapPadrao.style.display = emEdicao ? 'none' : '';
     fieldAluno.style.display = '';
     if(labelPadrao) labelPadrao.textContent = 'Situação padrão da matrícula';
     if(labelAluno)  labelAluno.textContent  = 'Situação';
@@ -1842,6 +1844,10 @@ function normSerie(s){
     if(!dadosComp.dataNascimento)return _toastErro('⚠️ Informe a data de nascimento.');
     if(!dadosComp.sexo)          return _toastErro('⚠️ Selecione o sexo.');
     if(!dadosComp.modeloEnsino)  return _toastErro('⚠️ Selecione o modelo de ensino (Regular ou Integral).');
+    // ano que não é o ativo: a situação da matrícula é obrigatória (mesma regra do cadastro novo)
+    const anoEhAtivoEd = isAnoAtivo(document.getElementById('anoLetivo')?.value);
+    const situacaoEd   = (statusAluno ? statusAluno.value : '').toString().trim();
+    if(!anoEhAtivoEd && !situacaoEd) return _toastErro('⚠️ Selecione a situação da matrícula (ano não é o ativo).');
     { const eN = window._natValidar ? window._natValidar() : ''; if(eN) return _toastErro('⚠️ ' + eN); }
     if(window._neeValidar){
       const erroNee = window._neeValidar();
@@ -1889,6 +1895,7 @@ function normSerie(s){
         if(mat && novo && String(mat.modelo || '').toUpperCase() !== novo.toUpperCase()) upd.modelo = novo;   // modelo em branco na matrícula também é corrigido aqui
         const serieNova = (document.getElementById('serieAluno')?.value || '').trim();
         if(mat && serieNova && serieNova !== String(mat.serie || '')) upd.serie = serieNova;   // série não faz parte do matriculaId
+        if(mat && !anoEhAtivoEd && situacaoEd && situacaoEd !== String(mat.situacao || '').toUpperCase()) upd.situacao = situacaoEd;   // ano que não é o ativo
         if(Object.keys(upd).length) ops.push({ col:'anoAtivoMatriculas', op:'update', id: matId, data: upd });
       }
       if(elo && (mudouCpf || mudouNome)){
@@ -2142,6 +2149,12 @@ function normSerie(s){
             }
           };
           _tentarSetar();
+          // situação gravada na matrícula (só aparece em ano que não é o ativo): preenche o select
+          _atualizarCamposStatusSituacao();
+          if(!isAnoAtivo(anoLetivo.value)){
+            const sitGravada = String(matAluno.situacao || '').toUpperCase();
+            if(SITUACOES_OPCOES.some(o => o.v === sitGravada)) statusAluno.value = sitGravada;
+          }
           turmaSelect.disabled = true; anoLetivo.disabled = true;   // turma/ano/série não mudam na edição (o matriculaId depende deles)
         }
       }catch(e){ console.warn('[edição] Erro ao buscar matrícula:', e); }
