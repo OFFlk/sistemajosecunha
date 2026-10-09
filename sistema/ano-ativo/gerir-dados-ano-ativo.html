@@ -1408,6 +1408,8 @@ async function gaRegistrarAnoNoIndice(ano) {
    com schoolId = ADMIN devolve vazio de propósito.
 ============================================= */
 const PSQ = { sel: [], linhas: [], titulo: '', ocupado: false };
+const PSQ_META = new Map();    // schoolId → { anoAtivo, turmas }          (cache só em memória)
+const PSQ_DADOS = new Map();   // `${schoolId}|${ano}` → linhas já montadas
 const PSQ_NEE = [['tea','TEA'],['altasHabilidades','Altas hab.'],['defFisica','Def. física'],['defIntelectual','Def. intelectual'],
   ['defVisual','Def. visual','defVisualTipo'],['defAuditiva','Def. auditiva','defAuditivaTipo'],['tdah','TDAH'],['tpac','TPAC'],
   ['dislexia','Dislexia'],['discalculia','Discalculia'],['disgrafia','Disgrafia'],['dislalia','Dislalia']];
@@ -1420,9 +1422,9 @@ const PSQ_COLS_CSV = [
   ['zona','ZONA'],['cep','CEP'],['logradouro','LOGRADOURO'],['endUF','UF'],['cidade','CIDADE'],['nee','NEE / TRANSTORNOS'],
 ];
 // tabela em tela (enxuta) e PDF (essenciais + larguras em pt; soma 786 < 802 úteis no A4 paisagem)
-const PSQ_COLS_TELA = [['escola','ESCOLA','esc'],['nome','NOME',''],['serie','SÉRIE','nw'],['cpf','CPF','nw'],['turma','TURMA','']];
+const PSQ_COLS_TELA = [['escola','ESCOLA','esc'],['nome','NOME',''],['serie','SÉRIE','nw'],['cpf','CPF','nw'],['turma','TURMA',''],['ano','ANO','nw']];
 const PSQ_COLS_PDF = [['escola','ESCOLA',120],['nome','NOME',185],['serie','SÉRIE',55],['cpf','CPF',80],
-  ['dataNascimento','NASCIMENTO',62],['idade','IDADE',34],['turma','TURMA',190],['modelo','MODELO',60]];
+  ['dataNascimento','NASCIMENTO',62],['idade','IDADE',34],['turma','TURMA',160],['ano','ANO',30],['modelo','MODELO',60]];
 
 function psqNorm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim(); }
 function psqDataBR(s) {
@@ -1559,10 +1561,17 @@ function psqLinha(esc_, ano, m, a, turmas) {
 }
 async function psqLerEscola(e, anoDigitado) {
   const ref = Auth.db.collection('schools').doc(e.id);
-  const [eDoc, tSnap] = await Promise.all([ref.get(), ref.collection('anoAtivoTurmas').get()]);
-  const anoAtivo = psqAnoAtivoDe(eDoc.exists ? eDoc.data() : null);
+  let meta = PSQ_META.get(e.id);
+  if (!meta) {
+    const [eDoc, tSnap] = await Promise.all([ref.get(), ref.collection('anoAtivoTurmas').get()]);
+    meta = { anoAtivo: psqAnoAtivoDe(eDoc.exists ? eDoc.data() : null), turmas: new Map(tSnap.docs.map(d => [d.id, d.data()])) };
+    PSQ_META.set(e.id, meta);
+  }
+  const anoAtivo = meta.anoAtivo;
   const ano = anoDigitado || anoAtivo;
   if (!ano) return { linhas: [], aviso: 'sem ano ativo configurado (informe o ano letivo)' };
+  const chave = e.id + '|' + ano;
+  if (PSQ_DADOS.has(chave)) return { linhas: PSQ_DADOS.get(chave), ano, cache: true };
   const ehAtivo = ano === anoAtivo;
 
   // anoLetivo pode estar como texto ou número nos dados de teste
@@ -1587,8 +1596,9 @@ async function psqLerEscola(e, anoDigitado) {
     const ondas = await Promise.all(lotes.slice(i, i + 10).map(l => ref.collection('anoAtivoAlunos').where('alunoId', 'in', l).get()));
     ondas.forEach(s => s.docs.forEach(d => { const a = d.data(); alunos.set(a.alunoId || d.id, a); }));
   }
-  const turmas = new Map(tSnap.docs.map(d => [d.id, d.data()]));
-  return { linhas: ids.map(id => psqLinha(e, ano, escolhidas.get(id), alunos.get(id), turmas)), ano };
+  const linhas = ids.map(id => psqLinha(e, ano, escolhidas.get(id), alunos.get(id), meta.turmas));
+  PSQ_DADOS.set(chave, linhas);
+  return { linhas, ano };
 }
 
 async function psqPesquisar() {
@@ -1621,7 +1631,7 @@ async function psqPesquisar() {
       try {
         const r = await psqLerEscola(alvo[i], anoDig);
         if (r.aviso) falhas.push(`${alvo[i].nome}: ${r.aviso}`);
-        else { r.linhas.forEach(l => linhas.push(l)); anos.add(r.ano); logEl(`✅ ${alvo[i].nome}: ${r.linhas.length} aluno(s) (${r.ano}).`, 'logPsq'); }
+        else { r.linhas.forEach(l => linhas.push(l)); anos.add(r.ano); logEl(`✅ ${alvo[i].nome}: ${r.linhas.length} aluno(s) (${r.ano})${r.cache ? ' — já carregado, sem nova leitura' : ''}.`, 'logPsq'); }
       } catch (e) {
         console.error('[psq]', alvo[i].id, e);
         falhas.push(`${alvo[i].nome}: ${e.code || e.message || e}`);
@@ -1647,7 +1657,12 @@ function psqAbrirModal() {
   const body = PSQ.linhas.map(l => '<tr>' + PSQ_COLS_TELA.map(c =>
     `<td class="${c[2]}"${c[0] === 'escola' ? ` title="${esc(l.escola)}"` : ''}>${esc(l[c[0]])}</td>`).join('') + '</tr>').join('');
   document.getElementById('psqBody').innerHTML = `<table class="psq-tab"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
-  document.getElementById('psqModal').style.display = 'flex';
+  const bd = document.getElementById('psqModal'), hp = document.getElementById('header-placeholder');
+  const topo = Math.max(0, hp ? Math.ceil(hp.getBoundingClientRect().bottom) : 0) + 12;   // abaixo do header fixo
+  bd.style.alignItems = 'flex-start';
+  bd.style.paddingTop = topo + 'px';
+  bd.querySelector('.psq-modal').style.height = `calc(100vh - ${topo + 18}px)`;
+  bd.style.display = 'flex';
 }
 function psqFecharModal() { document.getElementById('psqModal').style.display = 'none'; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') psqFecharModal(); });
