@@ -86,16 +86,13 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
    tema escuro calhava de "bater" com a marca — invisível no tema claro. */
 .card-destaque .item .help { color: var(--muted); }
 .card-destaque .info-tip { color: var(--dest-fg); }
-.card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
 h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
-.sub, .muted { color: var(--muted); font-size: 13px; }
 
-.grid2    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .split-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .split-grid { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
 
 .form-section { margin-top: 18px; }
 .form-section:first-of-type { margin-top: 4px; }
@@ -112,24 +109,21 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
   background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--chip-color);
 }
 
-.field { display: flex; flex-direction: column; min-width: 0; }
-.field label, .label {
+.label {
   display: block; font-size: 13px; font-weight: 700; margin: 0 0 6px;
   color: var(--text); text-transform: none; letter-spacing: 0;
 }
-.field input, .field select, .input {
+.input {
   width: 100%; padding: 11px 12px; border: 1px solid var(--field-border); border-radius: 10px;
   background: var(--field-bg); color: var(--text); font-size: 14px; font-family: 'Nunito', sans-serif;
   outline: none; transition: border-color 0.15s, box-shadow 0.15s;
 }
-.field input:focus, .field select:focus, .input:focus {
+.input:focus {
   border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
 }
-.input.readonly { background: var(--chip-bg); color: var(--muted); cursor: default; pointer-events: none; }
-html[data-theme="dark"] .field input, html[data-theme="dark"] .field select, html[data-theme="dark"] .input {
+html[data-theme="dark"] .input {
   background: var(--field-bg); color: var(--text); border-color: var(--field-border);
 }
-html[data-theme="dark"] .field select option { background: #0a1426; color: #e2e8f0; }
 html[data-theme="dark"] input::placeholder { color: rgba(226,232,240,0.45); }
 
 .btn {
@@ -143,11 +137,11 @@ html[data-theme="dark"] input::placeholder { color: rgba(226,232,240,0.45); }
 .btn.primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: var(--brand-fg, #fff); }
 .btn.primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
 html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
-.btn.ghost, .btn.secondary { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
-.btn.ghost:hover, .btn.secondary:hover {
+.btn.ghost { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn.ghost:hover {
   background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
 }
-html[data-theme="dark"] .btn.ghost:hover, html[data-theme="dark"] .btn.secondary:hover {
+html[data-theme="dark"] .btn.ghost:hover {
   background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd);
 }
 .btn.outline { background: var(--brand-faded, #f5f3ff); border-color: var(--brand-border, #ddd6fe); color: var(--brand-text, #6d28d9); }
@@ -320,7 +314,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO 2026 (MATUTINO)">
         </div>
 
-        <input id="turmaId" class="input readonly" readonly style="display:none">
         <div class="id-badge-row">
           <span class="label-inline">ID da turma:
             <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
@@ -333,8 +326,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         <div id="avisoMudancaId" class="warn" style="display:none;"></div>
       </div>
 
-      <div class="row" style="margin-top:18px;justify-content:space-between;gap:10px;align-items:center">
-        <div class="pill" id="dbInfo">DB: —</div>
+      <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px;align-items:center">
         <div class="row" style="gap:10px;justify-content:flex-end">
           <button class="btn ghost" id="btnResetForm" type="button">Limpar formulário</button>
           <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
@@ -414,12 +406,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     const t = document.getElementById('_toastGlobal');
     if(t) t.dataset.loading = '1';
   }
-  // Remove o toast atual SÓ se ele for um "carregando" — nunca apaga um
-  // sucesso/erro/aviso que tenha aparecido no meio do caminho.
-  function _toastLimpar(){
-    const t = document.getElementById('_toastGlobal');
-    if(t && t.dataset.loading === '1') t.remove();
-  }
   function setMsg(text, kind){
     const t = (text||"").toString();
     if(!t) return;
@@ -476,31 +462,15 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
        de atasSchemas (criado com a escola, em admin_escolas). Carregado uma vez
        no boot (carregarSchemasCache), igual ao padrão já usado por
        TURMAS_CACHE logo abaixo. ── */
-  function getDefaultConfig(){
-    return {
-      version: 1, nome: "Padrão (arquivo original)", serieAtiva: true, resultadoAtivo: true, ordenarPor: "nome",
-      colunas: [
-        { key:"port",  label:"Português",  type:"nota", enabled:true },
-        { key:"mat",   label:"Matemática", type:"nota", enabled:true },
-        { key:"hist",  label:"História",   type:"nota", enabled:true },
-        { key:"geo",   label:"Geografia",  type:"nota", enabled:true },
-        { key:"cien",  label:"Ciências",   type:"nota", enabled:true },
-        { key:"fis",   label:"Ed. Física", type:"nota", enabled:true },
-        { key:"arte",  label:"Arte",       type:"nota", enabled:true },
-        { key:"relig", label:"Ens. Religioso", type:"nota", enabled:true }
-      ]
-    };
-  }
   function normalizeSchema(cfg){
-    const def = getDefaultConfig();
     const out = {
       id: String(cfg?.id || cfg?.schemaId || "").trim() || "",
       version: 1,
-      nome: String(cfg?.nome ?? def.nome),
-      serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
-      resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+      nome: String(cfg?.nome ?? ""),
+      serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : true,
+      resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : true,
       ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
-      colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+      colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : []
     };
     out.colunas = out.colunas
       .map(c => ({
@@ -644,7 +614,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   // Lista fixa de séries. Mantenha IDÊNTICA em pesquisa-ata.html (SERIES_FILTRO).
   function serieOptions(){
     return [
-      "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3",
+      "Alfabetização", "Eixo 1", "Eixo 2", "Eixo 3", "Eixo 4", "Eixo 5",
       "1ª série","2ª série","3ª série","4ª série","5ª série","6ª série","7ª série","8ª série",
       "1º ano","2º ano","3º ano","4º ano","5º ano","6º ano","7º ano","8º ano","9º ano",
       "Multisseriada"
@@ -805,7 +775,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   }
   function syncDerived(){
     const previewId = buildTurmaIdPreview();
-    if($("turmaId")) $("turmaId").value = previewId;
     if($("turmaIdBadge")) $("turmaIdBadge").textContent = previewId || "—";
     if(!nomeManual && $("nomeTurma")) $("nomeTurma").value = buildNomeAuto();
 
@@ -824,11 +793,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       }
     }
   }
-  function updateDbInfo(){
-    const el = $("dbInfo");
-    if(el) el.textContent = `DB: turmas=${getTurmas().length}`;
-  }
-
   function renderListaTurmas(){
     const list = $("listaTurmas");
     if(!list) return;
@@ -1103,7 +1067,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     // precisa dizer isso, não "erro ao salvar".
     const okReload = await carregarTurmasCache();
     buildFiltroAnoOptions();
-    updateDbInfo();
     if(!okReload){
       setMsg("Turma salva, mas não foi possível atualizar a lista — recarregue a página.", "err");
     } else if(!indiceOk){
@@ -1158,7 +1121,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       buildFiltroAnoOptions();
       resetForm();
       renderListaTurmas();
-      updateDbInfo();
       if (window.ThemeColors) ThemeColors.ajustarContraste();
 
       // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
