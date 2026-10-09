@@ -194,18 +194,22 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
     <div class="sec-body" id="secPesquisa">
       <p class="muted">
         Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com
-        exportação em CSV (todos os dados) e PDF (colunas essenciais). Funciona mesmo em "Todas as escolas" no topo da página.
+        exportação em CSV (todos os dados) e PDF (colunas essenciais). Em "Todas as escolas" (topo da página) dá para escolher várias escolas; em uma escola específica a pesquisa fica limitada a ela, com o ano ativo já preenchido.
         Lê as matrículas do ano e os alunos delas, escola por escola. No <b>ano ativo</b> da escola entram só as matrículas em curso;
         em anos anteriores entram todas.
       </p>
+      <div id="psqFixa" style="display:none;"><span class="psq-chip">🔒 <span id="psqFixaNome"></span></span>
+        <div class="muted" style="margin-top:6px;">Você está em uma escola específica: a pesquisa é limitada a ela. Para pesquisar outras, use "Todas as escolas" no topo da página.</div></div>
+      <div id="psqMulti">
       <label class="psq-chk"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
       <div class="row-btns" style="margin-top:10px;">
         <select id="psqSel" class="psq-in" style="flex:1;min-width:220px;" onfocus="psqRenderSel()"></select>
         <button class="btn btn-gray" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
       </div>
       <div class="psq-chips" id="psqChips"></div>
+      </div>
       <div class="row-btns">
-        <input type="number" id="psqAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;" placeholder="Ano letivo (vazio = ano ativo de cada escola)">
+        <input type="number" id="psqAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
         <button class="btn btn-primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
@@ -406,7 +410,7 @@ document.addEventListener('auth:ready', function () {
     window.executarExclusaoTurma    = () => {};
   }
 
-  psqRenderSel();
+  psqIniciar();
   inicializar();
 });
 
@@ -1471,6 +1475,24 @@ function psqEscolas() {
   });
   return out.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
+function psqGlobal() {
+  const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+  return !sid || String(sid).toUpperCase() === 'ADMIN';
+}
+async function psqIniciar() {
+  const glob = psqGlobal();
+  document.getElementById('psqMulti').style.display = glob ? '' : 'none';
+  document.getElementById('psqFixa').style.display = glob ? 'none' : '';
+  if (glob) return psqRenderSel();
+  const sid = Auth.getActiveSchoolId(), ses = (Auth.getSession && Auth.getSession()) || {};
+  const e = psqEscolas().find(x => x.id === sid);
+  PSQ.sel = [{ id: sid, nome: (e && e.nome) || ses.schoolName || sid }];
+  document.getElementById('psqFixaNome').textContent = PSQ.sel[0].nome;
+  try {                                   // ano ativo da escola do header (1 leitura)
+    const ano = psqAnoAtivoDe(await window.DB.escola.get());
+    if (ano) document.getElementById('psqAno').value = ano;
+  } catch (err) { console.warn('[psq] ano ativo:', err); }
+}
 function psqRenderSel() {
   const sel = document.getElementById('psqSel');
   if (!sel) return;
@@ -1572,7 +1594,8 @@ async function psqLerEscola(e, anoDigitado) {
 async function psqPesquisar() {
   if (!IS_ADMIN || PSQ.ocupado) return;
   await waitAuth();
-  const todas = document.getElementById('psqTodas').checked;
+  const glob = psqGlobal();
+  const todas = glob && document.getElementById('psqTodas').checked;
   const alvo = todas ? psqEscolas() : PSQ.sel.slice();
   if (!alvo.length) return setMsg(todas ? 'Nenhuma escola encontrada.' : 'Adicione ao menos uma escola ou marque "Todas as escolas".', 'warn');
   if (!(window.Auth && Auth.db)) return setMsg('Firestore indisponível nesta página.', 'err');
