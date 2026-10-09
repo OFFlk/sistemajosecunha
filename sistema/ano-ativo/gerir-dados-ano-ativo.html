@@ -157,18 +157,19 @@ html[data-theme="dark"] .card.card-destaque { background:var(--btn-home-bg); bor
   border-color:var(--border,#ddd6fe);
 }
 .card-destaque h3, .card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
-.card.card-destaque .btn.primary { background:var(--dest-btn-bg); border:1.5px solid var(--dest-fg); color:var(--dest-fg); font-weight:800; }
-.card.card-destaque .btn.primary:hover:not(:disabled) { background:var(--dest-btn-hover); }
-.card.card-destaque .btn.outline { background:transparent; border:1.5px solid var(--dest-fg); color:var(--dest-fg); }
-.card.card-destaque .btn.outline:hover:not(:disabled) { background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
-.card.card-destaque .btn.ghost { background:transparent; border:1.5px solid var(--dest-btn-bd); color:var(--dest-fg); }
-.card.card-destaque .btn.ghost:hover:not(:disabled) { background:var(--dest-btn-hover); border-color:var(--dest-fg); }
-.card.card-destaque .btn:disabled, .card.card-destaque .btn:disabled:hover {
-  background:rgba(128,128,128,.28); border:1.5px solid rgba(128,128,128,.5); color:#6b7280; opacity:1; cursor:not-allowed; filter:none; box-shadow:none;
+.card-destaque .btn {
+  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
 }
+.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
 /* sub-caixas dentro do destaque têm fundo neutro próprio (guia, Parte 4) */
-.card-destaque .stat-box { background:var(--card); border-color:var(--border,#ddd6fe); }
+.card-destaque .stat-box { background:#ffffff; border-color:transparent; }
+html[data-theme="dark"] .card-destaque .stat-box { background:#0f172a; }
+.card-destaque.contraste-claro .stat-box { border-color:var(--border,#ddd6fe); }
 .card-destaque .stat-lbl { color:var(--muted,#6b7280); }
+
+/* ── Botão danger desta página (igual ao da gestao-atas) ── */
+.btn-danger { background:var(--danger-500,#b91c1c); border-color:var(--danger-500,#b91c1c); color:#fff; }
+.btn-danger:hover:not(:disabled) { background:var(--danger-600,#991b1b); border-color:var(--danger-600,#991b1b); }
 
 /* ── Backup (exportar à esquerda, importar à direita) ── */
 .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
@@ -198,14 +199,12 @@ html[data-theme="dark"] .card.card-destaque { background:var(--btn-home-bg); bor
 
 /* ── Modal de confirmação (guia-toasts) ── */
 .cm-box { background:var(--card); color:var(--text,#1e1b4b); border:1px solid var(--border,#ddd6fe); border-radius:14px; padding:22px; max-width:440px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.25); }
-.cm-box h3 { margin:0 0 8px; font-size:16px; font-weight:800; color:var(--text,#1e1b4b); }
-.cm-corpo { margin:0 0 18px; font-size:13px; color:var(--text,#1e1b4b); white-space:pre-line; line-height:1.5; overflow-y:auto; }
+.cm-box h3 { margin:0 0 8px; font-size:16px; font-weight:800; color:var(--brand-text,#6d28d9); }
+html[data-theme="dark"] .cm-box h3 { color:var(--brand-text-d,#c4b5fd); }
+.cm-box h3.perigo { color:#b91c1c; }
+html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
+.cm-corpo { margin:0 0 18px; font-size:13px; color:var(--muted,#6b7280); white-space:pre-line; line-height:1.5; overflow-y:auto; }
 .cm-acoes { display:flex; justify-content:flex-end; gap:8px; }
-.btn.primary.cm-perigo { background:#b91c1c; border-color:#b91c1c; color:#fff; }
-.btn.primary.cm-perigo:hover:not(:disabled) { background:#991b1b; border-color:#991b1b; }
-html[data-theme="dark"] .btn.primary.cm-perigo { background:#dc2626; border-color:#dc2626; color:#fff; }
-html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background:#ef4444; border-color:#ef4444; }
-
 /* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
 </style>
 </head>
@@ -229,7 +228,7 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
       <div class="stat-box"><div class="stat-num" id="statMatriculas">—</div><div class="stat-lbl">Matrículas</div></div>
     </div>
     <div class="row-btns" style="margin-top:14px;">
-      <button class="btn ghost" onclick="recarregar()">🔄 Recarregar</button>
+      <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
     </div>
     <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
   </div>
@@ -247,13 +246,13 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
       <label class="psq-chk"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
       <div class="row-btns" style="margin-top:10px;">
         <select id="psqSel" class="psq-in" style="flex:1;min-width:220px;" onfocus="psqRenderSel()"></select>
-        <button class="btn outline" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
+        <button class="btn btn-gray" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
       </div>
       <div class="psq-chips" id="psqChips"></div>
       </div>
       <div class="row-btns">
         <input type="number" id="psqAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
-        <button class="btn primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
+        <button class="btn btn-primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
     </div>
@@ -270,7 +269,7 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
         <input type="text" id="inpAlunoIdExcluir" placeholder="alunoId (ex.: ALU-000123)"
           style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
           font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
-        <button class="btn outline" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
+        <button class="btn btn-outline" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewAluno" style="display:none;margin-top:14px;">
@@ -280,7 +279,7 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
         <div id="previewAlunoFoto" style="margin-top:8px;"></div>
         <div id="previewAlunoElo" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
-          <button class="btn danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
+          <button class="btn btn-danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
         </div>
       </div>
 
@@ -299,14 +298,14 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
         <input type="text" id="inpTurmaIdExcluir" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)"
           style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
           font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
-        <button class="btn outline" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
+        <button class="btn btn-outline" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewTurma" style="display:none;margin-top:14px;">
         <div id="previewTurmaInfo"></div>
         <div id="previewTurmaMats" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
-          <button class="btn danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
+          <button class="btn btn-danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
         </div>
       </div>
 
@@ -322,7 +321,7 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
     </div>
     <div class="sec-body collapsed" id="secGerarAta">
       <div class="row-btns">
-        <button class="btn outline" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
+        <button class="btn btn-gray" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
       </div>
 
       <div id="gaForm" style="display:none;margin-top:14px;">
@@ -333,13 +332,13 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
         <select id="gaSchema" onchange="gaResetPlano()"
           style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
         <div class="row-btns" style="margin-top:0;">
-          <button class="btn outline" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
+          <button class="btn btn-outline" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
         </div>
       </div>
 
       <div id="gaPreview" style="display:none;margin-top:14px;"></div>
       <div class="row-btns" id="gaGerarWrap" style="display:none;">
-        <button class="btn primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
+        <button class="btn btn-primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
       </div>
       <div class="console" id="logGerarAta" style="display:none;"></div>
     </div>
@@ -356,13 +355,13 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
         <div>
           <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).</span></span></div>
           <div class="row-btns" style="margin-top:0;">
-            <button class="btn primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+            <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
           </div>
         </div>
         <div>
           <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
           <div class="row-btns" style="margin-top:0;">
-            <label class="btn outline" id="lblImportJSON" style="cursor:pointer;">
+            <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
               📂 Carregar JSON de backup
               <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
             </label>
@@ -381,8 +380,8 @@ html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background
     <div class="psq-head">
       <div><h3 id="psqTitulo">Alunos</h3><div class="muted" id="psqCont"></div></div>
       <div class="row-btns" style="margin:0;">
-        <button class="btn outline" onclick="psqCsv()">📊 Exportar CSV</button>
-        <button class="btn primary" onclick="psqPdf()">📄 Exportar PDF</button>
+        <button class="btn btn-outline" onclick="psqCsv()">📊 Exportar CSV</button>
+        <button class="btn btn-primary" onclick="psqPdf()">📄 Exportar PDF</button>
         <button class="btn ghost" onclick="psqFecharModal()">Fechar</button>
       </div>
     </div>
@@ -585,11 +584,11 @@ function _confirmModal({ titulo, corpo, perigo, textoConfirmar, textoCancelar })
     backdrop.style.display = 'flex';
     backdrop.innerHTML =
       `<div class="cm-box" role="alertdialog" aria-modal="true">`+
-        `<h3>${esc(titulo || 'Confirmar ação')}</h3>`+
+        `<h3${perigo ? ' class="perigo"' : ''}>${esc(titulo || 'Confirmar ação')}</h3>`+
         `<div class="cm-corpo">${corpo || ''}</div>`+
         `<div class="cm-acoes">`+
           `<button type="button" class="btn ghost" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="btn primary${perigo ? ' cm-perigo' : ''}" id="_confirmModalOk">${esc(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="btn ${perigo ? 'btn-danger' : 'btn-primary'}" id="_confirmModalOk">${esc(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
