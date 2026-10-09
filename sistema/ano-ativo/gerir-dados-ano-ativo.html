@@ -22,6 +22,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
 
 <title>Gestão de Dados · Ano Ativo</title>
 <style>
@@ -56,24 +57,6 @@ html[data-theme="dark"] {
 h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .muted { color:var(--muted,#6b7280); font-size:13px; }
 
-.btn {
-  appearance:none; border:1px solid transparent; border-radius:10px;
-  padding:9px 16px; font-size:14px; font-weight:800; cursor:pointer;
-  display:inline-flex; align-items:center; gap:7px;
-  font-family:'Nunito',system-ui,sans-serif;
-  transition:background .18s, border-color .18s, transform .06s;
-  user-select:none; white-space:nowrap; text-decoration:none;
-}
-.btn:active { transform:translateY(1px); }
-.btn:disabled { opacity:.45; cursor:not-allowed; transform:none; pointer-events:none; }
-.btn-primary { background:var(--brand,#7c3aed); border-color:var(--brand,#7c3aed); color:#fff; }
-.btn-primary:hover:not(:disabled) { background:var(--brand-hover,#6d28d9); }
-.btn-danger  { background:var(--danger); border-color:var(--danger); color:#fff; }
-.btn-danger:hover:not(:disabled)  { background:var(--danger2); }
-.btn-outline { background:transparent; border-color:var(--brand,#7c3aed); color:var(--brand,#7c3aed); }
-.btn-outline:hover:not(:disabled) { background:var(--chip); }
-.btn-gray    { background:var(--chip); border-color:var(--border,#ddd6fe); color:var(--chipTxt); }
-.btn-gray:hover:not(:disabled)    { background:var(--brand,#7c3aed); color:#fff; }
 .row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
 
 .badge {
@@ -95,7 +78,8 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 .stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
 .stat-box { flex:1; min-width:120px; background:var(--chip); border:1px solid var(--border,#ddd6fe); border-radius:10px; padding:12px 16px; text-align:center; }
-.stat-num { font-size:26px; font-weight:800; color:var(--brand,#7c3aed); line-height:1; }
+.stat-num { font-size:26px; font-weight:800; color:var(--brand-text,#6d28d9); line-height:1; }
+html[data-theme="dark"] .stat-num { color:var(--brand-text-d,#c4b5fd); }
 .stat-lbl { font-size:12px; color:var(--muted,#6b7280); margin-top:4px; }
 
 #avisoReadonly {
@@ -107,7 +91,8 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 
 .sec-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
-.sec-header:hover h3 { color:var(--brand,#7c3aed); }
+.card:not(.card-destaque) .sec-header:hover h3 { color:var(--brand-text,#6d28d9); }
+html[data-theme="dark"] .card:not(.card-destaque) .sec-header:hover h3 { color:var(--brand-text-d,#c4b5fd); }
 .sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; }
 .sec-toggle.collapsed { transform:rotate(-90deg); }
 .sec-body.collapsed { display:none; }
@@ -135,10 +120,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(15,23,42,.55);
   display: none; align-items: center; justify-content: center;
-  padding: 18px; z-index: 50;
-}
-.btn.ghost, .btn.secondary {
-  background: var(--chip); border-color: var(--border,#ddd6fe); color: var(--chipTxt);
+  padding: 18px; z-index: 1000;
 }
 
 /* ── Pesquisa de alunos (várias escolas) ── */
@@ -148,7 +130,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 .psq-chips.off { opacity:.35; pointer-events:none; }
 .psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--chip); border:1px solid var(--border,#ddd6fe); color:var(--chipTxt); font-size:13px; font-weight:700; }
 .psq-chip button { border:none; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px; font-weight:800; }
-.psq-modal { width:min(1280px,98vw); height:92vh; display:flex; flex-direction:column; background:var(--card); border:1px solid var(--border,#ddd6fe); border-radius:14px; box-shadow:0 30px 60px rgba(0,0,0,.25); overflow:hidden; }
+.psq-modal { width:min(1280px,98vw); height:70vh; display:flex; flex-direction:column; background:var(--card); border:1px solid var(--border,#ddd6fe); border-radius:14px; box-shadow:0 30px 60px rgba(0,0,0,.25); overflow:hidden; }
 .psq-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--border,#ddd6fe); }
 .psq-head h3 { margin:0; font-size:16px; font-weight:800; }
 .psq-body { flex:1; overflow:auto; }
@@ -158,6 +140,73 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 .psq-tab td.nw { white-space:nowrap; }
 .psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .psq-tab tbody tr:hover { background:var(--chip); }
+
+/* ── Cards: sem overflow:hidden (cortaria o balão do ⓘ) ── */
+.card { overflow:visible; }
+
+/* ── Card de destaque (guia 1.3b + 5.5) ── */
+.card.card-destaque {
+  --dest-fg:#ffffff; --dest-btn-bg:rgba(255,255,255,.18); --dest-btn-bd:rgba(255,255,255,.40);
+  --dest-btn-hover:rgba(255,255,255,.28); --dest-panel-bg:rgba(255,255,255,.10);
+  background:var(--btn-home-bg); border-color:var(--btn-home-border);
+}
+html[data-theme="dark"] .card.card-destaque { background:var(--btn-home-bg); border-color:var(--btn-home-border); }
+.card.card-destaque.contraste-claro {
+  --dest-fg:#0f172a; --dest-btn-bg:rgba(0,0,0,.08); --dest-btn-bd:rgba(0,0,0,.25);
+  --dest-btn-hover:rgba(0,0,0,.16); --dest-panel-bg:rgba(0,0,0,.06);
+  border-color:var(--border,#ddd6fe);
+}
+.card-destaque h3, .card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
+.card.card-destaque .btn.primary { background:var(--dest-btn-bg); border:1.5px solid var(--dest-fg); color:var(--dest-fg); font-weight:800; }
+.card.card-destaque .btn.primary:hover:not(:disabled) { background:var(--dest-btn-hover); }
+.card.card-destaque .btn.outline { background:transparent; border:1.5px solid var(--dest-fg); color:var(--dest-fg); }
+.card.card-destaque .btn.outline:hover:not(:disabled) { background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
+.card.card-destaque .btn.ghost { background:transparent; border:1.5px solid var(--dest-btn-bd); color:var(--dest-fg); }
+.card.card-destaque .btn.ghost:hover:not(:disabled) { background:var(--dest-btn-hover); border-color:var(--dest-fg); }
+.card.card-destaque .btn:disabled, .card.card-destaque .btn:disabled:hover {
+  background:rgba(128,128,128,.28); border:1.5px solid rgba(128,128,128,.5); color:#6b7280; opacity:1; cursor:not-allowed; filter:none; box-shadow:none;
+}
+/* sub-caixas dentro do destaque têm fundo neutro próprio (guia, Parte 4) */
+.card-destaque .stat-box { background:var(--card); border-color:var(--border,#ddd6fe); }
+.card-destaque .stat-lbl { color:var(--muted,#6b7280); }
+
+/* ── Backup (exportar à esquerda, importar à direita) ── */
+.bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
+.dest-tit { display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
+@media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
+
+/* ── Ícone de dica (ⓘ) — guia, Parte 2 ── */
+.info-tip{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; margin-left:6px; border-radius:50%;
+  border:1.5px solid currentColor; color:inherit; opacity:.72;
+  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
+  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
+}
+.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
+.info-tip-bubble{
+  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
+  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
+  background:var(--card); border:1.5px solid var(--border,#ddd6fe); color:var(--text,#1e1b4b);
+  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal; font-family:'Nunito',system-ui,sans-serif;
+  line-height:1.4; white-space:normal; cursor:default; text-align:left;
+}
+.info-tip.open .info-tip-bubble{ display:block; }
+.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
+.info-tip-bubble.align-right{ left:auto; right:0; }
+
+/* ── Modal de confirmação (guia-toasts) ── */
+.cm-box { background:var(--card); color:var(--text,#1e1b4b); border:1px solid var(--border,#ddd6fe); border-radius:14px; padding:22px; max-width:440px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.25); }
+.cm-box h3 { margin:0 0 8px; font-size:16px; font-weight:800; color:var(--text,#1e1b4b); }
+.cm-corpo { margin:0 0 18px; font-size:13px; color:var(--text,#1e1b4b); white-space:pre-line; line-height:1.5; overflow-y:auto; }
+.cm-acoes { display:flex; justify-content:flex-end; gap:8px; }
+.btn.primary.cm-perigo { background:#b91c1c; border-color:#b91c1c; color:#fff; }
+.btn.primary.cm-perigo:hover:not(:disabled) { background:#991b1b; border-color:#991b1b; }
+html[data-theme="dark"] .btn.primary.cm-perigo { background:#dc2626; border-color:#dc2626; color:#fff; }
+html[data-theme="dark"] .btn.primary.cm-perigo:hover:not(:disabled) { background:#ef4444; border-color:#ef4444; }
+
+/* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
 </style>
 </head>
 <body>
@@ -172,7 +221,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
   </div>
 
   <!-- ── ESTATÍSTICAS ── -->
-  <div class="card">
+  <div class="card card-destaque">
     <h3 style="margin-top:0;">📊 Visão geral — módulo de ano ativo</h3>
     <div class="stats-row">
       <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas (nova coleção)</div></div>
@@ -180,7 +229,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
       <div class="stat-box"><div class="stat-num" id="statMatriculas">—</div><div class="stat-lbl">Matrículas</div></div>
     </div>
     <div class="row-btns" style="margin-top:14px;">
-      <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
+      <button class="btn ghost" onclick="recarregar()">🔄 Recarregar</button>
     </div>
     <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
   </div>
@@ -188,29 +237,23 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
   <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secPesquisa')">
-      <h3 style="margin-top:0;">🔎 Pesquisar alunos (várias escolas)</h3>
+      <h3 style="margin-top:0;">🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
       <span class="sec-toggle" id="togSecPesquisa">▼</span>
     </div>
     <div class="sec-body" id="secPesquisa">
-      <p class="muted">
-        Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com
-        exportação em CSV (todos os dados) e PDF (colunas essenciais). Em "Todas as escolas" (topo da página) dá para escolher várias escolas; em uma escola específica a pesquisa fica limitada a ela, com o ano ativo já preenchido.
-        Lê as matrículas do ano e os alunos delas, escola por escola. No <b>ano ativo</b> da escola entram só as matrículas em curso;
-        em anos anteriores entram todas.
-      </p>
       <div id="psqFixa" style="display:none;"><span class="psq-chip">🔒 <span id="psqFixaNome"></span></span>
         <div class="muted" style="margin-top:6px;">Você está em uma escola específica: a pesquisa é limitada a ela. Para pesquisar outras, use "Todas as escolas" no topo da página.</div></div>
       <div id="psqMulti">
       <label class="psq-chk"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
       <div class="row-btns" style="margin-top:10px;">
         <select id="psqSel" class="psq-in" style="flex:1;min-width:220px;" onfocus="psqRenderSel()"></select>
-        <button class="btn btn-gray" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
+        <button class="btn outline" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
       </div>
       <div class="psq-chips" id="psqChips"></div>
       </div>
       <div class="row-btns">
         <input type="number" id="psqAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
-        <button class="btn btn-primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
+        <button class="btn primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
     </div>
@@ -219,21 +262,15 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
   <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secExcluirAluno')">
-      <h3 style="margin-top:0;">🗑️ Excluir aluno (registro pontual)</h3>
+      <h3 style="margin-top:0;">🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
       <span class="sec-toggle" id="togSecExcluirAluno">▼</span>
     </div>
     <div class="sec-body" id="secExcluirAluno">
-      <p class="muted">
-        Remove um único aluno: os dados pessoais (<b>anoAtivoAlunos</b>) e <b>todas</b> as
-        matrículas dele (<b>anoAtivoMatriculas</b>, de qualquer ano — não só o ano ativo),
-        além dos documentos anexados e do avatar (foto), se houver. Útil pra limpar dados de teste sem afetar o resto.
-        <b>Ação irreversível — não há como desfazer.</b>
-      </p>
       <div class="row-btns">
         <input type="text" id="inpAlunoIdExcluir" placeholder="alunoId (ex.: ALU-000123)"
           style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
           font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
-        <button class="btn btn-gray" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
+        <button class="btn outline" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewAluno" style="display:none;margin-top:14px;">
@@ -243,7 +280,7 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
         <div id="previewAlunoFoto" style="margin-top:8px;"></div>
         <div id="previewAlunoElo" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
-          <button class="btn btn-danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
+          <button class="btn danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
         </div>
       </div>
 
@@ -254,27 +291,22 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
   <!-- ── EXCLUSÃO PONTUAL: TURMA ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secExcluirTurma')">
-      <h3 style="margin-top:0;">🗑️ Excluir turma (registro pontual)</h3>
+      <h3 style="margin-top:0;">🗑️ Excluir turma (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove uma turma (<b>anoAtivoTurmas</b>) e as matrículas (<b>anoAtivoMatriculas</b>) que apontam para ela, evitando matrículas órfãs. Os alunos não são apagados. <b>Ação irreversível.</b></span></span></h3>
       <span class="sec-toggle" id="togSecExcluirTurma">▼</span>
     </div>
     <div class="sec-body" id="secExcluirTurma">
-      <p class="muted">
-        Remove uma única turma (<b>anoAtivoTurmas</b>) e qualquer matrícula
-        (<b>anoAtivoMatriculas</b>) que ainda aponte pra ela, evitando matrícula órfã
-        apontando pra uma turma que não existe mais. <b>Ação irreversível.</b>
-      </p>
       <div class="row-btns">
         <input type="text" id="inpTurmaIdExcluir" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)"
           style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
           font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
-        <button class="btn btn-gray" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
+        <button class="btn outline" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewTurma" style="display:none;margin-top:14px;">
         <div id="previewTurmaInfo"></div>
         <div id="previewTurmaMats" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
-          <button class="btn btn-danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
+          <button class="btn danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
         </div>
       </div>
 
@@ -285,18 +317,12 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
   <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secGerarAta')">
-      <h3 style="margin-top:0;">📜 Gerar ata de turma (módulo de Atas)</h3>
+      <h3 style="margin-top:0;">📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
       <span class="sec-toggle collapsed" id="togSecGerarAta">▼</span>
     </div>
     <div class="sec-body collapsed" id="secGerarAta">
-      <p class="muted">
-        Cria no módulo de Atas a turma e a ata de uma turma do ano-ativo, com os alunos matriculados, o schema escolhido
-        e as notas em branco. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas.
-        Cada turma só pode ser gerada <b>uma vez</b>; para gerar de novo, apague a turma em Gestão de Atas.
-        Alunos sem vínculo (elo) recebem um ID novo no módulo de Atas — a união dos IDs é feita na página de IDs.
-      </p>
       <div class="row-btns">
-        <button class="btn btn-gray" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
+        <button class="btn outline" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
       </div>
 
       <div id="gaForm" style="display:none;margin-top:14px;">
@@ -307,54 +333,43 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
         <select id="gaSchema" onchange="gaResetPlano()"
           style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
         <div class="row-btns" style="margin-top:0;">
-          <button class="btn btn-outline" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
+          <button class="btn outline" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
         </div>
       </div>
 
       <div id="gaPreview" style="display:none;margin-top:14px;"></div>
       <div class="row-btns" id="gaGerarWrap" style="display:none;">
-        <button class="btn btn-primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
+        <button class="btn primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
       </div>
       <div class="console" id="logGerarAta" style="display:none;"></div>
     </div>
   </div>
 
-  <!-- ── EXPORTAR ── -->
-  <div class="card">
-    <div class="sec-header" onclick="toggleSec('secExport')">
-      <h3 style="margin-top:0;">💾 Exportar backup</h3>
-      <span class="sec-toggle" id="togSecExport">▼</span>
+  <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
+  <div class="card card-destaque">
+    <div class="sec-header" onclick="toggleSec('secBackup')">
+      <h3 style="margin-top:0;">💾 Backup do ano ativo</h3>
+      <span class="sec-toggle" id="togSecBackup">▼</span>
     </div>
-    <div class="sec-body" id="secExport">
-      <p class="muted">
-        Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON
-        (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).
-      </p>
-      <div class="row-btns">
-        <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+    <div class="sec-body" id="secBackup">
+      <div class="bk-grid">
+        <div>
+          <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).</span></span></div>
+          <div class="row-btns" style="margin-top:0;">
+            <button class="btn primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+          </div>
+        </div>
+        <div>
+          <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
+          <div class="row-btns" style="margin-top:0;">
+            <label class="btn outline" id="lblImportJSON" style="cursor:pointer;">
+              📂 Carregar JSON de backup
+              <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
+            </label>
+          </div>
+          <div class="console" id="logImport" style="display:none;"></div>
+        </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ── IMPORTAR JSON ── -->
-  <div class="card">
-    <div class="sec-header" onclick="toggleSec('secImport')">
-      <h3 style="margin-top:0;">📥 Importar backup JSON</h3>
-      <span class="sec-toggle" id="togSecImport">▼</span>
-    </div>
-    <div class="sec-body" id="secImport">
-      <p class="muted">
-        Restaura um backup gerado por esta página, gravando em <b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b>
-        e <b>anoAtivoMatriculas</b>. Documentos com o mesmo ID são atualizados; novos são adicionados.
-        Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.
-      </p>
-      <div class="row-btns">
-        <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
-          📂 Carregar JSON de backup
-          <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
-        </label>
-      </div>
-      <div class="console" id="logImport" style="display:none;"></div>
     </div>
   </div>
 
@@ -366,9 +381,9 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
     <div class="psq-head">
       <div><h3 id="psqTitulo">Alunos</h3><div class="muted" id="psqCont"></div></div>
       <div class="row-btns" style="margin:0;">
-        <button class="btn btn-outline" onclick="psqCsv()">📊 Exportar CSV</button>
-        <button class="btn btn-primary" onclick="psqPdf()">📄 Exportar PDF</button>
-        <button class="btn btn-gray" onclick="psqFecharModal()">Fechar</button>
+        <button class="btn outline" onclick="psqCsv()">📊 Exportar CSV</button>
+        <button class="btn primary" onclick="psqPdf()">📄 Exportar PDF</button>
+        <button class="btn ghost" onclick="psqFecharModal()">Fechar</button>
       </div>
     </div>
     <div class="psq-body" id="psqBody"></div>
@@ -410,8 +425,13 @@ document.addEventListener('auth:ready', function () {
     window.executarExclusaoTurma    = () => {};
   }
 
+  try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+  catch (e) { console.warn('ajustarContraste:', e); }
   psqIniciar();
   inicializar();
+});
+document.addEventListener('click', () => {
+  document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open'));
 });
 
 /* =============================================
@@ -556,34 +576,35 @@ function setMsg(text, kind){
   }
 }
 
-/* ── Modal de confirmação (substitui confirm() nativo) ── */
-function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+/* ── Modal de confirmação (guia-toasts): `corpo` é HTML — escape tudo que for dinâmico.
+      perigo:true = confirmar em vermelho sólido. Esc cancela; foco inicial em Cancelar. ── */
+function _confirmModal({ titulo, corpo, perigo, textoConfirmar, textoCancelar }){
   return new Promise((resolve) => {
-    const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.style.display = 'flex';
     backdrop.innerHTML =
-      `<div style="background:var(--card,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${esc(titulo || 'Confirmar ação')}</h3>`+
-        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted,#6b7280);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+      `<div class="cm-box" role="alertdialog" aria-modal="true">`+
+        `<h3>${esc(titulo || 'Confirmar ação')}</h3>`+
+        `<div class="cm-corpo">${corpo || ''}</div>`+
+        `<div class="cm-acoes">`+
           `<button type="button" class="btn ghost" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-            `${esc(textoConfirmar || 'Continuar')}`+
-          `</button>`+
+          `<button type="button" class="btn primary${perigo ? ' cm-perigo' : ''}" id="_confirmModalOk">${esc(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
 
     function fechar(resultado){
+      document.removeEventListener('keydown', onKey, true);
       backdrop.remove();
       resolve(resultado);
     }
+    function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } }
+    document.addEventListener('keydown', onKey, true);
     backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
     backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    backdrop.querySelector('#_confirmModalCancelar').focus();
   });
 }
 
@@ -839,8 +860,8 @@ async function executarExclusaoAluno() {
 
   const confirmou = await _confirmModal({
     titulo: '⚠️ Excluir aluno definitivamente',
-    corDestaque: '#b91c1c',
-    corpo: `Excluir definitivamente o aluno "${aluno.nome || alunoId}"?\n\n` +
+    perigo: true,
+    corpo: `Excluir definitivamente o aluno "${esc(aluno.nome || alunoId)}"?\n\n` +
       `- ${mats.length} matrícula(s)\n` +
       `- ${elos.length} vínculo(s) com o módulo de Atas\n` +
       `- ${docs.length} documento(s) anexado(s)\n` +
@@ -955,8 +976,8 @@ async function executarExclusaoTurma() {
 
   const confirmou = await _confirmModal({
     titulo: '⚠️ Excluir turma definitivamente',
-    corDestaque: '#b91c1c',
-    corpo: `Excluir definitivamente a turma "${turma.nome || turmaId}"?\n\n` +
+    perigo: true,
+    corpo: `Excluir definitivamente a turma "${esc(turma.nome || turmaId)}"?\n\n` +
       `- ${mats.length} matrícula(s) que apontam pra ela\n` +
       `- ${fotos.length} avatar(es) dessas matrículas\n\n` +
       `Os alunos (dados pessoais) não são apagados.\nEsta ação NÃO PODE ser desfeita.`,
@@ -1308,10 +1329,9 @@ async function gaGerar() {
   const p = GA.plano;
   const ok = await _confirmModal({
     titulo: '📜 Gerar ata no módulo de Atas',
-    corDestaque: '#7c3aed',
-    corpo: `Gerar a ata da turma "${p.turma.nome}" (${p.ano})?\n\n` +
+    corpo: `Gerar a ata da turma "${esc(p.turma.nome)}" (${p.ano})?\n\n` +
       `- ${p.rows.length} aluno(s), ${p.novos} com ID novo em Atas\n` +
-      `- Schema: ${p.schema.nome || p.schema.id}\n\n` +
+      `- Schema: ${esc(p.schema.nome || p.schema.id)}\n\n` +
       `Para refazer depois, será preciso apagar a turma em Gestão de Atas.`,
     textoConfirmar: 'Gerar ata',
   });
@@ -1614,7 +1634,7 @@ async function psqPesquisar() {
   if (txt && !(anoDig >= 2000 && anoDig <= 2100)) return setMsg('Ano letivo inválido.', 'warn');
   if (todas) {
     const ok = await _confirmModal({
-      titulo: 'Pesquisar em todas as escolas', corDestaque: '#7c3aed', textoConfirmar: 'Pesquisar',
+      titulo: 'Pesquisar em todas as escolas', textoConfirmar: 'Pesquisar',
       corpo: `Serão lidas as matrículas do ano e os alunos de ${alvo.length} escola(s). Pode levar um tempo e consumir muitas leituras do Firestore.`,
     });
     if (!ok) return;
@@ -1657,13 +1677,25 @@ function psqAbrirModal() {
   const body = PSQ.linhas.map(l => '<tr>' + PSQ_COLS_TELA.map(c =>
     `<td class="${c[2]}"${c[0] === 'escola' ? ` title="${esc(l.escola)}"` : ''}>${esc(l[c[0]])}</td>`).join('') + '</tr>').join('');
   document.getElementById('psqBody').innerHTML = `<table class="psq-tab"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
-  const bd = document.getElementById('psqModal'), hp = document.getElementById('header-placeholder');
-  const topo = Math.max(0, hp ? Math.ceil(hp.getBoundingClientRect().bottom) : 0) + 12;   // abaixo do header fixo
+  psqAjustarModal();
+  document.getElementById('psqModal').style.display = 'flex';
+}
+const PSQ_FOLGA_HEADER = 80;   // px entre o fim do header e o topo do modal
+function psqAjustarModal() {
+  const bd = document.getElementById('psqModal');
+  if (!bd) return;
+  let fim = 0;                    // o header é fixo: o placeholder pode ter altura 0, então mede os filhos também
+  document.querySelectorAll('#header-placeholder, #header-placeholder *, header').forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (r.height > 0 && r.top <= 1) fim = Math.max(fim, r.bottom);
+  });
+  const topo = (fim || 76) + PSQ_FOLGA_HEADER;
   bd.style.alignItems = 'flex-start';
   bd.style.paddingTop = topo + 'px';
-  bd.querySelector('.psq-modal').style.height = `calc(100vh - ${topo + 18}px)`;
-  bd.style.display = 'flex';
+  bd.style.paddingBottom = '24px';
+  bd.querySelector('.psq-modal').style.height = `calc(100vh - ${topo + 24}px)`;
 }
+window.addEventListener('resize', () => { const m = document.getElementById('psqModal'); if (m && m.style.display === 'flex') psqAjustarModal(); });
 function psqFecharModal() { document.getElementById('psqModal').style.display = 'none'; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') psqFecharModal(); });
 
