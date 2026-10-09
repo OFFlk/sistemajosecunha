@@ -76,22 +76,22 @@ html[data-theme="dark"] {
 .btn:active { opacity: 0.85; }
 
 /* .btn base (sem modificador) */
-.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger) {
+.btn:not(.primary):not(.ghost):not(.secondary) {
   background: var(--chip-bg);
   border-color: var(--card-border);
   color: var(--chip-color);
 }
-.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger):hover {
+.btn:not(.primary):not(.ghost):not(.secondary):hover {
   background: var(--brand-faded);
   border-color: var(--brand-hover);
   color: var(--brand-text);
 }
-html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger) {
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary) {
   background: rgba(148,163,184,0.10);
   border-color: rgba(148,163,184,0.25);
   color: #cbd5e1;
 }
-html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger):not(.ldanger):hover {
+html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):hover {
   background: var(--brand-faded-d);
   border-color: var(--brand-border-d);
   color: var(--brand-text-d);
@@ -129,12 +129,6 @@ html[data-theme="dark"] .btn.ghost:hover { background: var(--brand-faded-d); bor
 .btn.secondary:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
 html[data-theme="dark"] .btn.secondary       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
 html[data-theme="dark"] .btn.secondary:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
-
-/* .btn.danger */
-.btn.danger          { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
-.btn.danger:hover    { background: rgba(185,28,28,0.18); border-color: rgba(185,28,28,0.55); }
-html[data-theme="dark"] .btn.danger       { background: rgba(185,28,28,0.15); border-color: rgba(239,68,68,0.40); color: #fca5a5; }
-html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); border-color: rgba(239,68,68,0.65); }
 
 /* .btn.small */
 .btn.small { padding: 6px 11px; font-size: 12px; }
@@ -259,15 +253,10 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
    pra continuar legível em qualquer fundo. */
 .card-destaque .info-tip{ color: var(--dest-fg); }
 
-/* ── Toasts + modal de confirmação (ver guia-toasts.md) ── */
+/* ── Toasts (ver guia-toasts.md) ── */
 @keyframes toastSubir {
   from { opacity: 0; transform: translateX(-50%) translateY(16px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-.modal-backdrop {
-  position: fixed; inset: 0; background: rgba(15,23,42,.55);
-  display: none; align-items: center; justify-content: center;
-  padding: 18px; z-index: 50;
 }
 </style>
 
@@ -380,7 +369,7 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
 
         <div class="detalhe-actions">
           <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
-          <div style="position:relative;display:inline-block;" id="wrapExportAta">
+          <div style="position:relative;display:inline-block;">
             <button class="btn primary" type="button" id="btnAtaExportar">Exportar ▾</button>
             <div id="dropExportAta" style="display:none;position:absolute;left:0;top:calc(100% + 6px);
               background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
@@ -500,32 +489,6 @@ window.addEventListener('unhandledrejection', (ev) => {
 function _escHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
-  return new Promise((resolve) => {
-    const cor = corDestaque || '#b45309';
-    const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.style.display = 'flex';
-    backdrop.innerHTML =
-      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
-        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
-          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-            `${_escHtml(textoConfirmar || 'Continuar')}`+
-          `</button>`+
-        `</div>`+
-      `</div>`;
-    document.body.appendChild(backdrop);
-    function fechar(resultado){ backdrop.remove(); resolve(resultado); }
-    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
-    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
-    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
-  });
-}
-
 /* =========================
    Permissões
 ========================= */
@@ -536,20 +499,17 @@ const _podeEditar = !!_session && _session.role === 'admin';
 
 /* =========================
    Dados: Firestore é a única fonte
-   (sem localStorage como cache — mesmo padrão adotado em
-   gestao-atas.html: localStorage usado como "guarda pra acessar
-   depois" já causou bug real de quota estourada travando o
-   salvamento de verdade no Firestore. turmas/atas/matriculas
-   não são mais coleções separadas: o dado de atas mora só em
-   turmas.alunos[], gravado por gestao-atas.html.)
+   (sem localStorage como cache — localStorage usado como "guarda pra acessar
+   depois" já causou bug real de quota estourada travando o salvamento de
+   verdade no Firestore.) As turmas vêm da coleção turmas (alunos[] dentro
+   do doc); a pesquisa por aluno usa alunos-atas + matriculas.
 ========================= */
 
 /* =========================
-   Catálogo de identidade (nome oficial por alunoId)
-   O nome gravado dentro de turma.alunos[].nome é o texto cru
-   do momento do import — se o aluno for fundido/corrigido depois
-   (idaluno.html), esse campo embutido fica desatualizado. O nome
-   correto pra exibir é sempre o do catálogo, por alunoId.
+   Nome oficial (alunos-atas)
+   O nome gravado dentro de turma.alunos[].nome é o texto cru do momento do
+   import — se o aluno for corrigido/fundido depois, esse campo embutido fica
+   desatualizado. O nome correto pra exibir é sempre o de alunos-atas, por alunoId.
 ========================= */
 let _mapaNomes = new Map(); // alunoId -> nome oficial
 
@@ -590,50 +550,19 @@ let turmasTodas = []; // todas as turmas carregadas, antes do filtro ativa/inati
 let turmaSelecionada = null;
 let alunosView = [];
 
-// Exposto pra script isolado de "Pesquisa por aluno" (abaixo, no fim do arquivo)
-// Busca sempre em TODAS as turmas (ativas + inativas), igual ao comportamento
-// original — o filtro de "Inativas" só afeta a lista principal, não essa busca.
-window.obterTurmas = () => turmasTodas;
-window.nomeAtual = nomeAtual;
-
 /* =========================
    Utilitários
 ========================= */
-// Mantém o filtro "só turmas ativas" que já era o padrão (checkbox desmarcado);
-// só a opção de ALTERNAR pra ver as inativas foi removida (legada).
-// Schema da turma (schemaSnapshot, gravado no doc da turma na criação — ver
-// cadastro-atas.html). Mesmos defaults/normalização usados no resto do
-// módulo, pra não divergir do que outras páginas consideram "schema padrão".
-function getDefaultConfig() {
-  return {
-    version: 1,
-    nome: "Padrão (arquivo original)",
-    serieAtiva: true,
-    resultadoAtivo: true,
-    ordenarPor: "nome",
-    colunas: [
-      { key:"lp",  label:"Português",      type:"nota", enabled:true },
-      { key:"edf", label:"E. Física",      type:"nota", enabled:true },
-      { key:"art", label:"Arte",           type:"nota", enabled:true },
-      { key:"mat", label:"Matemática",     type:"nota", enabled:true },
-      { key:"his", label:"História",       type:"nota", enabled:true },
-      { key:"geo", label:"Geografia",      type:"nota", enabled:true },
-      { key:"cie", label:"Ciências",       type:"nota", enabled:true },
-      { key:"er",  label:"E. Religioso",   type:"nota", enabled:true },
-      { key:"ing", label:"Língua Inglesa", type:"nota", enabled:true }
-    ]
-  };
-}
+// Normaliza o schema da turma (schemaSnapshot, gravado no doc da turma na criação — ver cadastro-turmas.html).
 function normalizeSchema(cfg) {
-  const def = getDefaultConfig();
   const out = {
     id: String(cfg?.id || cfg?.schemaId || "").trim() || "",
     version: 1,
-    nome: String(cfg?.nome ?? def.nome),
-    serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : def.serieAtiva,
-    resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : def.resultadoAtivo,
+    nome: String(cfg?.nome ?? ""),
+    serieAtiva: cfg?.serieAtiva !== undefined ? !!cfg.serieAtiva : true,
+    resultadoAtivo: cfg?.resultadoAtivo !== undefined ? !!cfg.resultadoAtivo : true,
     ordenarPor: (cfg?.ordenarPor === "numero") ? "numero" : "nome",
-    colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : def.colunas
+    colunas: Array.isArray(cfg?.colunas) ? cfg.colunas : []
   };
   out.colunas = out.colunas
     .map(c => ({
@@ -654,10 +583,9 @@ function normalizeSchema(cfg) {
 function getColunasAtivas(schema) {
   return (schema?.colunas || []).filter(c => c.enabled);
 }
-// Schema de verdade da turma selecionada (schemaSnapshot) — cai no schema
-// padrão só se a turma não tiver nenhum salvo (legado/turma antiga).
+// Schema de verdade da turma selecionada (schemaSnapshot, gravado no doc da turma na criação).
 function schemaDaTurmaSelecionada() {
-  return normalizeSchema(turmaSelecionada?.schemaSnapshot || getDefaultConfig());
+  return normalizeSchema(turmaSelecionada?.schemaSnapshot);
 }
 function renderTheadAlunos(schema) {
   const tr = document.getElementById("theadAlunosRow");
@@ -760,7 +688,7 @@ function preencherFiltroAno(anosIndice) {
   sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
 }
 
-// Busca no Firestore SÓ o que os filtros pedem (ano/turno viram query; o resto filtra no cliente).
+// Busca no Firestore SÓ o que os filtros pedem (ano, turno e série viram query; só a busca geral filtra no cliente).
 // Reaproveita o que já foi lido na sessão (ver _coberta): busca igual ou mais estreita que uma anterior não lê o banco.
 // Memória da página (variáveis JS — nada no localStorage; some ao recarregar a aba):
 // _memoria = turmas já lidas nesta sessão; _buscasFeitas = "regiões" já lidas por inteiro.
@@ -939,9 +867,6 @@ function selecionarTurma(id) {
 
   if (!turmaSelecionada) return;
 
-
-  // 🔥 ATIVA MODO EXPANDIDO (ADICIONADO)
-
   const serieTxt = turmaSelecionada.serieTexto ||
     (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "?");
 
@@ -1027,8 +952,6 @@ function editarTurmaSelecionada() {
   
   // Redireciona pra edição de alunos/notas da ata, já travado nesta turma
   // (cadastro-atas.html trava os selects de ano/turma quando vem via ?turma=).
-  // Antes apontava pro arquivo antigo cadastro-turma.html (pré-divisão do
-  // módulo em cadastro-turmas.html + cadastro-atas.html) — retirado de uso.
   window.location.href = `cadastro-atas.html?turma=${encodeURIComponent(turmaId)}`;
 }
 
@@ -1160,9 +1083,7 @@ async function carregarDadosEscola() {
 }
 
 // Dropdown "Exportar" (mesmo padrão de abrir/fechar do pesquisa-ano-ativo.html).
-// Só o PDF está ligado a uma função de verdade — o CSV fica "disabled" no
-// HTML até a análise do schema definir as colunas; por isso não tem
-// addEventListener aqui (não há handler nenhum pra escrever ainda).
+// PDF e CSV são ligados no IIFE abaixo.
 (function(){
   const btn  = document.getElementById("btnAtaExportar");
   const drop = document.getElementById("dropExportAta");
@@ -1426,17 +1347,10 @@ function _exportarCSVDaTurmaInterno() {
    Boot
 ========================= */
 async function carregar() {
-  let falhaTurmas = false;
-  try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
-
-  }catch(e){
-    console.warn('[pesquisa-ata] Falha na inicialização:', e);
-    falhaTurmas = true;
-  }
+  await new Promise(res=>{
+    if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
+    document.addEventListener('auth:ready', res, {once:true});
+  });
 
   recomputarTurmasBase();
 
@@ -1497,8 +1411,6 @@ async function carregar() {
   // Busca geral: Enter equivale a clicar em Pesquisar (digitar não refiltra sozinho)
   document.getElementById("fBusca").onkeydown = function(ev){ if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("btnPesquisar").click(); } };
 
-  if (falhaTurmas) setMsg("Não foi possível carregar as turmas — recarregue a página.", "err");
-
   if (window.ThemeColors) ThemeColors.ajustarContraste();
 
   // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
@@ -1519,7 +1431,7 @@ document.addEventListener("DOMContentLoaded", carregar);
 
 
 
-<!-- SCRIPT 5 — Pesquisa por aluno (bloco isolado) -->
+<!-- Pesquisa por aluno (bloco isolado) -->
 <script>
 (function(){
   function normNome(s){
