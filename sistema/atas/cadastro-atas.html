@@ -761,15 +761,70 @@ function limparCamposAluno() {
   if (nomeEl) nomeEl.focus();
 }
 
-/* ✅ Excluir matrícula (não apaga o alunoId/catálogo — só a matrícula
-   desta turma). Só fica disponível depois de clicar "Editar" na tabela. */
+/**
+ * Garbage collection de alunos de Atas, baseada na coleção `matriculas`
+ * (exclusiva do módulo de Atas — NÃO lê anoAtivoMatriculas).
+ * Para cada alunoId candidato conta as matrículas que restaram:
+ *   - matrículas > 0  → o aluno permanece (nada é apagado);
+ *   - matrículas <= 0 → apaga a identidade (`alunos-atas`) E o elo (`alunos`,
+ *                       doc `ELO|{alunoId}`) juntos, de forma atômica.
+ * Chamar DEPOIS de apagar a matrícula. Mesma regra de gestao-atas.html.
+ * Na dúvida (falha ao consultar), não apaga nada e devolve `aviso`.
+ *
+ * @param {Iterable<string>} alunoIds candidatos (alunos que perderam matrícula)
+ * @returns {Promise<{removidos:string[], aviso:string}>} IDs apagados + ressalva
+ */
+async function limparAlunosSemMatricula(alunoIds) {
+  const out = { removidos: [], aviso: '' };
+  if (!window.DB?.['alunos-atas'] || !window.DB?.matriculas) return out;
+
+  const candidatos = [...new Set([...alunoIds].map(i => String(i || '').trim()).filter(Boolean))];
+  if (!candidatos.length) return out;
+
+  let comMatricula;
+  try {
+    const restantes = await window.DB.matriculas.whereIn('alunoId', candidatos);
+    comMatricula = new Set(restantes.map(m => String(m.alunoId || '').trim()));
+  } catch (e) {
+    console.warn('[GC] Não foi possível checar a coleção matriculas:', e.message);
+    out.aviso = 'matrículas não verificadas, aluno preservado';
+    return out;
+  }
+
+  const orfaos = candidatos.filter(id => !comMatricula.has(id));
+  if (!orfaos.length) return out;
+
+  const eloDe = id => (window.Identidade?.eloId ? window.Identidade.eloId(id) : 'ELO|' + id);
+
+  // Identidade + elo no mesmo batch (2 ops por aluno; lotes de 200 alunos < limite de 500 ops)
+  for (let i = 0; i < orfaos.length; i += 200) {
+    const lote = orfaos.slice(i, i + 200);
+    const ops = lote.flatMap(id => [
+      { col: 'alunos-atas', op: 'delete', id },
+      { col: 'alunos',      op: 'delete', id: eloDe(id) },
+    ]);
+    try {
+      await window.DB.batchWrite(ops);
+      out.removidos.push(...lote);
+    } catch (e) {
+      console.warn('[GC] Erro ao remover lote de identidades/elos:', e.message);
+      out.aviso = 'falha ao remover identidade/elo do aluno';
+    }
+  }
+  return out;
+}
+
+/* ✅ Excluir matrícula desta turma. Só fica disponível depois de clicar
+   "Editar" na tabela. Se essa era a ÚLTIMA matrícula do aluno (nenhuma
+   outra turma de Atas), o aluno (alunos-atas) e o elo (alunos) são apagados
+   junto; se ele tem matrícula em outra turma, só a daqui é removida. */
 async function excluirAlunoEmEdicao() {
   if (!_alunoEmEdicao) return;
 
   const nome = _alunoEmEdicao.nome || "este aluno";
   const ok = await _confirmModal({
     titulo: "🗑️ Excluir matrícula?",
-    corpo: `Remove ${escHtml(nome)} desta turma.\n\nO cadastro do aluno (histórico/ID) NÃO é apagado — só a matrícula nesta turma. Essa ação não pode ser desfeita.`,
+    corpo: `Remove ${escHtml(nome)} desta turma.\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida. Essa ação não pode ser desfeita.`,
     corDestaque: "#991b1b",
     textoConfirmar: "Sim, excluir",
   });
@@ -780,6 +835,8 @@ async function excluirAlunoEmEdicao() {
 
   try {
     const alunoId = String(_alunoEmEdicao.alunoId || "").trim();
+    let gc = { removidos: [], aviso: "" };
+    let alunoApagado = false;
 
     // Só existe matrícula salva no Firestore se essa turma já foi salva
     // com esse aluno antes (alunoId só é atribuído em garantirIdsESistemaParaTurma).
@@ -792,9 +849,16 @@ async function excluirAlunoEmEdicao() {
         await window.DB.matriculas.remove(mid);
       }
 
+      // Sem nenhuma matrícula restante → apaga o aluno (alunos-atas) e o elo
+      // (alunos). Com matrícula em outra turma → o aluno permanece.
+      gc = await limparAlunosSemMatricula([alunoId]);
+      alunoApagado = gc.removidos.includes(alunoId);
+
       // Mantém ultimoAnoRegistro do catálogo (alunos-atas) coerente após a
       // remoção — mesma função usada em garantirIdsESistemaParaTurma().
-      if (window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+      // NÃO roda se o aluno acabou de ser apagado (o saveAll com merge
+      // recriaria o doc de alunos-atas).
+      if (!alunoApagado && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
         const escola = await window.DB.escola.get();
         const anoAtivoAtual = escola?.configAnoAtivo || null;
         await window.Identidade.recalcularUltimoAnoRegistroBatch([alunoId], anoAtivoAtual);
@@ -812,7 +876,13 @@ async function excluirAlunoEmEdicao() {
     }
 
     limparCamposAluno();
-    _toastSucesso(`✅ Matrícula de ${nome} excluída desta turma.`);
+    if (gc.aviso) {
+      _toastErro(`⚠️ Matrícula de ${nome} excluída, mas: ${gc.aviso}.`);
+    } else if (alunoApagado) {
+      _toastSucesso(`✅ ${nome} excluído: era a única matrícula, então o aluno (ID e elo) também foi apagado.`);
+    } else {
+      _toastSucesso(`✅ Matrícula de ${nome} excluída desta turma.`);
+    }
   } catch (err) {
     console.error("[excluirAlunoEmEdicao]", err);
     _toastErro("❌ Erro ao excluir a matrícula: " + err.message);
