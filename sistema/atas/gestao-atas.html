@@ -1056,7 +1056,8 @@ async function apagarSelecionadas() {
   setMsg('Verificando identidades órfãs…','loading');
   let apagados = 0, gcErro = '';
   try {
-    apagados = await _limparIdentidadesOrfas(aApagar, novas);
+    const idsAfetados = aApagar.flatMap(t => (t.alunos || []).map(a => a.alunoId));
+    apagados = await limparAlunosSemMatricula(idsAfetados);
   } catch(e) {
     gcErro = e.message;
     console.warn('[apagar] Erro ao limpar identidades:', e);
@@ -1064,7 +1065,7 @@ async function apagarSelecionadas() {
 
   // Um toast final só, na cor do resultado (verde / amarelo / vermelho)
   const partes = [`${removidosOk}/${aApagar.length} turma(s) removida(s)`];
-  if (apagados > 0) partes.push(`${apagados} identidade(s) órfã(s) removida(s)`);
+  if (apagados > 0) partes.push(`${apagados} aluno(s) sem matrícula removido(s) (identidade + elo)`);
   const ressalvas = [];
   if (problemas) ressalvas.push(`${problemas} aviso(s) — veja o console`);
   if (gcErro) ressalvas.push('falha ao limpar identidades');
@@ -1081,64 +1082,62 @@ async function apagarSelecionadas() {
 }
 
 /**
- * Garbage collection de identidades (coleção `alunos-atas`).
- * Remove apenas alunoId que NÃO aparecem em nenhuma turma de atas restante
- * E NÃO aparecem em anoAtivoMatriculas (módulo de ano-ativo) — essa segunda
- * checagem também protege um alunoId já fundido (existe em alunos-atas E
- * anoAtivoAlunos com o mesmo ID) que ainda tenha matrícula ativa no
- * Ano-Ativo, mesmo sem turma de Atas restante.
+ * Garbage collection de alunos de Atas, baseada na coleção `matriculas`
+ * (exclusiva do módulo de Atas: liga alunoId a turma; um aluno pode ter
+ * várias, mas nunca duas com o mesmo alunoId + turmaId).
  *
- * @param {Array} turmasApagadas  — turmas que acabaram de ser removidas
- * @param {Array} turmasRestantes — turmas de atas que ainda existem no banco
- * @returns {number} quantidade de identidades removidas
+ * Regra: para cada alunoId candidato, conta as matrículas que restaram.
+ *   - matrículas > 0  → o aluno permanece (nada é apagado);
+ *   - matrículas <= 0 → apaga a identidade (`alunos-atas`) E o elo
+ *                       (`alunos`, doc `ELO|{alunoId}`) juntos, de forma atômica.
+ *
+ * NÃO lê anoAtivoMatriculas (coleção exclusiva do Ano-Ativo). Deve ser
+ * chamada DEPOIS de apagar as matrículas. Pensada pra ser reaproveitada pelo
+ * cadastro-atas (apagar aluno específico).
+ *
+ * @param {Iterable<string>} alunoIds candidatos (alunos que perderam matrícula)
+ * @returns {Promise<number>} quantidade de alunos removidos
  */
-let _gcAviso = ''; // ressalva do GC de identidades, lida por apagarSelecionadas() pro toast final
-async function _limparIdentidadesOrfas(turmasApagadas, turmasRestantes) {
-  if (!window.DB || !window.DB['alunos-atas']) return 0;
+let _gcAviso = ''; // ressalva do GC, lida por apagarSelecionadas() pro toast final
+async function limparAlunosSemMatricula(alunoIds) {
+  if (!window.DB || !window.DB['alunos-atas'] || !window.DB.matriculas) return 0;
 
-  // Coleta IDs dos alunos das turmas apagadas
-  const idsApagados = new Set();
-  for (const t of turmasApagadas)
-    for (const a of (t.alunos || []))
-      if (String(a.alunoId || '').trim()) idsApagados.add(String(a.alunoId).trim());
+  const candidatos = [...new Set([...alunoIds].map(i => String(i || '').trim()).filter(Boolean))];
+  if (!candidatos.length) return 0;
 
-  if (!idsApagados.size) return 0;
-
-  // Coleta IDs que ainda existem nas turmas de atas restantes
-  const idsEmAtas = new Set();
-  for (const t of turmasRestantes)
-    for (const a of (t.alunos || []))
-      if (String(a.alunoId || '').trim()) idsEmAtas.add(String(a.alunoId).trim());
-
-  // Coleta IDs que existem no módulo de ano-ativo (anoAtivoMatriculas)
-  const idsEmAnoAtivo = new Set();
+  // Quem ainda tem pelo menos 1 matrícula em alguma turma de Atas
+  let comMatricula;
   try {
-    const mats = await window.DB.anoAtivoMatriculas.list();
-    for (const m of mats)
-      if (String(m.alunoId || '').trim()) idsEmAnoAtivo.add(String(m.alunoId).trim());
-  } catch(e) {
-    console.warn('[GC] Não foi possível checar anoAtivoMatriculas:', e.message);
-    // Se não conseguiu verificar o ano-ativo, aborta por segurança (não apaga nada)
-    _gcAviso = 'ano-ativo não verificado, identidades preservadas';
+    const restantes = await window.DB.matriculas.whereIn('alunoId', candidatos);
+    comMatricula = new Set(restantes.map(m => String(m.alunoId || '').trim()));
+  } catch (e) {
+    console.warn('[GC] Não foi possível checar a coleção matriculas:', e.message);
+    // Se não conseguiu verificar, não apaga nada por segurança
+    _gcAviso = 'matrículas não verificadas, alunos preservados';
     return 0;
   }
 
-  // Órfãos = estavam nas turmas apagadas, mas não aparecem em nenhum dos dois módulos
-  const idsOrfaos = [...idsApagados].filter(id => !idsEmAtas.has(id) && !idsEmAnoAtivo.has(id));
+  const orfaos = candidatos.filter(id => !comMatricula.has(id));
+  if (!orfaos.length) return 0;
 
-  if (!idsOrfaos.length) return 0;
+  console.log(`[GC] Alunos sem matrícula (a remover): ${orfaos.length}`);
 
-  console.log(`[GC] Candidatos a remoção: ${idsOrfaos.length} ID(s)`);
-
-  // Remove do Firestore (coleção `alunos-atas`)
+  const eloDe = id => (window.Identidade?.eloId ? window.Identidade.eloId(id) : 'ELO|' + id);
   let removidos = 0;
-  for (const alunoId of idsOrfaos) {
+
+  // Identidade + elo no mesmo batch (2 ops por aluno; lotes de 200 alunos < limite de 500 ops)
+  for (let i = 0; i < orfaos.length; i += 200) {
+    const lote = orfaos.slice(i, i + 200);
+    const ops = lote.flatMap(id => [
+      { col: 'alunos-atas', op: 'delete', id },
+      { col: 'alunos',      op: 'delete', id: eloDe(id) },
+    ]);
     try {
-      if (window.Identidade?.removerAtas) await window.Identidade.removerAtas(alunoId);
-      else await window.DB['alunos-atas'].remove(alunoId);
-      removidos++;
-    } catch(e) {
-      console.warn('[GC] Erro ao remover identidade', alunoId, e.message);
+      await window.DB.batchWrite(ops);
+      removidos += lote.length;
+    } catch (e) {
+      console.warn('[GC] Erro ao remover lote de identidades/elos:', e.message);
+      _gcAviso = 'falha ao remover parte das identidades/elos';
     }
   }
 
