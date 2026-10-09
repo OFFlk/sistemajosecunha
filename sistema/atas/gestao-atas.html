@@ -25,7 +25,6 @@
 <link rel="stylesheet" href="/css/components.css">
 
 <title>Gestão de Dados · Atas</title>
-<script>console.info('[gestao-atas] build 2026-09-30 · diff de alunos + toasts');</script>
 <style>
 /* ── Oculta até auth confirmar role ── */
 body { visibility: hidden; }
@@ -272,15 +271,15 @@ select.sel-padrao option { background: var(--card-bg, #fff); color: var(--text, 
     <div class="sec-body" id="secJSON">
       <p class="muted">Envie um arquivo de backup JSON para restaurar turmas e schemas. O sistema compara turma por turma, incluindo os alunos de cada uma, sem custo extra de leitura (os alunos já vêm dentro do documento da turma). Nada é sobrescrito sem você escolher.</p>
       <div class="row-btns">
-        <label class="btn btn-outline" id="lblJSON" style="cursor:pointer;">
+        <label class="btn btn-outline" style="cursor:pointer;">
           📂 Carregar JSON de backup
-          <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="analisarJSON(event)">
+          <input type="file" accept=".json" style="display:none" onchange="analisarJSON(event)">
         </label>
       </div>
       <div id="mergePreview" style="display:none; margin-top:14px;">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
           <div id="mergeResumo" class="merge-resumo"></div>
-          <button class="btn btn-primary" id="btnAplicarMerge" onclick="aplicarMerge()">✅ Aplicar merge</button>
+          <button class="btn btn-primary" onclick="aplicarMerge()">✅ Aplicar merge</button>
           <button class="btn btn-gray" onclick="cancelarMerge()">✖ Cancelar</button>
         </div>
         <div class="muted" style="font-size:12px; font-weight:800; margin-bottom:4px;">Turmas</div>
@@ -302,8 +301,8 @@ select.sel-padrao option { background: var(--card-bg, #fff); color: var(--text, 
     <div class="sec-body" id="secExport">
       <p class="muted">Exporta e salva uma cópia de segurança de todos os dados do módulo de atas.</p>
       <div class="row-btns">
-        <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
-        <button class="btn btn-outline" id="btnExportCSV"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
+        <button class="btn btn-primary" onclick="exportarJSON()">⬇ Exportar JSON</button>
+        <button class="btn btn-outline"  onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
       </div>
     </div>
   </div>
@@ -494,7 +493,7 @@ function idAtaFrom(tid)      { return 'ATA|' + tid; }
 function idMatFrom(tid, aid) { return 'MAT|' + tid + '|' + aid; }
 
 function reconstruirAuxiliares(turmas) {
-  const atas = [], mats = [], metas = [];
+  const atas = [], mats = [];
   for (const t of (turmas || [])) {
     const turmaId = String(t?.id || t?.turmaId || '').trim();
     if (!turmaId) continue;
@@ -504,10 +503,6 @@ function reconstruirAuxiliares(turmas) {
       seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
       origemArquivo:t.origemArquivo||'', aba:t.aba||'',
       schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
-    metas.push({ _id:turmaId, turmaId, ataId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
-      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
-      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
-      alunos:Array.isArray(t.alunos)?t.alunos.length:0 });
     for (const a of (t.alunos || [])) {
       const alunoId = String(a?.alunoId || '').trim();
       if (!alunoId) continue;
@@ -520,8 +515,7 @@ function reconstruirAuxiliares(turmas) {
   }
   dbWrite('atasDB',       atas);
   dbWrite('matriculasDB', mats);
-  dbWrite('turmasMetaDB', metas);
-  return { atas, mats, metas };
+  return { atas, mats };
 }
 
 /* =============================================
@@ -600,10 +594,7 @@ async function recarregar() {
   let falhou = false;
   try {
     if (window.DB && window.DB.turmas) {
-      // Limpa o cache interno do db.firebase.js (a chave é o nome da coleção)
-      try { delete window.DB.turmas._cache; } catch(_) {} // compat
-      // O cache real fica em _cache['turmas'] dentro do db.firebase.js — não acessível diretamente;
-      // basta chamar list() que ele já verifica o timestamp.
+      // list() já confere o timestamp do cache privado do db.firebase.js.
       const todasFirestore = await window.DB.turmas.list();
       _mem[dbKey('turmasDB')] = todasFirestore;
     }
@@ -880,41 +871,6 @@ function selecionarTodasTurmas(val) {
 }
 
 /* =============================================
-   AUXILIAR LOCAL (sem sync Firestore)
-   Usado após delete para não recriar docs que acabamos de apagar.
-============================================= */
-function _reconstruirAuxLocalmente(turmas) {
-  const atas = [], mats = [], metas = [];
-  for (const t of (turmas || [])) {
-    const turmaId = String(t?.id || t?.turmaId || '').trim();
-    if (!turmaId) continue;
-    const ataId = idAtaFrom(turmaId);
-    atas.push({ _id:ataId, id:ataId, turmaId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
-      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
-      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
-      schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
-    metas.push({ _id:turmaId, turmaId, ataId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
-      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
-      origemArquivo:t.origemArquivo||'', aba:t.aba||'',
-      alunos:Array.isArray(t.alunos)?t.alunos.length:0 });
-    for (const a of (t.alunos || [])) {
-      const alunoId = String(a?.alunoId || '').trim();
-      if (!alunoId) continue;
-      const matId = idMatFrom(turmaId, alunoId);
-      mats.push({ _id:matId, id:matId, turmaId, ataId, alunoId,
-        nomeRaw:String(a.nome||'').trim(), serie:String(a.serie||'').trim(),
-        resultado:String(a.resultado||'').trim()||'Não informado',
-        anoLetivo:t.anoLetivo||'' });
-    }
-  }
-  // Atualiza só o estado em memória (não dispara sync com Firestore)
-  _mem[dbKey('atasDB')] = atas;
-  _mem[dbKey('matriculasDB')] = mats;
-  _mem[dbKey('turmasMetaDB')] = metas;
-  return { atas, mats, metas };
-}
-
-/* =============================================
    APAGAR TURMAS — limpeza de scans no Cloudinary
    Complementa a exclusão no Firestore chamando a rota que apaga TODOS os
    arquivos da pasta atas/{turmaId_slug} + a pasta em si (ver
@@ -971,11 +927,10 @@ async function apagarSelecionadas() {
     for (const t of aApagar) {
       // O saveAll usa turmaId (ou id) como ID do documento no Firestore
       const docIdPrimario = t.turmaId || t.id;
-      const docIdSecundario = t._id && t._id !== docIdPrimario ? t._id : null;
       const nomeTurma = t.aba || docIdPrimario || '?';
       let removido = false;
 
-      // Tentativa 1: pelo turmaId (ID que o saveAll gravou como nome do documento)
+      // Remove o documento da turma (ID = turmaId, o mesmo que o saveAll gravou)
       if (docIdPrimario) {
         try {
           await window.DB.turmas.remove(docIdPrimario);
@@ -985,30 +940,8 @@ async function apagarSelecionadas() {
         }
       }
 
-      // Tentativa 2: pelo _id (caso a turma tenha sido salva com ID automático do Firestore)
-      if (!removido && docIdSecundario) {
-        try {
-          await window.DB.turmas.remove(docIdSecundario);
-          removido = true; removidosOk++;
-          avisos.push(`ℹ️ "${nomeTurma}": removido por _id, não pelo turmaId padrão`);
-        } catch(e) {
-          avisos.push(`⚠️ "${nomeTurma}": Firestore (_id) falhou — ${e.message}`);
-        }
-      }
-
-      // Tentativa 3: removeWhere pelo campo turmaId (fallback para documentos duplicados)
-      if (!removido && docIdPrimario) {
-        try {
-          await window.DB.turmas.removeWhere('turmaId', docIdPrimario);
-          removido = true; removidosOk++;
-          avisos.push(`ℹ️ "${nomeTurma}": removido via removeWhere (fallback de documento duplicado)`);
-        } catch(e) {
-          avisos.push(`⚠️ "${nomeTurma}": removeWhere falhou — ${e.message}`);
-        }
-      }
-
       if (!removido) {
-        avisos.push(`❌ "${nomeTurma}": não foi possível remover do Firestore por nenhum método`);
+        avisos.push(`❌ "${nomeTurma}": não foi possível remover do Firestore`);
       }
 
       // Também remove atas e matrículas associadas
@@ -1016,7 +949,6 @@ async function apagarSelecionadas() {
         try {
           const ataId = idAtaFrom(docIdPrimario);
           await window.DB.atas.remove(ataId).catch(()=>{});
-          await window.DB.atas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
           await window.DB.matriculas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
         } catch(e) {
           avisos.push(`⚠️ "${nomeTurma}": erro ao limpar atas/matrículas — ${e.message}`);
@@ -1044,12 +976,8 @@ async function apagarSelecionadas() {
   // 2. Atualiza o estado em memória diretamente (sem reenviar ao Firestore)
   const novas = turmas.filter((_,i) => !indices.includes(i));
   _mem[dbKey('turmasDB')] = novas;
-  // Reconstrói auxiliares localmente SEM sincronizar com Firestore (já deletamos acima)
-  const aux = _reconstruirAuxLocalmente(novas);
-
-  console.log(`[apagar] Bancos reconstruídos: atas=${aux.atas.length} • matrículas=${aux.mats.length}`);
   avisos.forEach(a => console.log('[apagar]', a));
-  // ℹ️ = fallback que funcionou (só informativo); ⚠️/❌ = problema de verdade.
+  // ℹ️ = só informativo; ⚠️/❌ = problema de verdade.
   const problemas = avisos.filter(a => a.startsWith('⚠️') || a.startsWith('❌')).length;
 
   // 3. Garbage collection de identidades órfãs
@@ -1299,9 +1227,8 @@ async function _analisarMerge(turmasEntrada, schemasEntrada) {
  * importante pro `padrao`, que só o admin global deveria recriar).
  * A comparação ignora campos voláteis (updatedAt/createdAt/criadoEm/
  * atualizadoEm) pra não marcar "conflito" só por causa do timestamp do
- * Firestore não bater com o do JSON exportado. Sem o shape exato do schema
- * (schema_ata.html/db.firebase.js não foram lidos por este chat), pode
- * sobrar algum falso "conflito" por outro campo de metadado desconhecido —
+ * Firestore não bater com o do JSON exportado. Se o schema tiver outro campo de metadado volátil, pode
+ * sobrar algum falso "conflito" —
  * o efeito é só pedir uma confirmação a mais, nunca sobrescrever sozinho.
  */
 async function _analisarMergeSchemas(schemasEntrada) {
@@ -1496,8 +1423,7 @@ async function aplicarMerge() {
   }
 
   cancelarMerge();
-  // Verde se tudo gravou; amarelo se algum schema falhou (parcial — situação
-  // que o guia não define; ver nota na resposta).
+  // Verde se tudo gravou; amarelo se algum schema falhou (parcial).
   setMsg('Merge aplicado: '+resumo.join(' · ')+'.', falhasSchemas ? 'warn' : 'ok');
   renderTabelaTurmas();
   atualizarStats();
