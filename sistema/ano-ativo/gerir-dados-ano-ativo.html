@@ -140,6 +140,24 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 .btn.ghost, .btn.secondary {
   background: var(--chip); border-color: var(--border,#ddd6fe); color: var(--chipTxt);
 }
+
+/* ── Pesquisa de alunos (várias escolas) ── */
+.psq-in { padding:9px 12px; border-radius:10px; border:1.5px solid var(--border,#ddd6fe); font-size:14px; background:var(--card); color:var(--text,#1e1b4b); font-family:'Nunito',sans-serif; }
+.psq-chk { display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:700; cursor:pointer; }
+.psq-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:4px; transition:opacity .2s; }
+.psq-chips.off { opacity:.35; pointer-events:none; }
+.psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--chip); border:1px solid var(--border,#ddd6fe); color:var(--chipTxt); font-size:13px; font-weight:700; }
+.psq-chip button { border:none; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px; font-weight:800; }
+.psq-modal { width:min(1280px,98vw); height:92vh; display:flex; flex-direction:column; background:var(--card); border:1px solid var(--border,#ddd6fe); border-radius:14px; box-shadow:0 30px 60px rgba(0,0,0,.25); overflow:hidden; }
+.psq-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--border,#ddd6fe); }
+.psq-head h3 { margin:0; font-size:16px; font-weight:800; }
+.psq-body { flex:1; overflow:auto; }
+.psq-tab { width:100%; border-collapse:collapse; font-size:12px; }
+.psq-tab th { position:sticky; top:0; z-index:2; background:var(--card); text-align:left; padding:6px 8px; border-bottom:2px solid var(--border,#ddd6fe); white-space:nowrap; }
+.psq-tab td { padding:4px 8px; border-bottom:1px solid var(--border,#ddd6fe); vertical-align:top; }
+.psq-tab td.nw { white-space:nowrap; }
+.psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.psq-tab tbody tr:hover { background:var(--chip); }
 </style>
 </head>
 <body>
@@ -165,6 +183,33 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
       <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
     </div>
     <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
+  </div>
+
+  <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
+  <div class="card">
+    <div class="sec-header" onclick="toggleSec('secPesquisa')">
+      <h3 style="margin-top:0;">🔎 Pesquisar alunos (várias escolas)</h3>
+      <span class="sec-toggle" id="togSecPesquisa">▼</span>
+    </div>
+    <div class="sec-body" id="secPesquisa">
+      <p class="muted">
+        Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com
+        exportação em CSV (todos os dados) e PDF (colunas essenciais). Funciona mesmo em "Todas as escolas" no topo da página.
+        Lê as matrículas do ano e os alunos delas, escola por escola. No <b>ano ativo</b> da escola entram só as matrículas em curso;
+        em anos anteriores entram todas.
+      </p>
+      <label class="psq-chk"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
+      <div class="row-btns" style="margin-top:10px;">
+        <select id="psqSel" class="psq-in" style="flex:1;min-width:220px;" onfocus="psqRenderSel()"></select>
+        <button class="btn btn-gray" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
+      </div>
+      <div class="psq-chips" id="psqChips"></div>
+      <div class="row-btns">
+        <input type="number" id="psqAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;" placeholder="Ano letivo (vazio = ano ativo de cada escola)">
+        <button class="btn btn-primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
+      </div>
+      <div class="console" id="logPsq" style="display:none;"></div>
+    </div>
   </div>
 
   <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
@@ -311,6 +356,25 @@ html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 
 </div>
 
+<!-- ── Modal: resultado da pesquisa multi-escolas ── -->
+<div class="modal-backdrop" id="psqModal" role="dialog" aria-modal="true" onclick="if(event.target===this)psqFecharModal()">
+  <div class="psq-modal">
+    <div class="psq-head">
+      <div><h3 id="psqTitulo">Alunos</h3><div class="muted" id="psqCont"></div></div>
+      <div class="row-btns" style="margin:0;">
+        <button class="btn btn-outline" onclick="psqCsv()">📊 Exportar CSV</button>
+        <button class="btn btn-primary" onclick="psqPdf()">📄 Exportar PDF</button>
+        <button class="btn btn-gray" onclick="psqFecharModal()">Fechar</button>
+      </div>
+    </div>
+    <div class="psq-body" id="psqBody"></div>
+  </div>
+</div>
+
+<!-- jsPDF + autoTable (mesmas versões da pesquisa-ano-ativo) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
 <script src="../header-logic.js"></script>
 
 <script>
@@ -342,6 +406,7 @@ document.addEventListener('auth:ready', function () {
     window.executarExclusaoTurma    = () => {};
   }
 
+  psqRenderSel();
   inicializar();
 });
 
@@ -1333,6 +1398,275 @@ async function gaRegistrarAnoNoIndice(ano) {
     return { ok: false, motivo: (e && (e.code || e.message)) || 'erro desconhecido' };
   }
 }
+/* =============================================
+   PESQUISA DE ALUNOS EM VÁRIAS ESCOLAS (B2)
+   Somente leitura. Lê direto de schools/{sid}/… via Auth.db, porque o DB
+   com schoolId = ADMIN devolve vazio de propósito.
+============================================= */
+const PSQ = { sel: [], linhas: [], titulo: '', ocupado: false };
+const PSQ_NEE = [['tea','TEA'],['altasHabilidades','Altas hab.'],['defFisica','Def. física'],['defIntelectual','Def. intelectual'],
+  ['defVisual','Def. visual','defVisualTipo'],['defAuditiva','Def. auditiva','defAuditivaTipo'],['tdah','TDAH'],['tpac','TPAC'],
+  ['dislexia','Dislexia'],['discalculia','Discalculia'],['disgrafia','Disgrafia'],['dislalia','Dislalia']];
+
+// colunas do CSV (as mesmas da pesquisa, com Escola, Ano e Turma na frente)
+const PSQ_COLS_CSV = [
+  ['escola','ESCOLA'],['ano','ANO LETIVO'],['turma','TURMA'],['serie','SÉRIE'],['nome','NOME'],['cpf','CPF'],
+  ['dataNascimento','DATA DE NASCIMENTO'],['idade','IDADE'],['mae','MÃE'],['pai','PAI'],['naturalidade','NATURALIDADE'],
+  ['sexo','SEXO'],['corRaca','COR/RAÇA'],['turno','TURNO'],['modelo','MODELO'],['rg','RG'],['certidao','CERTIDÃO'],
+  ['zona','ZONA'],['cep','CEP'],['logradouro','LOGRADOURO'],['endUF','UF'],['cidade','CIDADE'],['nee','NEE / TRANSTORNOS'],
+];
+// tabela em tela (enxuta) e PDF (essenciais + larguras em pt; soma 786 < 802 úteis no A4 paisagem)
+const PSQ_COLS_TELA = [['escola','ESCOLA','esc'],['nome','NOME',''],['serie','SÉRIE','nw'],['cpf','CPF','nw'],['turma','TURMA','']];
+const PSQ_COLS_PDF = [['escola','ESCOLA',120],['nome','NOME',185],['serie','SÉRIE',55],['cpf','CPF',80],
+  ['dataNascimento','NASCIMENTO',62],['idade','IDADE',34],['turma','TURMA',190],['modelo','MODELO',60]];
+
+function psqNorm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim(); }
+function psqDataBR(s) {
+  const t = String(s || '').trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[3].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[1]}`;
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m ? `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}` : t;
+}
+function psqIdade(s) {
+  const t = String(s || '').trim();
+  let y, mo, d, m;
+  if ((m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/))) { d = +m[1]; mo = +m[2]; y = +m[3]; }
+  else return '';
+  const h = new Date();
+  let i = h.getFullYear() - y;
+  if (h.getMonth() + 1 < mo || (h.getMonth() + 1 === mo && h.getDate() < d)) i--;
+  return (i >= 0 && i <= 130) ? String(i) : '';
+}
+// ordem pedagógica: G → 1º–5º → 6º–9º → EM → Eixo → especiais
+function psqSerieKey(s) {
+  const t = psqNorm(s); let m;
+  if ((m = t.match(/^G(?:RUPO\s*)?([1-5])$/))) return [0, +m[1]];
+  if ((m = t.match(/^([1-5])[º°O]?\s*ANO?$/))) return [1, +m[1]];
+  if ((m = t.match(/^([6-9])[º°O]?\s*ANO?$/))) return [2, +m[1]];
+  if ((m = t.match(/^([1-3])[º°O]?\s*E\.?M\.?$/))) return [3, +m[1]];
+  if ((m = t.match(/^EIXO\s*([1-5])$/))) return [4, +m[1]];
+  if (t.startsWith('ALFABET')) return [5, 0];
+  if (t.startsWith('MULTI')) return [5, 1];
+  return [9, 0];
+}
+function psqCmp(a, b) {
+  const c = a.escola.localeCompare(b.escola, 'pt-BR');
+  if (c) return c;
+  const ka = psqSerieKey(a.serie), kb = psqSerieKey(b.serie);
+  return (ka[0] - kb[0]) || (ka[1] - kb[1]) || a.nome.localeCompare(b.nome, 'pt-BR');
+}
+
+/* ── escolha das escolas ── */
+function psqEscolas() {
+  let l = [];
+  try { l = (window.Auth && Auth.listSchools && Auth.listSchools()) || []; } catch (_) {}
+  const vistos = new Set(), out = [];
+  l.forEach(s => {
+    const id = String(s.schoolId || s.id || '').trim();
+    if (!id || id.toUpperCase() === 'ADMIN' || vistos.has(id)) return;
+    vistos.add(id);
+    out.push({ id, nome: String(s.displayName || s.name || s.nome || id).trim() });
+  });
+  return out.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+function psqRenderSel() {
+  const sel = document.getElementById('psqSel');
+  if (!sel) return;
+  const v = sel.value, usados = new Set(PSQ.sel.map(e => e.id));
+  sel.innerHTML = '<option value="">(selecione uma escola)</option>' +
+    psqEscolas().filter(e => !usados.has(e.id)).map(e => `<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('');
+  sel.value = v;
+}
+function psqRenderChips() {
+  const el = document.getElementById('psqChips');
+  el.innerHTML = PSQ.sel.map(e =>
+    `<span class="psq-chip">${esc(e.nome)}<button type="button" title="Remover" onclick="psqRemover('${esc(e.id).replace(/'/g, '&#39;')}')">×</button></span>`).join('');
+}
+function psqAdicionar() {
+  const sel = document.getElementById('psqSel');
+  psqRenderSel();
+  const e = psqEscolas().find(x => x.id === sel.value);
+  if (!e) return setMsg('Selecione uma escola para adicionar.', 'warn');
+  if (!PSQ.sel.some(x => x.id === e.id)) PSQ.sel.push(e);
+  sel.value = '';
+  psqRenderSel(); psqRenderChips();
+}
+function psqRemover(id) {
+  PSQ.sel = PSQ.sel.filter(e => e.id !== id);
+  psqRenderSel(); psqRenderChips();
+}
+function psqTodasMudou() {
+  const todas = document.getElementById('psqTodas').checked;
+  document.getElementById('psqSel').disabled = todas;
+  document.getElementById('psqBtnAdd').disabled = todas;
+  document.getElementById('psqChips').classList.toggle('off', todas);   // chips ficam guardados, só ignorados
+}
+
+/* ── leitura (uma escola por vez) ── */
+function psqAnoAtivoDe(d) {
+  let v = d && d.configAnoAtivo;
+  if (v && typeof v === 'object') v = v.anoAtivo ?? v.ano ?? v.anoLetivo ?? null;
+  const n = parseInt(v, 10);
+  return n > 0 ? n : null;
+}
+function psqMatAtual(lista) {
+  const ts = m => { const d = new Date(m.encerradoEm || m.criadoEm || 0); return isNaN(d) ? 0 : d.getTime(); };
+  const at = lista.filter(m => String(m.status || 'ATIVO').toUpperCase() === 'ATIVO');
+  return (at.length ? at : lista).reduce((b, a) => (!b || ts(a) > ts(b)) ? a : b, null);
+}
+function psqLinha(esc_, ano, m, a, turmas) {
+  a = a || {};
+  const nee = PSQ_NEE.filter(x => a[x[0]]).map(x => (x[2] && a[x[2]]) || x[1]).join(', ');
+  const t = turmas.get(m.turmaId);
+  const nasc = String(a.dataNascimento || '').trim();
+  return {
+    escola: esc_.nome, ano: String(ano), turma: (t && t.nome) || m.turmaId || '',
+    serie: String(m.serie || '').toUpperCase(),
+    nome: String(a.nome || '').trim() || `(sem cadastro) ${m.alunoId}`,
+    cpf: String(a.cpf || '').trim(), dataNascimento: psqDataBR(nasc), idade: psqIdade(nasc),
+    mae: String(a.mae || '').trim(), pai: String(a.pai || '').trim(),
+    naturalidade: String(a.naturalidade || '').trim(), sexo: String(a.sexo || '').trim(),
+    corRaca: String(a.corRaca || '').trim() || 'Não declarada',
+    turno: String(m.turno || '').toUpperCase(), modelo: String(m.modelo || 'REGULAR').toUpperCase(),
+    rg: String(a.rg || '').trim(), certidao: String(a.certidao || '').trim(), zona: String(a.zona || '').trim(),
+    cep: String(a.cep || '').trim(), logradouro: String(a.logradouro || '').trim(),
+    endUF: String(a.endUF || '').trim(), cidade: String(a.cidade || '').trim(), nee: nee || '—',
+  };
+}
+async function psqLerEscola(e, anoDigitado) {
+  const ref = Auth.db.collection('schools').doc(e.id);
+  const [eDoc, tSnap] = await Promise.all([ref.get(), ref.collection('anoAtivoTurmas').get()]);
+  const anoAtivo = psqAnoAtivoDe(eDoc.exists ? eDoc.data() : null);
+  const ano = anoDigitado || anoAtivo;
+  if (!ano) return { linhas: [], aviso: 'sem ano ativo configurado (informe o ano letivo)' };
+  const ehAtivo = ano === anoAtivo;
+
+  // anoLetivo pode estar como texto ou número nos dados de teste
+  const mSnap = await ref.collection('anoAtivoMatriculas').where('anoLetivo', 'in', [String(ano), ano]).get();
+  const porAluno = new Map();
+  mSnap.docs.forEach(d => {
+    const m = d.data();
+    if (!m || !m.alunoId) return;
+    if (!porAluno.has(m.alunoId)) porAluno.set(m.alunoId, []);
+    porAluno.get(m.alunoId).push(m);
+  });
+  const escolhidas = new Map();
+  porAluno.forEach((lista, id) => {
+    const m = psqMatAtual(lista);
+    if (m && !(ehAtivo && String(m.status || 'ATIVO').toUpperCase() !== 'ATIVO')) escolhidas.set(id, m);
+  });
+
+  const ids = Array.from(escolhidas.keys()), lotes = [];
+  for (let i = 0; i < ids.length; i += 10) lotes.push(ids.slice(i, i + 10));
+  const alunos = new Map();
+  for (let i = 0; i < lotes.length; i += 10) {      // até 10 consultas em paralelo por onda
+    const ondas = await Promise.all(lotes.slice(i, i + 10).map(l => ref.collection('anoAtivoAlunos').where('alunoId', 'in', l).get()));
+    ondas.forEach(s => s.docs.forEach(d => { const a = d.data(); alunos.set(a.alunoId || d.id, a); }));
+  }
+  const turmas = new Map(tSnap.docs.map(d => [d.id, d.data()]));
+  return { linhas: ids.map(id => psqLinha(e, ano, escolhidas.get(id), alunos.get(id), turmas)), ano };
+}
+
+async function psqPesquisar() {
+  if (!IS_ADMIN || PSQ.ocupado) return;
+  await waitAuth();
+  const todas = document.getElementById('psqTodas').checked;
+  const alvo = todas ? psqEscolas() : PSQ.sel.slice();
+  if (!alvo.length) return setMsg(todas ? 'Nenhuma escola encontrada.' : 'Adicione ao menos uma escola ou marque "Todas as escolas".', 'warn');
+  if (!(window.Auth && Auth.db)) return setMsg('Firestore indisponível nesta página.', 'err');
+  const txt = document.getElementById('psqAno').value.trim();
+  const anoDig = txt ? parseInt(txt, 10) : null;
+  if (txt && !(anoDig >= 2000 && anoDig <= 2100)) return setMsg('Ano letivo inválido.', 'warn');
+  if (todas) {
+    const ok = await _confirmModal({
+      titulo: 'Pesquisar em todas as escolas', corDestaque: '#7c3aed', textoConfirmar: 'Pesquisar',
+      corpo: `Serão lidas as matrículas do ano e os alunos de ${alvo.length} escola(s). Pode levar um tempo e consumir muitas leituras do Firestore.`,
+    });
+    if (!ok) return;
+  }
+
+  PSQ.ocupado = true;
+  const btn = document.getElementById('psqBtnPesq');
+  btn.disabled = true;
+  clearLogEl('logPsq');
+  const linhas = [], anos = new Set(), falhas = [];
+  try {
+    for (let i = 0; i < alvo.length; i++) {
+      btn.textContent = `Lendo ${i + 1}/${alvo.length}…`;
+      try {
+        const r = await psqLerEscola(alvo[i], anoDig);
+        if (r.aviso) falhas.push(`${alvo[i].nome}: ${r.aviso}`);
+        else { r.linhas.forEach(l => linhas.push(l)); anos.add(r.ano); logEl(`✅ ${alvo[i].nome}: ${r.linhas.length} aluno(s) (${r.ano}).`, 'logPsq'); }
+      } catch (e) {
+        console.error('[psq]', alvo[i].id, e);
+        falhas.push(`${alvo[i].nome}: ${e.code || e.message || e}`);
+      }
+    }
+    falhas.forEach(f => logEl('⚠️ ' + f, 'logPsq'));
+    if (!linhas.length) return setMsg(falhas.length ? 'Nenhum aluno encontrado; veja o registro abaixo do card.' : 'Nenhum aluno encontrado.', 'warn');
+    if (falhas.length) setMsg(`${falhas.length} escola(s) não puderam ser lidas (veja o registro).`, 'warn');
+    PSQ.linhas = linhas.sort(psqCmp);
+    PSQ.titulo = `Alunos · ${alvo.length} escola(s) · ano ${Array.from(anos).sort().join(', ')}`;
+    psqAbrirModal();
+  } finally {
+    PSQ.ocupado = false;
+    btn.disabled = false; btn.textContent = '🔎 Pesquisar';
+  }
+}
+
+/* ── modal ── */
+function psqAbrirModal() {
+  document.getElementById('psqTitulo').textContent = PSQ.titulo;
+  document.getElementById('psqCont').textContent = `${PSQ.linhas.length} aluno(s)`;
+  const head = PSQ_COLS_TELA.map(c => `<th>${esc(c[1])}</th>`).join('');
+  const body = PSQ.linhas.map(l => '<tr>' + PSQ_COLS_TELA.map(c =>
+    `<td class="${c[2]}"${c[0] === 'escola' ? ` title="${esc(l.escola)}"` : ''}>${esc(l[c[0]])}</td>`).join('') + '</tr>').join('');
+  document.getElementById('psqBody').innerHTML = `<table class="psq-tab"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  document.getElementById('psqModal').style.display = 'flex';
+}
+function psqFecharModal() { document.getElementById('psqModal').style.display = 'none'; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') psqFecharModal(); });
+
+/* ── exportações ── */
+function psqNomeArq(ext) {
+  const h = new Date(), p = n => String(n).padStart(2, '0');
+  return `Pesquisa_Escolas_${p(h.getDate())}-${p(h.getMonth() + 1)}-${h.getFullYear()}.${ext}`;
+}
+function psqCsv() {
+  if (!PSQ.linhas.length) return;
+  const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const linhas = [PSQ_COLS_CSV.map(c => q(c[1])).join(';'),
+    ...PSQ.linhas.map(l => PSQ_COLS_CSV.map(c => q(l[c[0]])).join(';'))];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
+  a.download = psqNomeArq('csv');
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
+function psqPdf() {
+  if (!PSQ.linhas.length) return;
+  const { jsPDF } = window.jspdf || {};
+  if (!jsPDF) return setMsg('Falha ao carregar jsPDF. Verifique sua conexão.', 'err');
+  const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+  doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.text(PSQ.titulo, 20, 28);
+  doc.setFont(undefined, 'normal'); doc.setFontSize(8);
+  doc.text(`${PSQ.linhas.length} aluno(s) · gerado em ${new Date().toLocaleDateString('pt-BR')}`, 20, 40);
+  const columnStyles = {};
+  PSQ_COLS_PDF.forEach((c, i) => { columnStyles[i] = { cellWidth: c[2] }; });
+  doc.autoTable({
+    head: [PSQ_COLS_PDF.map(c => c[1])],
+    body: PSQ.linhas.map(l => PSQ_COLS_PDF.map(c => String(l[c[0]] || ''))),
+    startY: 48, columnStyles,
+    styles: { fontSize: 8, cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 }, overflow: 'linebreak', lineColor: [210, 220, 240], lineWidth: 0.3 },
+    headStyles: { fillColor: [11, 63, 191], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [243, 246, 255] },
+    margin: { left: 20, right: 20 },
+  });
+  doc.save(psqNomeArq('pdf'));
+}
+
 </script>
 
 </body>
