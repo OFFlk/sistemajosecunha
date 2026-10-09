@@ -89,6 +89,25 @@ html[data-theme="dark"] .btn.btn-danger-outline:hover { background: rgba(252,165
 .btn-gray:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
 .btn-mini { padding:8px 10px; font-size:13px; }
 
+/* Botão outline dos modais (Cancelar/Voltar) — mesmo padrão de cadastro-aluno-ativo.html */
+.btn.ghost { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
+.btn.ghost:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
+html[data-theme="dark"] .btn.ghost:hover { background: var(--brand-faded-d, rgba(124,58,237,.18)); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
+
+/* Modais de confirmação (cm-*) — copiado de cadastro-aluno-ativo.html, com os tokens
+   desta página (--ink no lugar de --text; --card-border no lugar de --border). */
+.cm-box{ background:var(--card-bg,#fff); border:1px solid var(--card-border); border-radius:14px; padding:22px; max-width:440px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto; }
+.cm-titulo{ margin:0 0 6px; font-size:16px; font-weight:800; color:var(--ink); }
+.cm-titulo.perigo{ color:var(--danger,#b91c1c); }
+html[data-theme="dark"] .cm-titulo.perigo{ color:#fca5a5; }
+.cm-corpo{ margin:0 0 14px; font-size:13px; color:var(--ink); white-space:pre-line; line-height:1.5; }
+.cm-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; flex-wrap:wrap; }
+.cm-ok{ padding:9px 16px; border-radius:8px; font-size:13px; font-weight:800; font-family:'Nunito',sans-serif; cursor:pointer; background:var(--brand); border:1px solid var(--brand); color:var(--brand-fg,#fff); }
+.cm-ok:hover:not(:disabled){ filter:brightness(1.08); }
+.cm-ok:disabled{ opacity:.55; cursor:not-allowed; }
+.cm-ok.perigo{ background:var(--danger,#b91c1c); border-color:var(--danger,#b91c1c); color:#fff; }
+html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626; }
+
 /* Formulário */
 .row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
 @media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
@@ -140,7 +159,6 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 
 /* Cabeçalho da ata (pré-visualização) */
 .cabecalho{ display:flex; align-items:center; gap:15px; margin-bottom:10px; }
-.cabecalho img{ width:90px; height:auto; display:none; }
 .cabecalho-texto{ flex:1; text-align:center; }
 .cabecalho-texto h2{ margin:0; }
 .cabecalho-texto p{ margin:2px 0; font-size:14px; }
@@ -248,6 +266,21 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
   border-left-color: var(--dest-fg); color: var(--dest-fg);
 }
 
+/* Chip com os metadados da turma escolhida — mesmo visual do aviso padrão do
+   card (painel translúcido do próprio destaque, faixa esquerda 4px), em vez de
+   --chip-bg/--chip-border (guia 1.9 / 5.5). */
+.card-destaque .info-turma {
+  display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; margin-bottom:12px;
+  padding:12px 14px; border-radius:12px; font-size:13px;
+  background:var(--dest-panel-bg); border:1px solid var(--dest-btn-bd);
+  border-left:4px solid var(--dest-fg); color:var(--dest-fg);
+}
+.card-destaque .info-turma b { color:var(--dest-fg); }
+
+/* Scan marcado para exclusão (só some de verdade ao "Salvar no banco") */
+.scans-item.scan-removendo { opacity:.6; }
+.scans-item.scan-removendo .scans-item-nome { text-decoration:line-through; }
+
 /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
    desktop e mobile (sem depender de hover). Texto mora inline, dentro do
    próprio .info-tip-bubble, junto de onde é usado. ===== */
@@ -287,7 +320,6 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
     </div>
 
     <div class="cabecalho">
-      <img id="escudo" alt="Escudo da escola">
       <div class="cabecalho-texto">
         <h2 id="nomeEscola">Nome da Escola</h2>
         <p id="enderecoEscola">Endereço da Escola</p>
@@ -315,7 +347,7 @@ html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); bo
       </div>
     </div>
 
-    <div id="infoTurmaSelecionada" class="hidden" style="margin-top:14px; padding:12px 14px; border-radius:10px; background:var(--chip-bg,#f5f3ff); border:1px solid var(--chip-border,#ddd6fe); font-size:13px; display:flex; flex-wrap:wrap; gap:14px;">
+    <div id="infoTurmaSelecionada" class="info-turma hidden">
       <span><b>Turno:</b> <span id="infoTurnoTurma">—</span></span>
       <span><b>Série(s):</b> <span id="infoSeriesTurma">—</span></span>
       <span><b>Schema de notas:</b> <span id="infoSchemaTurma">—</span></span>
@@ -600,20 +632,10 @@ async function carregarDadosEscola() {
 
   const elNome = $("nomeEscola");
   const elEnd  = $("enderecoEscola");
-  const imgEscudo = $("escudo");
 
   if (elNome && escola.nome) elNome.textContent = escola.nome;
   if (elEnd && escola.endereco) elEnd.textContent = escola.endereco;
 
-  if (imgEscudo) {
-    if (escola.escudo) {
-      imgEscudo.src = escola.escudo;
-      imgEscudo.style.display = "block";
-    } else {
-      imgEscudo.style.display = "none";
-      imgEscudo.removeAttribute("src");
-    }
-  }
 }
 
 /* =========================
@@ -814,81 +836,76 @@ async function limparAlunosSemMatricula(alunoIds) {
   return out;
 }
 
-/* ✅ Excluir matrícula desta turma. Só fica disponível depois de clicar
-   "Editar" na tabela. Se essa era a ÚLTIMA matrícula do aluno (nenhuma
-   outra turma de Atas), o aluno (alunos-atas) e o elo (alunos) são apagados
-   junto; se ele tem matrícula em outra turma, só a daqui é removida. */
+/* ✅ Excluir aluno desta turma — só MARCA a exclusão. Nada é apagado no banco
+   antes de "Salvar no banco" (matrícula, e — se era a última — aluno + elo);
+   "Descartar alterações" ou trocar de turma sem salvar desfaz. Só fica
+   disponível depois de clicar "Editar" na tabela. */
 async function excluirAlunoEmEdicao() {
   if (!_alunoEmEdicao) return;
 
   const nome = _alunoEmEdicao.nome || "este aluno";
   const ok = await _confirmModal({
-    titulo: "🗑️ Excluir matrícula?",
-    corpo: `Remove ${escHtml(nome)} desta turma.\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida. Essa ação não pode ser desfeita.`,
-    corDestaque: "#991b1b",
+    titulo: "🗑️ Excluir aluno desta turma?",
+    corpo: `${escHtml(nome)} sai desta turma quando você clicar em "Salvar no banco" — até lá nada é apagado.\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado nesse momento. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida.`,
+    corDestaque: "danger",
     textoConfirmar: "Sim, excluir",
   });
   if (!ok) return;
 
-  const btn = $("btnExcluirAluno");
-  if (btn) { btn.disabled = true; btn.textContent = "Excluindo…"; }
+  // alunoId só existe se a matrícula já foi salva antes; aluno recém-adicionado
+  // nesta sessão não tem nada no banco (o splice() do editarAluno() basta).
+  const alunoId = String(_alunoEmEdicao.alunoId || "").trim();
+  if (alunoId && turmaIdAtual) _exclusoesPendentes.set(alunoId, nome);
 
-  try {
-    const alunoId = String(_alunoEmEdicao.alunoId || "").trim();
-    let gc = { removidos: [], aviso: "" };
-    let alunoApagado = false;
+  _dirty = true;
+  limparCamposAluno();
+  _toastAviso(`🗑️ ${nome} será excluído ao salvar no banco.`);
+}
 
-    // Só existe matrícula salva no Firestore se essa turma já foi salva
-    // com esse aluno antes (alunoId só é atribuído em garantirIdsESistemaParaTurma).
-    // Se for um aluno recém-adicionado nesta sessão (ainda não salvo), o
-    // splice() do editarAluno() já é suficiente — não há nada no banco pra apagar.
-    if (alunoId && turmaIdAtual) {
-      setMsg('Excluindo matrícula…', 'loading');
-      const mid = idMatriculaFrom(turmaIdAtual, alunoId);
-      if (window.DB?.matriculas?.remove) {
-        await window.DB.matriculas.remove(mid);
-      }
+/**
+ * Aplica as exclusões marcadas (chamada por _salvarNoBancoInterno DEPOIS de
+ * salvar a turma e as matrículas). Para cada aluno: apaga a matrícula; depois,
+ * quem ficou sem nenhuma matrícula em Atas perde aluno + elo
+ * (limparAlunosSemMatricula); quem permaneceu tem o ultimoAnoRegistro recalculado.
+ * Aluno que voltou para a lista (re-adicionado) não é excluído.
+ */
+async function _efetivarExclusoesPendentes(turmaObj) {
+  const out = { matriculas: 0, alunosApagados: 0, erros: [] };
+  const naTurma = new Set((turmaObj.alunos || []).map(a => String(a?.alunoId || "").trim()).filter(Boolean));
+  const ids = [..._exclusoesPendentes.keys()].filter(id => !naTurma.has(id));
+  [..._exclusoesPendentes.keys()].filter(id => naTurma.has(id)).forEach(id => _exclusoesPendentes.delete(id));
+  if (!ids.length) return out;
 
-      // Sem nenhuma matrícula restante → apaga o aluno (alunos-atas) e o elo
-      // (alunos). Com matrícula em outra turma → o aluno permanece.
-      gc = await limparAlunosSemMatricula([alunoId]);
-      alunoApagado = gc.removidos.includes(alunoId);
-
-      // Mantém ultimoAnoRegistro do catálogo (alunos-atas) coerente após a
-      // remoção — mesma função usada em garantirIdsESistemaParaTurma().
-      // NÃO roda se o aluno acabou de ser apagado (o saveAll com merge
-      // recriaria o doc de alunos-atas).
-      if (!alunoApagado && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
-        const escola = await window.DB.escola.get();
-        const anoAtivoAtual = escola?.configAnoAtivo || null;
-        await window.Identidade.recalcularUltimoAnoRegistroBatch([alunoId], anoAtivoAtual);
-      }
-      // Remove esse aluno do doc da turma JÁ — só ele, a partir do que já
-      // está persistido (turmaAtual.alunos), sem tocar em nenhuma outra
-      // edição pendente na tela que ainda não passou por "Salvar no banco".
-      // Senão a turma ficaria listando um aluno cuja matrícula acabou de
-      // ser apagada, até alguém lembrar de salvar de novo.
-      const alunosPersistidos = Array.isArray(turmaAtual?.alunos)
-        ? turmaAtual.alunos.filter(x => String(x?.alunoId || "") !== alunoId)
-        : [];
-      await window.DB.turmas.save({ _id: turmaIdAtual, alunos: alunosPersistidos });
-      if (turmaAtual) turmaAtual.alunos = alunosPersistidos;
+  const falhou = new Set();
+  for (const id of ids) {
+    try {
+      await window.DB.matriculas.remove(idMatriculaFrom(turmaIdAtual, id));
+      out.matriculas++;
+    } catch (e) {
+      falhou.add(id);
+      out.erros.push(`matrícula de ${_exclusoesPendentes.get(id) || id}: ${e.message || e}`);
     }
-
-    limparCamposAluno();
-    if (gc.aviso) {
-      _toastErro(`⚠️ Matrícula de ${nome} excluída, mas: ${gc.aviso}.`);
-    } else if (alunoApagado) {
-      _toastSucesso(`✅ ${nome} excluído: era a única matrícula, então o aluno (ID e elo) também foi apagado.`);
-    } else {
-      _toastSucesso(`✅ Matrícula de ${nome} excluída desta turma.`);
-    }
-  } catch (err) {
-    console.error("[excluirAlunoEmEdicao]", err);
-    _toastErro("❌ Erro ao excluir a matrícula: " + err.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "🗑️ Excluir aluno desta turma"; }
   }
+
+  const efetivados = ids.filter(id => !falhou.has(id));
+  const gc = await limparAlunosSemMatricula(efetivados);
+  out.alunosApagados = gc.removidos.length;
+  if (gc.aviso) out.erros.push(gc.aviso);
+
+  // Quem permaneceu (tem matrícula em outra turma): mantém ultimoAnoRegistro coerente.
+  // NÃO roda para quem foi apagado (o saveAll com merge recriaria o doc de alunos-atas).
+  const permaneceram = efetivados.filter(id => !gc.removidos.includes(id));
+  if (permaneceram.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+    try {
+      const escola = await window.DB.escola.get();
+      await window.Identidade.recalcularUltimoAnoRegistroBatch(permaneceram, escola?.configAnoAtivo || null);
+    } catch (e) {
+      out.erros.push("atualização do último ano de registro");
+    }
+  }
+
+  efetivados.forEach(id => _exclusoesPendentes.delete(id)); // os que falharam ficam para a próxima tentativa
+  return out;
 }
 
 function ordenarAlunos() {
@@ -909,6 +926,7 @@ function ordenarAlunos() {
    aqui).
 ========================= */
 let _alunoCandidatoSelecionado = null; // { alunoId, nome, ultimoAnoRegistro } | null
+let _exclusoesPendentes = new Map(); // alunoId → nome: exclusões marcadas, aplicadas só em "Salvar no banco"
 let _alunoEmEdicao = null; // cópia do aluno que foi retirado da lista pra edição (via "Editar") | null
 
 function _limparVinculoCandidato() {
@@ -1483,6 +1501,7 @@ async function selecionarTurma(turmaId) {
   // turma), edição em andamento, estado "sujo" e trava do import.
   if (window.scansResetar) window.scansResetar();
   _alunoEmEdicao = null;
+  _exclusoesPendentes.clear();
   _alunoCandidatoSelecionado = null;
   _dirty = false;
   _destravarImport();
@@ -1552,7 +1571,7 @@ let _importJaFeito = false;  // o import pontual roda 1x por sessão de turma
 
 function _temAlteracoesNaoSalvas() {
   const scans = window.scansTemPendentes ? window.scansTemPendentes() : false;
-  return !!(_dirty || _alunoEmEdicao || scans);
+  return !!(_dirty || _alunoEmEdicao || scans || _exclusoesPendentes.size);
 }
 
 function _travarImport() {
@@ -1589,11 +1608,13 @@ async function descartarAlteracoes() {
   }
   const ok = await _confirmModal({
     titulo: "↩️ Descartar alterações?",
-    corpo: "Tudo o que foi lançado, editado ou importado desde o último salvamento — e os scans que estão na fila — será descartado.\n\nA turma volta ao que está salvo no banco. Essa ação não pode ser desfeita.",
+    corpo: "Tudo o que foi lançado, editado, importado ou excluído desde o último salvamento — e os scans na fila de envio ou marcados para exclusão — será descartado.\n\nA turma volta ao que está salvo no banco. Essa ação não pode ser desfeita.",
+    corDestaque: "danger",
     textoConfirmar: "Sim, descartar",
   });
   if (!ok) return;
   if (window.scansLimparFila) window.scansLimparFila();
+  _exclusoesPendentes.clear();
   _recarregarAlunosDaTurma();
   limparCamposAluno();
   _dirty = false;
@@ -1604,26 +1625,28 @@ async function descartarAlteracoes() {
 // Modal de 3 saídas (o _confirmModal só tem 2): 'salvar' | 'descartar' | 'cancelar'
 function _modalDadosNaoSalvos() {
   return new Promise((resolve) => {
-    const cor = '#b45309';
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.style.display = 'flex';
     backdrop.innerHTML =
-      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:460px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">⚠️ Dados não salvos</h3>`+
-        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">Há alunos lançados/importados ou scans nesta turma que ainda não foram salvos.\n\nO que deseja fazer?</p>`+
-        `<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">`+
+      `<div class="cm-box" style="max-width:460px;">`+
+        `<h3 class="cm-titulo">⚠️ Dados não salvos</h3>`+
+        `<p class="cm-corpo">Há alterações nesta turma que ainda não foram salvas (alunos lançados, importados ou excluídos, scans enviados ou excluídos).\n\nO que deseja fazer?</p>`+
+        `<div class="cm-acoes">`+
           `<button type="button" class="btn ghost" id="_nsVoltar">Voltar</button>`+
           `<button type="button" class="btn ghost" id="_nsDescartar">Descartar e continuar</button>`+
-          `<button type="button" id="_nsSalvar" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">Salvar e continuar</button>`+
+          `<button type="button" class="cm-ok" id="_nsSalvar">Salvar e continuar</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
-    const fechar = (r) => { backdrop.remove(); resolve(r); };
+    const fechar = (r) => { document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); };
+    const onKey = (ev) => { if (ev.key === 'Escape') fechar('cancelar'); };
+    document.addEventListener('keydown', onKey);
     backdrop.querySelector('#_nsVoltar').addEventListener('click', () => fechar('cancelar'));
     backdrop.querySelector('#_nsDescartar').addEventListener('click', () => fechar('descartar'));
     backdrop.querySelector('#_nsSalvar').addEventListener('click', () => fechar('salvar'));
     backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) fechar('cancelar'); });
+    backdrop.querySelector('#_nsVoltar').focus();
   });
 }
 
@@ -1729,31 +1752,32 @@ function _showToast(msg, bg, shadow, duration){
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
   return new Promise((resolve) => {
-    const cor = corDestaque || '#b45309'; // amber-700 (padrão do sistema)
+    const perigo = corDestaque === 'danger';   // senão, cores da marca (tokens do tema)
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.style.display = 'flex';
     backdrop.innerHTML =
-      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${escHtml(titulo || 'Confirmar ação')}</h3>`+
-        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+      `<div class="cm-box">`+
+        `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p class="cm-corpo">${corpo || ''}</p>`+
+        `<div class="cm-acoes">`+
           `<button type="button" class="btn ghost" id="_confirmModalCancelar">${escHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-            `${escHtml(textoConfirmar || 'Continuar')}`+
-          `</button>`+
+          `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk">${escHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
 
     function fechar(resultado){
+      document.removeEventListener('keydown', onKey);
       backdrop.remove();
       resolve(resultado);
     }
+    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+    document.addEventListener('keydown', onKey);
     backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
     backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    backdrop.querySelector('#_confirmModalCancelar').focus();   // lado seguro numa ação destrutiva
   });
 }
 
@@ -1829,7 +1853,7 @@ async function _salvarNoBancoInterno(recarregar) {
     const confirmou = await _confirmModal({
       titulo: "⚠️ Salvar turma sem nenhum aluno?",
       corpo: `Essa turma já tinha ${turmaAtual.alunos.length} aluno(s) lançado(s), e a lista está vazia agora.\n\nSalvar assim vai apagar todos os alunos dessa turma. Tem certeza?`,
-      corDestaque: "#991b1b",
+      corDestaque: "danger",
       textoConfirmar: "Sim, salvar vazio"
     });
     if (!confirmou) return false;
@@ -1880,6 +1904,14 @@ async function _salvarNoBancoInterno(recarregar) {
     falhasIds = [e.message || String(e)];
   }
 
+  // ── Exclusões de alunos marcadas (só agora vão para o banco) ──
+  let exclusoes = { matriculas: 0, alunosApagados: 0, erros: [] };
+  if (_exclusoesPendentes.size) {
+    setMsg('Aplicando exclusões…', 'loading');
+    try { exclusoes = await _efetivarExclusoesPendentes(turmaObj); }
+    catch (e) { console.error('[exclusões]', e); exclusoes.erros.push(e.message || String(e)); }
+  }
+
   // ── Scans: dispara upload da fila (a turma já existe desde antes) ──
   // O toast FINAL é montado aqui: senão o "salvo" apagaria na hora um erro de
   // upload. Scan que falhou não fica na fila — o aviso manda enviar depois
@@ -1903,16 +1935,22 @@ async function _salvarNoBancoInterno(recarregar) {
 
   const falhas = [];
   if (falhasIds.length) falhas.push(`vínculos/matrículas (${falhasIds.join('; ')})`);
+  if (exclusoes.erros.length) falhas.push(`exclusão de aluno(s) (${exclusoes.erros.join('; ')})`);
   if (resultadoScans && resultadoScans.erros.length) {
     falhas.push(`${resultadoScans.erros.length} scan(s) não enviado(s) — envie depois pela edição da ata (${resultadoScans.erros.join(' | ')})`);
   }
+  if (resultadoScans && resultadoScans.errosExclusao && resultadoScans.errosExclusao.length) {
+    falhas.push(`${resultadoScans.errosExclusao.length} scan(s) não excluído(s) — tente salvar de novo (${resultadoScans.errosExclusao.join(' | ')})`);
+  }
+  const extras = [];
+  if (resultadoScans && resultadoScans.enviados) extras.push(`${resultadoScans.enviados} scan(s) enviado(s).`);
+  if (resultadoScans && resultadoScans.removidos) extras.push(`${resultadoScans.removidos} scan(s) excluído(s).`);
+  if (exclusoes.matriculas) extras.push(`${exclusoes.matriculas} aluno(s) excluído(s) da turma.`);
+  const msgSalvo = ['Alunos e notas salvos.', ...extras].join(' ');
   // Hard refresh (padrão do sistema, igual ao cadastro-aluno-ativo): só quando TUDO deu certo.
   // Com falha parcial a página fica como está, pra você ver o erro e tentar de novo.
   if (!falhas.length && recarregar) {
-    const msgOk = (resultadoScans && resultadoScans.enviados)
-      ? `Alunos e notas salvos. ${resultadoScans.enviados} scan(s) enviado(s).`
-      : 'Alunos e notas salvos.';
-    try { sessionStorage.setItem('atas:toast', JSON.stringify({ msg: msgOk, kind: 'ok' })); } catch(_) {}
+    try { sessionStorage.setItem('atas:toast', JSON.stringify({ msg: msgSalvo, kind: 'ok' })); } catch(_) {}
     _recarregandoPosSalvar = true;
     window.location.reload();
     return true;
@@ -1920,10 +1958,8 @@ async function _salvarNoBancoInterno(recarregar) {
 
   if (falhas.length) {
     setMsg('Turma salva, mas falhou: ' + falhas.join(' — '), 'err');
-  } else if (resultadoScans && resultadoScans.enviados) {
-    setMsg(`Alunos e notas salvos. ${resultadoScans.enviados} scan(s) enviado(s).`, 'ok');
   } else {
-    setMsg('Alunos e notas salvos.', 'ok');
+    setMsg(msgSalvo, 'ok');
   }
   return true;
 }
@@ -2342,7 +2378,7 @@ function _importAbrirModalEscolhaAba() {
     </select>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
       <button type="button" class="btn ghost" onclick="_importFecharModal()">Cancelar</button>
-      <button type="button" class="btn btn-primary" onclick="_importConfirmarAba()">Continuar</button>
+      <button type="button" class="cm-ok" onclick="_importConfirmarAba()">Continuar</button>
     </div>
   `;
   _importMontarModal(body, 440);
@@ -2420,7 +2456,7 @@ function _importRenderRevisao(materiasSemColuna, colunasNaoReconhecidas) {
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
       <button type="button" class="btn ghost" onclick="_importFecharModal()">Cancelar</button>
-      <button type="button" class="btn btn-primary" onclick="_importConfirmarImportacao()">Importar ${_importAtaAlunos.length} aluno(s)</button>
+      <button type="button" class="cm-ok" onclick="_importConfirmarImportacao()">Importar ${_importAtaAlunos.length} aluno(s)</button>
     </div>
   `;
   _importMontarModal(body, 640);
@@ -2575,6 +2611,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let _fila    = [];
   let _turmaId = null;
+  let _excluirScans = new Map(); // fileId → {fileId,resourceType,name}: marcados, apagados só em "Salvar no banco"
 
   // Carrega o PDF via PDF.js e devolve o documento (sem converter páginas ainda).
   // Separado da conversão pra poder contar páginas ANTES de gastar processamento
@@ -2634,7 +2671,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Total de scans já contabilizados pra essa turma: os já salvos (renderizados
   // como .scan-existente) + os que já estão na fila aguardando envio.
   function contarScansAtuais(){
-    return document.querySelectorAll('#scansLista .scan-existente').length + _fila.length;
+    return document.querySelectorAll('#scansLista .scan-existente:not(.scan-removendo)').length + _fila.length;
   }
 
   // ÚNICA mudança de feedback: 'loading'/'ok'/'err' agora vão pro toast da
@@ -2751,8 +2788,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   window.uploadScansQueue = async function(){
-    if(!_fila.length || !_turmaId) return { enviados: 0, erros: [] };
-    setStatus('loading', `⏳ Enviando ${_fila.length} arquivo(s)…`);
+    if(!_turmaId || (!_fila.length && !_excluirScans.size)) return { enviados: 0, removidos: 0, erros: [], errosExclusao: [] };
+
+    // 1) exclusões marcadas (antes dos envios, pra liberar vaga no limite da turma)
+    const errosExclusao = [];
+    let removidos = 0;
+    for (const [id, it] of Array.from(_excluirScans)) {
+      setStatus('loading', `⏳ Removendo ${it.name}…`);
+      try {
+        const r = await fetch(API_DELETE, { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fileId: it.fileId, resourceType: it.resourceType || 'image' }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Erro no servidor');
+        _excluirScans.delete(id);
+        _divDoScan(id)?.remove();
+        removidos++;
+      } catch (e) {
+        errosExclusao.push(`${it.name}: ${e.message}`);
+      }
+    }
+
+    // 2) envios
+    if (_fila.length) setStatus('loading', `⏳ Enviando ${_fila.length} arquivo(s)…`);
     const erros = [];
     const enviados = [];
     for(const item of _fila){
@@ -2765,7 +2821,7 @@ document.addEventListener("DOMContentLoaded", () => {
     enviados.forEach(f => _renderExistente(f));
     // Devolve o resultado; o toast final é montado por salvarNoBanco() (senão o
     // "salvo" apagaria o erro na hora).
-    return { enviados: enviados.length, erros };
+    return { enviados: enviados.length, removidos, erros, errosExclusao };
   };
 
   window.initScans = function(turmaId){
@@ -2800,6 +2856,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function _marcarVisual(div, marcado){
+    div.classList.toggle('scan-removendo', marcado);
+    const b = div.querySelector('[data-fileid]');
+    if (b) { b.textContent = marcado ? '↩️ Desfazer' : '🗑️'; b.title = marcado ? 'Desfazer exclusão' : 'Excluir'; }
+  }
+  function _divDoScan(id){
+    return Array.from(document.querySelectorAll('#scansLista .scan-existente'))
+      .find(el => el.querySelector('[data-fileid]')?.dataset.fileid === id);
+  }
+
   function _renderExistente(f){
     const lista = document.getElementById('scansLista');
     if(!lista) return;
@@ -2828,22 +2894,15 @@ document.addEventListener("DOMContentLoaded", () => {
         btnPdf+
         `<button class="btn btn-danger-outline btn-mini" data-fileid="${escHtml(f.fileId)}" data-restype="${escHtml(f.resourceType||'image')}" data-name="${escHtml(f.fileName)}" title="Excluir">🗑️</button>`+
       '</div>';
-    div.querySelector('[data-fileid]').addEventListener('click', async function(){
-      const ok = await _confirmModal({
-        titulo: '🗑️ Excluir scan?',
-        corpo: `Excluir "${escHtml(this.dataset.name)}"?\n\nEssa ação não pode ser desfeita.`,
-        corDestaque: '#991b1b',
-        textoConfirmar: 'Sim, excluir',
-      });
-      if(!ok) return;
-      setStatus('loading','⏳ Removendo…');
-      try{
-        const r = await fetch(API_DELETE,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:this.dataset.fileid,resourceType:this.dataset.restype||'image'})});
-        const d = await r.json();
-        if(!r.ok) throw new Error(d.error);
-        this.closest('.scans-item').remove();
-        setStatus('ok','✅ Removido.');
-      }catch(e){ setStatus('err','❌ Erro: '+e.message); }
+    // Excluir só MARCA o scan (riscado + "Desfazer"); o arquivo do Cloudinary e o
+    // doc só somem em "Salvar no banco". Clicar de novo desfaz a marcação.
+    const btnDel = div.querySelector('[data-fileid]');
+    btnDel.addEventListener('click', function(){
+      const id = this.dataset.fileid;
+      if (_excluirScans.has(id)) { _excluirScans.delete(id); _marcarVisual(div, false); return; }
+      _excluirScans.set(id, { fileId: id, resourceType: this.dataset.restype || 'image', name: this.dataset.name });
+      _marcarVisual(div, true);
+      _toastAviso('🗑️ Scan marcado para exclusão — será removido ao salvar no banco.');
     });
     if (grupo) {
       div.querySelector('.btn-baixar-pdf').addEventListener('click', () => baixarPdfGrupo(grupo.base, grupo.total));
@@ -2909,7 +2968,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const ok = await _confirmModal({
         titulo: '⚠️ Páginas faltando',
         corpo: `Esta ata tinha ${total} página(s) originalmente, mas só ${itens.length} ainda existe(m) — as outras foram apagadas. Baixar mesmo assim, só com as páginas restantes?`,
-        corDestaque: '#b45309',
         textoConfirmar: 'Baixar mesmo assim',
       });
       if (!ok) return;
@@ -2938,12 +2996,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ── Aditivo: usados pela trava de "dados não salvos" / troca de turma ──
-  window.scansTemPendentes = function(){ return _fila.length > 0; };
+  window.scansTemPendentes = function(){ return _fila.length > 0 || _excluirScans.size > 0; };
   // Só descarta a fila de envio (mantém a lista de scans já enviados)
-  window.scansLimparFila = function(){ _fila = []; renderFila(); };
+  window.scansLimparFila = function(){
+    _fila = []; renderFila();
+    // desfaz as exclusões marcadas (volta ao que está salvo)
+    Array.from(_excluirScans.keys()).forEach(id => { const d = _divDoScan(id); if (d) _marcarVisual(d, false); });
+    _excluirScans.clear();
+  };
   // Troca de turma: esvazia fila E a lista da turma anterior (a nova é recarregada por initScans)
   window.scansResetar = function(){
-    _fila = []; _turmaId = null;
+    _fila = []; _turmaId = null; _excluirScans.clear();
     document.getElementById('scansLista')?.querySelectorAll('.scan-pendente,.scan-existente').forEach(el => el.remove());
   };
 
