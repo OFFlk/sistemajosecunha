@@ -146,6 +146,11 @@ html[data-theme="dark"] .card:not(.card-destaque) .sec-header.fechada:hover h3 {
 
 /* ── Botão ghost (cópia do cadastro-turma-ativa) ── */
 .btn.ghost,
+.btn.secondary,
+.btn.outline {
+  border: 1px solid;
+}
+.btn.ghost,
 .btn.secondary {
   background: var(--chip-bg);
   border-color: var(--chip-border);
@@ -271,7 +276,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
   <div class="card">
-    <div class="sec-header" onclick=\"secHeaderClick('secPesquisa', event)\">
+    <div class="sec-header" onclick="secHeaderClick('secPesquisa', event)">
       <h3 style="margin-top:0;">🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
       <span class="sec-toggle" id="togSecPesquisa">▼</span>
     </div>
@@ -282,7 +287,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
       <label class="psq-chk"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
       <div class="row-btns" style="margin-top:10px;">
         <select id="psqSel" class="psq-in" style="flex:1;min-width:220px;" onfocus="psqRenderSel()"></select>
-        <button class="btn btn-gray" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
+        <button class="btn secondary" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
       </div>
       <div class="psq-chips" id="psqChips"></div>
       </div>
@@ -296,7 +301,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
   <div class="card">
-    <div class="sec-header" onclick=\"secHeaderClick('secExcluirAluno', event)\">
+    <div class="sec-header" onclick="secHeaderClick('secExcluirAluno', event)">
       <h3 style="margin-top:0;">🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
       <span class="sec-toggle" id="togSecExcluirAluno">▼</span>
     </div>
@@ -325,7 +330,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── EXCLUSÃO PONTUAL: TURMA ── -->
   <div class="card">
-    <div class="sec-header" onclick=\"secHeaderClick('secExcluirTurma', event)\">
+    <div class="sec-header" onclick="secHeaderClick('secExcluirTurma', event)">
       <h3 style="margin-top:0;">🗑️ Excluir turma (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove uma turma (<b>anoAtivoTurmas</b>) e as matrículas (<b>anoAtivoMatriculas</b>) que apontam para ela, evitando matrículas órfãs. Os alunos não são apagados. <b>Ação irreversível.</b></span></span></h3>
       <span class="sec-toggle" id="togSecExcluirTurma">▼</span>
     </div>
@@ -351,7 +356,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
   <div class="card">
-    <div class="sec-header" onclick=\"secHeaderClick('secGerarAta', event)\">
+    <div class="sec-header" onclick="secHeaderClick('secGerarAta', event)">
       <h3 style="margin-top:0;">📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Informe o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
       <span class="sec-toggle" id="togSecGerarAta">▼</span>
     </div>
@@ -360,7 +365,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <input type="number" id="gaAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;"
           placeholder="Ano letivo da turma (ex.: 2025 — não pode ser o ano ativo)"
           onchange="document.getElementById('gaForm').style.display='none'; gaResetPlano();">
-        <button class="btn btn-gray" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
+        <button class="btn secondary" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
       </div>
 
       <div id="gaForm" style="display:none;margin-top:14px;">
@@ -385,7 +390,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
   <div class="card card-destaque">
-    <div class="sec-header" onclick=\"secHeaderClick('secBackup', event)\">
+    <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
       <h3 style="margin-top:0;">💾 Backup do ano ativo</h3>
       <span class="sec-toggle" id="togSecBackup">▼</span>
     </div>
@@ -400,7 +405,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <div>
           <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
           <div class="row-btns" style="margin-top:0;">
-            <label class="btn secondary" id="lblImportJSON" style="cursor:pointer;">
+            <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
               📂 Carregar JSON de backup
               <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
             </label>
