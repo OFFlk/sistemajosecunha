@@ -19,232 +19,117 @@
 <script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
-<script src="../theme-colors.js"></script>
+<script src="../theme-colors.js?v=2"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/base.css">
-<link rel="stylesheet" href="/css/header.css">
-<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/base.css?v=2">
+<link rel="stylesheet" href="/css/header.css?v=2">
+<link rel="stylesheet" href="/css/components.css?v=2">
 
 <title>Gestão de Dados · Ano Ativo</title>
 <style>
+/* Variáveis próprias da página (prefixo --gd-). Cores de tema vêm do global (--ui-*). */
 :root {
-  --card:    #ffffff;
-  --radius:  14px;
-  --shadow:  0 4px 20px rgba(0,0,0,0.06);
-  --danger:  #b91c1c;
-  --danger2: #991b1b;
-  --ok-bg:   rgba(22,163,74,.10);
-  --ok-bd:   rgba(22,163,74,.30);
-  --warn-bg: rgba(245,158,11,.10);
-  --warn-bd: rgba(245,158,11,.30);
-  --chip:    var(--brand-faded, #f5f3ff);
-  --chipTxt: var(--brand-text,  #6d28d9);
-}
-html[data-theme="dark"] {
-  --card:    #131c2e;
-  --shadow:  0 4px 24px rgba(0,0,0,0.4);
-  --chip:    var(--brand-faded-d, rgba(124,58,237,0.28));
-  --chipTxt: var(--brand-text-d,  #c4b5fd);
+  --gd-ok-bg:   rgba(22,163,74,.10);
+  --gd-ok-bd:   rgba(22,163,74,.30);
+  --gd-warn-bg: rgba(245,158,11,.10);
+  --gd-warn-bd: rgba(245,158,11,.30);
 }
 
+/* ── Layout ── */
 .container { max-width:1060px; margin:0 auto; padding:36px 24px 60px; position:relative; z-index:1; }
-
-.card {
-  background:var(--card); border:1px solid var(--border,#ddd6fe);
-  border-radius:var(--radius); padding:22px 26px;
-  box-shadow:var(--shadow); margin-bottom:18px;
-  transition:background .3s, border-color .3s;
-}
+/* Card: aparência é do global; aqui só espaçamento (variáveis) e overflow visível (não cortar o balão do ⓘ) */
+.container .card { --card-pad:22px; --card-gap:18px; overflow:visible; }
 h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
-.muted { color:var(--muted,#6b7280); font-size:13px; }
-
+.muted { color:var(--ui-muted); font-size:13px; }
 .row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
 
+/* ── Badge local (D2: o .badge global é diferente; manter local) ── */
 .badge {
   display:inline-flex; align-items:center; padding:2px 9px; border-radius:999px;
-  background:var(--chip); border:1px solid var(--border,#ddd6fe);
-  font-size:11px; color:var(--chipTxt); font-weight:700;
+  background:var(--ui-brand-faded); border:1px solid var(--ui-border);
+  font-size:11px; color:var(--ui-brand-text); font-weight:700;
 }
-.badge.warn { background:var(--warn-bg); border-color:var(--warn-bd); color:#92400e; }
-.badge.ok   { background:var(--ok-bg);   border-color:var(--ok-bd);   color:#166534; }
-.badge.danger { background:rgba(185,28,28,.10); border-color:rgba(185,28,28,.30); color:var(--danger); }
+.badge.warn { background:var(--gd-warn-bg); border-color:var(--gd-warn-bd); color:#92400e; }
+.badge.ok   { background:var(--gd-ok-bg);   border-color:var(--gd-ok-bd);   color:#166534; }
+.badge.danger { background:rgba(185,28,28,.10); border-color:rgba(185,28,28,.30); color:var(--ui-danger-fg); }
 
 .console {
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  font-size:12px; background:var(--chip); border:1px solid var(--border,#ddd6fe);
+  font-size:12px; background:var(--ui-brand-faded); border:1px solid var(--ui-border);
   padding:14px; border-radius:10px; white-space:pre-wrap;
-  color:var(--text,#1e1b4b); min-height:48px; max-height:280px;
+  color:var(--ui-text); min-height:48px; max-height:280px;
   overflow-y:auto; margin-top:12px;
 }
 
 .stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
-.stat-box { flex:1; min-width:120px; background:var(--chip); border:1px solid var(--border,#ddd6fe); border-radius:10px; padding:12px 16px; text-align:center; }
-.stat-num { font-size:26px; font-weight:800; color:var(--brand-text,#6d28d9); line-height:1; }
-html[data-theme="dark"] .stat-num { color:var(--brand-text-d,#c4b5fd); }
-.stat-lbl { font-size:12px; color:var(--muted,#6b7280); margin-top:4px; }
+.stat-box { flex:1; min-width:120px; background:var(--ui-brand-faded); border:1px solid var(--ui-border); border-radius:10px; padding:12px 16px; text-align:center; }
+.stat-num { font-size:26px; font-weight:800; color:var(--ui-brand-text); line-height:1; }
+.stat-lbl { font-size:12px; color:var(--ui-muted); margin-top:4px; }
 
+/* Aviso somente-leitura: âmbar fixo (D7) */
 #avisoReadonly {
   display:none; align-items:center; gap:8px;
-  background:var(--warn-bg); color:#92400e;
-  border:1px solid var(--warn-bd); border-radius:8px;
+  background:var(--gd-warn-bg); color:#92400e;
+  border:1px solid var(--gd-warn-bd); border-radius:8px;
   padding:10px 14px; font-size:13px; font-weight:700; margin-bottom:16px;
 }
 html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 
 .sec-header { display:flex; align-items:center; justify-content:space-between; cursor:default; user-select:none; }
 .sec-header.fechada { cursor:pointer; }
-.card:not(.card-destaque) .sec-header.fechada:hover h3 { color:var(--brand-text,#6d28d9); }
-html[data-theme="dark"] .card:not(.card-destaque) .sec-header.fechada:hover h3 { color:var(--brand-text-d,#c4b5fd); }
+.card:not(.card-destaque) .sec-header.fechada:hover h3 { color:var(--ui-brand-text); }
 .sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; cursor:pointer; padding:4px 8px; }
 .sec-toggle.collapsed { transform:rotate(-90deg); }
 .sec-body.collapsed { display:none; }
 
-/* ── Migração ── */
+/* ── Migração (status ok/aviso/perigo: candidato a global, D3) ── */
 .migr-item {
   display:flex; align-items:center; gap:10px;
   padding:9px 14px; border-radius:8px;
-  border:1px solid var(--border,#ddd6fe);
-  background:var(--card); margin-bottom:6px; font-size:13px;
+  border:1px solid var(--ui-border);
+  background:var(--ui-surface); margin-bottom:6px; font-size:13px;
 }
-.migr-item.ok     { border-color:var(--ok-bd);   background:var(--ok-bg); }
-.migr-item.warn   { border-color:var(--warn-bd); background:var(--warn-bg); }
+.migr-item.ok     { border-color:var(--gd-ok-bd);   background:var(--gd-ok-bg); }
+.migr-item.warn   { border-color:var(--gd-warn-bd); background:var(--gd-warn-bg); }
 .migr-item.danger { border-color:rgba(185,28,28,.30); background:rgba(185,28,28,.06); }
 
 /* ── Barra de progresso ── */
-.progress-wrap { background:var(--border,#ddd6fe); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
-.progress-bar  { background:var(--brand,#7c3aed); height:100%; border-radius:999px; transition:width .3s; width:0%; }
-
-/* ── Toasts e modal de confirmação (ver guia-toasts.md) ── */
-@keyframes toastSubir {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-.modal-backdrop {
-  position: fixed; inset: 0; background: rgba(15,23,42,.55);
-  display: none; align-items: center; justify-content: center;
-  padding: 18px; z-index: 1000;
-}
+.progress-wrap { background:var(--ui-border); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
+.progress-bar  { background:var(--ui-brand); height:100%; border-radius:999px; transition:width .3s; width:0%; }
 
 /* ── Pesquisa de alunos (várias escolas) ── */
-.psq-in { padding:9px 12px; border-radius:10px; border:1.5px solid var(--border,#ddd6fe); font-size:14px; background:var(--card); color:var(--text,#1e1b4b); font-family:'Nunito',sans-serif; }
+/* .psq-in = campo fora de .field (D6: manter local); também usado nos campos de exclusão e de gerar ata */
+.psq-in { padding:9px 12px; border-radius:10px; border:1.5px solid var(--ui-border); font-size:14px; background:var(--ui-surface); color:var(--ui-text); font-family:'Nunito',sans-serif; }
 .psq-chk { display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:700; cursor:pointer; }
 .psq-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:4px; transition:opacity .2s; }
 .psq-chips.off { opacity:.35; pointer-events:none; }
-.psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--chip); border:1px solid var(--border,#ddd6fe); color:var(--chipTxt); font-size:13px; font-weight:700; }
+.psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--ui-brand-faded); border:1px solid var(--ui-border); color:var(--ui-brand-text); font-size:13px; font-weight:700; }
 .psq-chip button { border:none; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px; font-weight:800; }
-.psq-modal { width:min(1280px,98vw); height:70vh; display:flex; flex-direction:column; background:var(--card); border:1px solid var(--border,#ddd6fe); border-radius:14px; box-shadow:0 30px 60px rgba(0,0,0,.25); overflow:hidden; }
-.psq-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--border,#ddd6fe); }
+/* Modal de pesquisa: aparência (fundo, borda, raio, sombra) vem de .modal; aqui só tamanho e disposição */
+.psq-modal { --modal-w:min(1280px,98vw); display:flex; flex-direction:column; overflow:hidden; }
+.psq-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 16px; border-bottom:1px solid var(--ui-border); }
 .psq-head h3 { margin:0; font-size:16px; font-weight:800; }
 .psq-body { flex:1; overflow:auto; }
 .psq-tab { width:100%; border-collapse:collapse; font-size:12px; }
-.psq-tab th { position:sticky; top:0; z-index:2; background:var(--card); text-align:left; padding:6px 8px; border-bottom:2px solid var(--border,#ddd6fe); white-space:nowrap; }
-.psq-tab td { padding:4px 8px; border-bottom:1px solid var(--border,#ddd6fe); vertical-align:top; }
+.psq-tab th { position:sticky; top:0; z-index:2; background:var(--ui-surface); text-align:left; padding:6px 8px; border-bottom:2px solid var(--ui-border); white-space:nowrap; }
+.psq-tab td { padding:4px 8px; border-bottom:1px solid var(--ui-border); vertical-align:top; }
 .psq-tab td.nw { white-space:nowrap; }
 .psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.psq-tab tbody tr:hover { background:var(--chip); }
+.psq-tab tbody tr:hover { background:var(--ui-brand-faded); }
 
-/* ── Botão ghost (cópia do cadastro-turma-ativa) ── */
-.btn.ghost,
-.btn.secondary,
-.btn.outline {
-  border: 1px solid;
-}
-.btn.ghost,
-.btn.secondary {
-  background: var(--chip-bg);
-  border-color: var(--chip-border);
-  color: var(--chip-color);
-}
-.btn.ghost:hover,
-.btn.secondary:hover {
-  background: var(--brand-faded, #f5f3ff);
-  border-color: var(--brand, #7c3aed);
-  color: var(--brand-text, #6d28d9);
-}
-html[data-theme="dark"] .btn.ghost:hover,
-html[data-theme="dark"] .btn.secondary:hover {
-  background: var(--brand-faded-d, rgba(124,58,237,0.28));
-  border-color: var(--brand-d, #7c3aed);
-  color: var(--brand-text-d, #c4b5fd);
-}
-
-/* ── Botão outline (terciário): sem fundo, texto --brand-text (escurece no claro, clareia no escuro) ── */
-.btn.outline { background:transparent; border-color:var(--brand-border,#ddd6fe); color:var(--brand-text,#6d28d9); }
-.btn.outline:hover:not(:disabled) { background:var(--brand-faded,#f5f3ff); border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
-html[data-theme="dark"] .btn.outline { background:transparent; border-color:var(--brand-border-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
-html[data-theme="dark"] .btn.outline:hover:not(:disabled) { background:var(--brand-faded-d,rgba(124,58,237,0.28)); border-color:var(--brand-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
-
-/* ── Cards: sem overflow:hidden (cortaria o balão do ⓘ) ── */
-.card { overflow:visible; }
-
-/* ── Card de destaque (guia 1.3b + 5.5) ── */
-.card.card-destaque {
-  --dest-fg:#ffffff; --dest-btn-bg:rgba(255,255,255,.18); --dest-btn-bd:rgba(255,255,255,.40);
-  --dest-btn-hover:rgba(255,255,255,.28); --dest-panel-bg:rgba(255,255,255,.10);
-  background:var(--btn-home-bg); border-color:var(--btn-home-border);
-}
-html[data-theme="dark"] .card.card-destaque { background:var(--btn-home-bg); border-color:var(--btn-home-border); }
-.card.card-destaque.contraste-claro {
-  --dest-fg:#0f172a; --dest-btn-bg:rgba(0,0,0,.08); --dest-btn-bd:rgba(0,0,0,.25);
-  --dest-btn-hover:rgba(0,0,0,.16); --dest-panel-bg:rgba(0,0,0,.06);
-  border-color:var(--border,#ddd6fe);
-}
-.card-destaque h3, .card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
-.card-destaque .btn {
-  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
-}
-.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
-/* sub-caixas dentro do destaque têm fundo neutro próprio (guia, Parte 4) */
-.card-destaque .stat-box { background:#ffffff; border-color:transparent; }
-html[data-theme="dark"] .card-destaque .stat-box { background:#0f172a; }
-.card-destaque.contraste-claro .stat-box { border-color:var(--border,#ddd6fe); }
-.card-destaque .stat-lbl { color:var(--muted,#6b7280); }
-
-/* ── Botão danger desta página (igual ao da gestao-atas) ── */
-.btn-danger { background:var(--danger-500,#b91c1c); border-color:var(--danger-500,#b91c1c); color:#fff; }
-.btn-danger:hover:not(:disabled) { background:var(--danger-600,#991b1b); border-color:var(--danger-600,#991b1b); }
+/* ── Card de destaque: fundo, h3, botões, tabela e .aviso-warn são do global (components.css).
+      Aqui só o que é desta página, usando --dest-* ── */
+.card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
+.card-destaque .stat-box { background:var(--ui-table-cell-bg); border-color:transparent; }
+.card-destaque.contraste-claro .stat-box { border-color:var(--ui-border); }
+.card-destaque .stat-lbl { color:var(--ui-muted); }
 
 /* ── Backup (exportar à esquerda, importar à direita) ── */
 .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
 .dest-tit { display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
 @media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
-
-/* ── Aviso de card (guia 1.9): sem fundo amarelo, herda o contexto ── */
-.aviso-warn { background:var(--chip-bg); border:1px solid var(--chip-border); border-left:4px solid #d97706;
-  color:var(--text,#1e1b4b); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; }
-.card-destaque .aviso-warn { background:var(--dest-panel-bg); border-color:var(--dest-btn-bd);
-  border-left-color:var(--dest-fg); color:var(--dest-fg); }
-
-/* ── Ícone de dica (ⓘ) — guia, Parte 2 ── */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card); border:1.5px solid var(--border,#ddd6fe); color:var(--text,#1e1b4b);
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal; font-family:'Nunito',system-ui,sans-serif;
-  line-height:1.4; white-space:normal; cursor:default; text-align:left;
-}
-.info-tip.open .info-tip-bubble{ display:block; }
-.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
-.info-tip-bubble.align-right{ left:auto; right:0; }
-
-/* ── Modal de confirmação (guia-toasts) ── */
-.cm-box { background:var(--card); color:var(--text,#1e1b4b); border:1px solid var(--border,#ddd6fe); border-radius:14px; padding:22px; max-width:440px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 50px rgba(0,0,0,.25); }
-.cm-box h3 { margin:0 0 8px; font-size:16px; font-weight:800; color:var(--brand-text,#6d28d9); }
-html[data-theme="dark"] .cm-box h3 { color:var(--brand-text-d,#c4b5fd); }
-.cm-box h3.perigo { color:#b91c1c; }
-html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
-.cm-corpo { margin:0 0 18px; font-size:13px; color:var(--muted,#6b7280); white-space:pre-line; line-height:1.5; overflow-y:auto; }
-.cm-acoes { display:flex; justify-content:flex-end; gap:8px; }
 /* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
 </style>
 </head>
@@ -268,7 +153,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
       <div class="stat-box"><div class="stat-num" id="statMatriculas">—</div><div class="stat-lbl">Matrículas</div></div>
     </div>
     <div class="row-btns" style="margin-top:14px;">
-      <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
+      <button class="btn secondary" onclick="recarregar()">🔄 Recarregar</button>
     </div>
     <div class="aviso-warn" id="avisoSemEscola" style="display:none;margin:12px 0 0;">⚠️ Nenhuma escola selecionada ("Todas as escolas"). Escolha uma escola para ver os números e usar as ferramentas.</div>
     <div class="console" id="logGeral" style="display:none;margin-top:12px;"></div>
@@ -293,7 +178,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
       </div>
       <div class="row-btns">
         <input type="number" id="psqAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
-        <button class="btn btn-primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
+        <button class="btn primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
     </div>
@@ -307,9 +192,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
     </div>
     <div class="sec-body" id="secExcluirAluno">
       <div class="row-btns">
-        <input type="text" id="inpAlunoIdExcluir" placeholder="alunoId (ex.: ALU-000123)"
-          style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
-          font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
+        <input type="text" id="inpAlunoIdExcluir" class="psq-in" placeholder="alunoId (ex.: ALU-000123)" style="flex:1;min-width:220px;">
         <button class="btn secondary" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
       </div>
 
@@ -320,7 +203,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <div id="previewAlunoFoto" style="margin-top:8px;"></div>
         <div id="previewAlunoElo" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
-          <button class="btn btn-danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
+          <button class="btn danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
         </div>
       </div>
 
@@ -336,9 +219,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
     </div>
     <div class="sec-body" id="secExcluirTurma">
       <div class="row-btns">
-        <input type="text" id="inpTurmaIdExcluir" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)"
-          style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
-          font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
+        <input type="text" id="inpTurmaIdExcluir" class="psq-in" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)" style="flex:1;min-width:220px;">
         <button class="btn secondary" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
       </div>
 
@@ -346,7 +227,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <div id="previewTurmaInfo"></div>
         <div id="previewTurmaMats" style="margin-top:8px;"></div>
         <div class="row-btns" style="margin-top:14px;">
-          <button class="btn btn-danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
+          <button class="btn danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
         </div>
       </div>
 
@@ -370,11 +251,9 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
       <div id="gaForm" style="display:none;margin-top:14px;">
         <label class="muted" for="gaTurma">Turmas</label>
-        <select id="gaTurma" onchange="gaResetPlano()"
-          style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
+        <select id="gaTurma" class="psq-in" onchange="gaResetPlano()" style="display:block;width:100%;margin:4px 0 12px;"></select>
         <label class="muted" for="gaSchema">Schema da ata</label>
-        <select id="gaSchema" onchange="gaResetPlano()"
-          style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
+        <select id="gaSchema" class="psq-in" onchange="gaResetPlano()" style="display:block;width:100%;margin:4px 0 12px;"></select>
         <div class="row-btns" style="margin-top:0;">
           <button class="btn secondary" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
         </div>
@@ -382,7 +261,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
       <div id="gaPreview" style="display:none;margin-top:14px;"></div>
       <div class="row-btns" id="gaGerarWrap" style="display:none;">
-        <button class="btn btn-primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
+        <button class="btn primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
       </div>
       <div class="console" id="logGerarAta" style="display:none;"></div>
     </div>
@@ -399,13 +278,13 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <div>
           <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).</span></span></div>
           <div class="row-btns" style="margin-top:0;">
-            <button class="btn btn-primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+            <button class="btn primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
           </div>
         </div>
         <div>
           <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
           <div class="row-btns" style="margin-top:0;">
-            <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
+            <label class="btn outline" id="lblImportJSON" style="cursor:pointer;">
               📂 Carregar JSON de backup
               <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
             </label>
@@ -420,12 +299,12 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
 <!-- ── Modal: resultado da pesquisa multi-escolas ── -->
 <div class="modal-backdrop" id="psqModal" role="dialog" aria-modal="true" onclick="if(event.target===this)psqFecharModal()">
-  <div class="psq-modal">
+  <div class="modal psq-modal">
     <div class="psq-head">
       <div><h3 id="psqTitulo">Alunos</h3><div class="muted" id="psqCont"></div></div>
       <div class="row-btns" style="margin:0;">
         <button class="btn secondary" onclick="psqCsv()">📊 Exportar CSV</button>
-        <button class="btn btn-primary" onclick="psqPdf()">📄 Exportar PDF</button>
+        <button class="btn primary" onclick="psqPdf()">📄 Exportar PDF</button>
         <button class="btn outline" onclick="psqFecharModal()">Fechar</button>
       </div>
     </div>
@@ -575,50 +454,39 @@ function _baixar(conteudo, nome, tipo) {
 function _hoje() { return new Date().toISOString().slice(0,10); }
 
 /* =============================================
-   TOASTS PADRONIZADOS (ver guia-toasts.md)
+   TOASTS PADRONIZADOS (visual em components.css: .toast .toast-ok|err|warn|loading)
 ============================================= */
-function _showToast(msg, bg, shadow, duration){
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:8000 },
+};
+function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
   if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
   const toast = document.createElement('div');
   toast.id = '_toastGlobal';
-  toast.style.cssText =
-    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-    `display:flex;align-items:center;gap:12px;`+
-    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
   const span = document.createElement('span');
+  span.className = 'toast-msg';
   span.textContent = msg;
-  span.style.cssText = 'flex:1;line-height:1.4;';
-  toast.appendChild(span);
-  const btnClose = document.createElement('button');
-  btnClose.type = 'button';
-  btnClose.textContent = '✕';
-  btnClose.setAttribute('aria-label','Fechar aviso');
-  btnClose.style.cssText =
-    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-  btnClose.onclick = () => toast.remove();
-  toast.appendChild(btnClose);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
   document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
 }
-
-function _toastSucesso(msg){
-  _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
-}
-function _toastErro(msg){
-  _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
-}
-function _toastAviso(msg){
-  _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
-}
-function _toastCarregando(msg){
-  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
-}
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
 
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -627,30 +495,31 @@ function setMsg(text, kind){
   else if(kind === "ok") _toastSucesso('✅ ' + t);
   else if(kind === "warn") _toastAviso('⚠️ ' + t);
   else if(kind === "loading") _toastCarregando('⏳ ' + t);
-  else {
-    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
-    _toastAviso(t);
-  }
+  else { console.warn('[toast] kind desconhecido:', JSON.stringify(kind)); _toastAviso(t); }
 }
 
-/* ── Modal de confirmação (guia-toasts): `corpo` é HTML — escape tudo que for dinâmico.
-      perigo:true = confirmar em vermelho sólido. Esc cancela; foco inicial em Cancelar. ── */
-function _confirmModal({ titulo, corpo, perigo, textoConfirmar, textoCancelar }){
+/* ── Modal de confirmação (CSS global: .modal-backdrop .cm-*). `corpo` é HTML: escape o dinâmico com esc().
+      corDestaque:'danger' = ação destrutiva. Esc cancela; foco inicial em Cancelar.
+      (captura + stopPropagation no Esc mantidos da versão anterior: evitam fechar outro modal por baixo.) ── */
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
   return new Promise((resolve) => {
+    const perigo = corDestaque === 'danger';
     const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.style.display = 'flex';
+    backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
       `<div class="cm-box" role="alertdialog" aria-modal="true">`+
-        `<h3${perigo ? ' class="perigo"' : ''}>${esc(titulo || 'Confirmar ação')}</h3>`+
-        `<div class="cm-corpo">${corpo || ''}</div>`+
+        `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${esc(titulo || 'Confirmar ação')}</h3>`+
+        `<p class="cm-corpo">${corpo || ''}</p>`+
+        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${esc(digitar)}">` : '')+
         `<div class="cm-acoes">`+
-          `<button type="button" class="btn outline" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="btn ${perigo ? 'btn-danger' : 'btn-primary'}" id="_confirmModalOk">${esc(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${esc(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
-
+    const ok = backdrop.querySelector('#_confirmModalOk');
+    const cancelar = backdrop.querySelector('#_confirmModalCancelar');
+    const input = backdrop.querySelector('#_confirmModalInput');
     function fechar(resultado){
       document.removeEventListener('keydown', onKey, true);
       backdrop.remove();
@@ -658,10 +527,11 @@ function _confirmModal({ titulo, corpo, perigo, textoConfirmar, textoCancelar })
     }
     function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } }
     document.addEventListener('keydown', onKey, true);
-    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
-    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    ok.addEventListener('click', () => fechar(true));
+    cancelar.addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
-    backdrop.querySelector('#_confirmModalCancelar').focus();
+    if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+    cancelar.focus();
   });
 }
 
@@ -917,7 +787,7 @@ async function executarExclusaoAluno() {
 
   const confirmou = await _confirmModal({
     titulo: '⚠️ Excluir aluno definitivamente',
-    perigo: true,
+    corDestaque: 'danger',
     corpo: `Excluir definitivamente o aluno "${esc(aluno.nome || alunoId)}"?\n\n` +
       `- ${mats.length} matrícula(s)\n` +
       `- ${elos.length} vínculo(s) com o módulo de Atas\n` +
@@ -1033,7 +903,7 @@ async function executarExclusaoTurma() {
 
   const confirmou = await _confirmModal({
     titulo: '⚠️ Excluir turma definitivamente',
-    perigo: true,
+    corDestaque: 'danger',
     corpo: `Excluir definitivamente a turma "${esc(turma.nome || turmaId)}"?\n\n` +
       `- ${mats.length} matrícula(s) que apontam pra ela\n` +
       `- ${fotos.length} avatar(es) dessas matrículas\n\n` +
@@ -1745,7 +1615,7 @@ function psqAbrirModal() {
     `<td class="${c[2]}"${c[0] === 'escola' ? ` title="${esc(l.escola)}"` : ''}>${esc(l[c[0]])}</td>`).join('') + '</tr>').join('');
   document.getElementById('psqBody').innerHTML = `<table class="psq-tab"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   psqAjustarModal();
-  document.getElementById('psqModal').style.display = 'flex';
+  document.getElementById('psqModal').classList.add('open');
 }
 const PSQ_FOLGA_HEADER = 80;   // px entre o fim do header e o topo do modal
 function psqAjustarModal() {
@@ -1762,8 +1632,8 @@ function psqAjustarModal() {
   bd.style.paddingBottom = '24px';
   bd.querySelector('.psq-modal').style.height = `calc(100vh - ${topo + 24}px)`;
 }
-window.addEventListener('resize', () => { const m = document.getElementById('psqModal'); if (m && m.style.display === 'flex') psqAjustarModal(); });
-function psqFecharModal() { document.getElementById('psqModal').style.display = 'none'; }
+window.addEventListener('resize', () => { const m = document.getElementById('psqModal'); if (m && m.classList.contains('open')) psqAjustarModal(); });
+function psqFecharModal() { document.getElementById('psqModal').classList.remove('open'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') psqFecharModal(); });
 
 /* ── exportações ── */
