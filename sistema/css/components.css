@@ -95,9 +95,9 @@
   --ui-st-bad-fg:  #b91c1c;  --ui-st-bad-bg:  rgba(185,28,28,.08);   --ui-st-bad-bd:  rgba(185,28,28,.30);
   --ui-st-info-fg: #1e3a8a;  --ui-st-info-bg: rgba(37,99,235,.10);   --ui-st-info-bd: rgba(37,99,235,.30);
 
-  /* CHIPS — as 5 cores (ver seção 1, .badge):
-       variável = --ui-chip-*  (segue a paleta)      verde = --ui-st-ok-*     vermelho = --ui-st-bad-*
-       cinza    = --ui-chip-gray-*                   neutro = --ui-chip-neutral-* (âmbar FIXO: não segue a paleta) */
+  /* CHIPS — as 5 cores (ver seção 1, .badge). Prioridade: variável (alta) > neutro (média) > cinza (baixa).
+       variável = --ui-chip-*  (segue a paleta)      neutro = --ui-chip-neutral-* (âmbar FIXO)
+       cinza    = --ui-chip-gray-*                   verde/vermelho = --ui-st-ok-* / --ui-st-bad-* (fora da escala) */
   --ui-chip-gray-fg:    #4b5563;  --ui-chip-gray-bg:    rgba(107,114,128,.12);  --ui-chip-gray-bd:    rgba(107,114,128,.30);
   --ui-chip-neutral-fg: #92400e;  --ui-chip-neutral-bg: rgba(245,158,11,.14);   --ui-chip-neutral-bd: rgba(245,158,11,.35);
 }
@@ -199,12 +199,13 @@ html[data-theme="dark"]{
 .list-item .right{ display:flex; gap:6px; }
 
 /* ── CHIP DE INFORMAÇÃO: .badge — 5 cores ──
-   dado curto, NÃO clicável (clicável é botão). A cor diz o tipo de dado:
-     .badge            variável  segue a paleta (theme-colors)   CPF, ID do aluno, ano, turno
-     .badge.ok         verde     verdadeiro / sim / ativo
-     .badge.bad        vermelho  falso / não / inativo
-     .badge.gray       cinza     dado sem destaque que precisa aparecer (professor, ID da turma)
-     .badge.neutral    neutro    âmbar fixo: dado-chave que se destaca em QUALQUER paleta (série)
+   dado curto, NÃO clicável (clicável é botão). A cor diz o GRAU DE PRIORIDADE do
+   dado NAQUELA TELA (a página ordena em até 3 níveis; não é fixo por tipo de dado):
+     .badge            nível 1 · alta    variável: segue a paleta (theme-colors)
+     .badge.neutral    nível 2 · média   neutro: âmbar FIXO, igual em qualquer paleta
+     .badge.gray       nível 3 · baixa   cinza: sem destaque, mas precisa aparecer
+   Fora da escala (par verdadeiro/falso, nunca enfeite):
+     .badge.ok         verde             .badge.bad   vermelho
    .badge.small = versão compacta. Espaçamento entre chips é do container (gap). */
 .badge{
   --bd-fg:var(--ui-chip-color); --bd-bg:var(--ui-chip-bg); --bd-bd:var(--ui-chip-border);
@@ -413,6 +414,16 @@ html[data-theme="dark"] .config-card.card-destaque{
   opacity:1;
 }
 
+/* conteúdo de LEITURA sobre o destaque (lista, merge, bloco de números, texto):
+   não pode ficar solto no fundo de marca. Painel de fundo liso, legível nos 2 temas.
+   .dest-tit = título de bloco dentro do destaque (na cor do destaque). */
+.dest-painel{
+  background:var(--ui-cell-bg); color:var(--ui-text);
+  border:1px solid var(--ui-border); border-radius:12px; padding:14px;
+}
+.dest-tit{ display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
+.card-destaque .dest-tit{ color:var(--dest-fg); }
+
 /* tabela dentro do destaque: célula neutra, cabeçalho com o véu do card */
 .card-destaque td{ background:var(--ui-table-cell-bg); }
 .card-destaque th{
@@ -438,6 +449,9 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
   background:var(--dest-panel-bg); border-color:var(--dest-btn-bd);
   border-left-color:var(--dest-fg); color:var(--dest-fg);
 }
+/* chip variável dentro do aviso: o aviso já usa o fundo de chip, então o chip
+   some. Dá a ele fundo sólido de card. Chips ok/bad/gray/neutral têm tinta própria. */
+.aviso-warn .badge:not(.ok, .bad, .gray, .neutral){ --bd-bg:var(--ui-surface); }
 
 
 /* ============================================================
