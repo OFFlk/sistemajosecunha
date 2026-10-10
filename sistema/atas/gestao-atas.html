@@ -29,25 +29,21 @@
 /* ── Oculta até auth confirmar role ── */
 body { visibility: hidden; }
 
-/* Variáveis próprias da página (prefixo --ga-). Cores de tema vêm do global (--ui-*).
-   Status (ok/aviso/perigo) e chip neutro são cores FIXAS: por isso têm par claro/escuro aqui. */
+/* Variáveis próprias da página: prefixo --ga- (gestao-atas). Cores de tema vêm do global (--ui-*).
+   Status (ok/aviso) são cores FIXAS: por isso têm par claro/escuro aqui. */
 :root {
   --ga-ok-bg:   rgba(22,163,74,.10);   --ga-ok-bd:   rgba(22,163,74,.30);   --ga-ok-fg:   #166534;
   --ga-warn-bg: rgba(245,158,11,.10);  --ga-warn-bd: rgba(245,158,11,.30);  --ga-warn-fg: #92400e;
-  --ga-bad-bg:  rgba(185,28,28,.10);   --ga-bad-bd:  rgba(185,28,28,.30);   --ga-bad-fg:  #991b1b;
-  /* chip NEUTRO (definido em cadastro-turma-ativa). Valores do escuro tirados da imagem; claro provisório. */
-  --ga-neutro-bg: #e0e7ff;  --ga-neutro-bd: #c7d2fe;  --ga-neutro-fg: #312e81;
 }
 html[data-theme="dark"] {
   --ga-ok-bg:   rgba(34,197,94,.16);   --ga-ok-bd:   rgba(74,222,128,.55);  --ga-ok-fg:   #86efac;
   --ga-warn-bg: rgba(245,158,11,.18);  --ga-warn-bd: rgba(251,191,36,.60);  --ga-warn-fg: #fcd34d;
-  --ga-bad-bg:  rgba(248,113,113,.16); --ga-bad-bd:  rgba(248,113,113,.60); --ga-bad-fg:  #fca5a5;
-  --ga-neutro-bg: #131749;  --ga-neutro-bd: rgba(165,180,252,.30);  --ga-neutro-fg: #a5b4fc;
 }
 
 /* ── Layout ── */
 .container { max-width:1100px; margin:0 auto; padding:36px 24px 60px; }
 h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
+.muted { color:var(--ui-muted); font-size:13px; }
 .row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
 /* espaçamentos usados no HTML e nos templates de JS (em vez de style inline) */
 .mt-0{margin-top:0} .mt-8{margin-top:8px} .mt-14{margin-top:14px} .mb-8{margin-bottom:8px}
@@ -62,7 +58,8 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 /* ── Card de destaque: fundo, h3, botões e tabela são do global (components.css).
       Aqui só o que é desta página, usando --dest-* ── */
-.card-destaque .stat-box { background:var(--ui-table-cell-bg); border-color:transparent; }
+.card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
+.card-destaque .stat-box { background:var(--ui-cell-bg); border-color:transparent; }
 .card-destaque.contraste-claro .stat-box { border-color:var(--ui-border); }
 
 /* ── Stats ── */
@@ -81,10 +78,8 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 /* ── Checkbox na cor do sistema (candidato a global) ── */
 input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); cursor:pointer; }
 
-/* ── Chip neutro (índice de anos, data e hora da última reconstrução) ── */
+/* ── Índice de anos: chips são .badge (5-A); aqui só o container ── */
 .chips-anos { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
-.chip-neutro { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:12.5px; font-weight:800;
-               background:var(--ga-neutro-bg); border:1px solid var(--ga-neutro-bd); color:var(--ga-neutro-fg); }
 
 /* ── Merge preview (status ok/aviso: candidato a global, D3) ── */
 .merge-item { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-radius:8px; border:1px solid var(--ui-border); background:var(--ui-surface); margin-bottom:6px; font-size:13px; }
@@ -92,10 +87,8 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 .merge-item.igual    { opacity:.65; }
 .merge-item.suspeita { border-color:var(--ga-warn-bd); background:var(--ga-warn-bg); }
 
-/* ── Badge colorido (extensão do .badge global) ── */
+/* ── Chip amarelo/aviso: sem equivalente nas 5 cores (D11) — fica local ── */
 .badge.warn { background:var(--ga-warn-bg); border-color:var(--ga-warn-bd); color:var(--ga-warn-fg); }
-.badge.ok   { background:var(--ga-ok-bg);   border-color:var(--ga-ok-bd);   color:var(--ga-ok-fg); }
-.badge.err  { background:var(--ga-bad-bg);  border-color:var(--ga-bad-bd);  color:var(--ga-bad-fg); }
 
 /* ── Resumo do import de backup (Turmas / Schemas) ──
    Verde = vai ser adicionado; cinza = nada a fazer; amarelo = precisa da sua decisão.
@@ -111,34 +104,24 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 .sum-chip.ok b, .sum-chip.warn b { color:inherit; }
 .sum-chip.zero { opacity:.45; }
 
-/* ── Select de ação nos itens DIVERGENTES do import (D6: não há select global) ── */
-select.sel-padrao {
-  appearance:none; -webkit-appearance:none;
-  font-family:'Nunito',sans-serif; font-size:13px; font-weight:700;
-  color:var(--ui-text); background-color:var(--ui-surface);
-  border:1.5px solid var(--ui-border); border-radius:10px;
-  padding:8px 34px 8px 12px; max-width:100%; cursor:pointer;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat; background-position:right 12px center;
-  transition:border-color .18s, box-shadow .18s;
-}
-select.sel-padrao:hover { border-color:var(--ui-brand); }
-select.sel-padrao:focus { outline:none; border-color:var(--ui-brand); box-shadow:0 0 0 3px var(--ui-brand-faded); }
-select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
-
 /* ── Modal de turmas (apagar): aparência vem de .modal / .modal-head; aqui só tamanho e disposição ── */
-.tur-modal { --modal-w:min(1100px,98vw); --modal-h:100vh; display:flex; flex-direction:column; overflow:hidden; }
-.tur-modal .modal-head { flex-wrap:wrap; }
+.tur-modal { --modal-w:min(1100px,98vw); --modal-h:none; }   /* altura vem do JS (turAjustarModal) */
 .tur-modal .modal-head .row-btns { margin:0; }
-.tur-body { flex:1; overflow:auto; }
-.tur-tab { width:100%; border-collapse:collapse; font-size:12px; }
-.tur-tab th { position:sticky; top:0; z-index:2; background:var(--ui-surface); text-align:left; padding:6px 8px; border:0; border-bottom:2px solid var(--ui-border); white-space:nowrap; color:var(--ui-text); }
-.tur-tab td { padding:6px 8px; border:0; border-bottom:1px solid var(--ui-border); vertical-align:middle; text-align:left; }
+.tur-tab { font-size:12px; }
+.tur-tab th { position:sticky; top:0; z-index:2; white-space:nowrap; }
+.tur-tab td { vertical-align:middle; }
 .tur-tab th.c, .tur-tab td.c { text-align:center; }
 .tur-tab th.w36 { width:36px; }
-.tur-tab td.origem { font-size:11px; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tur-tab td.origem { font-size:11px; max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }  /* overflow na célula, não na <table> */
 .tur-tab td.vazio { padding:18px; text-align:center; }
 .tur-tab tbody tr:hover { background:var(--ui-brand-faded); }
+
+/* ── Backup (exportar à esquerda, importar à direita), igual ao gerir-dados-ano-ativo ── */
+.bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
+.dest-tit { display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
+.dest-painel { background:var(--ui-cell-bg); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:12px; padding:14px; }
+@media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
 </style>
 </head>
 <body>
@@ -149,7 +132,7 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
 
   <!-- ── ESTATÍSTICAS ── -->
   <div class="card card-destaque">
-    <h3>📊 Visão geral — módulo de atas</h3>
+    <h3>📊 Visão geral — módulo de atas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os números só são lidos quando você aperta "Carregar dados". Assim, abrir esta página não gasta leituras do banco.</span></span></h3>
     <div class="stats-row">
       <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas</div></div>
       <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos no banco</div></div>
@@ -157,7 +140,7 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
       <div class="stat-box"><div class="stat-num" id="statSemId">—</div><div class="stat-lbl">Alunos sem ID</div></div>
     </div>
     <div class="row-btns mt-14">
-      <button class="btn secondary" id="btnRecarregar" onclick="recarregar()">🔄 Carregar números</button>
+      <button class="btn secondary" id="btnCarregarDados" onclick="carregarDados()">🔄 Carregar dados</button>
     </div>
   </div>
 
@@ -166,7 +149,7 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
     <h3>🧩 Schemas de ata
       <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
-        <span class="info-tip-bubble">"Schema" é a lista de matérias de uma ata e como as colunas da planilha são lidas na importação. Se uma turma tiver matérias diferentes das demais, crie, duplique ou edite outro schema e escolha qual deles ela vai usar ao ser cadastrada.</span>
+        <span class="info-tip-bubble wide">"Schema" é a lista de matérias de uma ata e como as colunas da planilha são lidas na importação. Se uma turma tiver matérias diferentes das demais, crie, duplique ou edite outro schema e escolha qual deles ela vai usar ao ser cadastrada.</span>
       </span>
     </h3>
     <div class="row-btns">
@@ -176,10 +159,10 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
 
   <!-- ── ÍNDICE DE ANOS ── -->
   <div class="card">
-    <h3>📅 Índice de anos (pesquisa de atas)
+    <h3>📅 Índice de anos
       <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
-        <span class="info-tip-bubble">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
+        <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
       </span>
     </h3>
     <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
@@ -189,21 +172,32 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
     </div>
   </div>
 
-  <!-- ── IMPORTAR JSON (merge) ── -->
-  <div class="card">
-    <div class="sec-header" onclick="toggleSec('secJSON')">
-      <h3>📥 Importar backup JSON (merge)</h3>
-      <span class="sec-toggle" id="togSecJSON">▼</span>
+  <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
+  <div class="card card-destaque">
+    <div class="sec-header" onclick="toggleSec('secBackup')">
+      <h3>💾 Backup do módulo de atas</h3>
+      <span class="sec-toggle" id="togSecBackup">▼</span>
     </div>
-    <div class="sec-body" id="secJSON">
-      <p class="muted">Envie um arquivo de backup (.json) para restaurar turmas e schemas. Você vê o que é novo, o que já existe e o que é diferente, e nada é substituído sem a sua escolha.</p>
-      <div class="row-btns">
-        <label class="btn outline">
-          📂 Carregar JSON de backup
-          <input type="file" accept=".json" hidden onchange="analisarJSON(event)">
-        </label>
+    <div class="sec-body" id="secBackup">
+      <div class="bk-grid">
+        <div>
+          <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Baixa uma cópia de segurança com todos os dados do módulo de atas: as turmas (com os alunos de cada uma), as identidades dos alunos e os schemas. O CSV leva só a lista de turmas.</span></span></div>
+          <div class="row-btns mt-0">
+            <button class="btn primary" onclick="exportarJSON()">⬇ Exportar JSON</button>
+            <button class="btn outline" onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
+          </div>
+        </div>
+        <div>
+          <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble align-right">Restaura turmas e schemas a partir de um arquivo de backup (.json). Você vê o que é novo, o que já existe e o que é diferente, e nada é substituído sem a sua escolha.</span></span></div>
+          <div class="row-btns mt-0">
+            <label class="btn primary">
+              📂 Carregar JSON de backup
+              <input type="file" accept=".json" hidden onchange="analisarJSON(event)">
+            </label>
+          </div>
+        </div>
       </div>
-      <div id="mergePreview" class="mt-14" style="display:none;">
+      <div id="mergePreview" class="dest-painel mt-14" style="display:none;">
         <div class="linha-merge">
           <div id="mergeResumo" class="merge-resumo"></div>
           <button class="btn primary" onclick="aplicarMerge()">✅ Aplicar merge</button>
@@ -219,27 +213,13 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
     </div>
   </div>
 
-  <!-- ── EXPORTAR ── -->
-  <div class="card">
-    <div class="sec-header" onclick="toggleSec('secExport')">
-      <h3>💾 Exportar backup <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Baixa uma cópia de segurança com todos os dados do módulo de atas: as turmas (com os alunos de cada uma), as identidades dos alunos e os schemas. O CSV leva só a lista de turmas.</span></span></h3>
-      <span class="sec-toggle" id="togSecExport">▼</span>
-    </div>
-    <div class="sec-body" id="secExport">
-      <div class="row-btns">
-        <button class="btn primary" onclick="exportarJSON()">⬇ Exportar JSON</button>
-        <button class="btn outline" onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ── APAGAR TURMAS ── -->
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secApagar')">
       <h3>🗑️ Apagar turmas
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
-          <span class="info-tip-bubble">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
+          <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
         </span>
       </h3>
       <span class="sec-toggle" id="togSecApagar">▼</span>
@@ -255,18 +235,16 @@ select.sel-padrao option { background:var(--ui-surface); color:var(--ui-text); }
 
 <!-- ── Modal: turmas para apagar (carregado só ao apertar "Carregar turmas") ── -->
 <div class="modal-backdrop" id="turModal" role="dialog" aria-modal="true" onclick="if(event.target===this)turFecharModal()">
-  <div class="modal tur-modal">
+  <div class="modal scroll-body tur-modal">
     <div class="modal-head">
       <div><h3>Apagar turmas</h3><div class="muted" id="turCont"></div></div>
       <div class="row-btns">
-        <button class="btn secondary" onclick="selecionarTodasTurmas(true)">Marcar todas</button>
-        <button class="btn secondary" onclick="selecionarTodasTurmas(false)">Desmarcar todas</button>
         <button class="btn danger" id="btnApagarSel" onclick="apagarSelecionadas()" disabled>🗑 Apagar selecionadas</button>
         <button class="btn outline" onclick="turFecharModal()">Fechar</button>
       </div>
     </div>
-    <div class="tur-body">
-      <table class="tur-tab">
+    <div class="modal-body flush">
+      <table class="left tur-tab">
         <thead>
           <tr>
             <th class="c w36"><input type="checkbox" id="chkTodas" onchange="selecionarTodasTurmas(this.checked)"></th>
@@ -473,7 +451,7 @@ async function inicializar() {
   // pontual e aguarda Auth sozinha.
 
   // As turmas NÃO são lidas aqui (cada leitura custa): só quando o usuário aperta
-  // "Carregar números", "Carregar turmas" ou usa uma função que precisa delas
+  // "Carregar dados", "Carregar turmas" ou usa uma função que precisa delas
   // (exportar, importar, reconstruir índice) — ver _garantirTurmas().
   carregarIndiceAnos();   // 1 leitura do doc da escola (não bloqueia)
   // Contraste do card de destaque agora é centralizado em theme-colors.js
@@ -518,8 +496,6 @@ function atualizarStats(comIdentidades = true) {
   document.getElementById('statTurmas').textContent   = turmas.length;
   document.getElementById('statAlunos').textContent   = totalAlunos;
   document.getElementById('statSemId').textContent    = semId;
-  const btn = document.getElementById('btnRecarregar');
-  if (btn) btn.textContent = '🔄 Recarregar';
   if (comIdentidades) _atualizarStatAlunosAtas();
 }
 
@@ -531,7 +507,7 @@ function _atualizarStatAlunosAtas(){
     .catch(()=>{});
 }
 
-async function recarregar() {
+async function carregarDados() {
   setMsg('Carregando…', 'loading');
   const ok = await _garantirTurmas(true);
   if (!ok) { setMsg('Não foi possível carregar as turmas. Verifique a conexão e tente de novo.', 'warn'); return; }
@@ -575,12 +551,12 @@ function _renderIndiceAnos() {
     info.innerHTML = ''; info.style.display = 'none';
     return;
   }
-  box.innerHTML = _indiceAnos.map(a => `<span class="chip-neutro">${_escHtml(a)}</span>`).join('');
+  box.innerHTML = _indiceAnos.map(a => `<span class="badge neutral">${_escHtml(a)}</span>`).join('');
   const d = _indiceAtualizadoEm ? new Date(_indiceAtualizadoEm) : null;
   if (d && !isNaN(d)) {
     const data = d.toLocaleDateString('pt-BR');
     const hora = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
-    info.innerHTML = `<span>Última reconstrução:</span><span class="chip-neutro">📅 ${_escHtml(data)}</span><span class="chip-neutro">🕐 ${_escHtml(hora)}</span>`;
+    info.innerHTML = `<span>Última reconstrução:</span><span class="badge">📅 ${_escHtml(data)}</span><span class="badge">🕐 ${_escHtml(hora)}</span>`;
     info.style.display = 'flex';
   } else {
     info.innerHTML = ''; info.style.display = 'none';
@@ -1296,7 +1272,7 @@ function _renderMergePreview() {
         <span class="badge warn">DIVERGENTE</span>
         <b class="ml-6">${esc(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${esc(entrada.anoLetivo||'?')} · ${esc(entrada.serieTexto||'?')}<br>
         <span class="muted peq">${linhas.join('<br>')}</span><br>
-        <select id="selDiv${i}" class="sel-padrao">
+        <select id="selDiv${i}" class="input">
           <option value="">Não importar (manter o banco)</option>
           ${diff.faltam.length?'<option value="repor">Repor só os alunos que faltam (mantém o resto do banco)</option>':''}
           <option value="sobrescrever">Sobrescrever a turma inteira pelo backup${diff.soBanco.length?' (perde os '+diff.soBanco.length+' só do banco)':''}</option>
