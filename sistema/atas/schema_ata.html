@@ -139,23 +139,17 @@
 
   h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
   h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
-  .muted { color: var(--muted, #6b7280); }
 
   .warn { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.30); padding: 12px 14px; border-radius: 10px; font-size: 13px; }
   /* Aviso de card (guia 1.9): sem fundo amarelo — herda o contexto; o sinal de atenção é o ⚠️/ℹ️ e a faixa esquerda. */
   .aviso-warn { background: var(--chip); border: 1px solid var(--border, #ddd6fe);
                 border-left: 4px solid #d97706; color: var(--text, #1e1b4b);
                 padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; }
-  .aviso-warn a,
-  html[data-theme="dark"] .aviso-warn a,
-  html[data-theme="dark"] .aviso-warn a:hover { color: inherit; font-weight: 700; text-decoration: underline; }
   .aviso-warn[hidden] { display: none; }
   @keyframes toastSubir { from{opacity:0;transform:translateX(-50%) translateY(16px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
   .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
   .modal-backdrop input { width:100%; }
-  .aviso-warn .btn { margin-top: 10px; }
   .tag-fora { display:block; margin-top:4px; font-size:11px; color: var(--muted, #6b7280); }
-  .ok   { background: rgba(22,163,74,.10);  border: 1px solid rgba(22,163,74,.30);  padding: 12px 14px; border-radius: 10px; font-size: 13px; }
 
   /* ── Form ── */
   label { display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px; }
@@ -677,7 +671,6 @@ function _showToast(msg, bg, shadow, duration){
 function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
 function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
 function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
-function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
 
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -685,7 +678,6 @@ function setMsg(text, kind){
   if(kind === "err") _toastErro('⚠️ ' + t);
   else if(kind === "ok") _toastSucesso('✅ ' + t);
   else if(kind === "warn") _toastAviso('⚠️ ' + t);
-  else if(kind === "loading") _toastCarregando('⏳ ' + t);
   else {
     console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
     _toastAviso(t);
@@ -929,7 +921,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // theme-colors.js reage sozinho ao 'colorchange' depois disso.
   if (window.ThemeColors) ThemeColors.ajustarContraste();
 
-  Loading.esconder(); // ← linha adicionada
+  Loading.esconder();
 });
 
 // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora (ver
