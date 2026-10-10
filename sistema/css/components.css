@@ -69,15 +69,15 @@
   --ui-chip-color:    var(--chip-color, var(--ui-text));
   --ui-table-cell-bg: var(--field-bg, #ffffff);
 
-  /* perigo = vermelho TRANSLÚCIDO (nunca sólido em botão — guia 7.4).
-     Estado base vem do header.css; hover é daqui. */
+  /* perigo: botão .btn.danger é SÓLIDO (--ui-danger-solid). Os tokens translúcidos
+     abaixo ficam para o que ainda os usa (ex.: hover/estados em outros componentes). */
   --ui-danger-fg:     var(--danger-color, #b91c1c);
   --ui-danger-bg:     var(--danger-bg, rgba(185,28,28,.10));
   --ui-danger-bd:     var(--danger-border, rgba(185,28,28,.30));
   --ui-danger-bg-h:   rgba(185,28,28,.18);
   --ui-danger-bd-h:   rgba(185,28,28,.50);
   --ui-danger-fg-h:   var(--danger-color, #b91c1c);
-  --ui-danger-solid:  #b91c1c;           /* só o confirmar destrutivo do modal */
+  --ui-danger-solid:  #b91c1c;           /* .btn.danger e confirmar destrutivo do modal */
 
   /* sucesso: estado base = tokens "ativo" do base.css */
   --ui-success-fg:    var(--ativo-color, #15803d);
@@ -119,6 +119,7 @@ html[data-theme="dark"]{
   box-shadow:var(--shadow, 0 4px 20px rgba(0,0,0,.06));
   padding:var(--card-pad, 18px);
   margin-bottom:var(--card-gap, 16px);
+  overflow:visible;               /* nunca hidden: cortaria o balão do ⓘ */
   transition:background .3s, border-color .3s;
 }
 .card-head{
@@ -200,7 +201,7 @@ td{ color:var(--text); }
      .btn.outline                    contorno de marca, sem preenchimento
      .btn.neutral                    contorno neutro, sem preenchimento
      .btn.quiet                      sem borda/fundo até o hover
-     .btn.danger                     ação destrutiva (vermelho translúcido)
+     .btn.danger                     ação destrutiva (vermelho SÓLIDO)
      .btn.success                    aprovar/confirmar positivo (verde translúcido)
      .btn.cancel                     cancelar (neutro, texto apagado)
    MODIFICADOR DE TAMANHO:  .btn.small
@@ -249,11 +250,19 @@ td{ color:var(--text); }
 /* ── secondary / ghost ── */
 .btn:is(.secondary, .ghost, .btn-gray){
   --btn-bg:var(--ui-chip-bg); --btn-bd:var(--ui-chip-border); --btn-fg:var(--ui-chip-color);
+  --btn-bg-h:color-mix(in srgb, var(--ui-brand) 22%, var(--ui-chip-bg));
+  --btn-bd-h:var(--ui-brand); --btn-fg-h:var(--ui-brand-text);
 }
 
 /* ── outline (contorno de marca) ── */
 .btn:is(.outline, .btn-outline){
   --btn-bg:transparent; --btn-bd:var(--ui-brand); --btn-fg:var(--ui-brand-text);
+  --btn-bg-h:color-mix(in srgb, var(--ui-brand) 22%, transparent);
+  --btn-bd-h:var(--ui-brand); --btn-fg-h:var(--ui-brand-text);
+}
+/* hover dos botões "de contorno/chip": preenchimento de marca + anel (só a troca de tom da borda não bastava) */
+.btn:is(.secondary, .ghost, .btn-gray, .outline, .btn-outline):hover:not(:disabled):not([aria-disabled="true"]){
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand) 20%, transparent);
 }
 
 /* ── neutral (contorno neutro) ── */
@@ -272,10 +281,12 @@ td{ color:var(--text); }
   --btn-bd-h:transparent;
 }
 
-/* ── danger (translúcido; único uso de vermelho translúcido do sistema) ── */
+/* ── danger (vermelho SÓLIDO: ação destrutiva tem que ser inconfundível) ── */
 .btn:is(.danger, .btn-danger, .ldanger){
-  --btn-bg:var(--ui-danger-bg);     --btn-bd:var(--ui-danger-bd);     --btn-fg:var(--ui-danger-fg);
-  --btn-bg-h:var(--ui-danger-bg-h); --btn-bd-h:var(--ui-danger-bd-h); --btn-fg-h:var(--ui-danger-fg-h);
+  --btn-bg:var(--ui-danger-solid);   --btn-bd:var(--ui-danger-solid);   --btn-fg:#ffffff;
+  --btn-bg-h:color-mix(in srgb, var(--ui-danger-solid) 84%, #000);
+  --btn-bd-h:color-mix(in srgb, var(--ui-danger-solid) 84%, #000);
+  --btn-fg-h:#ffffff;
 }
 
 /* ── success ── */
@@ -337,8 +348,7 @@ html[data-theme="dark"] .config-card.card-destaque{
 .card-destaque .btn:is(.primary, .btn-primary):not(table .btn, .item .btn){
   --btn-bg:var(--dest-btn-bg);
 }
-/* perigo de verdade continua vermelho dentro do destaque: vermelho-escuro
-   translúcido, nunca sólido e nunca só o tom claro (some no fundo de marca) */
+/* perigo dentro do destaque: vermelho-escuro (o sólido normal some no fundo de marca) */
 .card-destaque .btn:is(.danger, .btn-danger, .ldanger):not(table .btn, .item .btn){
   --btn-bg:rgba(153,27,27,.38);   --btn-bd:rgba(153,27,27,.65);   --btn-fg:var(--dest-fg);
   --btn-bg-h:rgba(153,27,27,.52); --btn-bd-h:rgba(153,27,27,.65); --btn-fg-h:var(--dest-fg);
