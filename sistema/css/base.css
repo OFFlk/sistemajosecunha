@@ -145,6 +145,14 @@ html[data-theme="dark"] a:not(.btn):hover {
   color: var(--brand-text-d);
 }
 
+/* ── Atributo hidden ──
+   Sem isso, uma classe com display:flex/grid (.card, .modal-backdrop...) vence o
+   atributo hidden do navegador. Permite esconder/mostrar por JS com
+   el.hidden = true/false, sem style="display:none" inline. */
+[hidden] {
+  display: none !important;
+}
+
 /* ── Botões nativos ── */
 button {
   font-family: inherit;

@@ -1,5 +1,5 @@
 /* ============================================================
-   COMPONENTES REUTILIZÁVEIS DO SISTEMA  (v2 — rodada 2)
+   COMPONENTES REUTILIZÁVEIS DO SISTEMA  (v2 — rodada 3, pós-piloto)
 
    QUEM É DONO DE QUÊ
      base.css ........ tema (cores claro/escuro), reset, fonte, body, links
@@ -67,17 +67,18 @@
   --ui-chip-bg:       var(--chip-bg, #f5f3ff);
   --ui-chip-border:   var(--chip-border, #ddd6fe);
   --ui-chip-color:    var(--chip-color, var(--ui-text));
-  --ui-table-cell-bg: var(--field-bg, #ffffff);
+  --ui-cell-bg:       var(--field-bg, #ffffff);   /* fundo liso legível sobre o card de destaque: célula de tabela, stat-box */
+  --ui-table-cell-bg: var(--ui-cell-bg);          /* nome antigo, mantido */
 
-  /* perigo: botão .btn.danger é SÓLIDO (--ui-danger-solid). Os tokens translúcidos
-     abaixo ficam para o que ainda os usa (ex.: hover/estados em outros componentes). */
+  /* perigo = vermelho TRANSLÚCIDO (nunca sólido em botão — guia 7.4).
+     Estado base vem do header.css; hover é daqui. */
   --ui-danger-fg:     var(--danger-color, #b91c1c);
   --ui-danger-bg:     var(--danger-bg, rgba(185,28,28,.10));
   --ui-danger-bd:     var(--danger-border, rgba(185,28,28,.30));
   --ui-danger-bg-h:   rgba(185,28,28,.18);
   --ui-danger-bd-h:   rgba(185,28,28,.50);
   --ui-danger-fg-h:   var(--danger-color, #b91c1c);
-  --ui-danger-solid:  #b91c1c;           /* .btn.danger e confirmar destrutivo do modal */
+  --ui-danger-solid:  #b91c1c;           /* só o confirmar destrutivo do modal */
 
   /* sucesso: estado base = tokens "ativo" do base.css */
   --ui-success-fg:    var(--ativo-color, #15803d);
@@ -86,6 +87,19 @@
   --ui-success-bg-h:  #bbf7d0;
   --ui-success-bd-h:  #4ade80;
   --ui-success-fg-h:  #166534;
+
+  /* STATUS (chip, linha de preview, aviso curto): cor fixa COM par claro/escuro
+     de contraste. Fonte única — a página não declara o próprio par. */
+  --ui-st-ok-fg:   #166534;  --ui-st-ok-bg:   rgba(22,163,74,.10);   --ui-st-ok-bd:   rgba(22,163,74,.30);
+  --ui-st-warn-fg: #92400e;  --ui-st-warn-bg: rgba(217,119,6,.10);   --ui-st-warn-bd: rgba(217,119,6,.35);
+  --ui-st-bad-fg:  #b91c1c;  --ui-st-bad-bg:  rgba(185,28,28,.08);   --ui-st-bad-bd:  rgba(185,28,28,.30);
+  --ui-st-info-fg: #1e3a8a;  --ui-st-info-bg: rgba(37,99,235,.10);   --ui-st-info-bd: rgba(37,99,235,.30);
+
+  /* CHIPS — as 5 cores (ver seção 1, .badge):
+       variável = --ui-chip-*  (segue a paleta)      verde = --ui-st-ok-*     vermelho = --ui-st-bad-*
+       cinza    = --ui-chip-gray-*                   neutro = --ui-chip-neutral-* (âmbar FIXO: não segue a paleta) */
+  --ui-chip-gray-fg:    #4b5563;  --ui-chip-gray-bg:    rgba(107,114,128,.12);  --ui-chip-gray-bd:    rgba(107,114,128,.30);
+  --ui-chip-neutral-fg: #92400e;  --ui-chip-neutral-bg: rgba(245,158,11,.14);   --ui-chip-neutral-bd: rgba(245,158,11,.35);
 }
 
 html[data-theme="dark"]{
@@ -103,23 +117,34 @@ html[data-theme="dark"]{
   --ui-success-bg-h:  rgba(21,128,61,.32);
   --ui-success-bd-h:  rgba(134,239,172,.60);
   --ui-success-fg-h:  #bbf7d0;
+
+  /* status no escuro: texto claro, fundo ~16%, borda ~55% */
+  --ui-st-ok-fg:   #86efac;  --ui-st-ok-bg:   rgba(74,222,128,.16);   --ui-st-ok-bd:   rgba(74,222,128,.55);
+  --ui-st-warn-fg: #fcd34d;  --ui-st-warn-bg: rgba(245,158,11,.16);   --ui-st-warn-bd: rgba(245,158,11,.55);
+  --ui-st-bad-fg:  #fca5a5;  --ui-st-bad-bg:  rgba(248,113,113,.16);  --ui-st-bad-bd:  rgba(248,113,113,.55);
+  --ui-st-info-fg: #93c5fd;  --ui-st-info-bg: rgba(96,165,250,.16);   --ui-st-info-bd: rgba(96,165,250,.55);
+
+  --ui-chip-gray-fg:    #cbd5e1;  --ui-chip-gray-bg:    rgba(148,163,184,.14);  --ui-chip-gray-bd:    rgba(148,163,184,.40);
+  --ui-chip-neutral-fg: #fbbf24;  /* bg e borda do neutro iguais ao claro */
 }
 
 
 /* ============================================================
    1. CARD / TÍTULO / CAMPO / LISTA / BADGE / TABELA
    Só aparência. Tamanho de card, colunas e lado a lado: na página.
-   Ajuste fino sem repintar: --card-pad, --card-radius, --card-gap
-   (ex.:  .meu-card{ --card-pad:12px; }  ).
+   Ajuste fino sem repintar: --card-pad (4 lados) ou --card-pad-y / --card-pad-x
+   (vertical / horizontal), --card-radius, --card-gap
+   (ex.:  .meu-card{ --card-pad-y:22px; --card-pad-x:26px; }  ).
+   overflow:visible é do card: hidden cortaria o balão do ⓘ e menus.
    ============================================================ */
 .card{
   background:var(--ui-surface);
   border:1px solid var(--ui-border);
   border-radius:var(--card-radius, 14px);
   box-shadow:var(--shadow, 0 4px 20px rgba(0,0,0,.06));
-  padding:var(--card-pad, 18px);
+  padding:var(--card-pad-y, var(--card-pad, 18px)) var(--card-pad-x, var(--card-pad, 18px));
   margin-bottom:var(--card-gap, 16px);
-  overflow:visible;               /* nunca hidden: cortaria o balão do ⓘ */
+  overflow:visible;
   transition:background .3s, border-color .3s;
 }
 .card-head{
@@ -132,25 +157,37 @@ html[data-theme="dark"]{
   margin-bottom:14px; letter-spacing:-0.1px;
 }
 
-/* campo: rótulo + controle (a disposição da linha de campos é da página) */
-.field label{
+/* campo: rótulo + controle (a disposição da linha de campos é da página).
+   Dentro de .field é automático. FORA de .field use as classes avulsas:
+     <label class="lbl">   rótulo solto (acima de um select, por ex.)
+     <select class="input"> controle solto (em .row-btns, barra de filtro...)
+     <label class="check"><input type="checkbox"> texto</label>   caixa de marcar */
+.field label, .lbl{
   display:block; margin:0 0 6px;
   font-size:13px; font-weight:700; color:var(--ui-text);
 }
-.field :is(input, select, textarea){
-  width:100%; box-sizing:border-box; padding:11px 12px;
+.field :is(input, select, textarea), .input{
+  box-sizing:border-box; padding:11px 12px;
   border:1px solid var(--field-border, var(--ui-border)); border-radius:10px;
   background:var(--field-bg, var(--ui-surface)); color:var(--ui-text);
   font-size:14px; font-family:'Nunito', ui-sans-serif, system-ui, sans-serif;
   outline:none; transition:border-color .15s, box-shadow .15s;
 }
-.field :is(input, select, textarea):focus{
+.field :is(input, select, textarea){ width:100%; }   /* .input avulso: largura é da página */
+.field :is(input, select, textarea):focus, .input:focus{
   border-color:var(--ui-brand); box-shadow:0 0 0 3px var(--ui-brand-faded);
 }
-.field :is(input, textarea)::placeholder{
+.field :is(input, textarea)::placeholder, .input::placeholder{
   color:color-mix(in srgb, var(--ui-text) 45%, transparent);
 }
-.field :is(input, select, textarea):disabled{ opacity:.6; cursor:not-allowed; }
+.field :is(input, select, textarea):disabled, .input:disabled{ opacity:.6; cursor:not-allowed; }
+
+.check{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:13px; font-weight:600; color:var(--ui-muted);
+  cursor:pointer; user-select:none;
+}
+.check input{ margin:0; width:16px; height:16px; accent-color:var(--ui-brand); }
 
 .list{ display:flex; flex-direction:column; }
 .list-item{
@@ -161,14 +198,26 @@ html[data-theme="dark"]{
 .list-item .left{ display:flex; flex-direction:column; gap:3px; }
 .list-item .right{ display:flex; gap:6px; }
 
-/* --ui-brand* (e não --primary): não quebra em página que não carregue base.css */
+/* ── CHIP DE INFORMAÇÃO: .badge — 5 cores ──
+   dado curto, NÃO clicável (clicável é botão). A cor diz o tipo de dado:
+     .badge            variável  segue a paleta (theme-colors)   CPF, ID do aluno, ano, turno
+     .badge.ok         verde     verdadeiro / sim / ativo
+     .badge.bad        vermelho  falso / não / inativo
+     .badge.gray       cinza     dado sem destaque que precisa aparecer (professor, ID da turma)
+     .badge.neutral    neutro    âmbar fixo: dado-chave que se destaca em QUALQUER paleta (série)
+   .badge.small = versão compacta. Espaçamento entre chips é do container (gap). */
 .badge{
-  display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px;
-  font-size:11px; font-weight:700; margin-left:4px;
-  background:color-mix(in srgb, var(--ui-brand) 15%, transparent);
-  color:var(--ui-brand-text);
-  border:1px solid color-mix(in srgb, var(--ui-brand) 30%, transparent);
+  --bd-fg:var(--ui-chip-color); --bd-bg:var(--ui-chip-bg); --bd-bd:var(--ui-chip-border);
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 10px; border-radius:999px;
+  font-size:12px; font-weight:700; line-height:1.2;
+  color:var(--bd-fg); background:var(--bd-bg); border:1px solid var(--bd-bd);
 }
+.badge.small{ padding:3px 8px; font-size:11px; }
+.badge.ok     { --bd-fg:var(--ui-st-ok-fg);         --bd-bg:var(--ui-st-ok-bg);         --bd-bd:var(--ui-st-ok-bd); }
+.badge.bad    { --bd-fg:var(--ui-st-bad-fg);        --bd-bg:var(--ui-st-bad-bg);        --bd-bd:var(--ui-st-bad-bd); }
+.badge.gray   { --bd-fg:var(--ui-chip-gray-fg);     --bd-bg:var(--ui-chip-gray-bg);     --bd-bd:var(--ui-chip-gray-bd); }
+.badge.neutral{ --bd-fg:var(--ui-chip-neutral-fg);  --bd-bg:var(--ui-chip-neutral-bg);  --bd-bd:var(--ui-chip-neutral-bd); }
 .badge-ativo{
   display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px;
   font-size:11px; font-weight:700; margin-left:6px;
@@ -182,6 +231,9 @@ table{ width:100%; border-collapse:collapse; font-size:13px; }
 th, td{ padding:8px 10px; text-align:center; border:1px solid var(--border); }
 th{ background:var(--tbtn-bg); font-weight:800; font-size:12px; color:var(--muted); }
 td{ color:var(--text); }
+/* alinhamento à esquerda: <table class="left">. Vai no th/td (via classe da
+   tabela), NUNCA no <tr> (text-align no tr não vence o th/td global). */
+table.left :is(th, td){ text-align:left; }
 
 
 /* ============================================================
@@ -201,7 +253,7 @@ td{ color:var(--text); }
      .btn.outline                    contorno de marca, sem preenchimento
      .btn.neutral                    contorno neutro, sem preenchimento
      .btn.quiet                      sem borda/fundo até o hover
-     .btn.danger                     ação destrutiva (vermelho SÓLIDO)
+     .btn.danger                     ação destrutiva (vermelho sólido)
      .btn.success                    aprovar/confirmar positivo (verde translúcido)
      .btn.cancel                     cancelar (neutro, texto apagado)
    MODIFICADOR DE TAMANHO:  .btn.small
@@ -211,9 +263,10 @@ td{ color:var(--text); }
   --btn-bg:   var(--ui-surface);
   --btn-bd:   var(--ui-border);
   --btn-fg:   var(--ui-text);
-  --btn-bg-h: var(--ui-brand-faded);
+  --btn-bg-h: color-mix(in srgb, var(--ui-brand) 22%, transparent);
   --btn-bd-h: var(--ui-brand);
   --btn-fg-h: var(--ui-brand-text);
+  --btn-ring: 0 0 0 3px color-mix(in srgb, var(--ui-brand) 22%, transparent);
 
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
   box-sizing:border-box;
@@ -226,10 +279,11 @@ td{ color:var(--text); }
   font-size:14px; font-weight:700; line-height:1.2;
   text-decoration:none; white-space:nowrap;
   cursor:pointer;
-  transition:background .18s, border-color .18s, color .18s, transform .06s;
+  transition:background .18s, border-color .18s, color .18s, box-shadow .18s, transform .06s;
 }
 .btn:hover:not(:disabled):not([aria-disabled="true"]){
   background:var(--btn-bg-h); border-color:var(--btn-bd-h); color:var(--btn-fg-h);
+  box-shadow:var(--btn-ring, none);
 }
 .btn:active:not(:disabled):not([aria-disabled="true"]){ transform:translateY(1px); }
 .btn:focus-visible{ outline:2px solid var(--ui-brand); outline-offset:2px; }
@@ -245,24 +299,17 @@ td{ color:var(--text); }
 .btn:is(.primary, .btn-primary){
   --btn-bg:var(--ui-brand);       --btn-bd:var(--ui-brand);       --btn-fg:var(--ui-brand-fg);
   --btn-bg-h:var(--ui-brand-hover); --btn-bd-h:var(--ui-brand-hover); --btn-fg-h:var(--ui-brand-fg);
+  --btn-ring:none;
 }
 
 /* ── secondary / ghost ── */
 .btn:is(.secondary, .ghost, .btn-gray){
   --btn-bg:var(--ui-chip-bg); --btn-bd:var(--ui-chip-border); --btn-fg:var(--ui-chip-color);
-  --btn-bg-h:color-mix(in srgb, var(--ui-brand) 22%, var(--ui-chip-bg));
-  --btn-bd-h:var(--ui-brand); --btn-fg-h:var(--ui-brand-text);
 }
 
 /* ── outline (contorno de marca) ── */
 .btn:is(.outline, .btn-outline){
   --btn-bg:transparent; --btn-bd:var(--ui-brand); --btn-fg:var(--ui-brand-text);
-  --btn-bg-h:color-mix(in srgb, var(--ui-brand) 22%, transparent);
-  --btn-bd-h:var(--ui-brand); --btn-fg-h:var(--ui-brand-text);
-}
-/* hover dos botões "de contorno/chip": preenchimento de marca + anel (só a troca de tom da borda não bastava) */
-.btn:is(.secondary, .ghost, .btn-gray, .outline, .btn-outline):hover:not(:disabled):not([aria-disabled="true"]){
-  box-shadow:0 0 0 3px color-mix(in srgb, var(--ui-brand) 20%, transparent);
 }
 
 /* ── neutral (contorno neutro) ── */
@@ -278,21 +325,25 @@ td{ color:var(--text); }
 /* ── quiet (sem borda até o hover) ── */
 .btn:is(.quiet, .btn-ghost){
   --btn-bg:transparent; --btn-bd:transparent; --btn-fg:var(--ui-text);
-  --btn-bd-h:transparent;
+  --btn-bg-h:var(--ui-brand-faded); --btn-bd-h:transparent; --btn-ring:none;
 }
 
-/* ── danger (vermelho SÓLIDO: ação destrutiva tem que ser inconfundível) ── */
+/* ── danger: SÓLIDO, texto branco (decisão do piloto: translúcido era pouco
+   indicativo na ação mais perigosa). ⚠️ na paleta Vermelho o primary tem a
+   mesma cor — não colocar os dois lado a lado. ── */
 .btn:is(.danger, .btn-danger, .ldanger){
-  --btn-bg:var(--ui-danger-solid);   --btn-bd:var(--ui-danger-solid);   --btn-fg:#ffffff;
-  --btn-bg-h:color-mix(in srgb, var(--ui-danger-solid) 84%, #000);
-  --btn-bd-h:color-mix(in srgb, var(--ui-danger-solid) 84%, #000);
-  --btn-fg-h:#ffffff;
+  --btn-bg:var(--ui-danger-solid); --btn-bd:var(--ui-danger-solid); --btn-fg:#fff;
+  --btn-bg-h:color-mix(in srgb, var(--ui-danger-solid) 82%, #000);
+  --btn-bd-h:color-mix(in srgb, var(--ui-danger-solid) 82%, #000);
+  --btn-fg-h:#fff;
+  --btn-ring:none;
 }
 
 /* ── success ── */
 .btn:is(.success, .btn-approve){
   --btn-bg:var(--ui-success-bg);     --btn-bd:var(--ui-success-bd);     --btn-fg:var(--ui-success-fg);
   --btn-bg-h:var(--ui-success-bg-h); --btn-bd-h:var(--ui-success-bd-h); --btn-fg-h:var(--ui-success-fg-h);
+  --btn-ring:none;
 }
 
 
@@ -344,11 +395,13 @@ html[data-theme="dark"] .config-card.card-destaque{
 .card-destaque .btn:not(table .btn, .item .btn){
   --btn-bg:transparent; --btn-bd:var(--dest-btn-bd); --btn-fg:var(--dest-fg);
   --btn-bg-h:var(--dest-btn-hover); --btn-bd-h:var(--dest-fg); --btn-fg-h:var(--dest-fg);
+  --btn-ring:none;
 }
 .card-destaque .btn:is(.primary, .btn-primary):not(table .btn, .item .btn){
   --btn-bg:var(--dest-btn-bg);
 }
-/* perigo dentro do destaque: vermelho-escuro (o sólido normal some no fundo de marca) */
+/* perigo de verdade continua vermelho dentro do destaque: vermelho-escuro
+   translúcido, nunca sólido e nunca só o tom claro (some no fundo de marca) */
 .card-destaque .btn:is(.danger, .btn-danger, .ldanger):not(table .btn, .item .btn){
   --btn-bg:rgba(153,27,27,.38);   --btn-bd:rgba(153,27,27,.65);   --btn-fg:var(--dest-fg);
   --btn-bg-h:rgba(153,27,27,.52); --btn-bd-h:rgba(153,27,27,.65); --btn-fg-h:var(--dest-fg);
@@ -497,8 +550,12 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 
 
 /* modal grande: só o ESQUELETO. O conteúdo (tabela, 3 colunas, só mensagem...)
-   é de cada página. Largura/altura por variável:
-     #meuModal .modal{ --modal-w:640px; }                                   */
+   é de cada página. Tamanho por variável:
+     #meuModal .modal{ --modal-w:640px; --modal-h:80vh; }
+   Altura que o JS define (ex.: calculada a partir do header):
+     --modal-h:none   (tira o teto de max-height; a altura inline manda)
+   Modal com cabeçalho/rodapé fixos e SÓ o corpo rolando: .modal.scroll-body
+   Corpo sem padding (tabela de borda a borda):         .modal-body.flush   */
 .modal{
   width:min(var(--modal-w, 1100px), 96vw); max-height:var(--modal-h, 86vh);
   overflow:auto;
@@ -507,15 +564,18 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 }
 .modal-head{
   position:sticky; top:0; z-index:1;
-  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
   padding:12px 14px; background:var(--ui-surface); border-bottom:1px solid var(--ui-border);
 }
 .modal-head h3{ margin:0; font-size:16px; font-weight:800; }
 .modal-body{ padding:14px; }
+.modal-body.flush{ padding:0; }
 .modal-foot{
   display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px;
   padding:12px 14px; border-top:1px solid var(--ui-border);
 }
+.modal.scroll-body{ display:flex; flex-direction:column; overflow:hidden; }
+.modal.scroll-body > .modal-body{ flex:1 1 auto; min-height:0; overflow:auto; }
 
 
 /* ============================================================
@@ -541,5 +601,7 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .filter-actions{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 .field{ display:flex; flex-direction:column; flex:1; min-width:160px; }
 .table-scroll{ overflow-x:auto; }
+/* margem que o .badge global tinha antes (páginas que dependem dela). Código novo usa gap no container. */
+.badge{ margin-left:4px; }
 /* regra de UMA página (card de detalhes) */
 #card-direita .detalhe-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
