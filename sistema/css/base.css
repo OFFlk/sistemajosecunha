@@ -1,5 +1,19 @@
 /* ══════════════════════════════════════════════════════════
-   BASE.CSS — Estilos globais, reset e variáveis do sistema
+   BASE.CSS — tema, reset, fonte, body, links
+
+   É DONO DE:  cores do tema claro/escuro, reset, fonte, fundo da
+               página, links, rolagem de âncora.
+   NÃO É DONO DE: aparência de componentes (→ components.css),
+               header (→ header.css), grid dos hubs (→ hub.css),
+               layout de página (→ <style> da própria página).
+
+   Página NÃO redeclara estes tokens no próprio :root
+   (--card, --text, --border, --danger, --field-*...). Se precisar de um
+   valor diferente, use outro nome com prefixo da página.
+
+   Obs.: header.css (ainda não migrado) repete reset, fonte, body e
+   alguns tokens. Quando o header for reformulado, esses itens saem de
+   lá e ficam só aqui.
    ══════════════════════════════════════════════════════════ */
 
 /* ── Reset básico ── */
@@ -24,115 +38,114 @@ body {
 
 /* ── Variáveis globais — Tema claro (padrão) ── */
 :root {
-  
+  /* Página */
+  --page-bg:      #f8fafc;
+  --text-color:   #0f172a;
 
-
-
-  --border:       #e5e7eb;
-  --field-bg:     #ffffff;
-  --field-border: #d1d5db;
+  /* Texto, bordas, campos */
   --text:         #1e1b4b;
+  --border:       #e5e7eb;
   --danger:       #b91c1c;
+  --field-bg:     #ffffff;
+  --field-border: var(--brand-border);
 
+  /* Chip (contexto de usuário/escola) */
+  --chip-bg:      #f1f5f9;
+  --chip-border:  #e2e8f0;
+
+  /* Card */
+  --card-bg:      #ffffff;
+  --card-border:  var(--brand-border);
+  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+
+  /* Badge e "ativo" */
   --badge-bg:     #ede9fe;
   --badge-color:  #5b21b6;
-
   --ativo-bg:     #dcfce7;
   --ativo-color:  #15803d;
   --ativo-border: #86efac;
 
-  /* Página */
-  --page-bg: #f8fafc;
-  --text-color: #0f172a;
-  
-  /* Chip (contexto de usuário/escola) */
-  --chip-bg: #f1f5f9;
-  --chip-border: #e2e8f0;
-  
-  /* Brand — Essas variáveis são sobrescritas pelo theme-colors.js */
-  --brand: #7c3aed;
-  --brand-faded: rgba(124, 58, 237, 0.12);
+  /* Brand — sobrescritas pelo theme-colors.js */
+  --brand:        #7c3aed;
+  --brand-faded:  rgba(124, 58, 237, 0.12);
   --brand-border: #c4b5fd;
-  --brand-text: #7c3aed;
+  --brand-text:   #7c3aed;
 
---primary: var(--brand);
-  --primary-faded: var(--brand-faded);
+  /* --primary-*: aliases da marca (existem p/ páginas antigas) */
+  --primary:        var(--brand);
+  --primary-faded:  var(--brand-faded);
   --primary-border: var(--brand-border);
-  --primary-text: var(--brand-text);
-  
-  /* ✅ ADICIONAR: --bg era usado em pesquisa.css mas nunca definido */
+  --primary-text:   var(--brand-text);
+
+  /* --bg: header.css redefine; aqui é o valor de quem não carrega o header */
   --bg: var(--field-bg);
 
-  --card-bg:      #ffffff;
-  --card-border:  var(--brand-border);
-
-  --field-bg:     #ffffff;
-  --field-border: var(--brand-border);
-
-  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+  /* Offset de scroll: header (72px) + barra gradiente (2px) */
+  --header-height: 74px;
 }
 
 /* ── Variáveis globais — Tema escuro ── */
 html[data-theme="dark"] {
-  --page-bg: #0f1829;
-  --text-color: #e2e8f0;
-  
-  --chip-bg: #1a2540;
-  --chip-border: #2a3a5c;
-  
-  /* Brand dark — Sobrescritas pelo theme-colors.js */
-  --brand-d: #a78bfa;
-  --brand-faded-d: rgba(124, 58, 237, 0.28);
-  --brand-border-d: #4c1d95;
-  --brand-text-d: #c4b5fd;
+  --page-bg:      #0f1829;
+  --text-color:   #e2e8f0;
 
-  --border:       #1e2540;
-  --field-bg:     #0f1829;
-  --field-border: #2a3a5c;
   --text:         #e2e8f0;
+  --border:       #1e2540;
   --danger:       #fca5a5;
+  --field-bg:     #0a1426;
+  --field-border: #1e2540;
 
-  --badge-bg:     rgba(124,58,237,0.28);
-  --badge-color:  #c4b5fd;
-
-  --ativo-bg:     rgba(21,128,61,0.18);
-  --ativo-color:  #86efac;
-  --ativo-border: rgba(134,239,172,0.35);
---primary: var(--brand-d);
-  --primary-faded: var(--brand-faded-d);
-  --primary-border: var(--brand-border-d);
-  --primary-text: var(--brand-text-d);
-
-  --bg: var(--field-bg);
+  --chip-bg:      #1a2540;
+  --chip-border:  #2a3a5c;
 
   --card-bg:      #131c2e;
   --card-border:  #2a3a5c;
-  --field-bg:     #0a1426;
-  --field-border: #1e2540;
   --shadow:       0 4px 24px rgba(0,0,0,0.4);
+
+  --badge-bg:     rgba(124,58,237,0.28);
+  --badge-color:  #c4b5fd;
+  --ativo-bg:     rgba(21,128,61,0.18);
+  --ativo-color:  #86efac;
+  --ativo-border: rgba(134,239,172,0.35);
+
+  /* Brand dark — sobrescritas pelo theme-colors.js */
+  --brand-d:        #a78bfa;
+  --brand-faded-d:  rgba(124, 58, 237, 0.28);
+  --brand-border-d: #4c1d95;
+  --brand-text-d:   #c4b5fd;
+
+  --primary:        var(--brand-d);
+  --primary-faded:  var(--brand-faded-d);
+  --primary-border: var(--brand-border-d);
+  --primary-text:   var(--brand-text-d);
+
+  --bg: var(--field-bg);
 }
 
 
-/* ── Links básicos ── */
-a {
+/* ── Links ──
+   :not(.btn) — <a class="btn"> é botão, não link: a cor dele vem do
+   components.css (--btn-fg). Sem isso, `html[data-theme="dark"] a`
+   (especificidade maior que .btn) pintava o botão-link com a cor de marca. */
+a:not(.btn) {
   color: var(--brand);
   text-decoration: none;
   transition: color 0.2s;
 }
 
-a:hover {
+a:not(.btn):hover {
   color: var(--brand-text);
 }
 
-html[data-theme="dark"] a {
+html[data-theme="dark"] a:not(.btn) {
   color: var(--brand-d);
 }
 
-html[data-theme="dark"] a:hover {
+html[data-theme="dark"] a:not(.btn):hover {
   color: var(--brand-text-d);
 }
 
-/* ── Botões básicos ── */
+/* ── Botões nativos ── */
 button {
   font-family: inherit;
   cursor: pointer;
@@ -144,21 +157,14 @@ button:focus-visible {
 }
 
 
-/* ── Header placeholder ──────────────────────────────────────────────────────
+/* ── Header placeholder ──
    display:contents faz o placeholder "desaparecer" do layout,
-   permitindo que o .app-header filho use position:sticky normalmente.
-   ─────────────────────────────────────────────────────────────────────────── */
+   permitindo que o .app-header filho use position:sticky normalmente. */
 #header-placeholder {
   display: contents;
 }
 
-/* ── Offset de scroll para âncoras ──────────────────────────────────────────
-   Compensa o header fixo (72px) + barra gradiente (2px) ao navegar por âncoras.
-   ─────────────────────────────────────────────────────────────────────────── */
-:root {
-  --header-height: 74px; /* 72px header + 2px .l-bar */
-}
-
+/* ── Offset de scroll para âncoras (usa --header-height) ── */
 html {
   scroll-padding-top: var(--header-height);
 }
