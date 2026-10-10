@@ -158,14 +158,14 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
   <!-- ── ESTATÍSTICAS ── -->
   <div class="card card-destaque">
-    <h3>📊 Visão geral — módulo de ano ativo</h3>
+    <h3>📊 Visão geral — módulo de ano ativo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os números só são lidos quando você aperta "Carregar dados". Assim, abrir esta página não gasta leituras do banco.</span></span></h3>
     <div class="stats-row">
       <div class="stat-box"><div class="stat-num" id="statTurmas">—</div><div class="stat-lbl">Turmas (nova coleção)</div></div>
       <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos cadastrados</div></div>
       <div class="stat-box"><div class="stat-num" id="statMatriculas">—</div><div class="stat-lbl">Matrículas</div></div>
     </div>
     <div class="row-btns mt-14">
-      <button class="btn secondary" onclick="recarregar()">🔄 Recarregar</button>
+      <button class="btn secondary" onclick="carregarDados()">🔄 Carregar dados</button>
     </div>
     <div class="aviso-warn mt-12 mb-0" id="avisoSemEscola" style="display:none;">⚠️ Nenhuma escola selecionada ("Todas as escolas"). Escolha uma escola para ver os números e usar as ferramentas.</div>
     <div class="console" id="logGeral" style="display:none;"></div>
@@ -398,6 +398,10 @@ function clearLogEl(id) {
   if (el) { el.textContent = ''; el.style.display = 'none'; }
 }
 
+let _visaoCarregada = false;   // false = os números da visão geral ainda não foram lidos
+
+// Boot e "depois de uma operação": confere a escola e só LÊ o banco se o usuário já tiver
+// apertado "Carregar dados" (cada leitura de turmas/alunos/matrículas custa).
 async function inicializar() {
   clearLogEl('logGeral');
   await waitAuth();
@@ -406,9 +410,11 @@ async function inicializar() {
   if (!sid || String(sid).toUpperCase() === 'ADMIN') {
     ['statTurmas', 'statAlunos', 'statMatriculas'].forEach(id => { document.getElementById(id).textContent = '—'; });
     document.getElementById('avisoSemEscola').style.display = '';
+    _visaoCarregada = false;
     return;
   }
   document.getElementById('avisoSemEscola').style.display = 'none';
+  if (!_visaoCarregada) return;
 
   try {
     const [novas, alunos, mats] = await Promise.all([
@@ -427,8 +433,9 @@ async function inicializar() {
   }
 }
 
-async function recarregar() {
-  clearLogEl('logGeral');
+// Botão "Carregar dados": única entrada que liga a leitura da visão geral.
+async function carregarDados() {
+  _visaoCarregada = true;
   await inicializar();
 }
 
