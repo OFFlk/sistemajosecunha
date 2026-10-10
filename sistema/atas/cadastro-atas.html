@@ -131,6 +131,7 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 .import-item { border:1px solid var(--ui-border); border-radius:10px; padding:10px 12px; }
 .import-item-nome { font-weight:700; font-size:13px; }
 .import-item-info { font-size:12px; color:var(--ui-muted); margin-top:2px; }
+#_importAtaModal .input { width:100%; box-sizing:border-box; }
 .import-sel { margin-top:6px; }
 </style>
 <script src="../db.firebase.js"></script>
@@ -550,10 +551,7 @@ function atualizarSelectSerieAluno() {
   const listaTurma = dedupSeries(seriesTurma);
   const listaUnica = listaTurma.some(_ehSerieMulti) ? SERIES_REAIS.slice() : listaTurma;
 
-  selAluno.innerHTML =
-    [`<option value="">Selecione...</option>`]
-      .concat(listaUnica.map(s => `<option value="${s}">${s}</option>`))
-      .join("");
+  selAluno.innerHTML = listaUnica.map(s => `<option value="${s}">${s}</option>`).join("");
 
   if (listaUnica.length === 1) {
     selAluno.value = listaUnica[0];
@@ -563,6 +561,7 @@ function atualizarSelectSerieAluno() {
   const keyAtual = normalizarSerieChave(atual);
   const match = listaUnica.find(s => normalizarSerieChave(s) === keyAtual);
   if (match) selAluno.value = match;
+  else selAluno.selectedIndex = -1;   // sem opção "Selecione": fica em branco até escolher (a validação do Adicionar continua valendo)
 }
 
 /* =========================
@@ -2675,7 +2674,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function _marcarVisual(div, marcado){
     div.classList.toggle('scan-removendo', marcado);
     const b = div.querySelector('[data-fileid]');
-    if (b) { b.textContent = marcado ? '↩️ Desfazer' : '🗑️'; b.title = marcado ? 'Desfazer exclusão' : 'Excluir'; }
+    if (b) { b.textContent = marcado ? '↩️ Desfazer' : '🗑️ Excluir'; b.title = marcado ? 'Desfazer exclusão' : 'Excluir'; }
   }
   function _divDoScan(id){
     return Array.from(document.querySelectorAll('#scansLista .scan-existente'))
@@ -2708,7 +2707,7 @@ document.addEventListener("DOMContentLoaded", () => {
       '<div class="scans-item-actions">'+
         `<a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>`+
         btnPdf+
-        `<button class="btn danger small" data-fileid="${escHtml(f.fileId)}" data-restype="${escHtml(f.resourceType||'image')}" data-name="${escHtml(f.fileName)}" title="Excluir">🗑️</button>`+
+        `<button class="btn danger small" data-fileid="${escHtml(f.fileId)}" data-restype="${escHtml(f.resourceType||'image')}" data-name="${escHtml(f.fileName)}" title="Excluir">🗑️ Excluir</button>`+
       '</div>';
     // Excluir só MARCA o scan (riscado + "Desfazer"); o arquivo do Cloudinary e o
     // doc só somem em "Salvar no banco". Clicar de novo desfaz a marcação.
