@@ -12,6 +12,8 @@
 })();
 </script>
 
+<script src="../loading-overlay.js"></script>
+
 <script src="../auth.firebase.js"></script>
 <!-- página exclusiva de ADMIN -->
 <script>window.Auth && Auth.requireRole('admin');</script>
@@ -140,6 +142,26 @@ html[data-theme="dark"] .card:not(.card-destaque) .sec-header:hover h3 { color:v
 .psq-tab td.nw { white-space:nowrap; }
 .psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .psq-tab tbody tr:hover { background:var(--chip); }
+
+/* ── Botão ghost (cópia do cadastro-turma-ativa) ── */
+.btn.ghost,
+.btn.secondary {
+  background: var(--chip-bg);
+  border-color: var(--chip-border);
+  color: var(--chip-color);
+}
+.btn.ghost:hover,
+.btn.secondary:hover {
+  background: var(--brand-faded, #f5f3ff);
+  border-color: var(--brand, #7c3aed);
+  color: var(--brand-text, #6d28d9);
+}
+html[data-theme="dark"] .btn.ghost:hover,
+html[data-theme="dark"] .btn.secondary:hover {
+  background: var(--brand-faded-d, rgba(124,58,237,0.28));
+  border-color: var(--brand-d, #7c3aed);
+  color: var(--brand-text-d, #c4b5fd);
+}
 
 /* ── Cards: sem overflow:hidden (cortaria o balão do ⓘ) ── */
 .card { overflow:visible; }
@@ -401,7 +423,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 ============================================= */
 let IS_ADMIN = false;
 
-document.addEventListener('auth:ready', function () {
+document.addEventListener('auth:ready', async function () {
   const session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
   const role = session ? String(session.role || '').trim().toLowerCase() : '';
   IS_ADMIN = (role === 'admin');
@@ -426,8 +448,14 @@ document.addEventListener('auth:ready', function () {
 
   try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
   catch (e) { console.warn('ajustarContraste:', e); }
-  psqIniciar();
-  inicializar();
+  try {
+    await Promise.all([
+      psqIniciar().catch(e => console.error('[psqIniciar]', e)),
+      inicializar().catch(e => console.error('[inicializar]', e)),
+    ]);
+  } finally {
+    try { if (window.Loading) Loading.esconder(); } catch (_) {}
+  }
 });
 document.addEventListener('click', () => {
   document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open'));
