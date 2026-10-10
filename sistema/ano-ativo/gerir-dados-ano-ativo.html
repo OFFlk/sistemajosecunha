@@ -92,10 +92,11 @@ html[data-theme="dark"] .stat-num { color:var(--brand-text-d,#c4b5fd); }
 }
 html[data-theme="dark"] #avisoReadonly { color:#fbbf24; }
 
-.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
-.card:not(.card-destaque) .sec-header:hover h3 { color:var(--brand-text,#6d28d9); }
-html[data-theme="dark"] .card:not(.card-destaque) .sec-header:hover h3 { color:var(--brand-text-d,#c4b5fd); }
-.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; }
+.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:default; user-select:none; }
+.sec-header.fechada { cursor:pointer; }
+.card:not(.card-destaque) .sec-header.fechada:hover h3 { color:var(--brand-text,#6d28d9); }
+html[data-theme="dark"] .card:not(.card-destaque) .sec-header.fechada:hover h3 { color:var(--brand-text-d,#c4b5fd); }
+.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; cursor:pointer; padding:4px 8px; }
 .sec-toggle.collapsed { transform:rotate(-90deg); }
 .sec-body.collapsed { display:none; }
 
@@ -163,6 +164,12 @@ html[data-theme="dark"] .btn.secondary:hover {
   color: var(--brand-text-d, #c4b5fd);
 }
 
+/* ── Botão outline (terciário): sem fundo, texto --brand-text (escurece no claro, clareia no escuro) ── */
+.btn.outline { background:transparent; border-color:var(--brand-border,#ddd6fe); color:var(--brand-text,#6d28d9); }
+.btn.outline:hover:not(:disabled) { background:var(--brand-faded,#f5f3ff); border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
+html[data-theme="dark"] .btn.outline { background:transparent; border-color:var(--brand-border-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
+html[data-theme="dark"] .btn.outline:hover:not(:disabled) { background:var(--brand-faded-d,rgba(124,58,237,0.28)); border-color:var(--brand-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
+
 /* ── Cards: sem overflow:hidden (cortaria o balão do ⓘ) ── */
 .card { overflow:visible; }
 
@@ -198,6 +205,12 @@ html[data-theme="dark"] .card-destaque .stat-box { background:#0f172a; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
 .dest-tit { display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
 @media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
+
+/* ── Aviso de card (guia 1.9): sem fundo amarelo, herda o contexto ── */
+.aviso-warn { background:var(--chip-bg); border:1px solid var(--chip-border); border-left:4px solid #d97706;
+  color:var(--text,#1e1b4b); padding:12px 14px; border-radius:12px; margin-bottom:12px; font-size:13px; }
+.card-destaque .aviso-warn { background:var(--dest-panel-bg); border-color:var(--dest-btn-bd);
+  border-left-color:var(--dest-fg); color:var(--dest-fg); }
 
 /* ── Ícone de dica (ⓘ) — guia, Parte 2 ── */
 .info-tip{
@@ -252,12 +265,13 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
     <div class="row-btns" style="margin-top:14px;">
       <button class="btn btn-gray" onclick="recarregar()">🔄 Recarregar</button>
     </div>
-    <div class="console" id="logGeral" style="margin-top:12px;">Aguardando carregamento...</div>
+    <div class="aviso-warn" id="avisoSemEscola" style="display:none;margin:12px 0 0;">⚠️ Nenhuma escola selecionada ("Todas as escolas"). Escolha uma escola para ver os números e usar as ferramentas.</div>
+    <div class="console" id="logGeral" style="display:none;margin-top:12px;"></div>
   </div>
 
   <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
   <div class="card">
-    <div class="sec-header" onclick="toggleSec('secPesquisa')">
+    <div class="sec-header" onclick=\"secHeaderClick('secPesquisa', event)\">
       <h3 style="margin-top:0;">🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
       <span class="sec-toggle" id="togSecPesquisa">▼</span>
     </div>
@@ -282,7 +296,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
   <div class="card">
-    <div class="sec-header" onclick="toggleSec('secExcluirAluno')">
+    <div class="sec-header" onclick=\"secHeaderClick('secExcluirAluno', event)\">
       <h3 style="margin-top:0;">🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
       <span class="sec-toggle" id="togSecExcluirAluno">▼</span>
     </div>
@@ -291,7 +305,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <input type="text" id="inpAlunoIdExcluir" placeholder="alunoId (ex.: ALU-000123)"
           style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
           font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
-        <button class="btn btn-outline" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
+        <button class="btn secondary" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewAluno" style="display:none;margin-top:14px;">
@@ -311,7 +325,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── EXCLUSÃO PONTUAL: TURMA ── -->
   <div class="card">
-    <div class="sec-header" onclick="toggleSec('secExcluirTurma')">
+    <div class="sec-header" onclick=\"secHeaderClick('secExcluirTurma', event)\">
       <h3 style="margin-top:0;">🗑️ Excluir turma (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove uma turma (<b>anoAtivoTurmas</b>) e as matrículas (<b>anoAtivoMatriculas</b>) que apontam para ela, evitando matrículas órfãs. Os alunos não são apagados. <b>Ação irreversível.</b></span></span></h3>
       <span class="sec-toggle" id="togSecExcluirTurma">▼</span>
     </div>
@@ -320,7 +334,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <input type="text" id="inpTurmaIdExcluir" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)"
           style="flex:1;min-width:220px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);
           font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;">
-        <button class="btn btn-outline" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
+        <button class="btn secondary" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewTurma" style="display:none;margin-top:14px;">
@@ -337,24 +351,27 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
   <div class="card">
-    <div class="sec-header" onclick="toggleSec('secGerarAta')">
-      <h3 style="margin-top:0;">📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
-      <span class="sec-toggle collapsed" id="togSecGerarAta">▼</span>
+    <div class="sec-header" onclick=\"secHeaderClick('secGerarAta', event)\">
+      <h3 style="margin-top:0;">📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Informe o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
+      <span class="sec-toggle" id="togSecGerarAta">▼</span>
     </div>
-    <div class="sec-body collapsed" id="secGerarAta">
-      <div class="row-btns">
+    <div class="sec-body" id="secGerarAta">
+      <div class="row-btns" style="margin-top:0;">
+        <input type="number" id="gaAno" class="psq-in" min="2000" max="2100" style="flex:1;min-width:220px;"
+          placeholder="Ano letivo da turma (ex.: 2025 — não pode ser o ano ativo)"
+          onchange="document.getElementById('gaForm').style.display='none'; gaResetPlano();">
         <button class="btn btn-gray" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
       </div>
 
       <div id="gaForm" style="display:none;margin-top:14px;">
-        <label class="muted" for="gaTurma">Turma do ano-ativo</label>
+        <label class="muted" for="gaTurma">Turmas</label>
         <select id="gaTurma" onchange="gaResetPlano()"
           style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
         <label class="muted" for="gaSchema">Schema da ata</label>
         <select id="gaSchema" onchange="gaResetPlano()"
           style="display:block;width:100%;margin:4px 0 12px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#ddd6fe);font-size:14px;background:var(--card);color:var(--text,#1e1b4b);font-family:'Nunito',sans-serif;"></select>
         <div class="row-btns" style="margin-top:0;">
-          <button class="btn btn-outline" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
+          <button class="btn secondary" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
         </div>
       </div>
 
@@ -368,7 +385,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
 
   <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
   <div class="card card-destaque">
-    <div class="sec-header" onclick="toggleSec('secBackup')">
+    <div class="sec-header" onclick=\"secHeaderClick('secBackup', event)\">
       <h3 style="margin-top:0;">💾 Backup do ano ativo</h3>
       <span class="sec-toggle" id="togSecBackup">▼</span>
     </div>
@@ -383,7 +400,7 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
         <div>
           <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
           <div class="row-btns" style="margin-top:0;">
-            <label class="btn btn-outline" id="lblImportJSON" style="cursor:pointer;">
+            <label class="btn secondary" id="lblImportJSON" style="cursor:pointer;">
               📂 Carregar JSON de backup
               <input type="file" id="fileJSON" accept=".json" style="display:none" onchange="importarJSON(event)">
             </label>
@@ -402,9 +419,9 @@ html[data-theme="dark"] .cm-box h3.perigo { color:#fca5a5; }
     <div class="psq-head">
       <div><h3 id="psqTitulo">Alunos</h3><div class="muted" id="psqCont"></div></div>
       <div class="row-btns" style="margin:0;">
-        <button class="btn btn-outline" onclick="psqCsv()">📊 Exportar CSV</button>
+        <button class="btn secondary" onclick="psqCsv()">📊 Exportar CSV</button>
         <button class="btn btn-primary" onclick="psqPdf()">📄 Exportar PDF</button>
-        <button class="btn ghost" onclick="psqFecharModal()">Fechar</button>
+        <button class="btn outline" onclick="psqFecharModal()">Fechar</button>
       </div>
     </div>
     <div class="psq-body" id="psqBody"></div>
@@ -487,15 +504,15 @@ function clearLogEl(id) {
 
 async function inicializar() {
   clearLogEl('logGeral');
-  logEl('Carregando dados do Firestore...', 'logGeral');
   await waitAuth();
 
   const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
   if (!sid || String(sid).toUpperCase() === 'ADMIN') {
     ['statTurmas', 'statAlunos', 'statMatriculas'].forEach(id => { document.getElementById(id).textContent = '—'; });
-    logEl('⚠️ Nenhuma escola selecionada ("Todas as escolas"). Escolha uma escola para ver os números e usar as ferramentas.', 'logGeral');
+    document.getElementById('avisoSemEscola').style.display = '';
     return;
   }
+  document.getElementById('avisoSemEscola').style.display = 'none';
 
   try {
     const [novas, alunos, mats] = await Promise.all([
@@ -508,7 +525,6 @@ async function inicializar() {
     document.getElementById('statAlunos').textContent     = alunos.length;
     document.getElementById('statMatriculas').textContent = mats.length;
 
-    logEl('✅ Pronto.', 'logGeral');
   } catch(e) {
     logEl('❌ Erro ao carregar dados: ' + e.message, 'logGeral');
     setMsg('Erro ao carregar dados: ' + e.message, 'err');
@@ -529,6 +545,15 @@ function toggleSec(id) {
   if (!body) return;
   const col = body.classList.toggle('collapsed');
   if (tog) tog.classList.toggle('collapsed', col);
+  const hdr = body.previousElementSibling;
+  if (hdr) hdr.classList.toggle('fechada', col);
+}
+// Aberto: só a seta recolhe. Fechado: a linha inteira abre.
+function secHeaderClick(id, ev) {
+  const body = document.getElementById(id);
+  if (!body) return;
+  const fechado = body.classList.contains('collapsed');
+  if (fechado || (ev && ev.target && ev.target.closest && ev.target.closest('.sec-toggle'))) toggleSec(id);
 }
 
 function esc(s) {
@@ -615,7 +640,7 @@ function _confirmModal({ titulo, corpo, perigo, textoConfirmar, textoCancelar })
         `<h3${perigo ? ' class="perigo"' : ''}>${esc(titulo || 'Confirmar ação')}</h3>`+
         `<div class="cm-corpo">${corpo || ''}</div>`+
         `<div class="cm-acoes">`+
-          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="btn outline" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
           `<button type="button" class="btn ${perigo ? 'btn-danger' : 'btn-primary'}" id="_confirmModalOk">${esc(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
@@ -1191,8 +1216,17 @@ async function gaCarregar() {
       setMsg('Selecione uma escola para gerar atas (você está em "Todas as escolas").', 'err');
       return;
     }
+    const anoSel = parseInt(document.getElementById('gaAno').value.trim(), 10);
+    if (!(anoSel >= 2000 && anoSel <= 2100)) {
+      setMsg('Informe o ano letivo (ex.: 2025) para carregar as turmas.', 'warn');
+      return;
+    }
+    // só as turmas do ano informado (anoLetivo pode estar como texto ou número)
+    const turmasQ = Auth.db.collection('schools').doc(sid).collection('anoAtivoTurmas')
+      .where('anoLetivo', 'in', [String(anoSel), anoSel]).get()
+      .then(sn => sn.docs.map(d => Object.assign({ _id: d.id }, d.data())));
     const [turmas, schemas, escola] = await Promise.all([
-      window.DB.anoAtivoTurmas.list(), window.DB.atasSchemas.list(), window.DB.escola.get(),
+      turmasQ, window.DB.atasSchemas.list(), window.DB.escola.get(),
     ]);
     GA.anoAtivo = gaAnoAtivoDe(escola);
     GA.turmas = Array.isArray(turmas) ? turmas.slice() : [];
@@ -1228,10 +1262,11 @@ async function gaCarregar() {
     if (GA.schemas.some(s => s.id === 'padrao')) selS.value = 'padrao';
 
     document.getElementById('gaForm').style.display = (GA.turmas.length && GA.schemas.length) ? 'block' : 'none';
-    logEl(`Ano ativo: ${GA.anoAtivo} · ${GA.turmas.length} turma(s), ${elegiveis} elegível(is) · ${GA.schemas.length} schema(s).`, GA_LOG);
+    logEl(`Ano ativo: ${GA.anoAtivo} · ${GA.turmas.length} turma(s) de ${anoSel}, ${elegiveis} elegível(is) · ${GA.schemas.length} schema(s).`, GA_LOG);
+    if (!GA.turmas.length) setMsg(`Nenhuma turma encontrada em ${anoSel}.`, 'warn');
     if (!GA.schemas.length) setMsg('Nenhum schema encontrado em atasSchemas. O schema padrão precisa existir.', 'err');
     else if (!GA.schemas.some(s => s.id === 'padrao')) setMsg('O schema "padrao" não foi encontrado.', 'err');
-    else if (!elegiveis) setMsg('Nenhuma turma elegível para gerar ata.', 'warn');
+    else if (GA.turmas.length && !elegiveis) setMsg('Nenhuma turma elegível para gerar ata.', 'warn');
   } catch (e) {
     console.error('[gaCarregar]', e);
     logEl('❌ ' + (e.message || e), GA_LOG);
