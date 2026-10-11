@@ -1307,7 +1307,7 @@ document.addEventListener("DOMContentLoaded", carregar);
     }
 
     const seq = ++_alunoSeq;
-    out.innerHTML = `<div class="aluno-not-found">Buscando…</div>`;
+    out.innerHTML = `<div class="aviso-warn">Buscando…</div>`;
     try {
       const LIMITE = 10;
       let alunos = await Identidade.buscarAtasPorNome(termo, LIMITE + 1);
@@ -1327,7 +1327,7 @@ document.addEventListener("DOMContentLoaded", carregar);
       })).filter(h => h.id);
 
       if (!achados.length){
-        out.innerHTML = `<div class="aluno-not-found">
+        out.innerHTML = `<div class="aviso-warn">
           Nenhuma ocorrência encontrada para <b>${escapeHtml(qEl.value)}</b>.
         </div>`;
         return;
@@ -1349,11 +1349,11 @@ document.addEventListener("DOMContentLoaded", carregar);
           <button class="btn secondary small" type="button" onclick="abrirTurmaPorId('${escapeHtml(h.id)}')">Abrir</button>
         </div>
       </div>
-    `).join("") + (temMais ? `<div class="aluno-not-found">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
+    `).join("") + (temMais ? `<div class="aviso-warn">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
     } catch(e) {
       if (seq !== _alunoSeq) return;
       console.warn("[pesquisa-ata] pesquisarAluno:", e);
-      out.innerHTML = `<div class="aluno-not-found">Não foi possível pesquisar agora. Tente novamente.</div>`;
+      out.innerHTML = `<div class="aviso-warn">Não foi possível pesquisar agora. Tente novamente.</div>`;
     }
   };
 
