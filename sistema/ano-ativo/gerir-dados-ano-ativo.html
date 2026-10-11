@@ -28,19 +28,6 @@
 
 <title>Gestão de Dados · Ano Ativo</title>
 <style>
-/* Variáveis próprias da página (prefixo --gd-). Cores de tema vêm do global (--ui-*).
-   Status (ok/aviso/perigo) são cores FIXAS: por isso têm par claro/escuro aqui. */
-:root {
-  --gd-ok-bg:   rgba(22,163,74,.10);   --gd-ok-bd:   rgba(22,163,74,.30);   --gd-ok-fg:   #166534;
-  --gd-warn-bg: rgba(245,158,11,.10);  --gd-warn-bd: rgba(245,158,11,.30);  --gd-warn-fg: #92400e;
-  --gd-bad-bg:  rgba(185,28,28,.10);   --gd-bad-bd:  rgba(185,28,28,.30);   --gd-bad-fg:  #b91c1c;
-}
-html[data-theme="dark"] {
-  --gd-ok-bg:   rgba(34,197,94,.16);   --gd-ok-bd:   rgba(74,222,128,.55);  --gd-ok-fg:   #86efac;
-  --gd-warn-bg: rgba(245,158,11,.18);  --gd-warn-bd: rgba(251,191,36,.60);  --gd-warn-fg: #fcd34d;
-  --gd-bad-bg:  rgba(248,113,113,.16); --gd-bad-bd:  rgba(248,113,113,.60); --gd-bad-fg:  #fca5a5;
-}
-
 /* ── Layout ── */
 .container { max-width:1060px; margin:0 auto; padding:36px 24px 60px; position:relative; z-index:1; }
 /* Card: aparência é do global (components.css); aqui só espaçamento, por variável */
@@ -54,16 +41,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .aviso-ico{font-size:16px}
 .prev-tit{display:block;margin-bottom:6px;font-size:13px}
 .preview-scroll{max-height:260px;overflow:auto;margin-top:12px}
-
-/* ── Badge local (D2: o .badge global é diferente; manter local) ── */
-.badge {
-  display:inline-flex; align-items:center; padding:2px 9px; border-radius:999px;
-  background:var(--ui-brand-faded); border:1px solid var(--ui-border);
-  font-size:11px; color:var(--ui-brand-text); font-weight:700;
-}
-.badge.warn   { background:var(--gd-warn-bg); border-color:var(--gd-warn-bd); color:var(--gd-warn-fg); }
-.badge.ok     { background:var(--gd-ok-bg);   border-color:var(--gd-ok-bd);   color:var(--gd-ok-fg); }
-.badge.danger { background:var(--gd-bad-bg);  border-color:var(--gd-bad-bd);  color:var(--gd-bad-fg); }
 
 .console {
   font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -81,8 +58,8 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 /* Aviso somente-leitura: âmbar fixo (D7) */
 #avisoReadonly {
   display:none; align-items:center; gap:8px;
-  background:var(--gd-warn-bg); color:var(--gd-warn-fg);
-  border:1px solid var(--gd-warn-bd); border-radius:8px;
+  background:var(--ui-st-warn-bg); color:var(--ui-st-warn-fg);
+  border:1px solid var(--ui-st-warn-bd); border-radius:8px;
   padding:10px 14px; font-size:13px; font-weight:700; margin-bottom:16px;
 }
 
@@ -100,47 +77,42 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   border:1px solid var(--ui-border);
   background:var(--ui-surface); margin-bottom:6px; font-size:13px;
 }
-.migr-item.ok     { border-color:var(--gd-ok-bd);   background:var(--gd-ok-bg); }
-.migr-item.warn   { border-color:var(--gd-warn-bd); background:var(--gd-warn-bg); }
-.migr-item.danger { border-color:var(--gd-bad-bd);  background:var(--gd-bad-bg); }
+.migr-item.ok     { border-color:var(--ui-st-ok-bd);   background:var(--ui-st-ok-bg); }
+.migr-item.warn   { border-color:var(--ui-st-warn-bd); background:var(--ui-st-warn-bg); }
+.migr-item.danger { border-color:var(--ui-st-bad-bd);  background:var(--ui-st-bad-bg); }
 
 /* ── Barra de progresso ── */
 .progress-wrap { background:var(--ui-border); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
 .progress-bar  { background:var(--ui-brand); height:100%; border-radius:999px; transition:width .3s; width:0%; }
 
 /* ── Pesquisa de alunos (várias escolas) ── */
-/* .psq-in = campo fora de .field (D6: manter local); também usado nos campos de exclusão e de gerar ata */
-.psq-in.cresce { flex:1; min-width:220px; }
-.psq-in.cheio  { display:block; width:100%; margin:4px 0 12px; }
-.psq-in { padding:9px 12px; border-radius:10px; border:1.5px solid var(--ui-border); font-size:14px; background:var(--ui-surface); color:var(--ui-text); font-family:'Nunito',sans-serif; }
-.psq-chk { display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:700; cursor:pointer; }
+/* campos fora de .field usam .input/.check (globais); aqui só a disposição */
+.input.cresce { flex:1; min-width:220px; }
+.input.cheio  { display:block; width:100%; margin:4px 0 12px; }
 .psq-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:4px; transition:opacity .2s; }
 .psq-chips.off { opacity:.35; pointer-events:none; }
 .psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--ui-brand-faded); border:1px solid var(--ui-border); color:var(--ui-brand-text); font-size:13px; font-weight:700; }
 .psq-chip button { border:none; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px; font-weight:800; }
 /* Modal de pesquisa: aparência (fundo, borda, raio, sombra) vem de .modal; aqui só tamanho e disposição */
-.psq-modal { --modal-w:min(1280px,98vw); --modal-h:100vh; display:flex; flex-direction:column; overflow:hidden; }
-.psq-modal .modal-head { flex-wrap:wrap; }
+.psq-modal { --modal-w:min(1280px,98vw); --modal-h:none; }   /* altura vem do JS (psqAjustarModal) */
 .psq-modal .modal-head .row-btns { margin:0; }
-.psq-body { flex:1; overflow:auto; }
-.psq-tab { width:100%; border-collapse:collapse; font-size:12px; }
-.psq-tab th { position:sticky; top:0; z-index:2; background:var(--ui-surface); text-align:left; padding:6px 8px; border-bottom:2px solid var(--ui-border); white-space:nowrap; }
-.psq-tab td { padding:4px 8px; border-bottom:1px solid var(--ui-border); vertical-align:top; }
+.psq-tab { font-size:12px; }
+.psq-tab th { position:sticky; top:0; z-index:2; background:var(--ui-surface); padding:6px 8px; white-space:nowrap; }
+.psq-tab td { padding:4px 8px; vertical-align:top; }
 .psq-tab td.nw { white-space:nowrap; }
 .psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .psq-tab tbody tr:hover { background:var(--ui-brand-faded); }
 
 /* ── Card de destaque: fundo, h3, botões, tabela e .aviso-warn são do global (components.css).
       Aqui só o que é desta página, usando --dest-* ── */
-.card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
-.card-destaque .stat-box { background:var(--ui-table-cell-bg); border-color:transparent; }
+.card-destaque .sec-toggle { color:var(--dest-fg); }
+.card-destaque .stat-box { background:var(--ui-cell-bg); border-color:transparent; }
 .card-destaque.contraste-claro .stat-box { border-color:var(--ui-border); }
 .card-destaque .stat-lbl { color:var(--ui-muted); }
 
 /* ── Backup (exportar à esquerda, importar à direita) ── */
 .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
-.dest-tit { display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
 @media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
 /* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
 </style>
@@ -181,15 +153,15 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <div id="psqFixa" style="display:none;"><span class="psq-chip">🔒 <span id="psqFixaNome"></span></span>
         <div class="muted mt-6">Você está em uma escola específica: a pesquisa é limitada a ela. Para pesquisar outras, use "Todas as escolas" no topo da página.</div></div>
       <div id="psqMulti">
-      <label class="psq-chk"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
+      <label class="check"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
       <div class="row-btns mt-10">
-        <select id="psqSel" class="psq-in cresce" onfocus="psqRenderSel()"></select>
+        <select id="psqSel" class="input cresce" onfocus="psqRenderSel()"></select>
         <button class="btn secondary" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
       </div>
       <div class="psq-chips" id="psqChips"></div>
       </div>
       <div class="row-btns">
-        <input type="number" id="psqAno" class="psq-in cresce" min="2000" max="2100" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
+        <input type="number" id="psqAno" class="input cresce" min="2000" max="2100" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
         <button class="btn primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
@@ -204,7 +176,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     </div>
     <div class="sec-body" id="secExcluirAluno">
       <div class="row-btns">
-        <input type="text" id="inpAlunoIdExcluir" class="psq-in cresce" placeholder="alunoId (ex.: ALU-000123)">
+        <input type="text" id="inpAlunoIdExcluir" class="input cresce" placeholder="alunoId (ex.: ALU-000123)">
         <button class="btn secondary" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
       </div>
 
@@ -231,7 +203,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     </div>
     <div class="sec-body" id="secExcluirTurma">
       <div class="row-btns">
-        <input type="text" id="inpTurmaIdExcluir" class="psq-in cresce" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)">
+        <input type="text" id="inpTurmaIdExcluir" class="input cresce" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)">
         <button class="btn secondary" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
       </div>
 
@@ -255,7 +227,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     </div>
     <div class="sec-body" id="secGerarAta">
       <div class="row-btns mt-0">
-        <input type="number" id="gaAno" class="psq-in cresce" min="2000" max="2100"
+        <input type="number" id="gaAno" class="input cresce" min="2000" max="2100"
           placeholder="Ano letivo da turma (ex.: 2025 — não pode ser o ano ativo)"
           onchange="document.getElementById('gaForm').style.display='none'; gaResetPlano();">
         <button class="btn secondary" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
@@ -263,9 +235,9 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
       <div id="gaForm" class="mt-14" style="display:none;">
         <label class="muted" for="gaTurma">Turmas</label>
-        <select id="gaTurma" class="psq-in cheio" onchange="gaResetPlano()"></select>
+        <select id="gaTurma" class="input cheio" onchange="gaResetPlano()"></select>
         <label class="muted" for="gaSchema">Schema da ata</label>
-        <select id="gaSchema" class="psq-in cheio" onchange="gaResetPlano()"></select>
+        <select id="gaSchema" class="input cheio" onchange="gaResetPlano()"></select>
         <div class="row-btns mt-0">
           <button class="btn secondary" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
         </div>
@@ -311,7 +283,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 <!-- ── Modal: resultado da pesquisa multi-escolas ── -->
 <div class="modal-backdrop" id="psqModal" role="dialog" aria-modal="true" onclick="if(event.target===this)psqFecharModal()">
-  <div class="modal psq-modal">
+  <div class="modal scroll-body psq-modal">
     <div class="modal-head">
       <div><h3 id="psqTitulo">Alunos</h3><div class="muted" id="psqCont"></div></div>
       <div class="row-btns">
@@ -320,7 +292,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
         <button class="btn outline" onclick="psqFecharModal()">Fechar</button>
       </div>
     </div>
-    <div class="psq-body" id="psqBody"></div>
+    <div class="modal-body flush" id="psqBody"></div>
   </div>
 </div>
 
@@ -753,14 +725,14 @@ async function buscarAlunoExcluir() {
 
     const info = document.getElementById('previewAlunoInfo');
     info.className = 'migr-item warn';
-    info.innerHTML = `<span class="badge warn">ALUNO</span> <b>${esc(aluno.nome || aluno.NOME || alunoId)}</b>` +
+    info.innerHTML = `<span class="badge neutral">ALUNO</span> <b>${esc(aluno.nome || aluno.NOME || alunoId)}</b>` +
       (aluno.cpf ? ' — CPF: ' + esc(aluno.cpf) : '') +
       ` <span class="muted">(${esc(alunoId)})</span>`;
 
     const matsEl = document.getElementById('previewAlunoMats');
     if (matsDoAluno.length) {
       matsEl.innerHTML = `<b class="prev-tit">${matsDoAluno.length} matrícula(s) serão apagadas:</b>` +
-        matsDoAluno.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Ano ${esc(m.anoLetivo || '?')} · Turma ${esc(m.turmaId || '—')} · ${esc(m.status || 'ATIVO')}${m.situacao ? ' · ' + esc(m.situacao) : ''}</div>`).join('');
+        matsDoAluno.map(m => `<div class="migr-item danger"><span class="badge bad">APAGAR</span> Ano ${esc(m.anoLetivo || '?')} · Turma ${esc(m.turmaId || '—')} · ${esc(m.status || 'ATIVO')}${m.situacao ? ' · ' + esc(m.situacao) : ''}</div>`).join('');
     } else {
       matsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhuma matrícula encontrada pra esse aluno.</div>`;
     }
@@ -768,7 +740,7 @@ async function buscarAlunoExcluir() {
     const docsEl = document.getElementById('previewAlunoDocs');
     if (docs.length) {
       docsEl.innerHTML = `<b class="prev-tit">${docs.length} documento(s) anexado(s) serão apagados:</b>` +
-        docs.map(f => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> ${esc(f.label || f.fileName)}</div>`).join('');
+        docs.map(f => `<div class="migr-item danger"><span class="badge bad">APAGAR</span> ${esc(f.label || f.fileName)}</div>`).join('');
     } else {
       docsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum documento anexado encontrado.</div>`;
     }
@@ -776,7 +748,7 @@ async function buscarAlunoExcluir() {
     const fotoEl = document.getElementById('previewAlunoFoto');
     if (fotos.length) {
       fotoEl.innerHTML = `<b class="prev-tit">${fotos.length} avatar(es) (foto) serão apagados:</b>` +
-        fotos.map(f => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> ${esc(f)}</div>`).join('');
+        fotos.map(f => `<div class="migr-item danger"><span class="badge bad">APAGAR</span> ${esc(f)}</div>`).join('');
     } else {
       fotoEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum avatar cadastrado pra esse aluno.</div>`;
     }
@@ -784,7 +756,7 @@ async function buscarAlunoExcluir() {
     const eloEl = document.getElementById('previewAlunoElo');
     if (elos.length) {
       eloEl.innerHTML = `<b class="prev-tit">${elos.length} vínculo(s) com o módulo de Atas (coleção <code>alunos</code>) serão apagados:</b>` +
-        elos.map(e => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> ${esc(e._id || e.id || '?')}${e.atasId ? ' <span class="muted">(aluno em Atas: ' + esc(e.atasId) + ' — não é apagado)</span>' : ''}</div>`).join('');
+        elos.map(e => `<div class="migr-item danger"><span class="badge bad">APAGAR</span> ${esc(e._id || e.id || '?')}${e.atasId ? ' <span class="muted">(aluno em Atas: ' + esc(e.atasId) + ' — não é apagado)</span>' : ''}</div>`).join('');
     } else {
       eloEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Sem vínculo com o módulo de Atas.</div>`;
     }
@@ -892,17 +864,17 @@ async function buscarTurmaExcluir() {
 
     const info = document.getElementById('previewTurmaInfo');
     info.className = 'migr-item warn';
-    info.innerHTML = `<span class="badge warn">TURMA</span> <b>${esc(turma.nome || turmaId)}</b> · Ano ${esc(turma.anoLetivo || '?')} <span class="muted">(${esc(turmaId)})</span>`;
+    info.innerHTML = `<span class="badge neutral">TURMA</span> <b>${esc(turma.nome || turmaId)}</b> · Ano ${esc(turma.anoLetivo || '?')} <span class="muted">(${esc(turmaId)})</span>`;
 
     const matsEl = document.getElementById('previewTurmaMats');
     if (matsDaTurma.length) {
       matsEl.innerHTML = `<b class="prev-tit">⚠️ ${matsDaTurma.length} matrícula(s) apontam pra essa turma e também serão apagadas:</b>` +
-        matsDaTurma.map(m => `<div class="migr-item danger"><span class="badge danger">APAGAR</span> Aluno ${esc(m.alunoId || '—')} · Ano ${esc(m.anoLetivo || '?')} · ${esc(m.status || 'ATIVO')}${m.fotoFileId ? ' · com avatar' : ''}</div>`).join('');
+        matsDaTurma.map(m => `<div class="migr-item danger"><span class="badge bad">APAGAR</span> Aluno ${esc(m.alunoId || '—')} · Ano ${esc(m.anoLetivo || '?')} · ${esc(m.status || 'ATIVO')}${m.fotoFileId ? ' · com avatar' : ''}</div>`).join('');
     } else {
       matsEl.innerHTML = `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhuma matrícula aponta pra essa turma.</div>`;
     }
     if (fotos.length) {
-      matsEl.innerHTML += `<div class="migr-item danger mt-8"><span class="badge danger">APAGAR</span> ${fotos.length} avatar(es) dessas matrículas (Cloudinary)</div>`;
+      matsEl.innerHTML += `<div class="migr-item danger mt-8"><span class="badge bad">APAGAR</span> ${fotos.length} avatar(es) dessas matrículas (Cloudinary)</div>`;
     }
 
     document.getElementById('previewTurma').style.display = 'block';
@@ -1255,10 +1227,10 @@ function gaRenderPreview() {
   const reaproveitados = p.rows.length - p.novos;
   const linhas = p.rows.slice(0, 60).map(r =>
     `<tr><td>${esc(r.nome)}</td><td>${esc(r.serie || '—')}</td><td>${esc(r.resultado || '—')}</td>` +
-    `<td>${r.novo ? '<span class="badge warn">ID novo</span>' : `<span class="badge ok">${esc(r.atasId)}</span>`}</td></tr>`).join('');
+    `<td>${r.novo ? '<span class="badge neutral">ID novo</span>' : `<span class="badge">${esc(r.atasId)}</span>`}</td></tr>`).join('');
   const el = document.getElementById('gaPreview');
   el.innerHTML =
-    `<div class="migr-item ok"><span class="badge ok">TURMA</span> <b>${esc(p.turma.nome)}</b> · ${p.ano} · ${esc(p.turnoFull)} · ${esc(p.seriesAtas.join(' + '))}</div>` +
+    `<div class="migr-item ok"><span class="badge neutral">TURMA</span> <b>${esc(p.turma.nome)}</b> · ${p.ano} · ${esc(p.turnoFull)} · ${esc(p.seriesAtas.join(' + '))}</div>` +
     `<div class="muted my-6">Id no módulo de Atas: <b>${esc(p.turmaIdAtas)}</b> · schema: <b>${esc(p.schema.nome || p.schema.id)}</b> (${p.cols.length} coluna(s))</div>` +
     `<div class="stats-row">` +
     `<div class="stat-box"><div class="stat-num">${p.rows.length}</div><div class="stat-lbl">alunos</div></div>` +
@@ -1632,7 +1604,7 @@ function psqAbrirModal() {
   const head = PSQ_COLS_TELA.map(c => `<th>${esc(c[1])}</th>`).join('');
   const body = PSQ.linhas.map(l => '<tr>' + PSQ_COLS_TELA.map(c =>
     `<td class="${c[2]}"${c[0] === 'escola' ? ` title="${esc(l.escola)}"` : ''}>${esc(l[c[0]])}</td>`).join('') + '</tr>').join('');
-  document.getElementById('psqBody').innerHTML = `<table class="psq-tab"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  document.getElementById('psqBody').innerHTML = `<table class="left psq-tab"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   psqAjustarModal();
   document.getElementById('psqModal').classList.add('open');
 }
