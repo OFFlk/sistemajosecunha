@@ -106,12 +106,6 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
 /* dentro de .item o fundo é neutro, não o de marca */
 .card-destaque .item .help { color: var(--ui-muted); }
-
-.info-note {
-  padding: 12px 14px; border-radius: 10px; background: var(--ui-chip-bg); border: 1px solid var(--ui-chip-border);
-  color: var(--ui-muted); font-size: 13px; margin-top: 12px;
-}
-.info-note strong { color: var(--ui-text); }
 </style>
 </head>
 <body>
@@ -214,7 +208,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
       </div>
 
-      <div class="info-note">
+      <div class="aviso-warn mt-12">
         <strong>Fluxo:</strong> ao criar uma turma nessa página, ela irá aparecer no cadastro de atas. Se tiver dúvidas, clique nas indicações de dicas (ⓘ) na página em questão.
       </div>
     </div>
@@ -541,13 +535,14 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   function fillSerieSelect(){
     const sel = $("serieSelect");
     if(!sel) return;
-    sel.innerHTML = "";   // sem opção "Selecione…": enquanto não há escolha, fica em branco (guia, seção 5)
+    // Placeholder só aparece no campo (disabled + hidden): não é opção da lista (guia, seção 5).
+    sel.innerHTML = '<option value="" disabled hidden selected>Selecione a série…</option>';
     for(const s of serieOptions()){
       const opt = document.createElement("option");
       opt.value = s; opt.textContent = s;
       sel.appendChild(opt);
     }
-    sel.selectedIndex = -1;
+    sel.value = "";
   }
   function normalizeSerie(s){
     return String(s||"").trim();
@@ -720,15 +715,14 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       // Linha 2 — Ano, Turno e uma badge por série (série vira badge própria
       // pra não formar um badge único gigante quando a turma tem várias).
       const series = Array.isArray(t.series) ? t.series : [];
-      // Prioridade na tela (5-A): Ano e Turno = variável (1); série = neutro (2).
+      // Prioridade na tela (5-A): Ano e série = variável (1); N alunos = neutro/cinza; Turno = cinza (3).
       const seriesBadges = series.length
-        ? series.map(s => `<span class="badge small neutral">${_escHtml(s)}</span>`).join("")
-        : `<span class="badge small neutral">Sem série</span>`;
+        ? series.map(s => `<span class="badge small">${_escHtml(s)}</span>`).join("")
+        : `<span class="badge small">Sem série</span>`;
       const linha2 = document.createElement("div");
       linha2.className = "row item-linha-badges";
       linha2.innerHTML =
         `<span class="badge small">Ano: ${_escHtml(t.anoLetivo||"—")}</span>`+
-        `<span class="badge small">Turno: ${_escHtml(t.turno||"—")}</span>`+
         seriesBadges;
 
       // Linha 3 — quantidade de alunos + toggle "Detalhes" (Schema + ID,
@@ -738,6 +732,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       const linha3 = document.createElement("div");
       linha3.className = "row item-linha-alunos";
       linha3.innerHTML =
+        `<span class="badge small gray">Turno: ${_escHtml(t.turno||"—")}</span>`+
         `<span class="badge small ${nAlunos ? 'neutral' : 'gray'}">${nAlunos} aluno(s)</span>`+
         `<span class="detalhes-toggle" tabindex="0" role="button" `+
           `onclick="event.stopPropagation(); const d=document.getElementById('${detalhesId}'); const ab=d.style.display==='block'; d.style.display= ab?'none':'block'; this.textContent = ab?'Detalhes ▾':'Detalhes ▴';">`+
