@@ -110,10 +110,7 @@ tr.linha-alvo{ font-weight:800; }
 .tleft .muted{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .tright{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
 
-/* Chips de resultado SEM equivalente nas 5 cores (DEST e TRA/AND): pendente de decisão.
-   AP→badge ok · REP/FAL→badge bad · NI→badge gray usam o global. */
-.badge.star{ background:var(--ui-st-warn-bg); border-color:var(--ui-st-warn-bd); color:var(--ui-st-warn-fg); }
-.badge.info{ background:var(--ui-st-info-bg); border-color:var(--ui-st-info-bd); color:var(--ui-st-info-fg); }
+.badges-linha{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
 </style>
 
 <title>Histórico por Aluno</title>
@@ -143,7 +140,6 @@ tr.linha-alvo{ font-weight:800; }
         <button class="btn secondary" type="button" onclick="limpar()">Limpar</button>
       </div>
     </div>
-    <div class="subnote mt-10" id="dbInfo"></div>
     <!-- Seção 19 do guia: admin global sem escola só recebe aviso (visível só nesse caso) -->
     <div class="aviso-warn mt-10" id="avisoSemEscola" hidden>⚠️ Você está vendo todas as escolas. Escolha uma escola no topo da página para pesquisar alunos.</div>
   </div>
@@ -151,7 +147,12 @@ tr.linha-alvo{ font-weight:800; }
   <div class="split">
     <div class="card">
       <div class="details-title">
-        <h3>Resultados</h3>
+        <h3>Resultados
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble">Pesquise um aluno nos campos acima e clique em Abrir para exibir os detalhes.</span>
+          </span>
+        </h3>
         <span class="muted" id="count"></span>
       </div>
       <div id="lista" class="mt-10">
@@ -161,7 +162,12 @@ tr.linha-alvo{ font-weight:800; }
 
     <div class="card">
       <div class="details-title">
-        <h3>Detalhes do aluno</h3>
+        <h3>Detalhes do aluno
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble wide align-right">Exportar (menu): gera um CSV ou PDF com todos os registros encontrados do aluno. Ver turma: abre a ata do aluno selecionado. Exportar ano: gera um PDF só com os dados daquele ano do aluno.</span>
+          </span>
+        </h3>
         <div class="rel-inline" id="wrapExportHistorico">
           <button class="btn primary" type="button" id="btnExportarSel" disabled>Exportar ▾</button>
           <div class="popover menu align-right" id="dropExportHistorico" hidden>
@@ -362,19 +368,26 @@ function tituloTurma(t){
 
 
 
+// Situação do aluno → badge global (ok / bad / neutral / gray)
 const RESULT_META = {
-  "AP":   { icon:"✅", label:"AP",   cls:"ok" },
-  "REP":  { icon:"❌", label:"REP",  cls:"bad" },
-  "DEST": { icon:"⭐", label:"DEST", cls:"star" },
-  "TRA":  { icon:"🔁", label:"TRA",  cls:"info" },
-  "FAL":  { icon:"🚫", label:"FAL",  cls:"bad" },
-  "AND":  { icon:"⏳", label:"AND",  cls:"info" },
+  "AP":   { icon:"✅", label:"AP",   cls:"ok" },        // aprovado
+  "REP":  { icon:"❌", label:"REP",  cls:"bad" },       // reprovado
+  "TRA":  { icon:"🔁", label:"TRA",  cls:"neutral" },   // transferido
+  "DEST": { icon:"",   label:"DEST", cls:"gray" },      // desistente
+  "FAL":  { icon:"",   label:"FAL",  cls:"gray" },      // falecido
+  "AND":  { icon:"⏳", label:"AND",  cls:"neutral" },   // (a confirmar: não definido nas regras)
   "Não informado": { icon:"•", label:"NI", cls:"gray" }
 };
 
 function badgeResultado(res){
   const meta = RESULT_META[String(res||"Não informado")] || { icon:"•", label:String(res||"NI"), cls:"gray" };
-  return `<span class="badge ${meta.cls}">${meta.icon} ${escapeHtml(meta.label)}</span>`;
+  return `<span class="badge ${meta.cls}">${meta.icon ? meta.icon + " " : ""}${escapeHtml(meta.label)}</span>`;
+}
+
+// Nome da turma: campo do cadastro; se não houver, cai no "série + ano"
+function nomeTurma(t){
+  const n = [t?.nome, t?.nomeTurma, t?.turmaNome].find(v => typeof v === "string" && v.trim());
+  return n ? n.trim() : tituloTurma(t).base;
 }
 
 function renderAusencia(de, ate){
@@ -631,9 +644,6 @@ async function selecionarAluno(alunoId){
           if (r.tipo === "ausencia") return renderAusencia(r.de, r.ate);
           const o = r.o;
           const t = o.turma;
-          const tt = tituloTurma(t);
-
-          const badge = badgeResultado(o.resultado);
           const encontrado = (o.nomeRaw && normNome(o.nomeRaw) !== normNome(aluno.display))
             ? `<span class="badge small gray">encontrado: ${escapeHtml(o.nomeRaw)}</span>`
             : ``;
@@ -641,8 +651,13 @@ async function selecionarAluno(alunoId){
           return `
             <div class="trow">
               <div class="tleft">
-                <b>${escapeHtml(o.ano || "?")} — ${escapeHtml(o.serie || "?")} — ${escapeHtml(o.turno || "?")} ${badge}</b>
-                <div class="muted">${escapeHtml(tt.base)}${tt.extras ? " • " + escapeHtml(tt.extras) : ""} ${encontrado}</div>
+                <b>${escapeHtml(nomeTurma(t))}</b>
+                <div class="badges-linha">
+                  <span class="badge">${escapeHtml(o.ano || "?")}</span>
+                  <span class="badge">${escapeHtml(o.serie || "?")}</span>
+                  ${badgeResultado(o.resultado)}
+                  ${encontrado}
+                </div>
               </div>
               <div class="tright">
                 <button class="btn secondary small" type="button" onclick="abrirTurmaTabela('${escapeHtml(t.id)}')">Ver turma</button>
@@ -651,9 +666,6 @@ async function selecionarAluno(alunoId){
             </div>
           `;
         }).join("")}
-      </div>
-      <div class="muted mt-10">
-        “Ver turma” abre a tabela completa da turma aqui mesmo, sem sair desta página.
       </div>
     </div>
   `;
@@ -1039,13 +1051,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     try{ _escolaCache = (await window.DB.escola.get()) || {}; }
     catch(e){ console.warn('historico-aluno: falha ao carregar dados da escola', e); _escolaCache = {}; }
 
-    // Seção 19: admin global sem escola só recebe o aviso (sem bloquear nada, sem "Escola: ADMIN")
+    // Seção 19: admin global sem escola só recebe o aviso (sem bloquear nada)
     const semEscola = DB.adminSemEscola();
     $("avisoSemEscola").hidden = !semEscola;
-    if (!semEscola){
-      const nomeEscola = (_escolaCache.displayName || _escolaCache.name || _escolaCache.nome || DB.getActiveSchoolId()).toString().trim();
-      $("dbInfo").textContent = `Escola: ${nomeEscola} • busca em tempo real, sem cache local`;
-    }
 
     try{
       if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
