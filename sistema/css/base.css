@@ -148,7 +148,9 @@ html[data-theme="dark"] a:not(.btn):hover {
 /* ── Atributo hidden ──
    Sem isso, uma classe com display:flex/grid (.card, .modal-backdrop...) vence o
    atributo hidden do navegador. Permite esconder/mostrar por JS com
-   el.hidden = true/false, sem style="display:none" inline. */
+   el.hidden = true/false, sem style="display:none" inline.
+   ⚠️ O !important é necessário (a classe de layout tem especificidade maior), e por isso um
+   elemento que recebeu hidden só reaparece com el.hidden = false; style.display NÃO o mostra. */
 [hidden] {
   display: none !important;
 }
