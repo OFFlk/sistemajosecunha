@@ -68,13 +68,8 @@
 .chip        { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); background: var(--ui-cell-bg); color: var(--ui-text); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
 .chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-text); font-weight: 900; font-size: 14px; line-height: 1; }
 
-/* Visual próprio (13): botão que abre o painel de filtros extras. Só reatribui tokens --btn-*;
-   o seletor com .card-destaque vence a reatribuição que o destaque faz nos botões soltos. */
-.btn.btn-avancada,
-.card-destaque .btn.btn-avancada {
-  --btn-bg: var(--ui-cell-bg);   --btn-fg: var(--ui-brand-text);   --btn-bd: var(--ui-brand-border);
-  --btn-bg-h: var(--ui-brand-faded); --btn-fg-h: var(--ui-brand-text); --btn-bd-h: var(--ui-brand);
-}
+/* Visual próprio (13): "Pesquisa avançada" — a cor vem inline no botão (âmbar fixo, --ui-st-warn-*); aqui só o hover */
+.btn-avancada:hover { filter: brightness(1.07); }
 
 /* Contador (não é .badge): número de filtros avançados ativos */
 .cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
@@ -86,16 +81,9 @@
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
 .pop-div      { height: 1px; background: var(--ui-border); margin: 12px 0; }
-.pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-/* O destaque reatribui os botões soltos (translúcido sobre a marca); o popover tem fundo liso, então volta ao visual normal */
-.card-destaque .pop-avancada .btn.primary {
-  --btn-bg: var(--ui-brand);  --btn-fg: var(--ui-brand-fg);  --btn-bd: var(--ui-brand);
-  --btn-bg-h: var(--ui-brand-hover); --btn-fg-h: var(--ui-brand-fg); --btn-bd-h: var(--ui-brand-hover);
-}
-.card-destaque .pop-avancada .btn.secondary {
-  --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
-  --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
-}
+/* Rodapé do popover = mini card de destaque (variáveis do .card): os botões ficam soltos sobre o fundo de marca,
+   idênticos ao "Pesquisar" do card; o contraste é o mesmo do card, nos dois temas. */
+.pop-foot     { --card-pad: 8px; --card-gap: 0; --card-radius: 10px; display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; box-shadow: none; }
 .pop-export   { right: 0; top: calc(100% + 6px); z-index: 200; min-width: 200px; padding: 6px 0; flex-direction: column; }
 .pop-export .pop-div { margin: 6px 0; }
 .menu-item    { width: 100%; justify-content: flex-start; border-radius: 0; padding: 10px 16px; }
@@ -216,7 +204,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
       <div class="field stack rel" id="blocoStatusAtivo">
         <label class="lbl-oculto">Pesquisa avançada</label>
-        <button type="button" class="btn btn-avancada nowrap rel" id="btnPesquisaAvancada">
+        <button type="button" class="btn btn-avancada nowrap rel" id="btnPesquisaAvancada" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
           🔎 Pesquisa avançada
           <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
         </button>
@@ -279,7 +267,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
             </label>
           </div>
 
-          <div class="pop-foot">
+          <div class="card card-destaque pop-foot">
             <button type="button" class="btn primary small" id="btnPesquisarAvancada">🔍 Pesquisar</button>
             <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
           </div>
