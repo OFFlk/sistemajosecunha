@@ -313,6 +313,15 @@ table.left :is(th, td){ text-align:left; }
   --btn-bg:transparent; --btn-bd:var(--ui-brand); --btn-fg:var(--ui-brand-text);
 }
 
+/* outline no ESCURO: o hover padrão mistura a cor de marca com o fundo, e marcas
+   escuras (Azul, Verde...) quase não aparecem. Aqui o hover usa o tom claro de TEXTO
+   da marca. Regra só do outline, só no escuro — não é por paleta. */
+html[data-theme="dark"] .btn:is(.outline, .btn-outline){
+  --btn-bg-h:color-mix(in srgb, var(--ui-brand-text) 18%, transparent);
+  --btn-bd-h:var(--ui-brand-text);
+  --btn-ring:0 0 0 3px color-mix(in srgb, var(--ui-brand-text) 30%, transparent);
+}
+
 /* ── neutral (contorno neutro) ── */
 .btn.neutral{
   --btn-bg:transparent; --btn-bd:var(--ui-border); --btn-fg:var(--ui-text);
@@ -389,6 +398,10 @@ html[data-theme="dark"] .config-card.card-destaque{
 .card-destaque .req{ color:var(--dest-fg); }
 .card-destaque > h2{ margin:0 0 18px; }
 .card-destaque .subnote{ color:var(--dest-fg); opacity:.85; }
+/* texto corrido SOLTO no cabeçalho do destaque (filho direto ou dentro de .card-head).
+   Dentro de .dest-painel / .item / tabela NÃO entra (têm fundo e cor próprios). */
+.card-destaque > :is(p, strong),
+.card-destaque .card-head :is(p, strong){ color:var(--dest-fg); }
 
 /* botões soltos no fundo do destaque: reatribuem os tokens --btn-*.
    Ficam de FORA: botão de tabela e botão de sub-card (.item), que já
