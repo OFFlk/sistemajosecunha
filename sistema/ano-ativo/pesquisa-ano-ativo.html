@@ -48,7 +48,6 @@
 .mt-8     { margin-top: 8px; }
 .w-100    { width: 100%; }
 .rel      { position: relative; }
-.rel-inline { position: relative; display: inline-block; }
 .muted    { color: var(--ui-muted); }
 .loading  { font-size: 12px; color: var(--ui-muted); margin-top: 8px; }
 .lbl-oculto { visibility: hidden; }
@@ -73,13 +72,12 @@
 /* Contador (não é .badge): número de filtros avançados ativos */
 .cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
 
-/* ── Popovers (pesquisa avançada, exportar, colunas): visual próprio, candidato a global (D) ── */
-.popover      { position: absolute; background: var(--ui-surface); color: var(--ui-text); border: 1.5px solid var(--ui-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+/* ── Popovers: a caixa (.popover), o dropdown (.popover.menu), .menu-item e .pop-div são globais (guia 6-A); aqui só tamanho e posição ── */
 .pop-avancada { top: calc(100% + 6px); right: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
 .pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
-.pop-div      { height: 1px; background: var(--ui-border); margin: 12px 0; }
+.pop-avancada .pop-div { margin: 12px 0; }
 .pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 /* "Pesquisar" do popover: preenchido com a cor de marca (a cor vem inline; texto = --ui-brand-fg, calculado para a marca).
    O hover precisa de !important para vencer o inline. */
@@ -89,9 +87,6 @@
   --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
   --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
 }
-.pop-export   { right: 0; top: calc(100% + 6px); z-index: 200; min-width: 200px; padding: 6px 0; flex-direction: column; }
-.pop-export .pop-div { margin: 6px 0; }
-.menu-item    { width: 100%; justify-content: flex-start; border-radius: 0; padding: 10px 16px; }
 .pop-cols     { right: 0; top: calc(100% + 6px); z-index: 60; border-radius: 10px; padding: 10px; max-height: 320px; overflow: auto; min-width: 230px; }
 .pop-cols .check { display: flex; font-size: 12.5px; padding: 4px 6px; white-space: nowrap; }
 .pop-cols-acoes { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
@@ -214,7 +209,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
         </button>
 
-        <div class="popover pop-avancada" id="painelPesquisaAvancada" style="display:none;">
+        <div class="popover pop-avancada" id="painelPesquisaAvancada" hidden>
 
           <div>
             <label class="check forte">
@@ -369,7 +364,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <button class="btn" id="btnAlunosTabela">Abrir tabela</button>
           <div class="rel-inline" id="wrapExportAlunos">
             <button class="btn primary" id="btnAlunosPdf">Exportar PDF ▾</button>
-            <div class="popover pop-export" id="dropExportAlunos" style="display:none;">
+            <div class="popover menu align-right" id="dropExportAlunos" hidden>
               <button class="btn quiet menu-item" id="btnExportLista">📋 Lista de alunos</button>
               <button class="btn quiet menu-item" id="btnExportTurma">🏫 Separado por turma</button>
               <button class="btn quiet menu-item" id="btnExportSerie">📚 Separado por série</button>
@@ -522,6 +517,23 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 /* =========================
    Helpers de persistência
 ========================= */
+// Dropdown/popover (guia 6-A): abre ao clicar no botão; fecha ao clicar fora, numa opção (.menu-item) e com Esc; um aberto por vez
+function initDropdown(btn, menu){
+  const fechar = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+  btn.setAttribute('aria-haspopup', 'menu');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const abrir = menu.hidden;
+    document.querySelectorAll('.popover:not([hidden])').forEach(p => { p.hidden = true; });
+    menu.hidden = !abrir;
+    btn.setAttribute('aria-expanded', String(abrir));
+  });
+  menu.addEventListener('click', (e) => { e.stopPropagation(); if(e.target.closest('.menu-item')) fechar(); });
+  document.addEventListener('click', fechar);
+  document.addEventListener('keydown', (e) => { if(e.key === 'Escape') fechar(); });
+}
+
 // Tooltips (ⓘ): fecha ao clicar fora (guia v5, seção 6)
 document.addEventListener("click", ()=>{
   document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
@@ -1692,7 +1704,7 @@ let _tabInterativa = { linhas: [], colunas: [], ocultas: new Set(), sortKey: nul
 if(!window._tabInterativaDocClickBound){
   document.addEventListener("click", ()=>{
     const p = document.getElementById("painelTabInterativaColunas");
-    if(p) p.style.display = "none";
+    if(p) p.hidden = true;
   });
   window._tabInterativaDocClickBound = true;
 }
@@ -1730,7 +1742,7 @@ function _tabInterativaRenderToolbar(){
       <div class="muted">${_tabInterativa.linhas.length} registro(s) • clique no cabeçalho pra ordenar</div>
       <div class="rel">
         <button type="button" class="btn secondary small" id="btnTabInterativaColunas">☰ Colunas</button>
-        <div class="popover pop-cols" id="painelTabInterativaColunas" style="display:none;">
+        <div class="popover pop-cols" id="painelTabInterativaColunas" hidden>
           <div class="pop-cols-acoes">
             <button type="button" class="btn secondary small" id="btnTabInterativaMostrarTudo">Mostrar todas</button>
             <button type="button" class="btn secondary small" id="btnTabInterativaOcultarTudo">Ocultar todas</button>
@@ -1809,7 +1821,7 @@ function _tabInterativaRenderCompleto(headerExtraHtml){
 function _tabInterativaLigarEventos(headerExtraHtml){
   const btnCol = document.getElementById("btnTabInterativaColunas");
   const painel = document.getElementById("painelTabInterativaColunas");
-  btnCol.addEventListener("click", (e)=>{ e.stopPropagation(); painel.style.display = painel.style.display === "none" ? "block" : "none"; });
+  btnCol.addEventListener("click", (e)=>{ e.stopPropagation(); const abrir = painel.hidden; document.querySelectorAll('.popover:not([hidden])').forEach(p => { p.hidden = true; }); painel.hidden = !abrir; });
   painel.addEventListener("click", (e)=> e.stopPropagation());
 
   document.querySelectorAll(".tabInterativaColChk").forEach(chk=>{
@@ -2411,14 +2423,8 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
   const painel = document.getElementById("painelPesquisaAvancada");
   const badge = document.getElementById("badgePesquisaAvancada");
 
-  btn.addEventListener("click", (e)=>{
-    e.stopPropagation();
-    const aberto = painel.style.display !== "none";
-    painel.style.display = aberto ? "none" : "block";
-  });
-  document.addEventListener("click", ()=>{ painel.style.display = "none"; });
-  painel.addEventListener("click", (e)=>{ e.stopPropagation(); });
-  document.getElementById("btnFecharPesquisaAvancada").addEventListener("click", ()=>{ painel.style.display = "none"; });
+  initDropdown(btn, painel);
+  document.getElementById("btnFecharPesquisaAvancada").addEventListener("click", ()=>{ painel.hidden = true; btn.setAttribute("aria-expanded", "false"); });
 
   function atualizarBadge(){
     let n = 0;
@@ -2496,24 +2502,11 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 });
 // Dropdown de export de alunos
 (function(){
-  const btnPdf  = document.getElementById("btnAlunosPdf");
-  const drop    = document.getElementById("dropExportAlunos");
-  const wrap    = document.getElementById("wrapExportAlunos");
-
-  // Abre/fecha o dropdown
-  btnPdf.addEventListener("click", (e)=>{
-    e.stopPropagation();
-    const aberto = drop.style.display !== "none";
-    drop.style.display = aberto ? "none" : "flex";
-  });
-
-  // Fecha ao clicar fora
-  document.addEventListener("click", ()=>{ drop.style.display = "none"; });
-  drop.addEventListener("click", (e)=>{ e.stopPropagation(); });
+  // Abre/fecha pelo padrão do guia (6-A); cada opção já fecha o menu antes de agir
+  initDropdown(document.getElementById("btnAlunosPdf"), document.getElementById("dropExportAlunos"));
 
   // Opção 1 — Lista simples
   document.getElementById("btnExportLista").addEventListener("click", ()=>{
-    drop.style.display = "none";
     const selA = alunosSelecionados();
     if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportPdf(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Relação de Alunos`, selA);
@@ -2521,7 +2514,6 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 
   // Opção 2 — Separado por turma
   document.getElementById("btnExportTurma").addEventListener("click", ()=>{
-    drop.style.display = "none";
     const selA = alunosSelecionados();
     if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportPdfPorTurma(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Turma`, selA);
@@ -2529,7 +2521,6 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 
   // Opção 3 — Separado por série
   document.getElementById("btnExportSerie").addEventListener("click", ()=>{
-    drop.style.display = "none";
     const selA = alunosSelecionados();
     if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportPdfPorSerie(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Alunos por Série`, selA);
@@ -2537,7 +2528,6 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 
   // Opção 4 — Fichas individuais (uma página por aluno, todos os dados)
   document.getElementById("btnExportFichas").addEventListener("click", ()=>{
-    drop.style.display = "none";
     const selA = alunosSelecionados();
     if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportFichasIndividuais(`Ano Ativo ${anoSelecionadoOuAtivo() || ""} • Ficha Individual`, selA);
@@ -2545,7 +2535,6 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 
   // Opção 5 — CSV completo (todos os dados, sem formatação)
   document.getElementById("btnExportCsv").addEventListener("click", ()=>{
-    drop.style.display = "none";
     const selA = alunosSelecionados();
     if(!selA.length){ setMsg("Nenhum aluno selecionado para exportar.", "warn"); return; }
     exportCsvCompleto(selA);
