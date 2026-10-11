@@ -34,7 +34,8 @@
 
 /* ── Layout ── */
 .wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
-.grid   { display: grid; grid-template-columns: 220px 1fr auto; gap: 14px; align-items: start; }
+.grid   { display: grid; grid-template-columns: 220px 1fr auto; gap: 14px; align-items: stretch; }
+#blocoStatusAtivo > .btn-avancada { flex: 1; }
 .split  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .split > .card { min-height: 200px; }
 @media(max-width:980px){ .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr !important; } }
@@ -55,7 +56,7 @@
 
 /* ── Busca e filtros ── */
 .busca-row    { display: flex; gap: 8px; align-items: stretch; }
-.busca-row input { flex: 1; }
+.busca-row input, .busca-row select { flex: 1; min-width: 0; }
 .bloco-filtros { margin-top: 10px; }
 .filtros-row  { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
 .filtros-row .field { margin: 0; min-width: 160px; }
@@ -66,6 +67,14 @@
 /* Chip removível (com ×): fica na página (D2/5-A) */
 .chip        { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); background: var(--ui-cell-bg); color: var(--ui-text); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
 .chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-text); font-weight: 900; font-size: 14px; line-height: 1; }
+
+/* Visual próprio (13): botão que abre o painel de filtros extras. Só reatribui tokens --btn-*;
+   o seletor com .card-destaque vence a reatribuição que o destaque faz nos botões soltos. */
+.btn.btn-avancada,
+.card-destaque .btn.btn-avancada {
+  --btn-bg: var(--ui-cell-bg);   --btn-fg: var(--ui-brand-text);   --btn-bd: var(--ui-brand-border);
+  --btn-bg-h: var(--ui-brand-faded); --btn-fg-h: var(--ui-brand-text); --btn-bd-h: var(--ui-brand);
+}
 
 /* Contador (não é .badge): número de filtros avançados ativos */
 .cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
@@ -78,6 +87,15 @@
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
 .pop-div      { height: 1px; background: var(--ui-border); margin: 12px 0; }
 .pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* O destaque reatribui os botões soltos (translúcido sobre a marca); o popover tem fundo liso, então volta ao visual normal */
+.card-destaque .pop-avancada .btn.primary {
+  --btn-bg: var(--ui-brand);  --btn-fg: var(--ui-brand-fg);  --btn-bd: var(--ui-brand);
+  --btn-bg-h: var(--ui-brand-hover); --btn-fg-h: var(--ui-brand-fg); --btn-bd-h: var(--ui-brand-hover);
+}
+.card-destaque .pop-avancada .btn.secondary {
+  --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
+  --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
+}
 .pop-export   { right: 0; top: calc(100% + 6px); z-index: 200; min-width: 200px; padding: 6px 0; flex-direction: column; }
 .pop-export .pop-div { margin: 6px 0; }
 .menu-item    { width: 100%; justify-content: flex-start; border-radius: 0; padding: 10px 16px; }
@@ -134,6 +152,7 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
 
 /* ── Modal (esqueleto global; aqui só o tamanho) ── */
 #modalBackdrop .modal { --modal-w: 1100px; }
+body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atrás do modal */
 
 /* ── Conteúdo dos modais: ficha do aluno ── */
 .foto-ficha      { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--ui-border); }
@@ -195,9 +214,9 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
         </div>
       </div>
 
-      <div class="field rel" id="blocoStatusAtivo">
+      <div class="field stack rel" id="blocoStatusAtivo">
         <label class="lbl-oculto">Pesquisa avançada</label>
-        <button type="button" class="btn secondary w-100 nowrap rel" id="btnPesquisaAvancada">
+        <button type="button" class="btn btn-avancada nowrap rel" id="btnPesquisaAvancada">
           🔎 Pesquisa avançada
           <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
         </button>
@@ -273,11 +292,13 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
       <div class="filtros-row">
         <div class="field grow">
           <label for="selSerieAdd">Filtrar por série <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Escolha uma série no seletor e aperte <b>+ Adicionar</b>. O filtro só passa a valer depois que você aperta o botão e a série aparece abaixo do seletor.</span></span></label>
-          <select id="selSerieAdd">
-            <option value="">(selecione)</option>
-          </select>
+          <div class="busca-row">
+            <select id="selSerieAdd">
+              <option value="">(selecione)</option>
+            </select>
+            <button class="btn primary nowrap" id="btnAddSerie">+ Adicionar</button>
+          </div>
         </div>
-        <button class="btn primary nowrap" id="btnAddSerie">+ Adicionar</button>
         <div class="field">
           <label for="selTurno">Filtrar por turno</label>
           <select id="selTurno">
@@ -324,7 +345,7 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
     <div class="card">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
+          <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllTurmas"> Todos</label>
@@ -348,7 +369,7 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
     <div class="card">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
+          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
