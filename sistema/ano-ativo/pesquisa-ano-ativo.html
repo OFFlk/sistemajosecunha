@@ -30,271 +30,142 @@
 
 <!-- CSS exclusivo desta página -->
 <style>
-/* ── Variáveis que esta página sobrescreve ── */
-:root {
-  --card-bg:             #ffffff;
-  --card-border:         var(--brand-border, #ddd6fe);
-  --field-bg:            #ffffff;
-  --field-border:        var(--brand-border, #ddd6fe);
-  --shadow:              0 4px 20px rgba(0,0,0,0.06);
-  --danger:              #b91c1c;
-  --chip-neutral-bg:     #f3f4f6;
-  --chip-neutral-border: #d1d5db;
-  --chip-neutral-color:  #4b5563;
-}
-html[data-theme="dark"] {
-  --card-bg:             #131c2e;
-  --card-border:         #2a3a5c;
-  --field-bg:            #0a1426;
-  --field-border:        #1e2540;
-  --shadow:              0 4px 24px rgba(0,0,0,0.4);
-  --chip-neutral-bg:     rgba(148,163,184,0.15);
-  --chip-neutral-border: rgba(148,163,184,0.3);
-  --chip-neutral-color:  #cbd5e1;
-}
+/* Prefixo de variáveis desta página: pa- (pesquisa-ano-ativo). Hoje não há variável própria. */
 
 /* ── Layout ── */
 .wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
-.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-h1      { font-size: 26px; margin: 0 0 4px; font-weight: 800; }
-.sub    { color: var(--muted); font-size: 13px; margin: 0; }
-
-/* ── Grids ── */
-.grid  { display: grid; grid-template-columns: 220px 1fr 200px; gap: 14px; align-items: start; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.grid   { display: grid; grid-template-columns: 220px 1fr 200px; gap: 14px; align-items: start; }
+.split  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.split > .card { min-height: 200px; }
 @media(max-width:980px){ .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr !important; } }
-@media(max-width:640px){ .grid2, .grid3 { grid-template-columns: 1fr; } }
 
-/* ── Misc ── */
-.statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
-.chips      { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.chip       { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-bg); background: var(--chip-bg); color: var(--chip-color); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+/* ── Utilitárias de layout ── */
+.stack    { display: flex; flex-direction: column; }
+.nowrap   { flex-shrink: 0; white-space: nowrap; }
+.ml-auto  { margin-left: auto; }
+.mt-6     { margin-top: 6px; }
+.mt-8     { margin-top: 8px; }
+.w-100    { width: 100%; }
+.pad-12   { padding: 12px; }
+.rel      { position: relative; }
+.rel-inline { position: relative; display: inline-block; }
+.muted    { color: var(--ui-muted); }
+.help     { font-size: 12px; color: var(--ui-muted); margin-top: 6px; min-height: 14px; }
+.loading  { font-size: 12px; color: var(--ui-muted); margin-top: 8px; }
+.lbl-oculto { visibility: hidden; }
 
-/* Badge do ano ativo */
-.pill-ano-ativo {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--brand-faded); border: 1.5px solid var(--brand-border, #ddd6fe);
-  color: var(--brand-text); padding: 8px 16px; border-radius: 999px;
-  font-size: 13px; font-weight: 800; white-space: nowrap;
-}
-.pill-ano-ativo b { font-weight: 900; }
-html[data-theme="dark"] .pill-ano-ativo {
-  background: var(--brand-faded-d); border-color: var(--brand-border-d);
-  color: var(--brand-text-d);
-}
-.chip button { border: 0; background: transparent; cursor: pointer; color: var(--chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
-.divider    { height: 1px; background: var(--line); margin: 14px 0; }
-.right-col  { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
-.stack      { display: flex; flex-direction: column; }
-.help       { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 14px; }
-.loading    { font-size: 12px; color: var(--muted); margin-top: 8px; }
+/* ── Busca e filtros ── */
+.busca-row    { display: flex; gap: 8px; align-items: stretch; }
+.busca-row input { flex: 1; }
+.bloco-filtros { margin-top: 10px; }
+.filtros-row  { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.filtros-row .field { margin: 0; min-width: 160px; }
+.filtros-row .field.grow { flex: 1; }
+.filtros-row .field.w230 { min-width: 230px; }
+.statusline   { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--ui-muted); font-size: 12px; border-top: 1px solid var(--ui-border); padding-top: 10px; }
+.chips        { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
-/* ── Split (dois painéis lado a lado) ── */
-.split         { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.panel         { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; min-height: 200px; transition: background 0.3s, border-color 0.3s; }
+/* Chip removível (com ×): fica na página (D2/5-A) */
+.chip        { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-chip-border); background: var(--ui-chip-bg); color: var(--ui-chip-color); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
+
+/* Contador (não é .badge): número de filtros avançados ativos */
+.cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-brand); color: var(--ui-brand-fg); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
+
+/* ── Popovers (pesquisa avançada, exportar, colunas): visual próprio, candidato a global (D) ── */
+.popover      { position: absolute; background: var(--ui-surface); color: var(--ui-text); border: 1.5px solid var(--ui-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+.pop-avancada { top: calc(100% + 6px); left: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
+.pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
+.check.forte  { font-weight: 700; }
+.sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
+.pop-div      { height: 1px; background: var(--ui-border); margin: 12px 0; }
+.pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.pop-export   { right: 0; top: calc(100% + 6px); z-index: 200; min-width: 200px; padding: 6px 0; flex-direction: column; }
+.pop-export .pop-div { margin: 6px 0; }
+.menu-item    { width: 100%; justify-content: flex-start; border-radius: 0; padding: 10px 16px; }
+.pop-cols     { right: 0; top: calc(100% + 6px); z-index: 60; border-radius: 10px; padding: 10px; max-height: 320px; overflow: auto; min-width: 230px; }
+.pop-cols .check { display: flex; font-size: 12.5px; padding: 4px 6px; white-space: nowrap; }
+.pop-cols-acoes { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+.pop-cols-acoes .btn { flex: 1; }
+
+/* ── Painéis (Turmas / Alunos) ── */
 .panel-head    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.panel h2      { font-size: 17px; margin: 0; font-weight: 800; }
-.count         { background: var(--chip-bg); border: 1px solid var(--line); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--chip-color); font-weight: 700; }
+.titulo-painel { display: flex; align-items: center; gap: 10px; }
+.split .card h2 { font-size: 17px; margin: 0; font-weight: 800; }
+.count         { background: var(--ui-chip-bg); border: 1px solid var(--ui-border); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--ui-chip-color); font-weight: 700; }
 .panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
-.check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 700; cursor: pointer; }
+.check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); font-weight: 700; cursor: pointer; }
+.dica-lista    { font-size: 12px; margin: -4px 0 10px 0; }
 .list          { display: flex; flex-direction: column; gap: 8px; }
 
-/* ── Items ── */
-.item        { border: 1px solid var(--card-border); border-radius: 10px; padding: 14px; background: var(--card-bg); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; transition: background 0.3s, border-color 0.3s; }
-.item .left  { min-width: 0; flex: 1; }
-.item .right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.item .title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 800; font-size: 14px; }
-.item .meta  { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-
-/* Seleção pelo card inteiro — a checkbox continua existindo e funcional
-   (mesma lógica de sempre), só que fica escondida; o card em si vira o
-   controle visual e o clique alterna o checked dela. */
-.item.selecionavel { cursor: pointer; position: relative; }
-.item.selecionavel .check-all,
-.item.selecionavel .check { display: none; }
-.item.selecionavel:has(.chkTurma:checked),
-.item.selecionavel:has(.chkAluno:checked) {
-  background: var(--brand-faded);
-  border-color: var(--brand-hover, var(--brand-border));
-}
-html[data-theme="dark"] .item.selecionavel:has(.chkTurma:checked),
-html[data-theme="dark"] .item.selecionavel:has(.chkAluno:checked) {
-  background: var(--brand-faded-d);
-  border-color: var(--brand-border-d);
-}
-.item.selecionavel .selo-selecionado {
-  display: none;
-  position: absolute; bottom: 10px; right: 10px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--brand, #6d28d9); color: #fff;
-  align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 900; line-height: 1;
-}
-.item.selecionavel:has(.chkTurma:checked) .selo-selecionado,
-.item.selecionavel:has(.chkAluno:checked) .selo-selecionado {
-  display: flex;
-}
-
-/* ── Badge neutro e separador ── */
-.badge-neutral  { background: var(--chip-neutral-bg); color: var(--chip-neutral-color); border-color: var(--chip-neutral-border); }
-.separator-line { border: none; border-top: 1px solid rgba(148,163,184,0.3); margin: 8px 0; }
-html[data-theme="dark"] .separator-line { border-top-color: rgba(148,163,184,0.2); }
-
-/* ── Aperfeiçoamentos gerais do .btn nesta página ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-family: 'Nunito', sans-serif;
-  font-weight: 700;
-  font-size: 13px;
-  border: 1.5px solid transparent;
-  cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s, opacity 0.18s;
-  white-space: nowrap;
-}
-.btn:active { opacity: 0.85; }
-
-/* .btn base (sem modificador) — modo claro */
-.btn:not(.primary):not(.ghost):not(.secondary):not(.danger) {
-  background: var(--chip-bg);
-  border-color: var(--card-border);
-  color: var(--chip-color);
-}
-.btn:not(.primary):not(.ghost):not(.secondary):not(.danger):hover {
-  background: var(--brand-faded);
-  border-color: var(--brand-hover);
-  color: var(--brand-text);
-}
-
-/* .btn base — modo escuro */
-html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger) {
-  background: rgba(148,163,184,0.10);
-  border-color: rgba(148,163,184,0.25);
-  color: #cbd5e1;
-}
-html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):not(.danger):hover {
-  background: var(--brand-faded-d);
-  border-color: var(--brand-border-d);
-  color: var(--brand-text-d);
-}
-
-/* .btn.primary — modo escuro */
-html[data-theme="dark"] .btn.primary {
-  background: var(--brand-d);
-  border-color: var(--brand-d);
-  color: #fff;
-}
-html[data-theme="dark"] .btn.primary:hover {
-  background: var(--brand-hover-d);
-  border-color: var(--brand-hover-d);
-}
-
-/* ── Variantes de botão não cobertas pelo components.css ── */
-.btn.ghost           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
-.btn.ghost:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
-html[data-theme="dark"] .btn.ghost       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
-html[data-theme="dark"] .btn.ghost:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
-
-.btn.secondary       { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
-.btn.secondary:hover { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
-html[data-theme="dark"] .btn.secondary       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
-html[data-theme="dark"] .btn.secondary:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
-
-.btn.danger          { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: #b91c1c; }
-.btn.danger:hover    { background: rgba(185,28,28,0.18); border-color: rgba(185,28,28,0.55); }
-html[data-theme="dark"] .btn.danger       { background: rgba(185,28,28,0.15); border-color: rgba(239,68,68,0.40); color: #fca5a5; }
-html[data-theme="dark"] .btn.danger:hover { background: rgba(185,28,28,0.28); border-color: rgba(239,68,68,0.65); }
-
-.btn.small           { padding: 6px 11px; font-size: 12px; }
-
-/* ── Botão Editar/Readmitir — meio-termo entre o chip neutro e o brand sólido,
-   mesmo hover de sempre. Usa color-mix() pra continuar 100% na cor de marca
-   escolhida pelo usuário, só que mais forte que o chip-bg original. ── */
-.btn-edit {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1.5px solid var(--brand-hover, var(--brand));
-  background: color-mix(in srgb, var(--brand) 30%, var(--card-bg));
-  color: var(--brand-text, var(--brand));
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 12px;
-  font-family: 'Nunito', sans-serif;
-  white-space: nowrap;
-  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
-}
-.btn-edit:hover {
-  background: var(--brand);
-  border-color: var(--brand-hover);
-  color: #fff;
-}
-html[data-theme="dark"] .btn-edit {
-  background: color-mix(in srgb, var(--brand-d) 30%, var(--card-bg));
-  border-color: var(--brand-border-d, var(--brand-d));
-  color: var(--brand-text-d);
-}
-html[data-theme="dark"] .btn-edit:hover {
-  background: var(--brand-d);
-  border-color: var(--brand-hover-d);
-  color: #fff;
-}
-
-/* ── Actions row ── */
-.actions     { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
-.actions .btn { border-radius: 10px; padding: 10px 16px; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 14px; }
-
-/* ── Checkbox ── */
-.check              { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
-.check input        { cursor: pointer; accent-color: var(--brand); }
-.check-all input    { cursor: pointer; accent-color: var(--brand); }
-.item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brand); }
-
 /* ── Ordenação ── */
-.sort-control        { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--chip-bg); border: 1px solid var(--card-border); border-radius: 10px; }
-.sort-control label  { font-size: 13px; font-weight: 700; color: var(--chip-color); white-space: nowrap; }
-.sort-control select { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--field-border); background: var(--field-bg); color: var(--ink); font-size: 13px; font-family: 'Nunito', sans-serif; cursor: pointer; outline: none; transition: border-color 0.18s; }
-.sort-control select:focus { border-color: var(--brand); }
-.sort-control button { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--chip-bg); color: var(--chip-color); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; transition: all 0.18s; }
-.sort-control button:hover { background: var(--brand); border-color: var(--brand-hover); color: #fff; }
-html[data-theme="dark"] .sort-control { background: rgba(148,163,184,0.07); border-color: rgba(148,163,184,0.18); }
-html[data-theme="dark"] .sort-control button { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
-html[data-theme="dark"] .sort-control button:hover { background: var(--brand-d); border-color: var(--brand-hover-d); color: #fff; }
+.sort-control  { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); border-radius: 10px; }
+.sort-control.compacto { margin-bottom: 10px; }
+.sort-control .lbl { margin: 0; white-space: nowrap; }
+.sort-control .input { flex: 1; width: auto; }
 
-/* ── Modal ── */
-@keyframes toastSubir {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
-.modal          { width: min(1100px, 96vw); max-height: 86vh; overflow: auto; background: var(--card-bg); border-radius: 14px; border: 1px solid var(--card-border); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
-.modal-head     { position: sticky; top: 0; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border); }
-.modal-head h3  { margin: 0; font-size: 16px; font-weight: 800; }
-.modal-body     { padding: 14px; }
-
-/* ── Toast ── */
-@keyframes slideUpToast  { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-
-/* ── Chips de turma ── */
+/* ── Sub-card (D19: definição local) ── */
+.item        { border: 1px solid var(--ui-border); border-radius: 10px; padding: 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.item .left  { min-width: 0; flex: 1; }
+.item .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.item .title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 800; font-size: 14px; }
+.item .title.col { flex-direction: column; align-items: flex-start; gap: 4px; }
+.item .meta  { margin-top: 6px; color: var(--ui-muted); font-size: 12px; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.item .meta.txt { display: block; }
+.item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; }
+input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color segue local */
+.separator-line { border: none; border-top: 1px solid var(--ui-border); margin: 8px 0; }
 .turma-chips     { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .turma-chips-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .badge-prof      { white-space: normal; word-break: break-word; max-width: 100%; }
 
-/* ── Badge integral ── */
-.badge-integral { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
-html[data-theme="dark"] .badge-integral { background: rgba(52,211,153,0.18); border-color: #34d399; color: #6ee7b7; }
+/* Seleção pelo card inteiro (a checkbox continua existindo, escondida) */
+.item.selecionavel { cursor: pointer; position: relative; }
+.item.selecionavel .check-all,
+.item.selecionavel .check { display: none; }
+.item.selecionavel:has(.chkTurma:checked),
+.item.selecionavel:has(.chkAluno:checked) { background: var(--ui-brand-faded); border-color: var(--ui-brand); }
+.item.selecionavel .selo-selecionado {
+  display: none; position: absolute; bottom: 10px; right: 10px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--ui-brand); color: var(--ui-brand-fg);
+  align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 900; line-height: 1;
+}
+.item.selecionavel:has(.chkTurma:checked) .selo-selecionado,
+.item.selecionavel:has(.chkAluno:checked) .selo-selecionado { display: flex; }
 
-/* ── Avisos ── */
-.warn { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); font-size: 14px; }
-.ok   { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #16a34a; font-size: 14px; }
-html[data-theme="dark"] .ok { color: #4ade80; }
+/* ── Modal (esqueleto global; aqui só o tamanho) ── */
+#modalBackdrop .modal { --modal-w: 1100px; }
 
+/* ── Conteúdo dos modais: ficha do aluno ── */
+.foto-ficha      { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--ui-border); }
+.foto-ficha.vazia { background: var(--ui-chip-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.ficha-cab       { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-chip-bg); display: flex; align-items: center; gap: 12px; }
+.ficha-grid      { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ficha-campo     { padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px; }
+.ficha-rot       { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .04em; }
+.ficha-val       { font-size: 13px; margin-top: 2px; }
+.ficha-sec       { margin-top: 16px; }
+.ficha-sec .ficha-rot { margin-bottom: 6px; }
+.ficha-txt       { font-size: 13px; color: var(--ui-muted); }
+.ficha-linha     { font-size: 13px; margin-top: 8px; }
+.ficha-erro      { font-size: 13px; color: var(--ui-danger-fg); }
+.doc-linha       { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--ui-border); }
+.doc-linha .doc-nome { flex: 1; font-size: 13px; }
+.doc-linha a     { font-size: 12px; font-weight: 800; text-decoration: none; }
+.chips-row       { display: flex; flex-wrap: wrap; gap: 6px; }
+.hdr-extra       { margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-chip-bg); font-size: 13px; line-height: 1.8; }
+
+/* ── Conteúdo dos modais: tabela interativa ── */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.tab-toolbar .muted { font-size: 12px; }
+.tab-scroll  { overflow: auto; max-height: 60vh; border: 1px solid var(--ui-border); border-radius: 8px; }
+.tab-scroll table { min-width: 100%; }
+.tab-scroll thead { position: sticky; top: 0; background: var(--ui-surface); z-index: 2; }
+.th-ord      { cursor: pointer; white-space: nowrap; user-select: none; }
+.th-ord.ativo { color: var(--ui-brand-text); }
+.vazio-tab   { padding: 20px; text-align: center; }
 </style>
 
 <title>Ano Ativo • Pesquisa e Lista</title>
@@ -319,27 +190,27 @@ html[data-theme="dark"] .ok { color: #4ade80; }
 
       <div class="field stack">
         <label for="inpBusca">Buscar aluno (nome ou CPF)</label>
-        <div style="display:flex;gap:8px;align-items:stretch;">
-          <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF" style="flex:1;"/>
-          <button class="btn primary" id="btnAtualizar" style="white-space:nowrap;flex-shrink:0;">🔍 Pesquisar</button>
-          <button class="btn ghost" id="btnLimparFiltros" style="flex-shrink:0;white-space:nowrap;">🧹 Limpar filtros</button>
-          <div class="pill pill-ano-ativo" style="flex-shrink:0;margin-left:auto;">📅 ano ativo: <b id="lblAnoAtivo">—</b></div>
+        <div class="busca-row">
+          <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF"/>
+          <button class="btn primary nowrap" id="btnAtualizar">🔍 Pesquisar</button>
+          <button class="btn secondary nowrap" id="btnLimparFiltros">🧹 Limpar filtros</button>
+          <span class="badge nowrap ml-auto">📅 ano ativo: <b id="lblAnoAtivo">—</b></span>
         </div>
         <div class="help">&nbsp;</div>
       </div>
     </div>
 
     <!-- Linha 2: filtros de série + turno + status -->
-    <div style="margin-top:10px;">
-      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-        <div class="field" style="flex:1;min-width:160px;margin:0;">
+    <div class="bloco-filtros">
+      <div class="filtros-row">
+        <div class="field grow">
           <label for="selSerieAdd">Filtrar por série</label>
           <select id="selSerieAdd">
             <option value="">(selecione)</option>
           </select>
         </div>
-        <button class="btn primary" id="btnAddSerie" style="flex-shrink:0;white-space:nowrap;">+ Adicionar</button>
-        <div class="field" style="min-width:160px;margin:0;">
+        <button class="btn primary nowrap" id="btnAddSerie">+ Adicionar</button>
+        <div class="field">
           <label for="selTurno">Filtrar por turno</label>
           <select id="selTurno">
             <option value="">Todos os turnos</option>
@@ -348,7 +219,7 @@ html[data-theme="dark"] .ok { color: #4ade80; }
             <option value="NOTURNO">🌙 Noturno</option>
           </select>
         </div>
-        <div class="field" style="min-width:160px;margin:0;">
+        <div class="field">
           <label for="selModelo">Filtrar por modelo</label>
           <select id="selModelo">
             <option value="">Todos</option>
@@ -356,23 +227,21 @@ html[data-theme="dark"] .ok { color: #4ade80; }
             <option value="INTEGRAL">📚 Integral</option>
           </select>
         </div>
-        <div class="field" id="blocoStatusAtivo" style="min-width:230px;margin:0;position:relative;">
-          <label style="visibility:hidden;">Pesquisa avançada</label>
-          <button type="button" class="btn ghost" id="btnPesquisaAvancada" style="width:100%;white-space:nowrap;position:relative;">
+        <div class="field w230 rel" id="blocoStatusAtivo">
+          <label class="lbl-oculto">Pesquisa avançada</label>
+          <button type="button" class="btn secondary w-100 nowrap rel" id="btnPesquisaAvancada">
             🔎 Pesquisa avançada
-            <span id="badgePesquisaAvancada" style="display:none;position:absolute;top:-7px;right:-7px;background:var(--brand,#6d28d9);color:#fff;border-radius:999px;font-size:11px;font-weight:800;line-height:1;padding:3px 6px;">0</span>
+            <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
           </button>
 
-          <div id="painelPesquisaAvancada" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:250;
-              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
-              box-shadow:0 8px 24px rgba(0,0,0,.18);padding:14px;min-width:300px;max-width:340px;">
+          <div class="popover pop-avancada" id="painelPesquisaAvancada" style="display:none;">
 
             <div>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-weight:700;font-size:13px;">
-                <input type="checkbox" id="chkReadmissao" style="width:auto;margin:0;">
+              <label class="check forte">
+                <input type="checkbox" id="chkReadmissao">
                 🔁 Somente readmissão (inativos)
               </label>
-              <select id="selSituacao" style="display:none;margin-top:6px;width:100%;">
+              <select class="input w-100 mt-6" id="selSituacao" style="display:none;">
                 <option value="">Todas as situações</option>
                 <option value="TRANSFERIDO">Transferido</option>
                 <option value="DESISTENTE">Desistente</option>
@@ -380,61 +249,61 @@ html[data-theme="dark"] .ok { color: #4ade80; }
               </select>
             </div>
 
-            <div style="height:1px;background:var(--card-border);margin:12px 0;"></div>
+            <div class="pop-div"></div>
 
             <div>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13px;">
+              <label class="check forte">
                 <input type="checkbox" id="chkFiltroDef">
                 ♿ Deficiência
               </label>
-              <div id="subFiltroDef" style="display:none;flex-direction:column;gap:6px;margin:8px 0 0 22px;">
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
+              <div class="sub-filtro" id="subFiltroDef" style="display:none;">
+                <label class="check"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
+                <label class="check"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
+                <label class="check"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
+                <label class="check"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
+                <label class="check"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
+                <label class="check"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
               </div>
             </div>
 
-            <div style="height:1px;background:var(--card-border);margin:12px 0;"></div>
+            <div class="pop-div"></div>
 
             <div>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13px;">
+              <label class="check forte">
                 <input type="checkbox" id="chkFiltroTrans">
                 🧠 Transtornos
               </label>
-              <div id="subFiltroTrans" style="display:none;flex-direction:column;gap:6px;margin:8px 0 0 22px;">
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="discalculia">🔢 Discalculia / raciocínio lógico-matemático</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="disgrafia">✏️ Disgrafia / disortografia / escrita</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="dislalia">🗣️ Dislalia / linguagem e comunicação</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="dislexia">📖 Dislexia</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="tdah">⚡ TDAH</label>
-                <label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;"><input type="checkbox" class="filtroTransItem" value="tpac">🔊 TPAC</label>
+              <div class="sub-filtro" id="subFiltroTrans" style="display:none;">
+                <label class="check"><input type="checkbox" class="filtroTransItem" value="discalculia">🔢 Discalculia / raciocínio lógico-matemático</label>
+                <label class="check"><input type="checkbox" class="filtroTransItem" value="disgrafia">✏️ Disgrafia / disortografia / escrita</label>
+                <label class="check"><input type="checkbox" class="filtroTransItem" value="dislalia">🗣️ Dislalia / linguagem e comunicação</label>
+                <label class="check"><input type="checkbox" class="filtroTransItem" value="dislexia">📖 Dislexia</label>
+                <label class="check"><input type="checkbox" class="filtroTransItem" value="tdah">⚡ TDAH</label>
+                <label class="check"><input type="checkbox" class="filtroTransItem" value="tpac">🔊 TPAC</label>
               </div>
             </div>
 
-            <div style="height:1px;background:var(--card-border);margin:12px 0;"></div>
+            <div class="pop-div"></div>
 
             <div>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;font-size:13px;">
+              <label class="check forte">
                 <input type="checkbox" id="chkFiltroAee">
                 🏫 Frequenta a sala do AEE
               </label>
             </div>
 
-            <div style="display:flex;justify-content:flex-end;margin-top:14px;">
-              <button type="button" class="btn primary" id="btnPesquisarAvancada" style="font-size:12px;padding:6px 14px;margin-right:8px;">🔍 Pesquisar</button>
-              <button type="button" class="btn ghost" id="btnFecharPesquisaAvancada" style="font-size:12px;padding:6px 14px;">Fechar</button>
+            <div class="pop-foot">
+              <button type="button" class="btn primary small" id="btnPesquisarAvancada">🔍 Pesquisar</button>
+              <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
             </div>
           </div>
         </div>
-        <div class="field" id="blocoStatusPassado" style="min-width:230px;margin:0;display:none;">
-          <label for="chkNaoConcluintes" style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;">
-            <input type="checkbox" id="chkNaoConcluintes" style="width:auto;margin:0;">
+        <div class="field w230" id="blocoStatusPassado" style="display:none;">
+          <label class="check" for="chkNaoConcluintes">
+            <input type="checkbox" id="chkNaoConcluintes">
             🚪 Não concluíram o ano
           </label>
-          <select id="selSituacaoPassado" style="margin-top:6px;width:100%;">
+          <select class="input w-100 mt-6" id="selSituacaoPassado">
             <option value="">Todas (concluíram o ano)</option>
             <option value="APROVADO">Aprovado</option>
             <option value="REPROVADO">Reprovado</option>
@@ -460,9 +329,9 @@ html[data-theme="dark"] .ok { color: #4ade80; }
 
   <!-- Turmas + Alunos lado a lado -->
   <div class="split">
-    <div class="panel">
+    <div class="card">
       <div class="panel-head">
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div class="titulo-painel">
           <h2>Turmas</h2><span class="count" id="countTurmas">0</span>
         </div>
         <div class="panel-actions">
@@ -471,9 +340,9 @@ html[data-theme="dark"] .ok { color: #4ade80; }
           <button class="btn primary" id="btnTurmasPdf">Exportar PDF</button>
         </div>
       </div>
-      <div class="sort-control" style="margin-bottom:10px;">
-        <label>Ordenar por:</label>
-        <select id="sortTurmaField">
+      <div class="sort-control compacto">
+        <label class="lbl" for="sortTurmaField">Ordenar por:</label>
+        <select class="input" id="sortTurmaField">
           <option value="serie">Série (pedagógico)</option>
           <option value="nome">Nome</option>
           <option value="alunos">Qtd. alunos</option>
@@ -484,43 +353,40 @@ html[data-theme="dark"] .ok { color: #4ade80; }
       <div class="loading" id="loadingTurmas"></div>
     </div>
 
-    <div class="panel">
+    <div class="card">
       <div class="panel-head">
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div class="titulo-painel">
           <h2>Alunos</h2><span class="count" id="countAlunos">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
           <button class="btn" id="btnAlunosTabela">Abrir tabela</button>
-          <div style="position:relative;display:inline-block;" id="wrapExportAlunos">
+          <div class="rel-inline" id="wrapExportAlunos">
             <button class="btn primary" id="btnAlunosPdf">Exportar PDF ▾</button>
-            <div id="dropExportAlunos" style="display:none;position:absolute;right:0;top:calc(100% + 6px);
-              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
-              box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:200px;padding:6px 0;
-              display:none;flex-direction:column;">
-              <button class="btn" id="btnExportLista" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📋 Lista de alunos</button>
-              <button class="btn" id="btnExportTurma" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">🏫 Separado por turma</button>
-              <button class="btn" id="btnExportSerie" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📚 Separado por série</button>
-              <div style="height:1px;background:var(--card-border);margin:6px 0;"></div>
-              <button class="btn" id="btnExportFichas" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Fichas individuais (1 por página)</button>
-              <button class="btn" id="btnExportCsv" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 CSV completo (todos os dados)</button>
+            <div class="popover pop-export" id="dropExportAlunos" style="display:none;">
+              <button class="btn quiet menu-item" id="btnExportLista">📋 Lista de alunos</button>
+              <button class="btn quiet menu-item" id="btnExportTurma">🏫 Separado por turma</button>
+              <button class="btn quiet menu-item" id="btnExportSerie">📚 Separado por série</button>
+              <div class="pop-div"></div>
+              <button class="btn quiet menu-item" id="btnExportFichas">📄 Fichas individuais (1 por página)</button>
+              <button class="btn quiet menu-item" id="btnExportCsv">📊 CSV completo (todos os dados)</button>
             </div>
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:12px;margin:-4px 0 10px 0;">Marque alunos para exportar/abrir a tabela. O filtro "Buscar aluno" afeta esta lista.</div>
+      <div class="muted dica-lista">Marque alunos para exportar/abrir a tabela. O filtro "Buscar aluno" afeta esta lista.</div>
 
       <!-- Controle de ordenação -->
       <div class="sort-control">
-        <label>Ordenar por:</label>
-        <select id="sortField">
+        <label class="lbl" for="sortField">Ordenar por:</label>
+        <select class="input" id="sortField">
           <option value="nome">Nome</option>
           <option value="idade">Idade</option>
           <option value="serie">Série</option>
           <option value="mae">Nome da mãe</option>
           <option value="pai">Nome do pai</option>
         </select>
-        <button type="button" id="btnToggleSort" title="Alternar ordem">↑↓</button>
+        <button type="button" class="btn secondary small" id="btnToggleSort" title="Alternar ordem">↑↓</button>
       </div>
 
       <div class="list" id="listaAlunos"></div>
@@ -530,10 +396,10 @@ html[data-theme="dark"] .ok { color: #4ade80; }
 </div>
 
 <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
-  <div class="modal">
+  <div class="modal scroll-body">
     <div class="modal-head">
       <h3 id="modalTitle">Tabela</h3>
-      <button class="btn" id="btnFecharModal">Fechar</button>
+      <button class="btn secondary small" id="btnFecharModal">Fechar</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -558,50 +424,40 @@ const _session = (window.Auth && typeof Auth.getSession === 'function') ? Auth.g
 const _podeEditar = !!_session && _session.role === 'admin';
 
 /* =========================
-   Toasts padronizados (ver guia-toasts.md)
+   Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) — guia v5, seção 8.2
 ========================= */
-function _showToast(msg, bg, shadow, duration){
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina
+};
+function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
   if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
   const toast = document.createElement('div');
   toast.id = '_toastGlobal';
-  toast.style.cssText =
-    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-    `display:flex;align-items:center;gap:12px;`+
-    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
   const span = document.createElement('span');
+  span.className = 'toast-msg';
   span.textContent = msg;
-  span.style.cssText = 'flex:1;line-height:1.4;';
-  toast.appendChild(span);
-  const btnClose = document.createElement('button');
-  btnClose.type = 'button';
-  btnClose.textContent = '✕';
-  btnClose.setAttribute('aria-label','Fechar aviso');
-  btnClose.style.cssText =
-    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-  btnClose.onclick = () => toast.remove();
-  toast.appendChild(btnClose);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
   document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
 }
-
-function _toastSucesso(msg){
-  _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
-}
-function _toastErro(msg){
-  _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
-}
-function _toastAviso(msg){
-  _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
-}
-function _toastCarregando(msg){
-  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
-}
+function _toastLimpar(){ const t = document.getElementById('_toastGlobal'); if(t) t.remove(); }
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
 
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -611,39 +467,46 @@ function setMsg(text, kind){
   else if(kind === "warn") _toastAviso('⚠️ ' + t);
   else if(kind === "loading") _toastCarregando('⏳ ' + t);
   else {
-    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" como padrão seguro.');
     _toastAviso(t);
   }
 }
 
-/* ── Modal de confirmação (substitui confirm() nativo) ── */
-function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+// Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+window.addEventListener('unhandledrejection', () => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+});
+
+/* ── Modal de confirmação (substitui confirm() nativo) — guia v5, seção 8.3 ── */
+// corDestaque: 'danger' = ação destrutiva (botão vermelho); qualquer outro = cor de marca.
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
   return new Promise((resolve) => {
-    const cor = corDestaque || '#b45309'; // amber-700 — padrão pra avisos
+    const perigo = corDestaque === 'danger';
     const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.style.display = 'flex';
+    backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
-        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted,#6b7280);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
-          `<button type="button" class="btn ghost" id="_confirmModalCancelar">${escapeHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-            `${escapeHtml(textoConfirmar || 'Continuar')}`+
-          `</button>`+
+      `<div class="cm-box" role="dialog" aria-modal="true">`+
+        `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p class="cm-corpo">${corpo || ''}</p>`+
+        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${escapeHtml(digitar)}">` : '')+
+        `<div class="cm-acoes">`+
+          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${escapeHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${escapeHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
-
-    function fechar(resultado){
-      backdrop.remove();
-      resolve(resultado);
-    }
-    backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
-    backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+    const ok = backdrop.querySelector('#_confirmModalOk');
+    const cancelar = backdrop.querySelector('#_confirmModalCancelar');
+    const input = backdrop.querySelector('#_confirmModalInput');
+    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+    document.addEventListener('keydown', onKey);
+    ok.addEventListener('click', () => fechar(true));
+    cancelar.addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+    cancelar.focus();
   });
 }
 
@@ -1370,24 +1233,24 @@ function atualizarListas(){
       const seriesTxt = seriesArr.join(", ") || t.serie || "—";
       const profTxt   = turmaOriginal.professor || t.professor || "";
       const qtdIntegral = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
-      const modeloBadge = qtdIntegral > 0 ? `<span class="badge badge-integral">📚 ${qtdIntegral} integral</span>` : '';
+      const modeloBadge = qtdIntegral > 0 ? `<span class="badge neutral">📚 ${qtdIntegral} integral</span>` : '';
 
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
-        <div class="left" style="flex:1;min-width:0;">
-          <div class="title" style="font-size:14px;font-weight:800;">${titulo}</div>
+        <div class="left">
+          <div class="title">${titulo}</div>
           <hr class="separator-line">
           <div class="turma-chips">
             <div class="turma-chips-row">
               <span class="badge">👥 ${qtdAlunos} aluno(s)</span>
-              <span class="badge">📚 ${seriesTxt}</span>
+              <span class="badge neutral">📚 ${seriesTxt}</span>
               ${modeloBadge}
             </div>
-            ${profTxt ? `<div class="turma-chips-row"><span class="badge badge-neutral badge-prof">👩‍🏫 ${profTxt}</span></div>` : ""}
-            <div class="turma-chips-row"><span class="badge badge-neutral">ID: ${t.turmaId||"—"}</span></div>
+            ${profTxt ? `<div class="turma-chips-row"><span class="badge gray badge-prof">👩‍🏫 ${profTxt}</span></div>` : ""}
+            <div class="turma-chips-row"><span class="badge gray">ID: ${t.turmaId||"—"}</span></div>
           </div>
         </div>
-        <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div class="right">
           <label class="check-all"><input type="checkbox" class="chkTurma" data-turma="${t.turmaId}"> Selecionar</label>
         </div>
       `;
@@ -1451,10 +1314,10 @@ async function _atualizarListaAlunos(_tScope){
   const busca = _busca;
   if(!busca && modo !== "serie" && !tMarcadas.length){
     alunosOrdenados = []; countAlunos.textContent = "—";
-    listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">Selecione uma ou mais turmas (ou marque <b>Todos</b>) para ver os alunos.</div>`;
+    listaAlunos.innerHTML = `<div class="muted pad-12">Selecione uma ou mais turmas (ou marque <b>Todos</b>) para ver os alunos.</div>`;
     return;
   }
-  listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">Carregando alunos…</div>`;
+  listaAlunos.innerHTML = `<div class="muted pad-12">Carregando alunos…</div>`;
   try{
     const idsT = new Set(tMarcadas.map(t => t.turmaId));
     await garantirAlunos(busca ? Array.from(busca.ids) : mats.filter(m => modo === "serie" || idsT.has(m.turmaId)).map(m => m.alunoId));
@@ -1493,10 +1356,10 @@ async function _atualizarListaAlunos(_tScope){
       const necFaltando  = camposNec.filter(v  => !v || !String(v).trim() || v === '--').length;
       const compFaltando = camposComp.filter(v => !v || !String(v).trim()).length;
       const badgeCompletude = necFaltando > 0
-        ? `<span class="badge" style="background:rgba(239,68,68,0.10);border-color:rgba(239,68,68,0.35);color:#b91c1c;">🔴 Dados obrigatórios faltando</span>`
+        ? `<span class="badge bad">🔴 Dados obrigatórios faltando</span>`
         : compFaltando > 0
-          ? `<span class="badge" style="background:rgba(234,179,8,0.10);border-color:rgba(234,179,8,0.40);color:#854d0e;">⚠️ Complementares pendentes</span>`
-          : `<span class="badge" style="background:rgba(22,163,74,0.10);border-color:rgba(22,163,74,0.30);color:#166534;">✅ Completo</span>`;
+          ? `<span class="badge neutral">⚠️ Complementares pendentes</span>`
+          : `<span class="badge ok">✅ Completo</span>`;
 
       // NEE badges
       const neeList = [];
@@ -1513,35 +1376,35 @@ async function _atualizarListaAlunos(_tScope){
       if(a.disgrafia)      neeList.push('Disgrafia');
       if(a.dislalia)       neeList.push('Dislalia');
       const neeBadge = neeList.length > 0
-        ? `<span class="badge" style="background:rgba(124,58,237,0.10);border-color:rgba(124,58,237,0.30);color:#6d28d9;">♿ ${neeList.join(', ')}</span>`
+        ? `<span class="badge gray">♿ ${neeList.join(', ')}</span>`
         : '';
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
         <div class="left">
-          <div class="title" style="flex-direction:column;align-items:flex-start;gap:4px;">
-            <span style="font-weight:800;font-size:14px;">${a.nome || "Sem nome"}</span>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <div class="title col">
+            <span>${a.nome || "Sem nome"}</span>
+            <div class="chips-row">
               <span class="badge">${a.alunoId || "—"}</span>
-              <span class="badge">📚 ${a.serie || "—"}</span>
+              <span class="badge neutral">📚 ${a.serie || "—"}</span>
             </div>
           </div>
-          <div class="meta" style="margin-top:6px;display:block;">
+          <div class="meta txt">
             CPF: ${a.cpf||"—"} • Nasc: ${nasc} • Idade: ${idade}<br>
             Turno: ${turnoDesc} • Modelo: ${modeloDesc}
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+          <div class="chips-row mt-8">
             ${badgeCompletude}
             ${neeBadge}
           </div>
         </div>
-        <div class="right" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-          <button class="btn primary" type="button" data-view-aluno="${a.alunoId}" title="Ver ficha completa do aluno">👁️ Visualizar</button>
+        <div class="right">
+          <button class="btn primary small" type="button" data-view-aluno="${a.alunoId}" title="Ver ficha completa do aluno">👁️ Visualizar</button>
           ${_podeEditar
             ? (a._status === 'INATIVO' && String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim()
-              ? `<button class="btn-edit" type="button"
+              ? `<button class="btn outline small" type="button"
             data-readmitir-aluno="${a.alunoId}"
             title="Readmitir aluno">🔁 Readmitir</button>`
-              : `<button class="btn-edit" type="button"
+              : `<button class="btn outline small" type="button"
             data-edit-aluno="${a.alunoId}"
             data-edit-turma="${a.turmaId||''}"
             data-edit-ano="${anoSelecionadoOuAtivo()}"
@@ -1597,7 +1460,7 @@ chkAllAlunos.addEventListener("change", ()=>{ setAllCheckboxes(".chkAluno", chkA
 /* =========================
    Modal
 ========================= */
-function abrirModal(titulo, rows){ modalTitle.textContent = titulo; modalBody.innerHTML = rows; modalBackdrop.style.display = "flex"; }
+function abrirModal(titulo, rows){ modalTitle.textContent = titulo; modalBody.innerHTML = rows; modalBackdrop.classList.add("open"); }
 
 async function abrirFichaAluno(alunoId){
   const raw = alunosOrdenados.find(x => x.alunoId === alunoId);
@@ -1638,11 +1501,11 @@ async function abrirFichaAluno(alunoId){
   const a = enriquecerAlunos([base])[0];
 
   const fotoHtml = a.fotoUrl
-    ? `<img src="${escapeHtml(a.fotoUrl)}" alt="Foto do aluno" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--line);" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:'🧑',style:'width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--line);'}))">`
-    : `<div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--line);">🧑</div>`;
+    ? `<img class="foto-ficha" src="${escapeHtml(a.fotoUrl)}" alt="Foto do aluno" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:'🧑',className:'foto-ficha vazia'}))">`
+    : `<div class="foto-ficha vazia">🧑</div>`;
 
   const cabecalho = `
-    <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--chip-bg);display:flex;align-items:center;gap:12px;">
+    <div class="ficha-cab">
       ${fotoHtml}
       <div>
         <b>${escapeHtml(a.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(a.alunoId||'—')}
@@ -1670,24 +1533,24 @@ async function abrirFichaAluno(alunoId){
     if(c.key === 'dataNascimento') v = formatarDataBR(v);
     if(c.key === 'corRaca' && !v) v = 'Não declarada';
     if(c.key === 'pais'    && !v) v = 'BR';
-    return `<div style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;">
-      <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">${c.label}</div>
-      <div style="font-size:13px;margin-top:2px;">${escapeHtml(String(v || '—'))}</div>
+    return `<div class="ficha-campo">
+      <div class="ficha-rot">${c.label}</div>
+      <div class="ficha-val">${escapeHtml(String(v || '—'))}</div>
     </div>`;
   }).join('');
 
   const docsPlaceholderId = `docsFicha_${alunoId.replace(/[^a-zA-Z0-9_-]/g,'')}`;
 
   const rows = `${cabecalho}
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">${campos}</div>
-    <div style="margin-top:16px;">
-      <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">NEE / Transtornos</div>
+    <div class="ficha-grid">${campos}</div>
+    <div class="ficha-sec">
+      <div class="ficha-rot">NEE / Transtornos</div>
       ${montarNeeDetalhado(a)}
-      <div style="font-size:13px;margin-top:8px;"><b>Profissional de apoio:</b> ${escapeHtml(a.profissionalApoioNome || '—')}</div>
+      <div class="ficha-linha"><b>Profissional de apoio:</b> ${escapeHtml(a.profissionalApoioNome || '—')}</div>
     </div>
-    <div style="margin-top:16px;">
-      <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Documentos</div>
-      <div id="${docsPlaceholderId}" style="font-size:13px;color:var(--muted);">Carregando documentos…</div>
+    <div class="ficha-sec">
+      <div class="ficha-rot">Documentos</div>
+      <div id="${docsPlaceholderId}" class="ficha-txt">Carregando documentos…</div>
     </div>
   `;
   abrirModal('Ficha do aluno', rows);
@@ -1710,10 +1573,10 @@ function montarNeeDetalhado(a){
   if(a.tpac)             itens.push('🔊 TPAC');
 
   if(!itens.length){
-    return `<div style="font-size:13px;color:var(--muted);">Nenhuma</div>`;
+    return `<div class="ficha-txt">Nenhuma</div>`;
   }
-  return `<div style="display:flex;flex-wrap:wrap;gap:6px;">` +
-    itens.map(t => `<span style="padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--chip-bg);font-size:12px;">${escapeHtml(t)}</span>`).join('') +
+  return `<div class="chips-row">` +
+    itens.map(t => `<span class="badge gray small">${escapeHtml(t)}</span>`).join('') +
     `</div>`;
 }
 
@@ -1728,23 +1591,23 @@ async function carregarDocsFicha(alunoId, targetId){
     // própria no cabeçalho da ficha — não deve aparecer aqui como documento.
     const files = data.files || [];
     if(!files.length){
-      el.innerHTML = `<div style="font-size:13px;color:var(--muted);">Nenhum documento anexado</div>`;
+      el.innerHTML = `<div class="ficha-txt">Nenhum documento anexado</div>`;
       return;
     }
     el.innerHTML = files.map(f => {
       const icon = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);">
+      return `<div class="doc-linha">
         <span>${icon}</span>
-        <span style="flex:1;font-size:13px;">${escapeHtml(f.label||f.fileName)}</span>
-        <a href="${f.webViewLink}" target="_blank" rel="noopener" style="font-size:12px;font-weight:800;color:var(--brand);text-decoration:none;">👁️ Ver</a>
+        <span class="doc-nome">${escapeHtml(f.label||f.fileName)}</span>
+        <a href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>
       </div>`;
     }).join('');
   }catch(e){
-    el.innerHTML = `<div style="font-size:13px;color:#b91c1c;">Erro ao carregar documentos.</div>`;
+    el.innerHTML = `<div class="ficha-erro">Erro ao carregar documentos.</div>`;
   }
 }
-document.getElementById("btnFecharModal").addEventListener("click", ()=> modalBackdrop.style.display="none");
-modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) modalBackdrop.style.display="none"; });
+document.getElementById("btnFecharModal").addEventListener("click", ()=> modalBackdrop.classList.remove("open"));
+modalBackdrop.addEventListener("click", (e)=>{ if(e.target===modalBackdrop) modalBackdrop.classList.remove("open"); });
 
 /* =========================
    Enriquecer + Tabelas
@@ -1852,21 +1715,19 @@ function _tabInterativaSortVal(col, row){
 
 function _tabInterativaRenderToolbar(){
   const chips = _tabInterativa.colunas.map(c => `
-    <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 6px;border-radius:6px;cursor:pointer;white-space:nowrap;">
+    <label class="check">
       <input type="checkbox" class="tabInterativaColChk" data-key="${c.key}" ${_tabInterativa.ocultas.has(c.key) ? "" : "checked"}>
       ${escapeHtml(c.label)}
     </label>`).join("");
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
-      <div class="muted" style="font-size:12px;">${_tabInterativa.linhas.length} registro(s) • clique no cabeçalho pra ordenar</div>
-      <div style="position:relative;">
-        <button type="button" class="btn ghost" id="btnTabInterativaColunas" style="font-size:12.5px;padding:6px 12px;">☰ Colunas</button>
-        <div id="painelTabInterativaColunas" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:60;
-            background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);
-            padding:10px;max-height:320px;overflow:auto;min-width:230px;">
-          <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:8px;">
-            <button type="button" class="btn ghost" id="btnTabInterativaMostrarTudo" style="font-size:11px;padding:3px 8px;flex:1;">Mostrar todas</button>
-            <button type="button" class="btn ghost" id="btnTabInterativaOcultarTudo" style="font-size:11px;padding:3px 8px;flex:1;">Ocultar todas</button>
+    <div class="tab-toolbar">
+      <div class="muted">${_tabInterativa.linhas.length} registro(s) • clique no cabeçalho pra ordenar</div>
+      <div class="rel">
+        <button type="button" class="btn secondary small" id="btnTabInterativaColunas">☰ Colunas</button>
+        <div class="popover pop-cols" id="painelTabInterativaColunas" style="display:none;">
+          <div class="pop-cols-acoes">
+            <button type="button" class="btn secondary small" id="btnTabInterativaMostrarTudo">Mostrar todas</button>
+            <button type="button" class="btn secondary small" id="btnTabInterativaOcultarTudo">Ocultar todas</button>
           </div>
           ${chips}
         </div>
@@ -1876,12 +1737,12 @@ function _tabInterativaRenderToolbar(){
 
 function _tabInterativaRenderTabela(){
   const cols = _tabInterativa.colunas.filter(c => !_tabInterativa.ocultas.has(c.key));
-  if(!cols.length) return `<div class="muted" style="padding:20px;text-align:center;">Nenhuma coluna visível — marque ao menos uma em "☰ Colunas".</div>`;
+  if(!cols.length) return `<div class="muted vazio-tab">Nenhuma coluna visível — marque ao menos uma em "☰ Colunas".</div>`;
 
   const headers = cols.map(c => {
     const ativo = _tabInterativa.sortKey === c.key;
     const seta = ativo ? (_tabInterativa.sortDir === 1 ? " ▲" : " ▼") : "";
-    return `<th data-key="${c.key}" style="cursor:pointer;white-space:nowrap;user-select:none;${ativo ? "color:var(--brand,#7c3aed);" : ""}">${escapeHtml(c.label)}${seta}</th>`;
+    return `<th data-key="${c.key}" class="th-ord${ativo ? " ativo" : ""}">${escapeHtml(c.label)}${seta}</th>`;
   }).join("");
 
   let linhas = _tabInterativa.linhas;
@@ -1899,8 +1760,8 @@ function _tabInterativaRenderTabela(){
     return `<tr>${tds}</tr>`;
   }).join("");
 
-  return `<div style="overflow:auto;max-height:60vh;border:1px solid var(--card-border);border-radius:8px;">
-    <table style="min-width:100%;"><thead style="position:sticky;top:0;background:var(--card-bg);z-index:2;"><tr>${headers}</tr></thead>
+  return `<div class="tab-scroll">
+    <table><thead><tr>${headers}</tr></thead>
     <tbody>${body}</tbody></table>
   </div>`;
 }
@@ -1968,7 +1829,7 @@ function abrirTabelaInterativa(titulo, colunas, linhas, headerExtraHtml){
   _tabInterativa = { linhas, colunas, ocultas: new Set(), sortKey: null, sortDir: 1 };
   modalTitle.textContent = titulo;
   _tabInterativaRenderCompleto(headerExtraHtml);
-  modalBackdrop.style.display = "flex";
+  modalBackdrop.classList.add("open");
 }
 
 const COLS_TURMAS = [
@@ -2623,7 +2484,7 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
       meta.turno     ? `<b>Turno:</b> ${escapeHtml(meta.turno)}`                 : "",
       meta.professor ? `<b>Professor(a):</b> ${escapeHtml(meta.professor)}`      : "",
     ].filter(Boolean);
-    headerExtraHtml = `<div style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--chip-bg);font-size:13px;line-height:1.8;">${linhas.join(" &nbsp;|&nbsp; ")}</div>`;
+    headerExtraHtml = `<div class="hdr-extra">${linhas.join(" &nbsp;|&nbsp; ")}</div>`;
   }
   abrirTabelaInterativa("Tabela • Alunos selecionados", COLS, aSel, headerExtraHtml);
 });
@@ -2803,12 +2664,12 @@ function restaurarEstadoPagina(){
 (async function init(){
   await carregarDB();
   if(_semEscola){
-    listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">Selecione uma escola no cabeçalho para pesquisar. Os dados de todas as escolas ficam na gestão do ano ativo.</div>`;
+    listaTurmas.innerHTML = `<div class="muted pad-12">Selecione uma escola no cabeçalho para pesquisar. Os dados de todas as escolas ficam na gestão do ano ativo.</div>`;
     listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
     Loading.esconder(); return;
   }
   if(!anoAtivo){
-    listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
+    listaTurmas.innerHTML = `<div class="muted pad-12">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
     listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
     Loading.esconder(); return;
   }
@@ -2824,8 +2685,8 @@ function restaurarEstadoPagina(){
       _jaFoiPesquisado = true;
       atualizarListas();
     } else {
-      listaTurmas.innerHTML = `<div class="muted" style="padding:12px;">Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
-      listaAlunos.innerHTML = `<div class="muted" style="padding:12px;">As turmas e alunos aparecerão após a pesquisa.</div>`;
+      listaTurmas.innerHTML = `<div class="muted pad-12">Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
+      listaAlunos.innerHTML = `<div class="muted pad-12">As turmas e alunos aparecerão após a pesquisa.</div>`;
       countTurmas.textContent = "—"; countAlunos.textContent = "—";
     }
   }
