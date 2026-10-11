@@ -35,229 +35,52 @@
 <link rel="stylesheet" href="/css/pesquisa.css">
 
 <style>
-/* ── Variáveis que esta página sobrescreve ── */
-:root {
-  --card-bg:             #ffffff;
-  --card-border:         var(--brand-border, #ddd6fe);
-  --field-bg:            #ffffff;
-  --field-border:        var(--brand-border, #ddd6fe);
-  --shadow:              0 4px 20px rgba(0,0,0,0.06);
-  --danger:              #b91c1c;
-  --chip-neutral-bg:     #f3f4f6;
-  --chip-neutral-border: #d1d5db;
-  --chip-neutral-color:  #4b5563;
-}
-html[data-theme="dark"] {
-  --card-bg:             #131c2e;
-  --card-border:         #2a3a5c;
-  --field-bg:            #0a1426;
-  --field-border:        #1e2540;
-  --shadow:              0 4px 24px rgba(0,0,0,0.4);
-  --chip-neutral-bg:     rgba(148,163,184,0.15);
-  --chip-neutral-border: rgba(148,163,184,0.3);
-  --chip-neutral-color:  #cbd5e1;
-}
+/* ═══════════════════════════════════════════════════════════════
+   pesquisa-ata — só LAYOUT e componentes próprios da página.
+   Aparência (card, destaque, botão, campo, badge, tooltip, toast)
+   vem do components.css. Layout geral: /css/pesquisa.css.
+═══════════════════════════════════════════════════════════════ */
 
-/* ── Aperfeiçoamentos do .btn ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-family: 'Nunito', sans-serif;
-  font-weight: 700;
-  font-size: 13px;
-  border: 1.5px solid transparent;
-  cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s, opacity 0.18s;
-  white-space: nowrap;
-}
-.btn:active { opacity: 0.85; }
-
-/* .btn base (sem modificador) */
-.btn:not(.primary):not(.ghost):not(.secondary) {
-  background: var(--chip-bg);
-  border-color: var(--card-border);
-  color: var(--chip-color);
-}
-.btn:not(.primary):not(.ghost):not(.secondary):hover {
-  background: var(--brand-faded);
-  border-color: var(--brand-hover);
-  color: var(--brand-text);
-}
-html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary) {
-  background: rgba(148,163,184,0.10);
-  border-color: rgba(148,163,184,0.25);
-  color: #cbd5e1;
-}
-html[data-theme="dark"] .btn:not(.primary):not(.ghost):not(.secondary):hover {
-  background: var(--brand-faded-d);
-  border-color: var(--brand-border-d);
-  color: var(--brand-text-d);
-}
-
-/* .btn.primary dark */
-html[data-theme="dark"] .btn.primary {
-  background: var(--brand-d);
-  border-color: var(--brand-d);
-  color: var(--brand-fg, #fff);
-}
-html[data-theme="dark"] .btn.primary:hover {
-  background: var(--brand-hover-d);
-  border-color: var(--brand-hover-d);
-}
-
+/* ── Filtros (card de destaque) ── */
 .filters { align-items:start; }
 #campoSerie { min-width:0; }
-.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.chips:empty { display:none; }
-/* cores FIXAS: iguais no tema claro e no escuro (não usam --brand/--chip-*) */
-.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid #c7d2fe; background:#e0e7ff; color:#312e81; padding:5px 10px; border-radius:999px; font-size:12.5px; font-weight:700; max-width:100%; }
-.chip button { border:0; background:transparent; cursor:pointer; color:#312e81; font-weight:900; font-size:14px; line-height:1; padding:0; }
 .serie-add-row { display:flex; gap:8px; align-items:stretch; }
 .serie-add-row select { flex:1; min-width:0; }
-
-/* .btn.ghost */
-.btn.ghost           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
-.btn.ghost:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
-html[data-theme="dark"] .btn.ghost       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
-html[data-theme="dark"] .btn.ghost:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
-
-/* .btn.secondary */
-.btn.secondary           { background: var(--chip-bg); border-color: var(--card-border); color: var(--chip-color); }
-.btn.secondary:hover     { background: var(--brand-faded); border-color: var(--brand-hover); color: var(--brand-text); }
-html[data-theme="dark"] .btn.secondary       { background: rgba(148,163,184,0.10); border-color: rgba(148,163,184,0.25); color: #94a3b8; }
-html[data-theme="dark"] .btn.secondary:hover { background: var(--brand-faded-d); border-color: var(--brand-border-d); color: var(--brand-text-d); }
-
-/* .btn.small */
-.btn.small { padding: 6px 11px; font-size: 12px; }
+.filter-actions { display:flex; align-items:center; gap:8px; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.chips:empty { display:none; }
+/* Chip removível (série escolhida, com ×) solto sobre o destaque: fundo liso (D10), não é .badge (5-A) */
+.chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--ui-border); background:var(--ui-cell-bg); color:var(--ui-text); padding:5px 10px; border-radius:999px; font-size:12.5px; font-weight:700; max-width:100%; }
+.chip button { border:0; background:transparent; cursor:pointer; color:inherit; font-weight:900; font-size:14px; line-height:1; padding:0; }
 
 /* ── Título TURMAS clicável (ordenador) ── */
-#sidebarTitulo {
-  cursor: pointer;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-#sidebarTitulo:hover { opacity: 0.75; }
-#sortIndicator {
-  font-size: 11px;
-  opacity: 0.6;
-  transition: transform 0.2s;
-}
+#sidebarTitulo { cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; }
+#sidebarTitulo:hover { opacity:.75; }
+#sortIndicator { font-size:11px; opacity:.6; transition:transform .2s; }
 
 /* ── Sidebar expandida: compacta ao máximo ── */
-.layout-expandido #card-esquerda .list-item .item-meta {
-  display: none !important; /* oculta metadados extras */
-}
-.layout-expandido #card-esquerda .list-item .badges-row {
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
+.layout-expandido #card-esquerda .list-item .item-meta { display:none !important; }
+.layout-expandido #card-esquerda .list-item .badges-row { flex-wrap:nowrap; overflow:hidden; }
 .layout-expandido #card-esquerda .list-item .badges-row .badge {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 90px;
-  font-size: 10px;
-  padding: 1px 5px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:90px; font-size:10px; padding:1px 5px;
 }
 
 /* ── Cards mesma altura no estado normal ── */
-#container.split.layout-normal {
-  align-items: stretch;
-}
+#container.split.layout-normal { align-items:stretch; }
 #container.split.layout-normal #card-esquerda,
-#container.split.layout-normal #card-direita {
-  align-self: stretch;
-}
+#container.split.layout-normal #card-direita { align-self:stretch; }
 
 /* ── Hover do list-item no estado normal ── */
-#card-esquerda .list-item:not(.selected):hover {
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  cursor: pointer;
-}
+#card-esquerda .list-item:not(.selected):hover { background:color-mix(in srgb, var(--ui-brand) 8%, transparent); cursor:pointer; }
 
-/* ── Checkbox da pesquisa por aluno ── */
-.aluno-search-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--muted);
-  cursor: pointer;
-  user-select: none;
+/* ── Detalhes: filtro de aluno em linha cheia + menu "Exportar" ── */
+.detalhe-actions .input { width:100%; }
+.drop-wrap { position:relative; display:inline-block; }
+.drop-menu {
+  position:absolute; left:0; top:calc(100% + 6px); z-index:200; min-width:180px; padding:6px 0; flex-direction:column;
+  background:var(--ui-surface); border:1.5px solid var(--ui-border); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.18);
 }
-.aluno-search-checkbox input {
-  cursor: pointer;
-  accent-color: var(--brand);
-}
-
-/* ── Card de destaque na cor do usuário (mesmo mecanismo de gestão-atas) ── */
-.card.card-destaque {
-  background: var(--btn-home-bg);
-  border-color: var(--btn-home-border);
-  --dest-fg: #ffffff;
-  --dest-btn-bg: rgba(255,255,255,0.16);
-  --dest-btn-bd: rgba(255,255,255,0.55);
-  --dest-btn-hover: rgba(255,255,255,0.26);
-}
-html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
-.card.card-destaque.contraste-claro {
-  --dest-fg: #1e293b;
-  --dest-btn-bg: rgba(15,23,42,0.08);
-  --dest-btn-bd: rgba(15,23,42,0.35);
-  --dest-btn-hover: rgba(15,23,42,0.14);
-}
-.card-destaque .section-title { color: var(--dest-fg); }
-.card-destaque .muted { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
-.card-destaque label { color: var(--dest-fg); }
-.card-destaque .aluno-search-checkbox { color: var(--dest-fg); }
-.card-destaque .btn {
-  background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
-}
-.card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
-/* Sem isto, "html[data-theme=dark] .btn.primary" (mais específico) vence e o
-   botão "Pesquisar" volta pra cor de marca padrão — ilegível sobre o card
-   já colorido pela cor do usuário no tema escuro. */
-html[data-theme="dark"] .card-destaque .btn { background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
-html[data-theme="dark"] .card-destaque .btn:hover:not(:disabled) { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
-
-/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
-   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
-   próprio .info-tip-bubble, junto de onde é usado. Bloco pensado pra ser
-   copiado igual em outras páginas do módulo quando entrarem na fila. ===== */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); padding:10px 12px; border-radius:10px;
-  background:var(--card-bg); border:1.5px solid var(--card-border); color:#1e293b;
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
-  white-space:normal; cursor:default;
-}
-html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
-.info-tip.open .info-tip-bubble{ display:block; }
-/* Dentro de um card de destaque, o ícone acompanha o texto do card
-   (var(--dest-fg), já ajustado por ThemeColors.ajustarContraste()) — igual
-   aos outros elementos do card. O balão NÃO herda isso (cor fixa acima),
-   pra continuar legível em qualquer fundo. */
-.card-destaque .info-tip{ color: var(--dest-fg); }
-
-/* ── Toasts (ver guia-toasts.md) ── */
-@keyframes toastSubir {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
+.drop-menu .btn { width:100%; justify-content:flex-start; padding:10px 16px; }
 </style>
 
 <title>Pesquisa de Atas</title>
@@ -272,6 +95,10 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
      CONTEÚDO PRINCIPAL
 ============================================================ -->
 <div class="wrap">
+
+  <div id="avisoAdminTodasEscolas" class="aviso-warn" hidden>
+    ⚠️ Os dados não podem ser exibidos enquanto <b>"Todas as escolas"</b> estiver selecionado no seletor do header. Por favor, selecione uma escola válida.
+  </div>
 
   <!-- Filtros -->
   <div class="card card-destaque">
@@ -298,8 +125,8 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
       <div class="field" id="campoSerie">
         <label for="selSerieAdd">Filtrar por série</label>
         <div class="serie-add-row">
-          <select id="selSerieAdd"><option value="">(selecione)</option></select>
-          <button class="btn primary" id="btnAddSerie" type="button" style="white-space:nowrap;">+ Adicionar</button>
+          <select id="selSerieAdd"><option value="" disabled hidden selected>Selecione a série…</option></select>
+          <button class="btn primary" id="btnAddSerie" type="button">+ Adicionar</button>
         </div>
         <div class="chips" id="chipsSeries"></div>
       </div>
@@ -310,12 +137,12 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
       </div>
     </div>
 
-    <div class="filter-actions" style="display:flex; align-items:center; gap:2px;">
+    <div class="filter-actions">
       <button class="btn primary" id="btnPesquisar" type="button">🔍 Pesquisar</button>
-      <button class="btn ghost" id="btnLimparFiltros" type="button" style="margin-left:6px; margin-right:6px; white-space:nowrap;">🧹 Limpar filtros</button>
-      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <button class="btn secondary" id="btnLimparFiltros" type="button">🧹 Limpar filtros</button>
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
-        <span class="info-tip-bubble" id="dbInfoTip">carregando...</span>
+        <span class="info-tip-bubble wide" id="dbInfoTip">carregando...</span>
       </span>
     </div>
   </div>
@@ -324,7 +151,7 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
   <div class="card">
     <div class="card-head">
       <p class="section-title">Pesquisa por aluno</p>
-      <a class="btn ghost" href="historico-aluno.html">👤 Pesquisar notas por aluno</a>
+      <a class="btn secondary" href="historico-aluno.html">👤 Pesquisar notas por aluno</a>
     </div>
     <div class="aluno-search-row">
       <div class="field">
@@ -332,7 +159,7 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
         <input id="alunoQuery" type="text" placeholder="Ex: José da Silva">
       </div>
       <div class="aluno-search-actions">
-        <label class="aluno-search-checkbox">
+        <label class="check">
           <input type="checkbox" id="alunoParcial" checked>
           Início do nome (desmarque para nome exato)
         </label>
@@ -368,20 +195,16 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
         <div class="muted" id="detalhesMeta"></div>
 
         <div class="detalhe-actions">
-          <input id="fAluno" type="text" placeholder="Filtrar aluno por nome...">
-          <div style="position:relative;display:inline-block;">
+          <input id="fAluno" class="input" type="text" placeholder="Filtrar aluno por nome...">
+          <div class="drop-wrap">
             <button class="btn primary" type="button" id="btnAtaExportar">Exportar ▾</button>
-            <div id="dropExportAta" style="display:none;position:absolute;left:0;top:calc(100% + 6px);
-              background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
-              box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:180px;padding:6px 0;
-              flex-direction:column;">
-              <button class="btn" id="btnExportAtaPdf" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Exportar PDF</button>
-              <button class="btn" id="btnExportAtaCsv" type="button"
-                style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 Exportar CSV</button>
+            <div id="dropExportAta" class="drop-menu" style="display:none;">
+              <button class="btn quiet" id="btnExportAtaPdf" type="button">📄 Exportar PDF</button>
+              <button class="btn quiet" id="btnExportAtaCsv" type="button">📊 Exportar CSV</button>
             </div>
           </div>
           <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
-          <button class="btn secondary small" type="button" onclick="fecharTurma()" style="margin-left:auto;">✕ Fechar</button>
+          <button class="btn secondary small" type="button" onclick="fecharTurma()">✕ Fechar</button>
         </div>
 
         <div class="table-scroll">
@@ -422,49 +245,42 @@ html[data-theme="dark"] .info-tip-bubble{ color:#e2e8f0; }
 /* =========================
    Toasts padronizados + modal de confirmação (ver guia-toasts.md)
 ========================= */
-function _showToast(msg, bg, shadow, duration){
+// ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
+// "carregando" não expira: fecha pelo próximo toast ou por _toastLimpar() (só ele; nunca apaga sucesso/erro/aviso).
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:0    },
+};
+function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
   if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
   const toast = document.createElement('div');
   toast.id = '_toastGlobal';
-  toast.style.cssText =
-    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-    `display:flex;align-items:center;gap:12px;`+
-    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
   const span = document.createElement('span');
+  span.className = 'toast-msg';
   span.textContent = msg;
-  span.style.cssText = 'flex:1;line-height:1.4;';
-  toast.appendChild(span);
-  const btnClose = document.createElement('button');
-  btnClose.type = 'button';
-  btnClose.textContent = '✕';
-  btnClose.setAttribute('aria-label','Fechar aviso');
-  btnClose.style.cssText =
-    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-  btnClose.onclick = () => toast.remove();
-  toast.appendChild(btnClose);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
   document.body.appendChild(toast);
-  // duration 0 = fica até virar outro toast ou ser fechado (usado só pelo "carregando")
-  if (duration !== 0) setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
 }
-function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
-function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
-function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
-function _toastCarregando(msg){
-  _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 0);
-  const t = document.getElementById('_toastGlobal');
-  if(t) t.dataset.loading = '1';
-}
-// Remove o toast atual SÓ se ele for um "carregando" — nunca apaga um
-// sucesso/erro/aviso que tenha aparecido no meio do caminho.
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
 function _toastLimpar(){
   const t = document.getElementById('_toastGlobal');
-  if(t && t.dataset.loading === '1') t.remove();
+  if(t && t.classList.contains('toast-loading')) t.remove();
 }
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -478,11 +294,12 @@ function setMsg(text, kind){
     _toastAviso(t);
   }
 }
+// Rede de segurança: promise sem catch durante um "carregando" troca o azul por erro.
 window.addEventListener('unhandledrejection', (ev) => {
   const t = document.getElementById('_toastGlobal');
-  if(t && t.dataset.loading === '1'){
+  if(t && t.classList.contains('toast-loading')){
     console.error('[unhandledrejection]', ev.reason);
-    setMsg('Algo deu errado — veja o console.', 'err');
+    _toastErro('⚠️ Não foi possível concluir a operação.');
   }
 });
 
@@ -640,7 +457,8 @@ function seriesDaTurma(t) {
 }
 function preencherFiltroSerie() {
   const sel = document.getElementById("selSerieAdd");
-  sel.innerHTML = '<option value="">(selecione)</option>' +
+  // Placeholder só aparece no campo (disabled + hidden): não é opção da lista.
+  sel.innerHTML = '<option value="" disabled hidden selected>Selecione a série…</option>' +
     SERIES_FILTRO.map(x => `<option value="${x}">${x}</option>`).join("");
 }
 function renderChipsSeries() {
@@ -824,7 +642,7 @@ function renderListaTurmas(lista) {
         </div>
         <div class="badges-row">
           <span class="badge">${_escHtml(anoTxt)}</span>
-          <span class="badge badge-serie">${_escHtml(serieTxt || "?")}</span>
+          <span class="badge">${_escHtml(serieTxt || "?")}</span>
         </div>
         <div class="muted item-meta">
           ${_escHtml(turnoTxt)} · ${_escHtml(alunosTxt)}
@@ -1411,7 +1229,16 @@ async function carregar() {
   // Busca geral: Enter equivale a clicar em Pesquisar (digitar não refiltra sozinho)
   document.getElementById("fBusca").onkeydown = function(ev){ if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("btnPesquisar").click(); } };
 
-  if (window.ThemeColors) ThemeColors.ajustarContraste();
+  try{
+    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+  }catch(e){ console.warn('ajustarContraste:', e); }
+
+  // Admin global com "Todas as escolas" (guia, seção 19): só avisa; o header recarrega a página ao trocar de escola.
+  try{
+    const sid = (window.Auth && typeof Auth.getActiveSchoolId === 'function') ? Auth.getActiveSchoolId() : '';
+    const avisoAdmin = document.getElementById("avisoAdminTodasEscolas");
+    if(avisoAdmin) avisoAdmin.hidden = String(sid || '').toUpperCase() !== 'ADMIN';
+  }catch(_){}
 
   // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
   document.addEventListener("click", ()=>{
@@ -1517,10 +1344,10 @@ document.addEventListener("DOMContentLoaded", carregar);
       out.innerHTML = achados.map(h => `
       <div class="aluno-result-row">
         <div class="aluno-result-info">
-          <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — <span style="font-weight:700;">${escapeHtml(h.aluno)}</span>${h.resultado ? " — " + escapeHtml(h.resultado) : ""}</div>
+          <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — <b>${escapeHtml(h.aluno)}</b>${h.resultado ? " — " + escapeHtml(h.resultado) : ""}</div>
         </div>
         <div class="aluno-result-actions">
-          <button class="btn ghost small" type="button" onclick="abrirTurmaPorId('${escapeHtml(h.id)}')">Abrir</button>
+          <button class="btn secondary small" type="button" onclick="abrirTurmaPorId('${escapeHtml(h.id)}')">Abrir</button>
         </div>
       </div>
     `).join("") + (temMais ? `<div class="aluno-not-found">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
