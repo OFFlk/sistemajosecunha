@@ -34,7 +34,7 @@
 
 /* ── Layout ── */
 .wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
-.grid   { display: grid; grid-template-columns: 220px 1fr 200px; gap: 14px; align-items: start; }
+.grid   { display: grid; grid-template-columns: 220px 1fr auto; gap: 14px; align-items: start; }
 .split  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .split > .card { min-height: 200px; }
 @media(max-width:980px){ .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr !important; } }
@@ -50,7 +50,6 @@
 .rel      { position: relative; }
 .rel-inline { position: relative; display: inline-block; }
 .muted    { color: var(--ui-muted); }
-.help     { font-size: 12px; color: var(--ui-muted); margin-top: 6px; min-height: 14px; }
 .loading  { font-size: 12px; color: var(--ui-muted); margin-top: 8px; }
 .lbl-oculto { visibility: hidden; }
 
@@ -62,19 +61,18 @@
 .filtros-row .field { margin: 0; min-width: 160px; }
 .filtros-row .field.grow { flex: 1; }
 .filtros-row .field.w230 { min-width: 230px; }
-.statusline   { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--ui-muted); font-size: 12px; border-top: 1px solid var(--ui-border); padding-top: 10px; }
 .chips        { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 /* Chip removível (com ×): fica na página (D2/5-A) */
-.chip        { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-chip-border); background: var(--ui-chip-bg); color: var(--ui-chip-color); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-.chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
+.chip        { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); background: var(--ui-cell-bg); color: var(--ui-text); padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-text); font-weight: 900; font-size: 14px; line-height: 1; }
 
 /* Contador (não é .badge): número de filtros avançados ativos */
-.cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-brand); color: var(--ui-brand-fg); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
+.cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
 
 /* ── Popovers (pesquisa avançada, exportar, colunas): visual próprio, candidato a global (D) ── */
 .popover      { position: absolute; background: var(--ui-surface); color: var(--ui-text); border: 1.5px solid var(--ui-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
-.pop-avancada { top: calc(100% + 6px); left: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
+.pop-avancada { top: calc(100% + 6px); right: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
 .pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
@@ -95,7 +93,6 @@
 .count         { background: var(--ui-chip-bg); border: 1px solid var(--ui-border); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--ui-chip-color); font-weight: 700; }
 .panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
 .check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); font-weight: 700; cursor: pointer; }
-.dica-lista    { font-size: 12px; margin: -4px 0 10px 0; }
 .list          { display: flex; flex-direction: column; gap: 8px; }
 
 /* ── Ordenação ── */
@@ -179,32 +176,103 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
 
 <div class="wrap">
 
-  <div class="card">
-    <!-- Linha 1: ano + busca + pesquisar -->
+  <div class="card card-destaque">
+    <div class="card-head"><h2>Pesquisa <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Use este card para encontrar turmas e alunos. O ano letivo, a busca por aluno e os filtros de série, turno e modelo diminuem a lista de turmas exibida abaixo. O botão <b>Pesquisa avançada</b> abre filtros extras: <b>Somente readmissão</b> mostra apenas alunos que saíram da escola (transferidos, desistentes ou falecidos); <b>Deficiência</b> e <b>Transtornos</b> mostram alunos que têm algum dos itens marcados na lista que aparece ao ativar o filtro; <b>Frequenta a sala do AEE</b> mostra alunos que frequentam o Atendimento Educacional Especializado. Depois de marcar os filtros, aperte <b>Pesquisar</b>. O número no botão indica quantos filtros avançados estão ativos. Em anos passados, o filtro extra disponível é <b>Não concluíram o ano</b>.</span></span></h2></div>
+
+    <!-- Linha 1: ano + busca + pesquisa avançada -->
     <div class="grid">
       <div class="field stack">
-        <label for="selAno">Ano letivo</label>
+        <label for="selAno">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">O ano ativo declarado pelo sistema é preenchido automaticamente. Para ver dados de anos passados, altere o seletor manualmente. Se o ano que você procura não aparecer, ou se o preenchimento automático estiver errado, contate o responsável pelo sistema.</span></span></label>
         <select id="selAno"></select>
-        <div class="help" id="helpAno">Por padrão, usa o ano ativo detectado.</div>
       </div>
 
       <div class="field stack">
-        <label for="inpBusca">Buscar aluno (nome ou CPF)</label>
+        <label for="inpBusca">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por nome ou CPF. A busca por nome precisa de no mínimo 3 letras e vale só para o início do nome: pesquisar “ana” mostra nomes que começam com Ana e ignora nomes com “ana” no meio, como Mariana. A busca por CPF só funciona com os 11 números preenchidos; usar ou não pontos e traço é irrelevante.</span></span></label>
         <div class="busca-row">
           <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF"/>
           <button class="btn primary nowrap" id="btnAtualizar">🔍 Pesquisar</button>
           <button class="btn secondary nowrap" id="btnLimparFiltros">🧹 Limpar filtros</button>
-          <span class="badge nowrap ml-auto">📅 ano ativo: <b id="lblAnoAtivo">—</b></span>
         </div>
-        <div class="help">&nbsp;</div>
+      </div>
+
+      <div class="field rel" id="blocoStatusAtivo">
+        <label class="lbl-oculto">Pesquisa avançada</label>
+        <button type="button" class="btn secondary w-100 nowrap rel" id="btnPesquisaAvancada">
+          🔎 Pesquisa avançada
+          <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
+        </button>
+
+        <div class="popover pop-avancada" id="painelPesquisaAvancada" style="display:none;">
+
+          <div>
+            <label class="check forte">
+              <input type="checkbox" id="chkReadmissao">
+              🔁 Somente readmissão (inativos)
+            </label>
+            <select class="input w-100 mt-6" id="selSituacao" style="display:none;">
+              <option value="">Todas as situações</option>
+              <option value="TRANSFERIDO">Transferido</option>
+              <option value="DESISTENTE">Desistente</option>
+              <option value="FALECIDO">Faleceu</option>
+            </select>
+          </div>
+
+          <div class="pop-div"></div>
+
+          <div>
+            <label class="check forte">
+              <input type="checkbox" id="chkFiltroDef">
+              ♿ Deficiência
+            </label>
+            <div class="sub-filtro" id="subFiltroDef" style="display:none;">
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
+            </div>
+          </div>
+
+          <div class="pop-div"></div>
+
+          <div>
+            <label class="check forte">
+              <input type="checkbox" id="chkFiltroTrans">
+              🧠 Transtornos
+            </label>
+            <div class="sub-filtro" id="subFiltroTrans" style="display:none;">
+              <label class="check"><input type="checkbox" class="filtroTransItem" value="discalculia">🔢 Discalculia / raciocínio lógico-matemático</label>
+              <label class="check"><input type="checkbox" class="filtroTransItem" value="disgrafia">✏️ Disgrafia / disortografia / escrita</label>
+              <label class="check"><input type="checkbox" class="filtroTransItem" value="dislalia">🗣️ Dislalia / linguagem e comunicação</label>
+              <label class="check"><input type="checkbox" class="filtroTransItem" value="dislexia">📖 Dislexia</label>
+              <label class="check"><input type="checkbox" class="filtroTransItem" value="tdah">⚡ TDAH</label>
+              <label class="check"><input type="checkbox" class="filtroTransItem" value="tpac">🔊 TPAC</label>
+            </div>
+          </div>
+
+          <div class="pop-div"></div>
+
+          <div>
+            <label class="check forte">
+              <input type="checkbox" id="chkFiltroAee">
+              🏫 Frequenta a sala do AEE
+            </label>
+          </div>
+
+          <div class="pop-foot">
+            <button type="button" class="btn primary small" id="btnPesquisarAvancada">🔍 Pesquisar</button>
+            <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Linha 2: filtros de série + turno + status -->
+    <!-- Linha 2: filtros de série + turno + modelo -->
     <div class="bloco-filtros">
       <div class="filtros-row">
         <div class="field grow">
-          <label for="selSerieAdd">Filtrar por série</label>
+          <label for="selSerieAdd">Filtrar por série <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Escolha uma série no seletor e aperte <b>+ Adicionar</b>. O filtro só passa a valer depois que você aperta o botão e a série aparece abaixo do seletor.</span></span></label>
           <select id="selSerieAdd">
             <option value="">(selecione)</option>
           </select>
@@ -227,77 +295,6 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
             <option value="INTEGRAL">📚 Integral</option>
           </select>
         </div>
-        <div class="field w230 rel" id="blocoStatusAtivo">
-          <label class="lbl-oculto">Pesquisa avançada</label>
-          <button type="button" class="btn secondary w-100 nowrap rel" id="btnPesquisaAvancada">
-            🔎 Pesquisa avançada
-            <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
-          </button>
-
-          <div class="popover pop-avancada" id="painelPesquisaAvancada" style="display:none;">
-
-            <div>
-              <label class="check forte">
-                <input type="checkbox" id="chkReadmissao">
-                🔁 Somente readmissão (inativos)
-              </label>
-              <select class="input w-100 mt-6" id="selSituacao" style="display:none;">
-                <option value="">Todas as situações</option>
-                <option value="TRANSFERIDO">Transferido</option>
-                <option value="DESISTENTE">Desistente</option>
-                <option value="FALECIDO">Faleceu</option>
-              </select>
-            </div>
-
-            <div class="pop-div"></div>
-
-            <div>
-              <label class="check forte">
-                <input type="checkbox" id="chkFiltroDef">
-                ♿ Deficiência
-              </label>
-              <div class="sub-filtro" id="subFiltroDef" style="display:none;">
-                <label class="check"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
-                <label class="check"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
-                <label class="check"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
-                <label class="check"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
-                <label class="check"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
-                <label class="check"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
-              </div>
-            </div>
-
-            <div class="pop-div"></div>
-
-            <div>
-              <label class="check forte">
-                <input type="checkbox" id="chkFiltroTrans">
-                🧠 Transtornos
-              </label>
-              <div class="sub-filtro" id="subFiltroTrans" style="display:none;">
-                <label class="check"><input type="checkbox" class="filtroTransItem" value="discalculia">🔢 Discalculia / raciocínio lógico-matemático</label>
-                <label class="check"><input type="checkbox" class="filtroTransItem" value="disgrafia">✏️ Disgrafia / disortografia / escrita</label>
-                <label class="check"><input type="checkbox" class="filtroTransItem" value="dislalia">🗣️ Dislalia / linguagem e comunicação</label>
-                <label class="check"><input type="checkbox" class="filtroTransItem" value="dislexia">📖 Dislexia</label>
-                <label class="check"><input type="checkbox" class="filtroTransItem" value="tdah">⚡ TDAH</label>
-                <label class="check"><input type="checkbox" class="filtroTransItem" value="tpac">🔊 TPAC</label>
-              </div>
-            </div>
-
-            <div class="pop-div"></div>
-
-            <div>
-              <label class="check forte">
-                <input type="checkbox" id="chkFiltroAee">
-                🏫 Frequenta a sala do AEE
-              </label>
-            </div>
-
-            <div class="pop-foot">
-              <button type="button" class="btn primary small" id="btnPesquisarAvancada">🔍 Pesquisar</button>
-              <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
-            </div>
-          </div>
-        </div>
         <div class="field w230" id="blocoStatusPassado" style="display:none;">
           <label class="check" for="chkNaoConcluintes">
             <input type="checkbox" id="chkNaoConcluintes">
@@ -319,11 +316,6 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
       </div>
 
       <div class="chips" id="chipsSeries"></div>
-
-      <div class="statusline">
-        <div id="lblDb" class="muted">Carregando banco...</div>
-        <div class="muted" id="lblInfo"></div>
-      </div>
     </div>
   </div>
 
@@ -332,7 +324,7 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
     <div class="card">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Turmas</h2><span class="count" id="countTurmas">0</span>
+          <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllTurmas"> Todos</label>
@@ -356,7 +348,7 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
     <div class="card">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Alunos</h2><span class="count" id="countAlunos">0</span>
+          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
@@ -374,7 +366,6 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color 
           </div>
         </div>
       </div>
-      <div class="muted dica-lista">Marque alunos para exportar/abrir a tabela. O filtro "Buscar aluno" afeta esta lista.</div>
 
       <!-- Controle de ordenação -->
       <div class="sort-control">
@@ -513,6 +504,11 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 /* =========================
    Helpers de persistência
 ========================= */
+// Tooltips (ⓘ): fecha ao clicar fora (guia v5, seção 6)
+document.addEventListener("click", ()=>{
+  document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+});
+
 /* =========================
    Util
 ========================= */
@@ -648,9 +644,6 @@ const selAno       = document.getElementById("selAno");
 const inpBusca     = document.getElementById("inpBusca");
 const selSerieAdd  = document.getElementById("selSerieAdd");
 const chipsSeries  = document.getElementById("chipsSeries");
-const lblDb        = document.getElementById("lblDb");
-const lblAnoAtivo  = document.getElementById("lblAnoAtivo");
-const lblInfo      = document.getElementById("lblInfo");
 const listaTurmas  = document.getElementById("listaTurmas");
 const listaAlunos  = document.getElementById("listaAlunos");
 const countTurmas  = document.getElementById("countTurmas");
@@ -821,7 +814,6 @@ async function carregarDB(){
     status:    (m.status || "ATIVO").toString().trim().toUpperCase()
   }));
 
-  lblAnoAtivo.textContent = anoAtivo || "—";
 
   const anosSet = new Set();
   turmas.forEach(t => t.anoLetivo && anosSet.add(String(t.anoLetivo)));
@@ -854,7 +846,6 @@ async function carregarDB(){
   seriesOrdenadas.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; selSerieAdd.appendChild(o); });
 
   try{ await garantirMatsDoAno(anoSelecionadoOuAtivo()); }catch(e){ console.warn('matrículas:', e); _toastErro('Erro ao carregar as matrículas do ano.'); }
-  lblDb.textContent = `DB Ano Ativo: turmas=${turmas.length} • matrículas do ano=${mats.length}`;
 }
 
 function ordenarSeries(arr){
@@ -1212,7 +1203,6 @@ function sortAlunos(alunosList){
    Render
 ========================= */
 function atualizarListas(){
-  lblInfo.textContent = "";
   const tScope = sortTurmas(turmasFiltradas());
   listaTurmas.innerHTML = "";
   countTurmas.textContent = tScope.length;
@@ -1259,9 +1249,7 @@ function atualizarListas(){
   }
   bindTurmaSelectionHandlers();
   _atualizarListaAlunos(tScope);
-  lblAnoAtivo.textContent = anoAtivo || "—";
   const anoUso = anoSelecionadoOuAtivo();
-  lblInfo.textContent = anoUso ? `filtrando ano: ${anoUso}` : "filtrando: todos os anos";
 }
 
 function _bindCliqueSelecao(container, checkboxSelector){
@@ -1314,7 +1302,7 @@ async function _atualizarListaAlunos(_tScope){
   const busca = _busca;
   if(!busca && modo !== "serie" && !tMarcadas.length){
     alunosOrdenados = []; countAlunos.textContent = "—";
-    listaAlunos.innerHTML = `<div class="muted pad-12">Selecione uma ou mais turmas (ou marque <b>Todos</b>) para ver os alunos.</div>`;
+    listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ Para ver os alunos, marque uma ou mais turmas (ou a opção <b>Todos</b>) no card <b>Turmas</b>, à esquerda, ou faça uma busca no card de pesquisa.</div>`;
     return;
   }
   listaAlunos.innerHTML = `<div class="muted pad-12">Carregando alunos…</div>`;
@@ -1340,7 +1328,7 @@ async function _atualizarListaAlunos(_tScope){
   listaAlunos.innerHTML = "";
   countAlunos.textContent = aScope.length;
   if(aScope.length===0){
-    listaAlunos.innerHTML = `<div class="muted">Nenhum aluno encontrado para os filtros.</div>`;
+    listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ Nenhum aluno encontrado para os filtros.</div>`;
   } else {
     aScope.forEach(a=>{
       const el=document.createElement("div");
@@ -2691,6 +2679,11 @@ function restaurarEstadoPagina(){
     }
   }
   
+  // Card de destaque já existe no HTML: ajusta o contraste (guia v5, 4.2)
+  try{
+    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+  }catch(e){ console.warn('ajustarContraste:', e); }
+
   // Salvar estado apenas ao navegar para edição (não ao fechar/recarregar)
   // Isso garante que ao abrir a página do zero, nenhum estado antigo seja restaurado
   window.addEventListener('beforeunload', ()=>{
