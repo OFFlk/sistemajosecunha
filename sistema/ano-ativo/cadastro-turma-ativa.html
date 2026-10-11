@@ -32,630 +32,60 @@
 
 <title>Cadastro de turmas • Ano Ativo</title>
 <style>
-/* ══════════════════════════════════════════════════════════
-   CADASTRO-TURMA-ATIVA.CSS (inline)
-   Estilos exclusivos da página de cadastro de turmas.
+/* Prefixo de variáveis desta página: ta- (cadastro-turma-ativa). Hoje não há variável própria. */
 
-   Carregado após os arquivos globais:
-     /css/base.css · /css/header.css · /css/components.css
-   ══════════════════════════════════════════════════════════ */
-
-
-/* ============================================================
-   VARIÁVEIS AUSENTES NOS ARQUIVOS COMPARTILHADOS
-   ============================================================ */
-:root {
-  --card:    var(--header-bg, #ffffff);
-  --shadow:  0 4px 20px rgba(0,0,0,0.06);
-  --radius:  14px;
-  --radius2: 10px;
-}
-html[data-theme="dark"] {
-  --card:   #131c2e;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
-}
-
-
-/* ============================================================
-   CONTAINER
-   ============================================================ */
-.wrap {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 18px 48px;
-}
-
-
-/* ============================================================
-   CARD — override de components.css
-   ============================================================ */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 18px;
-  margin-bottom: 16px;
-  transition: background 0.3s, border-color 0.3s;
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
+/* ── Layout ── */
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
 h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
+.form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.split-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .split-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+.mt-10 { margin-top: 10px; }
+.mono  { font-family: ui-monospace, monospace; font-size: 12px; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 18px; flex-wrap: wrap; }
 
-.sub,
-.muted { color: var(--muted); font-size: 13px; }
-
-
-/* ============================================================
-   GRIDS (exclusivos desta página)
-   ============================================================ */
-.grid2    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-
-/* Dois cards lado a lado (form / lista), no lugar de um card único */
-.split-grid {
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 16px;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .split-grid { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 640px) {
-  .grid2    { grid-template-columns: 1fr; }
-  .form-row { grid-template-columns: 1fr; }
-}
-
-/* Seções internas do formulário */
+/* ── Seções internas do formulário (C: componente próprio) ── */
 .form-section { margin-top: 18px; }
 .form-section:first-of-type { margin-top: 4px; }
-.form-section-label {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 0 0 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.form-section-label::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
+.form-section-label { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ui-muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.form-section-label::after { content: ""; flex: 1; height: 1px; background: var(--ui-border); }
+.linha-serie { display: flex; gap: 10px; align-items: flex-end; margin-top: 6px; }
+.linha-serie select { flex: 1; min-width: 0; }
+.id-badge-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.id-badge-row .label-inline { font-size: 12px; color: var(--ui-muted); font-weight: 700; }
 
-/* ID da turma como badge compacto, não um campo de formulário inteiro */
-.id-badge-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-.id-badge-row .label-inline {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
-}
-.id-badge {
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--chip-bg);
-  border: 1px solid var(--chip-border);
-  color: var(--chip-color);
-}
+/* ── Chip removível de série (D: candidato a global) ── */
+.chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); background: var(--ui-cell-bg); color: var(--ui-text); padding: 6px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-text); font-weight: 900; font-size: 14px; line-height: 1; padding: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
+/* ── Card de destaque: cabeçalho da lista ── */
+.lista-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.lista-head h2 { margin: 0; }
+.lista-head .input { font-size: 13px; }
+.lista-head .filtro-ano    { max-width: 140px; }
+.lista-head .filtro-status { max-width: 130px; }
+.lista-head .ordem { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.lista-head .ordem .input { max-width: 150px; }
 
-/* ============================================================
-   CAMPOS — override de components.css
-   ============================================================ */
-.field {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.field label,
-.label {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-  margin: 0 0 6px;
-  color: var(--text);
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.field input,
-.field select,
-.input {
-  width: 100%;
-  padding: 11px 12px;
-  border: 1px solid var(--field-border);
-  border-radius: 10px;
-  background: var(--field-bg);
-  color: var(--text);
-  font-size: 14px;
-  font-family: 'Nunito', sans-serif;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.field input:focus,
-.field select:focus,
-.input:focus {
-  border-color: var(--brand, #7c3aed);
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
-}
-
-.input.readonly {
-  background: var(--chip-bg);
-  color: var(--muted);
-  cursor: default;
-  pointer-events: none;
-}
-
-html[data-theme="dark"] .field input,
-html[data-theme="dark"] .field select,
-html[data-theme="dark"] .input {
-  background: var(--field-bg);
-  color: var(--text);
-  border-color: var(--field-border);
-}
-
-html[data-theme="dark"] .field select option {
-  background: #0a1426;
-  color: #e2e8f0;
-}
-
-html[data-theme="dark"] input::placeholder { color: rgba(226,232,240,0.45); }
-
-
-/* ============================================================
-   BOTÕES — override de components.css
-   ============================================================ */
-.btn {
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-  padding: 9px 14px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 14px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-family: 'Nunito', sans-serif;
-  white-space: nowrap;
-  transition: background 0.18s, border-color 0.18s, transform 0.06s;
-}
-.btn:hover { background: var(--chip-bg); }
-.btn:active { transform: translateY(1px); }
-
-.btn.primary {
-  background: var(--brand, #7c3aed);
-  border-color: var(--brand, #7c3aed);
-  color: var(--brand-fg, #fff);
-}
-.btn.primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
-html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
-
-.btn.danger {
-  background: rgba(185,28,28,0.10);
-  border-color: rgba(185,28,28,0.30);
-  color: var(--danger);
-}
-.btn.danger:hover { background: rgba(185,28,28,0.18); }
-html[data-theme="dark"] .btn.danger { background: rgba(185,28,28,0.12); border-color: rgba(185,28,28,0.45); color: #f87171; }
-html[data-theme="dark"] .btn.danger:hover { background: #b91c1c; border-color: #b91c1c; color: #ffffff; }
-
-.btn.success {
-  background: rgba(22,163,74,0.10);
-  border-color: rgba(22,163,74,0.30);
-  color: #166534;
-}
-.btn.success:hover { background: rgba(22,163,74,0.18); }
-html[data-theme="dark"] .btn.success { background: rgba(22,163,74,0.14); border-color: rgba(22,163,74,0.45); color: #4ade80; }
-html[data-theme="dark"] .btn.success:hover { background: #166534; border-color: #166534; color: #ffffff; }
-
-.btn.ghost,
-.btn.secondary {
-  background: var(--chip-bg);
-  border-color: var(--chip-border);
-  color: var(--chip-color);
-}
-.btn.ghost:hover,
-.btn.secondary:hover {
-  background: var(--brand-faded, #f5f3ff);
-  border-color: var(--brand, #7c3aed);
-  color: var(--brand-text, #6d28d9);
-}
-html[data-theme="dark"] .btn.ghost:hover,
-html[data-theme="dark"] .btn.secondary:hover {
-  background: var(--brand-faded-d, rgba(124,58,237,0.28));
-  border-color: var(--brand-d, #7c3aed);
-  color: var(--brand-text-d, #c4b5fd);
-}
-
-.btn.outline { background: var(--brand-faded, #f5f3ff); border-color: var(--brand-border, #ddd6fe); color: var(--brand-text, #6d28d9); }
-.btn.outline:hover { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: var(--brand-fg, #fff); }
-html[data-theme="dark"] .btn.outline { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-html[data-theme="dark"] .btn.outline:hover { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); color: #fff; }
-
-.btn.cancel { background: var(--card); border-color: var(--border); color: var(--muted); }
-.btn.cancel:hover { background: var(--chip-bg); border-color: var(--muted); }
-.btn.small  { padding: 6px 10px; font-size: 12px; }
-
-/* Item da lista sendo editado no momento */
-.item.editing {
-  border-color: var(--brand, #7c3aed);
-  box-shadow: 0 0 0 3px var(--brand-faded, rgba(124,58,237,0.12));
-}
-
-
-/* ============================================================
-   CHIPS DE SÉRIE
-   ============================================================ */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--chip-border);
-  background: var(--chip-bg);
-  color: var(--chip-color);
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 700;
-}
-.chip button {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  color: inherit;
-  font-weight: 900;
-  font-size: 14px;
-  line-height: 1;
-  padding: 0;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-
-/* ============================================================
-   LISTA DE TURMAS
-   ============================================================ */
+/* ── Lista de turmas: sub-card (D19: definição local) ── */
 .list { display: flex; flex-direction: column; gap: 10px; }
-
-.item {
-  border: 1px solid var(--border);
-  border-radius: var(--radius2);
-  padding: 12px 14px;
-  background: var(--card);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  transition: background 0.3s, border-color 0.3s;
-}
-.item:hover { border-color: var(--brand); }
-
-.head-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.row-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Coluna de botões do item de turma */
-.btns {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-  align-items: stretch;
-  min-width: 90px;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 16px;
-  flex-wrap: wrap;
-}
-
-
-/* ============================================================
-   MISC
-   ============================================================ */
-.mono { font-family: ui-monospace, monospace; font-size: 12px; }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--border);
-  background: var(--chip-bg);
-  border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--chip-color);
-}
-
-.divider { height: 1px; background: var(--border); margin: 12px 0; }
-
-.badge.status-inativa {
-  background: rgba(153,27,27,0.12);
-  border-color: rgba(153,27,27,0.35);
-  color: #991b1b;
-}
-html[data-theme="dark"] .badge.status-inativa {
-  background: rgba(153,27,27,0.20);
-  border-color: rgba(153,27,27,0.5);
-  color: #f87171;
-}
-
-.help {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 6px;
-  line-height: 1.4;
-  min-height: 14px;
-}
-.help.err { color: var(--danger); font-weight: 700; }
-.help.ok  { color: #1f8f4a; font-weight: 700; }
-
-.warn {
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(245,158,11,.10);
-  border: 1px solid rgba(245,158,11,.30);
-  font-size: 13px;
-  margin-top: 12px;
-}
-
-/* Nota informativa (não é um alerta real — reserva o âmbar de .warn pra avisos de verdade) */
-.info-note {
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--chip-bg);
-  border: 1px solid var(--chip-border);
-  color: var(--muted);
-  font-size: 13px;
-  margin-top: 12px;
-}
-.info-note strong { color: var(--text); }
-
-.ok-msg {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(22,163,74,0.10);
-  border: 1px solid rgba(22,163,74,0.25);
-  color: #15803d;
-  font-size: 14px;
-  margin-bottom: 12px;
-}
-html[data-theme="dark"] .ok-msg { color: #4ade80; }
-
-
-/* ============================================================
-   CAMPO BLOQUEADO (aluno encontrado)
-   ============================================================ */
-#bannerAlunoEncontrado { display: none; }
-#bannerAlunoEncontrado.visible { display: flex !important; }
-
-.field-locked input,
-.field-locked select,
-.field-locked .nat-input-real {
-  background: var(--chip-bg) !important;
-  color: var(--muted) !important;
-  cursor: default !important;
-  pointer-events: none;
-}
-.field-locked label::after { content: " 🔒"; font-size: 11px; opacity: .6; }
-
-
-/* ============================================================
-   NATURALIDADE — autocomplete
-   ============================================================ */
-.nat-wrap { position: relative; }
-
-.nat-ghost-layer {
-  position: absolute;
-  inset: 0;
-  padding: 11px 12px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: 'Nunito', inherit;
-  pointer-events: none;
-  white-space: nowrap;
-  overflow: hidden;
-  color: transparent;
-}
-.nat-ghost-layer span.ghost-tail { color: #adb5bd; }
-
-.nat-input-real {
-  position: relative;
-  width: 100%;
-  padding: 11px 12px;
-  border: 1px solid var(--field-border);
-  border-radius: 10px;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  font-family: 'Nunito', sans-serif;
-  color: var(--text);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.nat-input-real:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
-html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--text); }
-
-.nat-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0; right: 0;
-  z-index: 40;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(15,23,42,.10);
-  max-height: 200px;
-  overflow-y: auto;
-  display: none;
-}
-.nat-dropdown.open { display: block; }
-
-.nat-opt {
-  padding: 10px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.nat-opt:hover,
-.nat-opt.active { background: var(--chip-bg); }
-
-.nat-opt .nat-uf {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--chip-color);
-  background: var(--chip-bg);
-  border-radius: 999px;
-  padding: 2px 7px;
-  flex-shrink: 0;
-}
-
-
-/* ============================================================
-   TOAST
-   ============================================================ */
-@keyframes toastSubir {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-
-/* ============================================================
-   MODAL
-   ============================================================ */
-.modal-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(15,23,42,.55);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  z-index: 50;
-}
-.modal-backdrop.open { display: flex; }
-
-.modal {
-  width: min(1100px, 96vw);
-  max-height: 86vh;
-  overflow: auto;
-  background: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  box-shadow: 0 30px 60px rgba(0,0,0,.25);
-}
-
-.modal-head {
-  position: sticky; top: 0;
-  background: var(--card);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-}
-.modal-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
-.modal-body { padding: 14px; }
-
-/* ============================================================
-   CARD DESTAQUE + ⓘ + DETALHES (padrão de cadastro-turmas.html / guia)
-   Os botões "Editar/Inativar" vivem dentro de .item (fundo neutro próprio),
-   por isso não há override de .btn no destaque (guia 4.1).
-   ============================================================ */
-.card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); --dest-fg: #ffffff; }
-html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
-.card.card-destaque.contraste-claro { --dest-fg: #1e293b; }
-.card-destaque h2 { color: var(--dest-fg); }
-.card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
-.card-destaque .item .help { color: var(--muted); }
-.card-destaque .info-tip { color: var(--dest-fg); }
-
-.badge.small { font-size: 11px; padding: 3px 8px; }
-.badge.badge-serie { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.35); color: #92400e; }
-html[data-theme="dark"] .badge.badge-serie { color: #fbbf24; }
-.detalhes-toggle { font-size: 12px; font-weight: 700; color: var(--brand-text, #6d28d9); cursor: pointer; user-select: none; }
+.item { border: 1px solid var(--ui-border); border-radius: 10px; padding: 12px 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.item:hover { border-color: var(--ui-brand); }
+.item.editing { border-color: var(--ui-brand); box-shadow: 0 0 0 3px var(--ui-brand-faded); }
+.item .left { flex: 1; min-width: 0; }
+.item h4 { margin: 0 0 6px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row.tight { gap: 6px; row-gap: 6px; margin-top: 6px; }
+.btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
+.detalhes-toggle { font-size: 12px; font-weight: 700; color: var(--ui-brand-text); cursor: pointer; user-select: none; margin-left: 4px; }
 .detalhes-toggle:hover { text-decoration: underline; }
-html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); }
+.detalhes { margin-top: 6px; }
 
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card); border:1.5px solid var(--border); color:var(--text);
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal;
-  font-family:'Nunito', sans-serif; line-height:1.4; text-align:left; white-space:normal; cursor:default;
-}
-.info-tip.open .info-tip-bubble{ display:block; }
-.card-destaque #btnOrdenarCriacao{
-  background: color-mix(in srgb, var(--dest-fg) 14%, transparent);
-  border: 2px solid color-mix(in srgb, var(--dest-fg) 60%, transparent);
-  color: var(--dest-fg);
-}
-.card-destaque #btnOrdenarCriacao:hover{
-  background: color-mix(in srgb, var(--dest-fg) 26%, transparent);
-  border-color: var(--dest-fg); color: var(--dest-fg);
-}
-.btn:disabled, .input:disabled { opacity: .55; cursor: not-allowed; }
+/* Contraponto verde do btn danger ("Reativar"): a cor vem inline (--ui-st-ok-*); aqui só o hover */
+.btn-reativar:hover { filter: brightness(1.08); }
 </style>
 </head>
 <body>
@@ -665,22 +95,17 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   <div class="split-grid">
 
     <div class="card">
-      <h2 style="margin:0 0 10px">Cadastrar / editar turma
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">Por enquanto, esta tela cadastra e edita apenas turmas. No próximo passo, vamos matricular alunos na página de cadastro!</span>
-          </span>
-      </h2>
+      <h2>Cadastrar / editar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Por enquanto, esta tela cadastra e edita apenas turmas. No próximo passo, vamos matricular alunos na página de cadastro!</span></span></h2>
 
       <div class="form-section">
         <div class="form-row">
-          <div>
-            <label class="label">Ano letivo</label>
-            <input type="number" id="anoSelect" class="input" inputmode="numeric" step="1" min="2000" max="2100">
+          <div class="field">
+            <label for="anoSelect">Ano letivo</label>
+            <input type="number" id="anoSelect" inputmode="numeric" step="1" min="2000" max="2100">
           </div>
-          <div>
-            <label class="label">Turno</label>
-            <select id="turno" class="input">
+          <div class="field">
+            <label for="turno">Turno</label>
+            <select id="turno">
               <option value="MATUTINO">Matutino</option>
               <option value="VESPERTINO">Vespertino</option>
               <option value="NOTURNO">Noturno</option>
@@ -688,100 +113,71 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
             </select>
           </div>
         </div>
-        <div id="avisoTravaEdicao" class="warn" style="display:none;margin-top:10px;">🔒 Ano letivo e séries não podem ser alterados numa turma já cadastrada (o ID depende deles). Aqui você pode editar o nome, o turno e o professor(a).</div>
+        <div id="avisoTravaEdicao" class="aviso-warn mt-10" hidden>🔒 Ano letivo e séries não podem ser alterados numa turma já cadastrada (o ID depende deles). Aqui você pode editar o nome, o turno e o professor(a).</div>
       </div>
 
       <div class="form-section">
         <div class="form-section-label">Séries</div>
-        <label class="label">Adicionar série
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">Escolha uma série na lista e clique em <b>Adicionar</b>. A turma só passa a ter a série depois que ela aparece nas etiquetas abaixo.</span>
-          </span>
-        </label>
-        <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
-          <select id="serieSelect" class="input">
-            <option value="">(selecione)</option>
-          </select>
-          <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
-          <button class="btn ghost" id="btnClearSeries" type="button">Limpar séries</button>
+        <div class="field">
+          <label for="serieSelect">Adicionar série <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Escolha uma série na lista e clique em <b>Adicionar</b>. A turma só passa a ter a série depois que ela aparece nas etiquetas abaixo.</span></span></label>
+          <div class="linha-serie">
+            <select id="serieSelect">
+              <option value="" disabled hidden selected>Escolha a série…</option>
+            </select>
+            <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
+            <button class="btn secondary" id="btnClearSeries" type="button">Limpar séries</button>
+          </div>
         </div>
-        <div id="chipsSeries" class="chips" style="margin-top:10px"></div>
+        <div id="chipsSeries" class="chips"></div>
       </div>
 
       <div class="form-section">
         <div class="form-section-label">Identificação</div>
         <div class="form-row">
-          <div>
-            <label class="label">Nome da turma
-              <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">Preenchido automaticamente com séries, ano e turno. Você pode alterar o nome como preferir.</span>
-          </span>
-            </label>
-            <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO e 2º ANO 2026 (MATUTINO)">
+          <div class="field">
+            <label for="nomeTurma">Nome da turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Preenchido automaticamente com séries, ano e turno. Você pode alterar o nome como preferir.</span></span></label>
+            <input id="nomeTurma" placeholder="Ex.: 1º ANO e 2º ANO 2026 (MATUTINO)">
           </div>
-          <div>
-            <label class="label">Professor(a)
-              <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">A escolha do professor é opcional. O seletor lista todos os professores cadastrados no módulo de Funcionários. Se não encontrar o professor, confira o cadastro dele na página de pesquisa de funcionários.</span>
-          </span>
-            </label>
-            <select id="prof" class="input">
-              <option value="">— selecione —</option>
+          <div class="field">
+            <label for="prof">Professor(a) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">A escolha do professor é opcional. O seletor lista todos os professores cadastrados no módulo de Funcionários. Se não encontrar o professor, confira o cadastro dele na página de pesquisa de funcionários.</span></span></label>
+            <select id="prof">
+              <option value="">— nenhum(a) —</option>
             </select>
             <div class="help" id="profHelp">Carregando professores...</div>
           </div>
         </div>
 
         <!-- ID da turma: mantido como input (usado pelo script), mas escondido visualmente -->
-        <input id="turmaId" class="input readonly" readonly style="display:none">
+        <input id="turmaId" readonly hidden>
         <div class="id-badge-row">
-          <span class="label-inline">ID da turma:
-            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">O ID da turma é gerado automaticamente a partir do ano letivo e das séries — não é possível editá-lo manualmente. Como pode haver mais de uma turma com as mesmas séries (por exemplo, em turnos diferentes), uma letra (A, B, C...) é sempre adicionada ao final pra torná-lo único.<br><br>Depois que a turma é salva, o ano letivo e as séries ficam travados, porque o ID depende deles. Pra corrigir algum desses dados, o fluxo é: <b>Gestão de dados</b> → apague a turma → volte aqui e cadastre-a de novo. O turno e o nome podem ser alterados normalmente.</span>
-          </span>
-          </span>
-          <span class="id-badge" id="turmaIdBadge">—</span>
+          <span class="label-inline">ID da turma: <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">O ID da turma é gerado automaticamente a partir do ano letivo e das séries — não é possível editá-lo manualmente. Como pode haver mais de uma turma com as mesmas séries (por exemplo, em turnos diferentes), uma letra (A, B, C...) é sempre adicionada ao final pra torná-lo único.<br><br>Depois que a turma é salva, o ano letivo e as séries ficam travados, porque o ID depende deles. Pra corrigir algum desses dados, o fluxo é: <b>Gestão de dados</b> → apague a turma → volte aqui e cadastre-a de novo. O turno e o nome podem ser alterados normalmente.</span></span></span>
+          <span class="badge gray mono" id="turmaIdBadge">—</span>
         </div>
       </div>
 
-      <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px;align-items:center">
-        <div class="row" style="gap:10px;justify-content:flex-end">
-          <button class="btn ghost" id="btnCancelar" type="button" style="display:none">Cancelar</button>
-          <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
-        </div>
+      <div class="actions">
+        <button class="btn secondary" id="btnCancelar" type="button" hidden>Cancelar</button>
+        <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
       </div>
     </div>
 
     <div class="card card-destaque">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-        <h2 style="margin:0">Turmas cadastradas
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">Este card tem 3 filtros. Ao lado do título, o <b>ano letivo</b>: alterne entre os anos que já têm turmas cadastradas. Abaixo do título, o <b>status</b>: mostre turmas ativas, inativas ou todas. Por último, o <b>ordenador</b>: escolha a ordem (data de criação, nome ou série); o botão ao lado alterna entre crescente e decrescente.</span>
-          </span>
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-            i
-            <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma voltam para o formulário e você pode alterar o nome, o turno e o professor(a). Para os demais dados, siga as dicas em <b>ID da turma</b>. <b>Inativar</b> muda o status da turma para inativa; para vê-las, troque o filtro do card de "Ativas" para "Inativas".</span>
-          </span>
-        </h2>
-        <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
-        <select id="filtroStatusLista" class="input" style="max-width:130px;font-size:13px;">
+      <div class="lista-head">
+        <h2>Turmas cadastradas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Este card tem 3 filtros. Ao lado do título, o <b>ano letivo</b>: alterne entre os anos que já têm turmas cadastradas. Abaixo do título, o <b>status</b>: mostre turmas ativas, inativas ou todas. Por último, o <b>ordenador</b>: escolha a ordem (data de criação, nome ou série); o botão ao lado alterna entre crescente e decrescente.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Ao clicar em <b>Editar</b>, os dados da turma voltam para o formulário e você pode alterar o nome, o turno e o professor(a). Para os demais dados, siga as dicas em <b>ID da turma</b>. <b>Inativar</b> muda o status da turma para inativa; para vê-las, troque o filtro do card de "Ativas" para "Inativas".</span></span></h2>
+        <select id="filtroAnoLista" class="input filtro-ano"></select>
+        <select id="filtroStatusLista" class="input filtro-status">
           <option value="">Todas</option>
           <option value="ATIVA" selected>Ativas</option>
           <option value="INATIVA">Inativas</option>
         </select>
-        <span id="countTurmasLista" class="help" style="margin:0"></span>
-        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-          <select id="criterioOrdenacao" class="input" style="max-width:150px;font-size:13px;">
+        <span id="countTurmasLista" class="subnote"></span>
+        <div class="ordem">
+          <select id="criterioOrdenacao" class="input">
             <option value="criadoEm">Data de criação</option>
             <option value="serie">Série</option>
             <option value="nome">Nome</option>
           </select>
-          <button type="button" id="btnOrdenarCriacao" class="btn ghost small">
+          <button type="button" id="btnOrdenarCriacao" class="btn secondary small">
             <span id="iconOrdenar">▼</span>
           </button>
         </div>
@@ -800,49 +196,43 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
 (function(){
   const $ = (id)=>document.getElementById(id);
 
-  // ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
-  function _showToast(msg, bg, shadow, duration){
+  // ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) — guia v6, 8.2 ──
+  const _TOAST = {
+    ok:      { cls:'toast-ok',      ms:2500 },
+    err:     { cls:'toast-err',     ms:4500 },
+    warn:    { cls:'toast-warn',    ms:4000 },
+    loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: some quando a operação termina (aqui, no reload)
+  };
+  function _showToast(msg, tipo){
     const existing = document.getElementById('_toastGlobal');
     if(existing) existing.remove();
+    const cfg = _TOAST[tipo] || _TOAST.warn;
     const toast = document.createElement('div');
     toast.id = '_toastGlobal';
-    toast.style.cssText =
-      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-      `display:flex;align-items:center;gap:12px;`+
-      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    toast.className = 'toast ' + cfg.cls;
+    toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
     const span = document.createElement('span');
+    span.className = 'toast-msg';
     span.textContent = msg;
-    span.style.cssText = 'flex:1;line-height:1.4;';
-    toast.appendChild(span);
-    const btnClose = document.createElement('button');
-    btnClose.type = 'button';
-    btnClose.textContent = '✕';
-    btnClose.setAttribute('aria-label','Fechar aviso');
-    btnClose.style.cssText =
-      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-    btnClose.onclick = () => toast.remove();
-    toast.appendChild(btnClose);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-close';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label','Fechar aviso');
+    btn.onclick = () => toast.remove();
+    toast.append(span, btn);
     document.body.appendChild(toast);
-    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+    if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
   }
-
-  function _toastSucesso(msg){
-    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
+  // só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+  function _toastLimpar(){
+    const t = document.getElementById('_toastGlobal');
+    if(t && t.classList.contains('toast-loading')) t.remove();
   }
-  function _toastErro(msg){
-    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
-  }
-  function _toastAviso(msg){
-    _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
-  }
-  function _toastCarregando(msg){
-    _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
-  }
+  function _toastSucesso(m){ _showToast(m,'ok'); }
+  function _toastErro(m){ _showToast(m,'err'); }
+  function _toastAviso(m){ _showToast(m,'warn'); }
+  function _toastCarregando(m){ _showToast(m,'loading'); }
 
   function setMsg(text, kind){
     const t = (text||"").toString();
@@ -852,43 +242,53 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
     else if(kind === "warn") _toastAviso('⚠️ ' + t);
     else if(kind === "loading") _toastCarregando('⏳ ' + t);
     else {
-      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
+      console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" como padrão seguro.');
       _toastAviso(t);
     }
   }
 
-  // ── Modal de confirmação (substitui confirm() nativo) ─────────────────
+  // Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+  window.addEventListener('unhandledrejection', () => {
+    const t = document.getElementById('_toastGlobal');
+    if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+  });
+
+  // ── Modal de confirmação (substitui confirm() nativo) — guia v6, 8.3 ──
   function _escHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  // corDestaque: 'danger' = ação destrutiva (vermelho); 'ok' = contraponto verde do danger (EXTENSÃO local, ver relatório);
+  // omitido = cor de marca.
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
     return new Promise((resolve) => {
-      const cor = corDestaque || '#b45309';
+      const perigo = corDestaque === 'danger';
+      const verde  = corDestaque === 'ok';
       const backdrop = document.createElement('div');
-      backdrop.className = 'modal-backdrop';
-      backdrop.style.display = 'flex';
+      backdrop.className = 'modal-backdrop open';
       backdrop.innerHTML =
-        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
-          `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
-            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-              `${_escHtml(textoConfirmar || 'Continuar')}`+
-            `</button>`+
+        `<div class="cm-box" role="dialog" aria-modal="true">`+
+          `<h3 class="cm-titulo${perigo ? ' perigo' : ''}"${verde ? ' style="color:var(--ui-st-ok-fg)"' : ''}>${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<p class="cm-corpo">${corpo || ''}</p>`+
+          (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
+          `<div class="cm-acoes">`+
+            `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}`+
+              `${verde ? ' style="background:var(--ui-st-ok-bg);color:var(--ui-st-ok-fg);border:1px solid var(--ui-st-ok-bd)"' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
           `</div>`+
         `</div>`;
       document.body.appendChild(backdrop);
-
-      function fechar(resultado){
-        backdrop.remove();
-        resolve(resultado);
-      }
-      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
-      backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+      const ok = backdrop.querySelector('#_confirmModalOk');
+      const cancelar = backdrop.querySelector('#_confirmModalCancelar');
+      const input = backdrop.querySelector('#_confirmModalInput');
+      function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+      function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+      document.addEventListener('keydown', onKey);
+      ok.addEventListener('click', () => fechar(true));
+      cancelar.addEventListener('click', () => fechar(false));
       backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+      if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+      cancelar.focus();
     });
   }
 
@@ -1058,7 +458,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   function fillSerieSelect(){
     const sel = $("serieSelect");
     if(!sel) return;
-    sel.innerHTML = '<option value="">(selecione)</option>';
+    sel.innerHTML = '<option value="" disabled hidden selected>Escolha a série…</option>';
     for(const s of serieOptions()){
       const opt = document.createElement("option");
       opt.value = s;
@@ -1161,8 +561,8 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
   function aplicarTravaEdicao(){
     const trava = !!editingTurmaId;
     ["anoSelect","serieSelect","btnAddSerie","btnClearSeries"].forEach(id => { const el = $(id); if(el) el.disabled = trava; });
-    const av = $("avisoTravaEdicao"); if(av) av.style.display = trava ? "block" : "none";
-    const bc = $("btnCancelar"); if(bc) bc.style.display = trava ? "" : "none";
+    const av = $("avisoTravaEdicao"); if(av) av.hidden = !trava;
+    const bc = $("btnCancelar"); if(bc) bc.hidden = !trava;
   }
 
   function syncDerived(){
@@ -1197,7 +597,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
     if(countEl) countEl.textContent = turmas.length ? `${turmas.length} turma(s)` : "";
 
     if(!turmas.length){
-      list.innerHTML = '<div class="help">Nenhuma turma cadastrada ainda.</div>';
+      list.innerHTML = '<div class="aviso-warn">⚠️ Nenhuma turma cadastrada ainda.</div>';
       return;
     }
 
@@ -1220,44 +620,41 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
       div.className = "item" + (editingTurmaId === t.turmaId ? " editing" : "");
 
       const left = document.createElement("div");
-      left.style.cssText = "flex:1;min-width:0;";
+      left.className = "left";
       const isInativa = t.status === "INATIVA";
 
       // Linha 1 — nome da turma
       const title = document.createElement("h4");
-      title.style.margin = "0 0 6px";
       title.textContent = t.nome || "(sem nome)";
 
-      // Linha 2 — ano letivo e turno (badges)
-      const linha2 = document.createElement("div");
-      linha2.className = "row";
-      linha2.style.cssText = "gap:6px;row-gap:6px;margin-top:2px;";
-      linha2.innerHTML =
-        `<span class="pill badge small">Ano: ${_escHtml(t.anoLetivo||"—")}</span>`+
-        `<span class="pill badge small">Turno: ${_escHtml(t.turno||"—")}</span>`+
-        (isInativa ? `<span class="pill badge small status-inativa">INATIVA</span>` : "");
-
-      // Linha 3 — séries (uma badge por série) + toggle "Detalhes" (ID e professor)
+      // Linha 2 — ano letivo (nível 1), séries (nível 2, neutro) e status inativa
       const series = Array.isArray(t.series) ? t.series : [];
+      const linha2 = document.createElement("div");
+      linha2.className = "row tight";
+      linha2.innerHTML =
+        `<span class="badge small">Ano: ${_escHtml(t.anoLetivo||"—")}</span>`+
+        (series.length ? series.map(x => `<span class="badge small neutral">${_escHtml(x)}</span>`).join("")
+                       : `<span class="badge small gray">Sem série</span>`)+
+        (isInativa ? `<span class="badge small bad">INATIVA</span>` : "");
+
+      // Linha 3 — turno (nível 3, cinza) + toggle "Detalhes" (ID e professor)
       const detalhesId = `detTurma${idx}`;
       const linha3 = document.createElement("div");
-      linha3.className = "row";
-      linha3.style.cssText = "gap:6px;row-gap:6px;margin-top:6px;align-items:center;";
+      linha3.className = "row tight";
       linha3.innerHTML =
-        (series.length ? series.map(x => `<span class="pill badge small badge-serie">${_escHtml(x)}</span>`).join("")
-                       : `<span class="pill badge small">Sem série</span>`)+
-        `<span class="detalhes-toggle" tabindex="0" role="button" style="margin-left:4px" `+
-          `onclick="event.stopPropagation(); const d=document.getElementById('${detalhesId}'); const ab=d.style.display==='block'; d.style.display= ab?'none':'block'; this.textContent = ab?'Detalhes ▾':'Detalhes ▴';">`+
+        `<span class="badge small gray">Turno: ${_escHtml(t.turno||"—")}</span>`+
+        `<span class="detalhes-toggle" tabindex="0" role="button" `+
+          `onclick="event.stopPropagation(); const d=document.getElementById('${detalhesId}'); d.hidden = !d.hidden; this.textContent = d.hidden ? 'Detalhes ▾' : 'Detalhes ▴';">`+
           `Detalhes ▾`+
         `</span>`;
 
       const detalhes = document.createElement("div");
       detalhes.id = detalhesId;
-      detalhes.className = "help";
-      detalhes.style.cssText = "display:none;margin-top:6px;";
+      detalhes.className = "help detalhes";
+      detalhes.hidden = true;
       detalhes.innerHTML =
         `<div><span class="mono">ID:</span> <span class="mono">${_escHtml(t.turmaId||"—")}</span></div>`+
-        `<div style="margin-top:2px">Professor(a): ${_escHtml(t.professor || "não informado")}</div>`;
+        `<div>Professor(a): ${_escHtml(t.professor || "não informado")}</div>`;
 
       left.appendChild(title);
       left.appendChild(linha2);
@@ -1278,7 +675,9 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
         const btnStatus = document.createElement("button");
         btnStatus.type = "button";
         if(isInativa){
-          btnStatus.className = "btn success";
+          // contraponto verde do btn danger: mesma estrutura, cor do chip "ok" (ver relatório)
+          btnStatus.className = "btn danger btn-reativar";
+          btnStatus.setAttribute("style", "background:var(--ui-st-ok-bg);border-color:var(--ui-st-ok-bd);color:var(--ui-st-ok-fg);");
           btnStatus.textContent = "Reativar";
         } else {
           btnStatus.className = "btn danger";
@@ -1338,7 +737,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
       corpo: vaiInativar
         ? "A turma deixa de contar como ativa (some do histórico automático), mas os dados continuam no banco.\n\nPara excluir de vez, use a página de gestão de dados.\n\nDeseja continuar?"
         : "A turma volta a ficar disponível como ativa.\n\nDeseja continuar?",
-      corDestaque: vaiInativar ? "#991b1b" : "#166534",
+      corDestaque: vaiInativar ? "danger" : "ok",
       textoConfirmar: vaiInativar ? "Sim, inativar" : "Sim, reativar"
     });
     if(!confirmou) return;
@@ -1580,7 +979,7 @@ html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); 
       resetForm();
       renderListaTurmas();
       await carregarProfessores();
-      if (window.ThemeColors) ThemeColors.ajustarContraste();
+      try{ if (window.ThemeColors) ThemeColors.ajustarContraste(); }catch(e){ console.warn("ajustarContraste:", e); }
 
       // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
       document.addEventListener("click", ()=>{
