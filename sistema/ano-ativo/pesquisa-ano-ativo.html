@@ -47,7 +47,6 @@
 .mt-6     { margin-top: 6px; }
 .mt-8     { margin-top: 8px; }
 .w-100    { width: 100%; }
-.pad-12   { padding: 12px; }
 .rel      { position: relative; }
 .rel-inline { position: relative; display: inline-block; }
 .muted    { color: var(--ui-muted); }
@@ -111,7 +110,7 @@
 .sort-control  { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); border-radius: 10px; }
 .sort-control.compacto { margin-bottom: 10px; }
 .sort-control .lbl { margin: 0; white-space: nowrap; }
-.sort-control .input { flex: 1; width: auto; }
+.sort-control .input { flex: 1; }
 
 /* ── Sub-card (D19: definição local) ── */
 .item        { border: 1px solid var(--ui-border); border-radius: 10px; padding: 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -288,7 +287,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <label for="selSerieAdd">Filtrar por série <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Escolha uma série no seletor e aperte <b>+ Adicionar</b>. O filtro só passa a valer depois que você aperta o botão e a série aparece abaixo do seletor.</span></span></label>
           <div class="busca-row">
             <select id="selSerieAdd">
-              <option value="">(selecione)</option>
+              <option value="" disabled hidden selected>Escolha a série…</option>
             </select>
             <button class="btn primary nowrap" id="btnAddSerie">+ Adicionar</button>
           </div>
@@ -339,7 +338,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
     <div class="card">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
+          <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllTurmas"> Todos</label>
@@ -363,7 +362,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
     <div class="card">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
+          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
@@ -459,7 +458,11 @@ function _showToast(msg, tipo){
   document.body.appendChild(toast);
   if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
 }
-function _toastLimpar(){ const t = document.getElementById('_toastGlobal'); if(t) t.remove(); }
+// só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) t.remove();
+}
 function _toastSucesso(m){ _showToast(m,'ok'); }
 function _toastErro(m){ _showToast(m,'err'); }
 function _toastAviso(m){ _showToast(m,'warn'); }
@@ -857,7 +860,7 @@ async function carregarDB(){
     ["EIXO 1","EIXO 2","EIXO 3","EIXO 4","EIXO 5"].forEach(e => seriesSet.add(e));
   }
   const seriesOrdenadas = ordenarSeries(Array.from(seriesSet).filter(Boolean));
-  selSerieAdd.innerHTML = '<option value="">(selecione)</option>';
+  selSerieAdd.innerHTML = '<option value="" disabled hidden selected>Escolha a série…</option>';
   seriesOrdenadas.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; selSerieAdd.appendChild(o); });
 
   try{ await garantirMatsDoAno(anoSelecionadoOuAtivo()); }catch(e){ console.warn('matrículas:', e); _toastErro('Erro ao carregar as matrículas do ano.'); }
@@ -1222,7 +1225,7 @@ function atualizarListas(){
   listaTurmas.innerHTML = "";
   countTurmas.textContent = tScope.length;
   if(tScope.length===0){
-    listaTurmas.innerHTML = `<div class="muted">Nenhuma turma encontrada para os filtros.</div>`;
+    listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Nenhuma turma encontrada para os filtros.</div>`;
   } else {
     // Pré-calcular Map turmaId → turmaOriginal
     const turmasMap = new Map(turmas.map(t => [t.turmaId, t]));
@@ -1320,7 +1323,7 @@ async function _atualizarListaAlunos(_tScope){
     listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ Para ver os alunos, marque uma ou mais turmas (ou a opção <b>Todos</b>) no card <b>Turmas</b>, à esquerda, ou faça uma busca no card de pesquisa.</div>`;
     return;
   }
-  listaAlunos.innerHTML = `<div class="muted pad-12">Carregando alunos…</div>`;
+  listaAlunos.innerHTML = `<div class="aviso-warn">⏳ Carregando alunos…</div>`;
   try{
     const idsT = new Set(tMarcadas.map(t => t.turmaId));
     await garantirAlunos(busca ? Array.from(busca.ids) : mats.filter(m => modo === "serie" || idsT.has(m.turmaId)).map(m => m.alunoId));
@@ -2667,12 +2670,12 @@ function restaurarEstadoPagina(){
 (async function init(){
   await carregarDB();
   if(_semEscola){
-    listaTurmas.innerHTML = `<div class="muted pad-12">Selecione uma escola no cabeçalho para pesquisar. Os dados de todas as escolas ficam na gestão do ano ativo.</div>`;
+    listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Selecione uma escola no cabeçalho para pesquisar. Os dados de todas as escolas ficam na gestão do ano ativo.</div>`;
     listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
     Loading.esconder(); return;
   }
   if(!anoAtivo){
-    listaTurmas.innerHTML = `<div class="muted pad-12">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
+    listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
     listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
     Loading.esconder(); return;
   }
@@ -2688,8 +2691,8 @@ function restaurarEstadoPagina(){
       _jaFoiPesquisado = true;
       atualizarListas();
     } else {
-      listaTurmas.innerHTML = `<div class="muted pad-12">Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
-      listaAlunos.innerHTML = `<div class="muted pad-12">As turmas e alunos aparecerão após a pesquisa.</div>`;
+      listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
+      listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ As turmas e alunos aparecerão após a pesquisa.</div>`;
       countTurmas.textContent = "—"; countAlunos.textContent = "—";
     }
   }
