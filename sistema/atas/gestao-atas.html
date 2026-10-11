@@ -29,17 +29,6 @@
 /* ── Oculta até auth confirmar role ── */
 body { visibility: hidden; }
 
-/* Variáveis próprias da página: prefixo --ga- (gestao-atas). Cores de tema vêm do global (--ui-*).
-   Status (ok/aviso) são cores FIXAS: por isso têm par claro/escuro aqui. */
-:root {
-  --ga-ok-bg:   rgba(22,163,74,.10);   --ga-ok-bd:   rgba(22,163,74,.30);   --ga-ok-fg:   #166534;
-  --ga-warn-bg: rgba(245,158,11,.10);  --ga-warn-bd: rgba(245,158,11,.30);  --ga-warn-fg: #92400e;
-}
-html[data-theme="dark"] {
-  --ga-ok-bg:   rgba(34,197,94,.16);   --ga-ok-bd:   rgba(74,222,128,.55);  --ga-ok-fg:   #86efac;
-  --ga-warn-bg: rgba(245,158,11,.18);  --ga-warn-bd: rgba(251,191,36,.60);  --ga-warn-fg: #fcd34d;
-}
-
 /* ── Layout ── */
 .container { max-width:1100px; margin:0 auto; padding:36px 24px 60px; }
 h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
@@ -58,7 +47,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 /* ── Card de destaque: fundo, h3, botões e tabela são do global (components.css).
       Aqui só o que é desta página, usando --dest-* ── */
-.card-destaque .sec-toggle, .card-destaque .dest-tit { color:var(--dest-fg); }
+.card-destaque .sec-toggle { color:var(--dest-fg); }
 .card-destaque .stat-box { background:var(--ui-cell-bg); border-color:transparent; }
 .card-destaque.contraste-claro .stat-box { border-color:var(--ui-border); }
 
@@ -83,12 +72,9 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 
 /* ── Merge preview (status ok/aviso: candidato a global, D3) ── */
 .merge-item { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-radius:8px; border:1px solid var(--ui-border); background:var(--ui-surface); margin-bottom:6px; font-size:13px; }
-.merge-item.nova     { border-color:var(--ga-ok-bd);   background:var(--ga-ok-bg); }
+.merge-item.nova     { border-color:var(--ui-st-ok-bd);   background:var(--ui-st-ok-bg); }
 .merge-item.igual    { opacity:.65; }
-.merge-item.suspeita { border-color:var(--ga-warn-bd); background:var(--ga-warn-bg); }
-
-/* ── Chip amarelo/aviso: sem equivalente nas 5 cores (D11) — fica local ── */
-.badge.warn { background:var(--ga-warn-bg); border-color:var(--ga-warn-bd); color:var(--ga-warn-fg); }
+.merge-item.suspeita { border-color:var(--ui-st-warn-bd); background:var(--ui-st-warn-bg); }
 
 /* ── Resumo do import de backup (Turmas / Schemas) ──
    Verde = vai ser adicionado; cinza = nada a fazer; amarelo = precisa da sua decisão.
@@ -96,13 +82,13 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 .merge-resumo { display:flex; flex-direction:column; gap:8px; flex:1; min-width:260px; }
 .sum-row   { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .sum-title { min-width:64px; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ui-brand-text); }
-.sum-chip  { display:inline-flex; align-items:baseline; gap:5px; padding:4px 11px; border-radius:999px;
+.count  { display:inline-flex; align-items:baseline; gap:5px; padding:4px 11px; border-radius:999px;
              border:1px solid var(--ui-border); background:var(--ui-chip-bg); color:var(--ui-muted); font-size:12px; font-weight:700; }
-.sum-chip b { font-size:14px; font-weight:800; color:var(--ui-text); }
-.sum-chip.ok   { background:var(--ga-ok-bg);   border-color:var(--ga-ok-bd);   color:var(--ga-ok-fg); }
-.sum-chip.warn { background:var(--ga-warn-bg); border-color:var(--ga-warn-bd); color:var(--ga-warn-fg); }
-.sum-chip.ok b, .sum-chip.warn b { color:inherit; }
-.sum-chip.zero { opacity:.45; }
+.count b { font-size:14px; font-weight:800; color:var(--ui-text); }
+.count.ok   { background:var(--ui-st-ok-bg);   border-color:var(--ui-st-ok-bd);   color:var(--ui-st-ok-fg); }
+.count.warn { background:var(--ui-st-warn-bg); border-color:var(--ui-st-warn-bd); color:var(--ui-st-warn-fg); }
+.count.ok b, .count.warn b { color:inherit; }
+.count.zero { opacity:.45; }
 
 /* ── Modal de turmas (apagar): aparência vem de .modal / .modal-head; aqui só tamanho e disposição ── */
 .tur-modal { --modal-w:min(1100px,98vw); --modal-h:none; }   /* altura vem do JS (turAjustarModal) */
@@ -119,8 +105,6 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 /* ── Backup (exportar à esquerda, importar à direita), igual ao gerir-dados-ano-ativo ── */
 .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
-.dest-tit { display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
-.dest-painel { background:var(--ui-cell-bg); color:var(--ui-text); border:1px solid var(--ui-border); border-radius:12px; padding:14px; }
 @media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
 </style>
 </head>
@@ -759,8 +743,8 @@ function renderTabelaTurmas() {
   tbody.innerHTML = turmas.map((t, i) => {
     const alunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
     const semId  = Array.isArray(t.alunos) ? t.alunos.filter(a => !String(a.alunoId||'').trim()).length : 0;
-    const badgeSemId = semId ? `<span class="badge warn">${semId} sem ID</span>` : '';
-    const badgeLegado = !ehTurmaDeAtas(t) ? `<span class="badge warn" title="Não parece uma turma de atas (sem origemArquivo/aba) — possível resquício legado do ano-ativo">⚠️ suspeita/legado</span>` : '';
+    const badgeSemId = semId ? `<span class="badge neutral">${semId} sem ID</span>` : '';
+    const badgeLegado = !ehTurmaDeAtas(t) ? `<span class="badge" title="Não parece uma turma de atas (sem origemArquivo/aba) — possível resquício legado do ano-ativo">⚠️ suspeita/legado</span>` : '';
     const origem = (t.origemArquivo||'').replace(/^.+[/\\]/,'') || '—';
     return `
       <tr>
@@ -1218,7 +1202,7 @@ function _renderMergePreview() {
   const {novas,iguais,suspeitas,divergentes}=_pendingMerge.turmas;
   const {novos:schemasNovos,iguais:schemasIguais,conflitos:schemasConflitos}=_pendingMerge.schemas;
   document.getElementById('mergePreview').style.display='block';
-  const _chip=(n,rot,tipo)=>`<span class="sum-chip ${n>0?tipo:'zero'}"><b>${n}</b> ${rot}</span>`;
+  const _chip=(n,rot,tipo)=>`<span class="count ${n>0?tipo:'zero'}"><b>${n}</b> ${rot}</span>`;
   document.getElementById('mergeResumo').innerHTML =
     `<div class="sum-row"><span class="sum-title">Turmas</span>`+
       _chip(novas.length,'nova(s)','ok')+
@@ -1236,7 +1220,7 @@ function _renderMergePreview() {
 
   for (const t of novas) {
     const div=document.createElement('div'); div.className='merge-item nova';
-    div.innerHTML=`<span class="badge ok">NOVA</span> <b>${esc(t.aba||t.id)}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')} · ${esc(t.serieTexto||'?')} <span class="muted">(${(t.alunos||[]).length} alunos)</span>`;
+    div.innerHTML=`<span class="badge neutral">NOVA</span> <b>${esc(t.aba||t.id)}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')} · ${esc(t.serieTexto||'?')} <span class="muted">(${(t.alunos||[]).length} alunos)</span>`;
     lista.appendChild(div);
   }
 
@@ -1246,7 +1230,7 @@ function _renderMergePreview() {
     div.innerHTML=`
       <input type="checkbox" id="chkSus${i}" class="chk" checked>
       <div>
-        <span class="badge warn">SUSPEITA</span>
+        <span class="badge">SUSPEITA</span>
         <b class="ml-6">${esc(nova.aba||nova.id)}</b> — ${esc(nova.anoLetivo||'?')} · ${esc(nova.serieTexto||'?')}
         <span class="muted">(${(nova.alunos||[]).length} alunos)</span><br>
         <span class="muted peq">⚠️ Parecida com: ${parecidaCom.map(x=>esc(x.aba||x.id)).join(', ')}</span>
@@ -1269,7 +1253,7 @@ function _renderMergePreview() {
     if (diff.camposDiff.length) linhas.push(`🗂️ Campos da turma diferentes: ${diff.camposDiff.map(esc).join(', ')}`);
     div.innerHTML=`
       <div class="corpo">
-        <span class="badge warn">DIVERGENTE</span>
+        <span class="badge">DIVERGENTE</span>
         <b class="ml-6">${esc(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${esc(entrada.anoLetivo||'?')} · ${esc(entrada.serieTexto||'?')}<br>
         <span class="muted peq">${linhas.join('<br>')}</span><br>
         <select id="selDiv${i}" class="input">
@@ -1283,7 +1267,7 @@ function _renderMergePreview() {
 
   for (const t of iguais) {
     const div=document.createElement('div'); div.className='merge-item igual';
-    div.innerHTML=`<span class="badge">IDÊNTICA</span> <b>${esc(t.aba||t.id)}</b> — será ignorada`;
+    div.innerHTML=`<span class="badge gray">IDÊNTICA</span> <b>${esc(t.aba||t.id)}</b> — será ignorada`;
     lista.appendChild(div);
   }
 
@@ -1294,7 +1278,7 @@ function _renderMergePreview() {
   for (const s of schemasNovos) {
     const id=s._id||s.id, nome=s.nome||s.titulo||id;
     const div=document.createElement('div'); div.className='merge-item nova';
-    div.innerHTML=`<span class="badge ok">NOVO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span>`;
+    div.innerHTML=`<span class="badge neutral">NOVO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span>`;
     listaSchemas.appendChild(div);
   }
 
@@ -1306,7 +1290,7 @@ function _renderMergePreview() {
     div.innerHTML=`
       <input type="checkbox" id="chkSchemaConf${i}" class="chk">
       <div>
-        <span class="badge warn">CONFLITO${ehPadrao?' · PADRÃO':''}</span>
+        <span class="badge">CONFLITO${ehPadrao?' · PADRÃO':''}</span>
         <b class="ml-6">${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span><br>
         <span class="muted peq">⚠️ Já existe um schema com este ID e conteúdo diferente${ehPadrao?' — este é o schema padrão da escola, confirme com atenção':''}. Desmarcado por padrão: marque só se quiser <b>sobrescrever</b> o schema atual pelo do backup.</span>
       </div>`;
@@ -1316,7 +1300,7 @@ function _renderMergePreview() {
   for (const s of schemasIguais) {
     const id=s._id||s.id, nome=s.nome||s.titulo||id;
     const div=document.createElement('div'); div.className='merge-item igual';
-    div.innerHTML=`<span class="badge">IDÊNTICO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span> — será ignorado`;
+    div.innerHTML=`<span class="badge gray">IDÊNTICO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span> — será ignorado`;
     listaSchemas.appendChild(div);
   }
 }
