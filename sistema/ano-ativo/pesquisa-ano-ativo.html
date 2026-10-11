@@ -77,7 +77,6 @@
 .pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
-.pop-avancada .pop-div { margin: 12px 0; }
 .pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 /* "Pesquisar" do popover: preenchido com a cor de marca (a cor vem inline; texto = --ui-brand-fg, calculado para a marca).
    O hover precisa de !important para vencer o inline. */
@@ -204,7 +203,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
       <div class="field stack rel" id="blocoStatusAtivo">
         <label class="lbl-oculto">Pesquisa avançada</label>
-        <button type="button" class="btn btn-avancada nowrap rel" id="btnPesquisaAvancada" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
+        <button type="button" class="btn btn-avancada nowrap rel" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
           🔎 Pesquisa avançada
           <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
         </button>
@@ -363,7 +362,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
           <button class="btn" id="btnAlunosTabela">Abrir tabela</button>
           <div class="rel-inline" id="wrapExportAlunos">
-            <button class="btn primary" id="btnAlunosPdf">Exportar PDF ▾</button>
+            <button class="btn primary" id="btnAlunosPdf" type="button" data-dropdown="dropExportAlunos" aria-haspopup="menu" aria-expanded="false">Exportar PDF ▾</button>
             <div class="popover menu align-right" id="dropExportAlunos" hidden>
               <button class="btn quiet menu-item" id="btnExportLista">📋 Lista de alunos</button>
               <button class="btn quiet menu-item" id="btnExportTurma">🏫 Separado por turma</button>
@@ -517,22 +516,31 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 /* =========================
    Helpers de persistência
 ========================= */
-// Dropdown/popover (guia 6-A): abre ao clicar no botão; fecha ao clicar fora, numa opção (.menu-item) e com Esc; um aberto por vez
-function initDropdown(btn, menu){
-  const fechar = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
-  btn.setAttribute('aria-haspopup', 'menu');
-  btn.setAttribute('aria-expanded', 'false');
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
+// Dropdown/popover (guia 6-A): uma vez por página, por delegação; vale também para popover criado por template
+function _fecharDropdowns(exceto){
+  document.querySelectorAll('[data-dropdown]').forEach(b => {
+    const m = document.getElementById(b.dataset.dropdown);
+    if(m && m !== exceto){ m.hidden = true; b.setAttribute('aria-expanded', 'false'); }
+  });
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-dropdown]');
+  if(btn){
+    const menu = document.getElementById(btn.dataset.dropdown);
+    if(!menu) return;
     const abrir = menu.hidden;
-    document.querySelectorAll('.popover:not([hidden])').forEach(p => { p.hidden = true; });
+    _fecharDropdowns(menu);
     menu.hidden = !abrir;
     btn.setAttribute('aria-expanded', String(abrir));
-  });
-  menu.addEventListener('click', (e) => { e.stopPropagation(); if(e.target.closest('.menu-item')) fechar(); });
-  document.addEventListener('click', fechar);
-  document.addEventListener('keydown', (e) => { if(e.key === 'Escape') fechar(); });
-}
+    return;
+  }
+  if(e.target.closest('.popover')){                         // clique dentro do popover
+    if(e.target.closest('.menu-item')) _fecharDropdowns();  // item de lista fecha; filtro/colunas ficam abertos
+    return;
+  }
+  _fecharDropdowns();                                       // clique fora
+});
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDropdowns(); });
 
 // Tooltips (ⓘ): fecha ao clicar fora (guia v5, seção 6)
 document.addEventListener("click", ()=>{
@@ -1701,13 +1709,6 @@ const COLS_ESSENCIAIS = [
 ========================= */
 let _tabInterativa = { linhas: [], colunas: [], ocultas: new Set(), sortKey: null, sortDir: 1 };
 
-if(!window._tabInterativaDocClickBound){
-  document.addEventListener("click", ()=>{
-    const p = document.getElementById("painelTabInterativaColunas");
-    if(p) p.hidden = true;
-  });
-  window._tabInterativaDocClickBound = true;
-}
 
 // Valor de EXIBIÇÃO de uma célula (mesmas regras especiais que já existiam
 // nas tabelas estáticas: idade calculada, data em BR, cor/raça padrão, e
@@ -1741,7 +1742,7 @@ function _tabInterativaRenderToolbar(){
     <div class="tab-toolbar">
       <div class="muted">${_tabInterativa.linhas.length} registro(s) • clique no cabeçalho pra ordenar</div>
       <div class="rel">
-        <button type="button" class="btn secondary small" id="btnTabInterativaColunas">☰ Colunas</button>
+        <button type="button" class="btn secondary small" id="btnTabInterativaColunas" data-dropdown="painelTabInterativaColunas" aria-haspopup="menu" aria-expanded="false">☰ Colunas</button>
         <div class="popover pop-cols" id="painelTabInterativaColunas" hidden>
           <div class="pop-cols-acoes">
             <button type="button" class="btn secondary small" id="btnTabInterativaMostrarTudo">Mostrar todas</button>
@@ -1819,11 +1820,6 @@ function _tabInterativaRenderCompleto(headerExtraHtml){
 }
 
 function _tabInterativaLigarEventos(headerExtraHtml){
-  const btnCol = document.getElementById("btnTabInterativaColunas");
-  const painel = document.getElementById("painelTabInterativaColunas");
-  btnCol.addEventListener("click", (e)=>{ e.stopPropagation(); const abrir = painel.hidden; document.querySelectorAll('.popover:not([hidden])').forEach(p => { p.hidden = true; }); painel.hidden = !abrir; });
-  painel.addEventListener("click", (e)=> e.stopPropagation());
-
   document.querySelectorAll(".tabInterativaColChk").forEach(chk=>{
     chk.addEventListener("change", ()=>{
       const key = chk.dataset.key;
@@ -2423,7 +2419,6 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
   const painel = document.getElementById("painelPesquisaAvancada");
   const badge = document.getElementById("badgePesquisaAvancada");
 
-  initDropdown(btn, painel);
   document.getElementById("btnFecharPesquisaAvancada").addEventListener("click", ()=>{ painel.hidden = true; btn.setAttribute("aria-expanded", "false"); });
 
   function atualizarBadge(){
@@ -2503,7 +2498,6 @@ document.getElementById("btnAlunosTabela").addEventListener("click", ()=>{
 // Dropdown de export de alunos
 (function(){
   // Abre/fecha pelo padrão do guia (6-A); cada opção já fecha o menu antes de agir
-  initDropdown(document.getElementById("btnAlunosPdf"), document.getElementById("dropExportAlunos"));
 
   // Opção 1 — Lista simples
   document.getElementById("btnExportLista").addEventListener("click", ()=>{
