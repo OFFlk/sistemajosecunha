@@ -81,9 +81,15 @@
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
 .pop-div      { height: 1px; background: var(--ui-border); margin: 12px 0; }
-/* Rodapé do popover = mini card de destaque (variáveis do .card): os botões ficam soltos sobre o fundo de marca,
-   idênticos ao "Pesquisar" do card; o contraste é o mesmo do card, nos dois temas. */
-.pop-foot     { --card-pad: 8px; --card-gap: 0; --card-radius: 10px; display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; box-shadow: none; }
+.pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* "Pesquisar" do popover: preenchido com a cor de marca (a cor vem inline; texto = --ui-brand-fg, calculado para a marca).
+   O hover precisa de !important para vencer o inline. */
+.pop-avancada .btn-pesq-av:hover { background: var(--ui-brand-hover) !important; border-color: var(--ui-brand-hover) !important; }
+/* "Fechar": o destaque reatribui os botões soltos; o popover tem fundo liso, então volta ao contorno normal */
+.card-destaque .pop-avancada .btn.secondary {
+  --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
+  --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
+}
 .pop-export   { right: 0; top: calc(100% + 6px); z-index: 200; min-width: 200px; padding: 6px 0; flex-direction: column; }
 .pop-export .pop-div { margin: 6px 0; }
 .menu-item    { width: 100%; justify-content: flex-start; border-radius: 0; padding: 10px 16px; }
@@ -267,8 +273,8 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
             </label>
           </div>
 
-          <div class="card card-destaque pop-foot">
-            <button type="button" class="btn primary small" id="btnPesquisarAvancada">🔍 Pesquisar</button>
+          <div class="pop-foot">
+            <button type="button" class="btn primary small btn-pesq-av" id="btnPesquisarAvancada" style="background:var(--ui-brand);color:var(--ui-brand-fg);border:1px solid var(--ui-brand);">🔍 Pesquisar</button>
             <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
           </div>
         </div>
