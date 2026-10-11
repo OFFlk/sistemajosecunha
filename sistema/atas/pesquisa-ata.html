@@ -177,9 +177,7 @@
   <div id="card-esquerda" class="card">
     <p class="section-title" id="sidebarTitulo" title="Clique para ordenar as turmas">TURMAS <span id="sortIndicator">↑</span></p>
     <div id="listaTurmas" class="list">
-      <div class="list-item">
-        <span class="muted">Nenhuma turma carregada.</span>
-      </div>
+      <div class="aviso-warn">Nenhuma turma carregada.</div>
     </div>
   </div>
 
@@ -187,7 +185,7 @@
   <div id="card-direita" class="card">
     <p class="section-title">Detalhes</p>
 
-      <div id="detalhesVazio" class="muted">
+      <div id="detalhesVazio" class="aviso-warn">
         Selecione uma turma na lista para ver os alunos.
       </div>
 
@@ -614,7 +612,7 @@ function renderListaTurmas(lista) {
   box.innerHTML = "";
 
   if (!lista.length) {
-    box.innerHTML = `<div class="list-item"><span class="muted">Nenhuma turma encontrada com os filtros.</span></div>`;
+    box.innerHTML = `<div class="aviso-warn">Nenhuma turma encontrada com os filtros.</div>`;
     return;
   }
 
@@ -644,8 +642,9 @@ function renderListaTurmas(lista) {
           <span class="badge">${_escHtml(anoTxt)}</span>
           <span class="badge">${_escHtml(serieTxt || "?")}</span>
         </div>
-        <div class="muted item-meta">
-          ${_escHtml(turnoTxt)} · ${_escHtml(alunosTxt)}
+        <div class="badges-row item-meta">
+          <span class="badge gray">Turno: ${_escHtml(turnoTxt)}</span>
+          <span class="badge ${(t.alunos?.length ?? 0) ? 'neutral' : 'gray'}">${_escHtml(alunosTxt)}</span>
         </div>
       </div>
       <div class="right" onclick="event.stopPropagation()">
@@ -1178,7 +1177,7 @@ async function carregar() {
   preencherFiltroAno(await carregarAnosDoIndice());
 
   document.getElementById("listaTurmas").innerHTML =
-    `<div class="list-item"><span class="muted">Escolha os filtros e clique em <b>🔍 Pesquisar</b>.</span></div>`;
+    `<div class="aviso-warn">Escolha os filtros e clique em <b>🔍 Pesquisar</b>.</div>`;
   document.getElementById("detalhesVazio").style.display = "block";
   document.getElementById("detalhesBox").style.display = "none";
 
@@ -1188,12 +1187,12 @@ async function carregar() {
     // Ela só refina turmas já buscadas por ano/turno/série — sozinha, obrigaria ler o banco inteiro.
     const _temFiltroServidor = document.getElementById("fAno").value.trim() || document.getElementById("fTurno").value.trim() || seriesSelecionadas.length;
     if (norm(document.getElementById("fBusca").value) && !_temFiltroServidor) {
-      box.innerHTML = `<div class="list-item"><span class="muted">A busca geral refina turmas já filtradas. Escolha ao menos um <b>ano</b>, <b>turno</b> ou <b>série</b> — ou use a <b>Pesquisa por aluno</b> para achar um nome.</span></div>`;
+      box.innerHTML = `<div class="aviso-warn">A busca geral refina turmas já filtradas. Escolha ao menos um <b>ano</b>, <b>turno</b> ou <b>série</b> — ou use a <b>Pesquisa por aluno</b> para achar um nome.</div>`;
       setMsg("Escolha ano, turno ou série para usar a busca geral.", "warn");
       return;
     }
     btn.disabled = true;
-    box.innerHTML = `<div class="list-item"><span class="muted">Buscando turmas…</span></div>`;
+    box.innerHTML = `<div class="aviso-warn">Buscando turmas…</div>`;
     try {
       turmasTodas = await buscarTurmasNoBanco();
       recomputarTurmasBase();
@@ -1202,7 +1201,7 @@ async function carregar() {
       aplicarFiltros();
     } catch(e) {
       console.warn("[pesquisa-ata] Falha ao buscar turmas:", e);
-      box.innerHTML = `<div class="list-item"><span class="muted">Não foi possível buscar as turmas agora.</span></div>`;
+      box.innerHTML = `<div class="aviso-warn">Não foi possível buscar as turmas agora.</div>`;
       setMsg("Não foi possível buscar as turmas. Tente novamente.", "err");
     } finally {
       btn.disabled = false;
