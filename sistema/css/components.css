@@ -27,7 +27,7 @@
      2. Botões
      3. Card de destaque
      4. Aviso de card (.aviso-warn)
-     5. Ícone de dica (ⓘ)
+     5. Ícone de dica (ⓘ) e 5-C. Popover/dropdown
      6. Toast
      7. Modais (confirmação .cm-* e modal grande .modal)
      8. Legado (aliases)
@@ -188,6 +188,29 @@ html[data-theme="dark"]{
   cursor:pointer; user-select:none;
 }
 .check input{ margin:0; width:16px; height:16px; accent-color:var(--ui-brand); }
+
+/* mensagem curta de campo (dica, validação, status). A página troca a classe por JS:
+     el.className = msg ? 'help err' : 'help'
+   min-height reserva a linha para o formulário não "pular" quando a mensagem aparece. */
+.help{ font-size:12px; color:var(--ui-muted); margin-top:6px; line-height:1.4; min-height:14px; }
+.help.err{ color:var(--ui-st-bad-fg); font-weight:700; }
+.help.ok { color:var(--ui-st-ok-fg);  font-weight:700; }
+
+/* área de upload (arrastar/soltar). .over = arrastando por cima (JS). O <input type=file> fica escondido
+   dentro dela; o clique abre pelo <span> do texto. Aliases .docs-drop-* mantidos até migrar as páginas. */
+.drop-area, .docs-drop-area{
+  border:2px dashed var(--ui-border); border-radius:12px; padding:20px 16px;
+  text-align:center; cursor:pointer;
+  background:var(--field-bg, var(--ui-surface));
+  transition:border-color .2s, background .2s;
+}
+.drop-area:hover, .drop-area.over, .docs-drop-area:hover, .docs-drop-area.over{
+  border-color:var(--ui-brand); background:var(--ui-chip-bg);
+}
+.drop-area input[type="file"], .docs-drop-area input[type="file"]{ display:none; }
+.drop-icon, .docs-drop-icon{ font-size:26px; margin-bottom:4px; }
+.drop-text, .docs-drop-text{ font-size:13px; font-weight:700; color:var(--ui-muted); }
+.drop-text span, .docs-drop-text span{ color:var(--ui-brand-text); cursor:pointer; text-decoration:underline; }
 
 .list{ display:flex; flex-direction:column; }
 .list-item{
@@ -397,7 +420,9 @@ html[data-theme="dark"] .config-card.card-destaque{
 .card-destaque .field > label,
 .card-destaque .req{ color:var(--dest-fg); }
 .card-destaque > h2{ margin:0 0 18px; }
-.card-destaque :is(.subnote, .help){ color:var(--dest-fg); opacity:.85; }   /* .help: mensagem local da página, quando solta sobre o destaque */
+.card-destaque .subnote{ color:var(--dest-fg); opacity:.85; }
+/* .help solto sobre o destaque. Fora: .help dentro de .dest-painel / .item / tabela / aviso (têm fundo próprio) */
+.card-destaque .help:not(.item .help, .dest-painel .help, table .help, .aviso-warn .help){ color:var(--dest-fg); opacity:.85; }
 /* texto corrido SOLTO no cabeçalho do destaque (filho direto ou dentro de .card-head).
    Dentro de .dest-painel / .item / tabela NÃO entra (têm fundo e cor próprios). */
 .card-destaque > :is(p, strong),
@@ -497,6 +522,45 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .info-tip.open .info-tip-bubble{ display:block; }
 .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
 .info-tip-bubble.align-right{ left:auto; right:0; }
+
+
+/* ============================================================
+   5-C. POPOVER E DROPDOWN (menu suspenso)
+   Padrão da pesquisa-ano-ativo. O DROPDOWN é um popover com lista de botões:
+
+     <div class="rel-inline">                                  ← âncora (position:relative)
+       <button class="btn primary" id="btn">Exportar ▾</button>
+       <div class="popover menu align-right" id="menu" hidden>  ← aberto/fechado: atributo hidden
+         <button class="btn quiet menu-item">📋 Lista</button>
+         <div class="pop-div"></div>                            ← divisória
+         <button class="btn quiet menu-item">📊 CSV</button>
+       </div>
+     </div>
+
+   .popover (sozinho) = só a caixa (fundo, borda, sombra). Serve também para conteúdo que
+   NÃO é lista de botões (filtro avançado, seletor de colunas): tamanho e posição são da
+   página (.pop-avancada, .pop-cols). Hover dos itens vem do .btn.quiet.
+   ⚠️ overflow:hidden em qualquer ancestral corta o popover (igual ao balão do ⓘ).
+   Inline legado: display:none no HTML e JS com style.display ('flex' para abrir) continua funcionando.
+   ============================================================ */
+.rel-inline{ position:relative; display:inline-block; }
+
+.popover{
+  position:absolute; z-index:200;
+  background:var(--ui-surface); color:var(--ui-text);
+  border:1.5px solid var(--ui-border); border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);
+}
+.pop-div{ height:1px; background:var(--ui-border); margin:12px 0; }
+
+/* dropdown: lista vertical de botões. .pop-export = nome antigo (mantido, alinha à direita) */
+.popover:is(.menu, .pop-export){
+  display:flex; flex-direction:column;
+  top:calc(100% + 6px); min-width:200px; padding:6px 0;
+}
+.popover:is(.menu, .pop-export) .pop-div{ margin:6px 0; }
+.popover:is(.menu.align-right, .pop-export){ right:0; }
+.btn.menu-item{ width:100%; justify-content:flex-start; border-radius:0; padding:10px 16px; }
 
 
 /* ============================================================
