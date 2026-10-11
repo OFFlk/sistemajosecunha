@@ -31,205 +31,87 @@
 
 <title>Cadastro de turmas • Atas</title>
 <style>
-/* ══════════════════════════════════════════════════════════
-   CADASTRO-TURMAS.CSS (inline) — módulo de Atas
-   Mesmo padrão visual de cadastro-turma-ativa.html (Ano Ativo);
-   só os campos do formulário mudam (schema em vez de professor,
-   sem status ativa/inativa).
-   ══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   cadastro-turmas — só LAYOUT e componentes próprios da página.
+   Aparência (card, destaque, botão, campo, badge, aviso, tooltip,
+   toast, modal) vem do components.css.
+═══════════════════════════════════════════════════════════════ */
 
-:root {
-  --card:    var(--header-bg, #ffffff);
-  --shadow:  0 4px 20px rgba(0,0,0,0.06);
-  --radius:  14px;
-  --radius2: 10px;
-}
-html[data-theme="dark"] {
-  --card:   #131c2e;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
-}
-
+/* ── Layout geral ── */
 .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 18px;
-  margin-bottom: 16px;
-  transition: background 0.3s, border-color 0.3s;
-}
-
-/* Card de destaque na cor do usuário (mesmo mecanismo de historico-aluno /
-   gestão-atas / pesquisa-ata.html). Nesta página o destaque é o card
-   "Turmas cadastradas" (os dois cards ficam lado a lado, .split-grid).
-   Sem override de .btn: o único botão daqui dentro ("Editar") vive dentro
-   de .item, que tem fundo neutro (var(--card)) próprio — não fica
-   diretamente sobre o fundo colorido, então não precisa (e não deve)
-   herdar o estilo translúcido do dest-fg. */
-.card.card-destaque {
-  background: var(--btn-home-bg);
-  border-color: var(--btn-home-border);
-  --dest-fg: #ffffff;
-}
-html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
-.card.card-destaque.contraste-claro {
-  --dest-fg: #1e293b;
-}
-.card-destaque h2 { color: var(--dest-fg); }
-.card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
-/* Exceção: .help dentro de um .item (o texto de "Detalhes") não deve herdar
-   a cor fixa do fundo colorido — o .item é um card neutro por baixo
-   (var(--card), branco ou escuro conforme o tema), não fica direto sobre o
-   fundo de marca. Sem isso, o texto ficava com a cor certa só quando o
-   tema escuro calhava de "bater" com a marca — invisível no tema claro. */
-.card-destaque .item .help { color: var(--muted); }
-.card-destaque .info-tip { color: var(--dest-fg); }
-h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
-h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
-
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .split-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .split-grid { grid-template-columns: 1fr; } }
+h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }   /* D6: h2/h3 seguem locais */
+h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
+.h2-form { margin-bottom: 10px; }
+.dest-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.dest-head h2 { margin: 0; }
+.mt-2  { margin-top: 2px; }
+.mt-12 { margin-top: 12px; }
+
+/* ── Campos: só disposição (aparência é do .field / .input globais) ── */
+.field { min-width: 0; }
+.wrap .input { width: 100%; }                    /* .input avulso não tem largura própria */
+.filtro-ano { max-width: 140px; font-size: 13px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
 
 .form-section { margin-top: 18px; }
 .form-section:first-of-type { margin-top: 4px; }
 .form-section-label {
   font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
+  color: var(--ui-muted); margin: 0 0 10px; display: flex; align-items: center; gap: 8px;
 }
-.form-section-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.form-section-label::after { content: ""; flex: 1; height: 1px; background: var(--ui-border); }
+
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row.serie-linha { align-items: flex-end; margin-top: 6px; }
+.form-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
+.btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
 
 .id-badge-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-.id-badge-row .label-inline { font-size: 12px; color: var(--muted); font-weight: 700; }
-.id-badge {
-  font-family: ui-monospace, monospace; font-size: 12px; padding: 5px 10px; border-radius: 999px;
-  background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--chip-color);
-}
+.id-badge-row .label-inline { font-size: 12px; color: var(--ui-muted); font-weight: 700; }
+.mono { font-family: ui-monospace, monospace; font-size: 12px; }
 
-.label {
-  display: block; font-size: 13px; font-weight: 700; margin: 0 0 6px;
-  color: var(--text); text-transform: none; letter-spacing: 0;
-}
-.input {
-  width: 100%; padding: 11px 12px; border: 1px solid var(--field-border); border-radius: 10px;
-  background: var(--field-bg); color: var(--text); font-size: 14px; font-family: 'Nunito', sans-serif;
-  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
-}
-.input:focus {
-  border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
-}
-html[data-theme="dark"] .input {
-  background: var(--field-bg); color: var(--text); border-color: var(--field-border);
-}
-html[data-theme="dark"] input::placeholder { color: rgba(226,232,240,0.45); }
-
-.btn {
-  border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 9px 14px;
-  border-radius: 10px; font-weight: 700; font-size: 14px; text-decoration: none; display: inline-flex;
-  align-items: center; gap: 8px; cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap;
-  transition: background 0.18s, border-color 0.18s, transform 0.06s;
-}
-.btn:hover { background: var(--chip-bg); }
-.btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: var(--brand-fg, #fff); }
-.btn.primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
-html[data-theme="dark"] .btn.primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
-.btn.ghost { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
-.btn.ghost:hover {
-  background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9);
-}
-html[data-theme="dark"] .btn.ghost:hover {
-  background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd);
-}
-.btn.outline { background: var(--brand-faded, #f5f3ff); border-color: var(--brand-border, #ddd6fe); color: var(--brand-text, #6d28d9); }
-.btn.outline:hover { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: #fff; }
-html[data-theme="dark"] .btn.outline { background: var(--brand-faded-d, rgba(124,58,237,0.28)); border-color: var(--brand-border-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-html[data-theme="dark"] .btn.outline:hover { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); color: #fff; }
-.btn.small { padding: 6px 10px; font-size: 12px; }
-
-.item.editing { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px var(--brand-faded, rgba(124,58,237,0.12)); }
-
+/* ── Chip removível (série escolhida, com ×): não é .badge (5-A) ── */
 .chip {
-  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-border);
-  background: var(--chip-bg); color: var(--chip-color); padding: 6px 10px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-chip-border);
+  background: var(--ui-chip-bg); color: var(--ui-chip-color); padding: 6px 10px; border-radius: 999px;
   font-size: 13px; font-weight: 700;
 }
 .chip button { border: 0; background: transparent; cursor: pointer; color: inherit; font-weight: 900; font-size: 14px; line-height: 1; padding: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chips-series { margin-top: 10px; }
 
+/* ── Lista de turmas: sub-card (D19, definição local) ── */
 .list { display: flex; flex-direction: column; gap: 10px; }
 .item {
-  border: 1px solid var(--border); border-radius: var(--radius2); padding: 12px 14px; background: var(--card);
+  border: 1px solid var(--ui-border); border-radius: 10px; padding: 12px 14px;
+  background: var(--ui-surface); color: var(--ui-text);
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  transition: background 0.3s, border-color 0.3s;
 }
-.item:hover { border-color: var(--brand); }
-
-.detalhes-toggle {
-  font-size: 12px; font-weight: 700; color: var(--brand-text, #6d28d9); cursor: pointer; user-select: none;
-}
+.item:hover { border-color: var(--ui-brand); }
+.item.editing { border-color: var(--ui-brand); box-shadow: 0 0 0 3px var(--ui-brand-faded); }
+.item-main { flex: 1; min-width: 0; }
+.item-titulo { margin: 0 0 6px; }
+.row.item-linha-badges { gap: 6px; margin-top: 2px; }
+.row.item-linha-alunos { row-gap: 6px; margin-top: 6px; }
+.detalhes-toggle { font-size: 12px; font-weight: 700; color: var(--ui-brand-text); cursor: pointer; user-select: none; }
 .detalhes-toggle:hover { text-decoration: underline; }
-html[data-theme="dark"] .detalhes-toggle { color: var(--brand-text-d, #c4b5fd); }
 
-/* Botão "Editar" cai aqui pela regra base .btn.outline acima (mesmo
-   tratamento do "Adicionar" — contraste garantido em qualquer paleta). */
-.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
-
-.mono { font-family: ui-monospace, monospace; font-size: 12px; }
-.pill {
-  display: inline-flex; align-items: center; border: 1px solid var(--border); background: var(--chip-bg);
-  border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--chip-color);
-}
-.badge.small { font-size: 11px; padding: 3px 8px; }
-.badge.warn-alunos {
-  background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.35); color: #92400e;
-}
-html[data-theme="dark"] .badge.warn-alunos { color: #fbbf24; }
-
-.help { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; min-height: 14px; }
-.help.err { color: var(--danger); font-weight: 700; }
-.help.ok  { color: #1f8f4a; font-weight: 700; }
+/* ── Texto de apoio ── */
+.help { font-size: 12px; color: var(--ui-muted); margin-top: 6px; line-height: 1.4; min-height: 14px; }
+.help.sem-margem { margin: 0; }
+/* .help solto direto no fundo de marca (contagem e "nenhuma turma"): fora da cobertura D18 */
+.card-destaque .help { color: color-mix(in srgb, var(--dest-fg) 75%, transparent); }
+/* dentro de .item o fundo é neutro, não o de marca */
+.card-destaque .item .help { color: var(--ui-muted); }
 
 .info-note {
-  padding: 12px 14px; border-radius: 10px; background: var(--chip-bg); border: 1px solid var(--chip-border);
-  color: var(--muted); font-size: 13px; margin-top: 12px;
+  padding: 12px 14px; border-radius: 10px; background: var(--ui-chip-bg); border: 1px solid var(--ui-chip-border);
+  color: var(--ui-muted); font-size: 13px; margin-top: 12px;
 }
-.info-note strong { color: var(--text); }
-
-/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
-   desktop e mobile (sem depender de hover). Texto mora inline, dentro do
-   próprio .info-tip-bubble, junto de onde é usado. Bloco copiado do padrão
-   já aprovado em historico-aluno.html / gestao-atas.html. ===== */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card); border:1.5px solid var(--border); color:var(--text);
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
-  white-space:normal; cursor:default;
-}
-.info-tip.open .info-tip-bubble{ display:block; }
-
-.warn {
-  padding: 12px 14px; border-radius: 10px; background: rgba(245,158,11,.10);
-  border: 1px solid rgba(245,158,11,.30); font-size: 13px; margin-top: 12px;
-}
-
-@keyframes toastSubir { from { opacity:0; transform:translateX(-50%) translateY(16px);} to { opacity:1; transform:translateX(-50%) translateY(0);} }
-
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
-.modal-backdrop.open { display: flex; }
+.info-note strong { color: var(--ui-text); }
 </style>
 </head>
 <body>
@@ -246,21 +128,24 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 </script>
 <div id="header-placeholder"></div>
 <main class="wrap">
+  <div id="avisoAdminTodasEscolas" class="aviso-warn" hidden>
+    ⚠️ Os dados não podem ser exibidos enquanto <b>"Todas as escolas"</b> estiver selecionado no seletor do header. Por favor, selecione uma escola válida.
+  </div>
   <div class="split-grid">
 
     <div class="card">
-      <h2 style="margin:0 0 10px">Cadastrar / editar turma (Atas)</h2>
+      <h2 class="h2-form">Cadastrar / editar turma (Atas)</h2>
 
       <div class="form-section">
         <div class="form-section-label">Dados da turma</div>
         <div class="form-row">
-          <div>
-            <label class="label">Ano letivo</label>
-            <input type="number" id="anoSelect" class="input" inputmode="numeric" step="1" min="2000" max="2100">
+          <div class="field">
+            <label>Ano letivo</label>
+            <input type="number" id="anoSelect" inputmode="numeric" step="1" min="2000" max="2100">
           </div>
-          <div>
-            <label class="label">Turno</label>
-            <select id="turno" class="input">
+          <div class="field">
+            <label>Turno</label>
+            <select id="turno">
               <option value="MATUTINO">Matutino</option>
               <option value="VESPERTINO">Vespertino</option>
               <option value="NOTURNO">Noturno</option>
@@ -272,65 +157,61 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 
       <div class="form-section">
         <div class="form-section-label">Séries</div>
-        <label class="label">Adicionar série
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        <label class="lbl">Adicionar série
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+            <span class="info-tip-bubble wide">Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
           </span>
         </label>
-        <div class="row" style="gap:10px;align-items:flex-end;margin-top:6px;">
-          <select id="serieSelect" class="input">
-            <option value="">(selecione)</option>
-          </select>
+        <div class="row serie-linha">
+          <select id="serieSelect" class="input"></select>
           <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
-          <button class="btn ghost" id="btnClearSeries" type="button">Limpar séries</button>
+          <button class="btn secondary" id="btnClearSeries" type="button">Limpar séries</button>
         </div>
-        <div id="chipsSeries" class="chips" style="margin-top:10px"></div>
+        <div id="chipsSeries" class="chips chips-series"></div>
       </div>
 
       <div class="form-section">
         <div class="form-section-label">Notas</div>
-        <label class="label">Schema de notas
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        <label class="lbl">Schema de notas
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Define as matérias que vão aparecer no cadastro de atas pra essa turma. Você pode configurar os schemas indo em: <b>Gestão de dados → Gerenciar schemas</b>.</span>
           </span>
         </label>
         <select id="schemaSelect" class="input"></select>
-        <div id="avisoSchemaBloqueado" class="warn" style="display:none;">
+        <div id="avisoSchemaBloqueado" class="aviso-warn mt-12" style="display:none;">
           🔒 O schema não pode ser alterado depois que a turma é criada. Ao salvar, a turma continua com o schema original.
         </div>
       </div>
 
       <div class="form-section">
         <div class="form-section-label">Identificação</div>
-        <div>
-          <label class="label">Nome da turma
-            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        <div class="field">
+          <label>Nome da turma
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
               i
               <span class="info-tip-bubble">Preenchido automaticamente usando os dados anteriores! O nome da turma pode ser alterado manualmente de acordo com sua preferência.</span>
             </span>
           </label>
-          <input id="nomeTurma" class="input" placeholder="Ex.: 1º ANO 2026 (MATUTINO)">
+          <input id="nomeTurma" placeholder="Ex.: 1º ANO 2026 (MATUTINO)">
         </div>
 
         <div class="id-badge-row">
           <span class="label-inline">ID da turma:
-            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
               i
-              <span class="info-tip-bubble">O ID da turma é gerado automaticamente usando os dados anteriores — não é possível editá-lo manualmente. Caso haja um ID idêntico, uma letra (A, B, C...) é adicionada ao final pra torná-lo único.<br><br>Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+              <span class="info-tip-bubble wide">O ID da turma é gerado automaticamente usando os dados anteriores — não é possível editá-lo manualmente. Caso haja um ID idêntico, uma letra (A, B, C...) é adicionada ao final pra torná-lo único.<br><br>Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
             </span>
           </span>
-          <span class="id-badge" id="turmaIdBadge">—</span>
+          <span class="badge gray mono" id="turmaIdBadge">—</span>
         </div>
-        <div id="avisoMudancaId" class="warn" style="display:none;"></div>
+        <div id="avisoMudancaId" class="aviso-warn mt-12" style="display:none;"></div>
       </div>
 
-      <div class="row" style="margin-top:18px;justify-content:flex-end;gap:10px;align-items:center">
-        <div class="row" style="gap:10px;justify-content:flex-end">
-          <button class="btn ghost" id="btnResetForm" type="button">Limpar formulário</button>
-          <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
-        </div>
+      <div class="form-actions">
+        <button class="btn secondary" id="btnResetForm" type="button">Limpar formulário</button>
+        <button class="btn primary" id="btnSalvar" type="button">Salvar turma</button>
       </div>
 
       <div class="info-note">
@@ -339,19 +220,19 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     </div>
 
     <div class="card card-destaque">
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-        <h2 style="margin:0">Turmas cadastradas
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="dest-head">
+        <h2>Turmas cadastradas
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Selecione um ano no seletor ao lado — ele vai listar automaticamente todas as turmas encontradas para aquele filtro.</span>
           </span>
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma salva no banco voltam para o formulário e você poderá alterar alguns dados. Em nenhuma circunstância altere o schema. Siga também as dicas em Séries e ID da turma.</span>
           </span>
         </h2>
-        <select id="filtroAnoLista" class="input" style="max-width:140px;font-size:13px;"></select>
-        <span id="countTurmasLista" class="help" style="margin:0"></span>
+        <select id="filtroAnoLista" class="input filtro-ano"></select>
+        <span id="countTurmasLista" class="help sem-margem"></span>
       </div>
       <div id="listaTurmas" class="list"></div>
     </div>
@@ -365,47 +246,40 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 (function(){
   const $ = (id) => document.getElementById(id);
 
-  /* ── Toasts padronizados (mesmo padrão do resto do sistema) ── */
-  function _showToast(msg, bg, shadow, duration){
+  /* ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ── */
+  // "carregando" não expira: só é usado em "Salvar turma" e todos os caminhos
+  // dela terminam em sucesso/aviso/erro (que substituem o azul) ou em reload.
+  const _TOAST = {
+    ok:      { cls:'toast-ok',      ms:2500 },
+    err:     { cls:'toast-err',     ms:4500 },
+    warn:    { cls:'toast-warn',    ms:4000 },
+    loading: { cls:'toast-loading', ms:0    },
+  };
+  function _showToast(msg, tipo){
     const existing = document.getElementById('_toastGlobal');
     if(existing) existing.remove();
+    const cfg = _TOAST[tipo] || _TOAST.warn;
     const toast = document.createElement('div');
     toast.id = '_toastGlobal';
-    toast.style.cssText =
-      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-      `display:flex;align-items:center;gap:12px;`+
-      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    toast.className = 'toast ' + cfg.cls;
+    toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
     const span = document.createElement('span');
+    span.className = 'toast-msg';
     span.textContent = msg;
-    span.style.cssText = 'flex:1;line-height:1.4;';
-    toast.appendChild(span);
-    const btnClose = document.createElement('button');
-    btnClose.type = 'button';
-    btnClose.textContent = '✕';
-    btnClose.setAttribute('aria-label','Fechar aviso');
-    btnClose.style.cssText =
-      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-    btnClose.onclick = () => toast.remove();
-    toast.appendChild(btnClose);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-close';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label','Fechar aviso');
+    btn.onclick = () => toast.remove();
+    toast.append(span, btn);
     document.body.appendChild(toast);
-    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+    if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
   }
-  function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
-  function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
-  function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
-  function _toastCarregando(msg){
-    // Sem auto-dismiss (duração 0): fica até virar sucesso/erro/aviso, ou até
-    // fechar no ✕. Só usado em "Salvar turma", a única ação desta página que
-    // o usuário fica esperando (a tela de loading de página cobre o boot).
-    _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 0);
-    const t = document.getElementById('_toastGlobal');
-    if(t) t.dataset.loading = '1';
-  }
+  function _toastSucesso(m){ _showToast(m,'ok'); }
+  function _toastErro(m){ _showToast(m,'err'); }
+  function _toastAviso(m){ _showToast(m,'warn'); }
+  function _toastCarregando(m){ _showToast(m,'loading'); }
   function setMsg(text, kind){
     const t = (text||"").toString();
     if(!t) return;
@@ -422,39 +296,54 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   // troca o azul por erro em vez de deixá-lo preso na tela.
   window.addEventListener('unhandledrejection', (ev) => {
     const t = document.getElementById('_toastGlobal');
-    if(t && t.dataset.loading === '1'){
+    if(t && t.classList.contains('toast-loading')){
       console.error('[unhandledrejection]', ev.reason);
-      setMsg('Algo deu errado — veja o console.', 'err');
+      _toastErro('⚠️ Não foi possível concluir a operação.');
     }
   });
 
   function _escHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
-  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  // corDestaque: 'danger' = ação destrutiva (botão vermelho); qualquer outro = cor de marca.
+  // corpo é HTML: quebras de linha com <br>, dinâmicos com _escHtml.
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
     return new Promise((resolve) => {
-      const cor = corDestaque || '#b45309';
+      const perigo = corDestaque === 'danger';
       const backdrop = document.createElement('div');
-      backdrop.className = 'modal-backdrop';
-      backdrop.style.display = 'flex';
+      backdrop.className = 'modal-backdrop open';
       backdrop.innerHTML =
-        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-          `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
-          `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
-          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
-            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-            `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-              `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-              `${_escHtml(textoConfirmar || 'Continuar')}`+
-            `</button>`+
+        `<div class="cm-box" role="dialog" aria-modal="true">`+
+          `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+          `<p class="cm-corpo">${corpo || ''}</p>`+
+          (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
+          `<div class="cm-acoes">`+
+            `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
           `</div>`+
         `</div>`;
       document.body.appendChild(backdrop);
-      function fechar(resultado){ backdrop.remove(); resolve(resultado); }
-      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
-      backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+      const ok = backdrop.querySelector('#_confirmModalOk');
+      const cancelar = backdrop.querySelector('#_confirmModalCancelar');
+      const input = backdrop.querySelector('#_confirmModalInput');
+      function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+      function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+      document.addEventListener('keydown', onKey);
+      ok.addEventListener('click', () => fechar(true));
+      cancelar.addEventListener('click', () => fechar(false));
       backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+      if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+      cancelar.focus();   // lado seguro
     });
+  }
+
+  // Admin global com "Todas as escolas" no header (seção 19 do guia): o schoolId ativo é 'ADMIN'
+  // e as leituras por escola ficam travadas. O header recarrega a página ao trocar de escola.
+  function _adminSemEscolaSelecionada(){
+    try{
+      const sid = window.Auth && typeof Auth.getActiveSchoolId === 'function' ? Auth.getActiveSchoolId() : '';
+      return String(sid || '').toUpperCase() === 'ADMIN';
+    }catch(_){ return false; }
   }
 
   /* ── Schemas do módulo de Atas — Firestore (DB.atasSchemas), sem
@@ -652,12 +541,13 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   function fillSerieSelect(){
     const sel = $("serieSelect");
     if(!sel) return;
-    sel.innerHTML = '<option value="">(selecione)</option>';
+    sel.innerHTML = "";   // sem opção "Selecione…": enquanto não há escolha, fica em branco (guia, seção 5)
     for(const s of serieOptions()){
       const opt = document.createElement("option");
       opt.value = s; opt.textContent = s;
       sel.appendChild(opt);
     }
+    sel.selectedIndex = -1;
   }
   function normalizeSerie(s){
     return String(s||"").trim();
@@ -820,25 +710,25 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       div.className = "item" + (editingTurmaId === t.turmaId ? " editing" : "");
 
       const left = document.createElement("div");
-      left.style.cssText = "flex:1;min-width:0;";
+      left.className = "item-main";
 
       // Linha 1 — nome da turma
       const title = document.createElement("h4");
-      title.style.margin = "0 0 6px";
+      title.className = "item-titulo";
       title.textContent = t.nome || "(sem nome)";
 
       // Linha 2 — Ano, Turno e uma badge por série (série vira badge própria
       // pra não formar um badge único gigante quando a turma tem várias).
       const series = Array.isArray(t.series) ? t.series : [];
+      // Prioridade na tela (5-A): Ano e Turno = variável (1); série = neutro (2).
       const seriesBadges = series.length
-        ? series.map(s => `<span class="pill badge small">${_escHtml(s)}</span>`).join("")
-        : `<span class="pill badge small">Sem série</span>`;
+        ? series.map(s => `<span class="badge small neutral">${_escHtml(s)}</span>`).join("")
+        : `<span class="badge small neutral">Sem série</span>`;
       const linha2 = document.createElement("div");
-      linha2.className = "row";
-      linha2.style.cssText = "gap:6px;row-gap:6px;margin-top:2px;";
+      linha2.className = "row item-linha-badges";
       linha2.innerHTML =
-        `<span class="pill badge small">Ano: ${t.anoLetivo||"—"}</span>`+
-        `<span class="pill badge small">Turno: ${t.turno||"—"}</span>`+
+        `<span class="badge small">Ano: ${_escHtml(t.anoLetivo||"—")}</span>`+
+        `<span class="badge small">Turno: ${_escHtml(t.turno||"—")}</span>`+
         seriesBadges;
 
       // Linha 3 — quantidade de alunos + toggle "Detalhes" (Schema + ID,
@@ -846,10 +736,9 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       const nAlunos = Array.isArray(t.alunos) ? t.alunos.length : 0;
       const detalhesId = `detTurma${idx}`;
       const linha3 = document.createElement("div");
-      linha3.className = "row";
-      linha3.style.cssText = "gap:10px;row-gap:6px;margin-top:6px;align-items:center;";
+      linha3.className = "row item-linha-alunos";
       linha3.innerHTML =
-        `<span class="pill badge small ${nAlunos ? 'warn-alunos' : ''}">${nAlunos} aluno(s)</span>`+
+        `<span class="badge small ${nAlunos ? 'neutral' : 'gray'}">${nAlunos} aluno(s)</span>`+
         `<span class="detalhes-toggle" tabindex="0" role="button" `+
           `onclick="event.stopPropagation(); const d=document.getElementById('${detalhesId}'); const ab=d.style.display==='block'; d.style.display= ab?'none':'block'; this.textContent = ab?'Detalhes ▾':'Detalhes ▴';">`+
           `Detalhes ▾`+
@@ -858,10 +747,10 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       const detalhes = document.createElement("div");
       detalhes.id = detalhesId;
       detalhes.className = "help";
-      detalhes.style.cssText = "display:none;margin-top:6px;";
+      detalhes.style.display = "none";   // alternado pelo "Detalhes ▾"
       detalhes.innerHTML =
         `<div>Schema: ${_escHtml(t.schemaSnapshot?.nome || "—")}</div>`+
-        `<div style="margin-top:2px"><span class="mono">ID:</span> <span class="mono">${_escHtml(t.turmaId||"—")}</span></div>`;
+        `<div class="mt-2"><span class="mono">ID:</span> <span class="mono">${_escHtml(t.turmaId||"—")}</span></div>`;
 
       left.appendChild(title);
       left.appendChild(linha2);
@@ -995,8 +884,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     if(oldId && turmaId !== oldId && alunosExistentes && alunosExistentes.length){
       const confirmou = await _confirmModal({
         titulo: "⚠️ Isso vai trocar o ID de uma turma com alunos",
-        corpo: `Essa turma já tem ${alunosExistentes.length} aluno(s) lançado(s) em cadastro-atas.html.\n\nMudar ano/turno/série troca o ID de ${oldId} para ${turmaId} — os dados de ata/matrícula já lançados continuam presos no ID antigo (ficam órfãos).\n\nSó continue se tiver certeza. Deseja continuar mesmo assim?`,
-        corDestaque: "#991b1b",
+        corpo: `Essa turma já tem ${alunosExistentes.length} aluno(s) lançado(s) em cadastro-atas.html.<br><br>Mudar ano/turno/série troca o ID de ${_escHtml(oldId)} para ${_escHtml(turmaId)} — os dados de ata/matrícula já lançados continuam presos no ID antigo (ficam órfãos).<br><br>Só continue se tiver certeza. Deseja continuar mesmo assim?`,
+        corDestaque: "danger",
         textoConfirmar: "Sim, trocar o ID mesmo assim"
       });
       if(!confirmou) return;
@@ -1099,7 +988,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   $("btnResetForm")?.addEventListener("click", async ()=>{
     const confirmou = await _confirmModal({
       titulo: "⚠️ Limpar o formulário?",
-      corpo: "Os dados preenchidos aqui serão perdidos (a turma ainda não foi salva).\n\nDeseja continuar?",
+      corpo: "Os dados preenchidos aqui serão perdidos (a turma ainda não foi salva).<br><br>Deseja continuar?",
       textoConfirmar: "Sim, limpar"
     });
     if(!confirmou) return;
@@ -1121,7 +1010,14 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       buildFiltroAnoOptions();
       resetForm();
       renderListaTurmas();
-      if (window.ThemeColors) ThemeColors.ajustarContraste();
+      try{
+        if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+      }catch(e){ console.warn('ajustarContraste:', e); }
+
+      // Admin global sem escola: aviso visível; os toasts de falha de leitura ficam de fora (o aviso já explica).
+      const semEscola = _adminSemEscolaSelecionada();
+      const avisoAdmin = $("avisoAdminTodasEscolas");
+      if(avisoAdmin) avisoAdmin.hidden = !semEscola;
 
       // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
       document.addEventListener("click", ()=>{
@@ -1131,7 +1027,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       // Erro de leitura ≠ "schema padrão não existe" — antes os dois casos
       // caíam na mesma mensagem (falha silenciosa também zerava SCHEMAS_CACHE).
       const msgPosReload = lerMsgPosReload(); // confirmação de uma edição que acabou de recarregar a página
-      if(!okTurmas) setMsg("Não foi possível carregar as turmas cadastradas — recarregue a página.", "err");
+      if(semEscola){ /* aviso acima já explica; nenhum toast de erro de leitura */ }
+      else if(!okTurmas) setMsg("Não foi possível carregar as turmas cadastradas — recarregue a página.", "err");
       else if(!okSchemas) setMsg("Não foi possível carregar os schemas — recarregue a página.", "err");
       else if(msgPosReload) setMsg(msgPosReload.text, msgPosReload.kind || "ok");
       else if(!temSchemaPadrao()) setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err");
