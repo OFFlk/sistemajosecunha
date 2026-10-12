@@ -78,7 +78,8 @@
   --ui-danger-bg-h:   rgba(185,28,28,.18);
   --ui-danger-bd-h:   rgba(185,28,28,.50);
   --ui-danger-fg-h:   var(--danger-color, #b91c1c);
-  --ui-danger-solid:  #b91c1c;           /* só o confirmar destrutivo do modal */
+  --ui-danger-solid:  #b91c1c;           /* botão danger sólido e confirmar destrutivo do modal */
+  --ui-success-solid: #15803d;           /* contraponto verde do danger sólido (texto branco: 5:1) */
 
   /* sucesso: estado base = tokens "ativo" do base.css */
   --ui-success-fg:    var(--ativo-color, #15803d);
@@ -278,7 +279,8 @@ table.left :is(th, td){ text-align:left; }
      .btn.neutral                    contorno neutro, sem preenchimento
      .btn.quiet                      sem borda/fundo até o hover
      .btn.danger                     ação destrutiva (vermelho sólido)
-     .btn.success                    aprovar/confirmar positivo (verde translúcido)
+     .btn.success                    contraponto do danger (verde sólido)
+   .btn.danger-soft / .success-soft  o par em versão discreta (translúcida)
      .btn.cancel                     cancelar (neutro, texto apagado)
    MODIFICADOR DE TAMANHO:  .btn.small
    ESTADOS: :hover  :active  :focus-visible  :disabled / [aria-disabled="true"]
@@ -372,10 +374,30 @@ html[data-theme="dark"] .btn:is(.outline, .btn-outline){
   --btn-ring:none;
 }
 
-/* ── success ── */
+/* ── success: SÓLIDO, texto branco — contraponto do danger ──
+   danger e success são um PAR de ações opostas (ativar/desativar, aprovar/reprovar):
+   mesma família nos dois (ambos sólidos ou ambos soft), vermelho × verde. ── */
 .btn:is(.success, .btn-approve){
-  --btn-bg:var(--ui-success-bg);     --btn-bd:var(--ui-success-bd);     --btn-fg:var(--ui-success-fg);
-  --btn-bg-h:var(--ui-success-bg-h); --btn-bd-h:var(--ui-success-bd-h); --btn-fg-h:var(--ui-success-fg-h);
+  --btn-bg:var(--ui-success-solid); --btn-bd:var(--ui-success-solid); --btn-fg:#fff;
+  --btn-bg-h:color-mix(in srgb, var(--ui-success-solid) 82%, #000);
+  --btn-bd-h:color-mix(in srgb, var(--ui-success-solid) 82%, #000);
+  --btn-fg-h:#fff;
+  --btn-ring:none;
+}
+
+/* ── danger-soft / success-soft: versão discreta do par ──
+   fundo translúcido, borda e texto do mesmo tom (--ui-st-*). Use quando o par fica
+   colado a um .primary (na paleta Vermelho o danger sólido tem a cor do primary). ── */
+.btn.danger-soft{
+  --btn-bg:var(--ui-st-bad-bg); --btn-bd:var(--ui-st-bad-bd); --btn-fg:var(--ui-st-bad-fg);
+  --btn-bg-h:color-mix(in srgb, var(--ui-st-bad-fg) 20%, transparent);
+  --btn-bd-h:var(--ui-st-bad-fg); --btn-fg-h:var(--ui-st-bad-fg);
+  --btn-ring:none;
+}
+.btn.success-soft{
+  --btn-bg:var(--ui-st-ok-bg); --btn-bd:var(--ui-st-ok-bd); --btn-fg:var(--ui-st-ok-fg);
+  --btn-bg-h:color-mix(in srgb, var(--ui-st-ok-fg) 20%, transparent);
+  --btn-bd-h:var(--ui-st-ok-fg); --btn-fg-h:var(--ui-st-ok-fg);
   --btn-ring:none;
 }
 
@@ -441,9 +463,14 @@ html[data-theme="dark"] .config-card.card-destaque{
 }
 /* perigo de verdade continua vermelho dentro do destaque: vermelho-escuro
    translúcido, nunca sólido e nunca só o tom claro (some no fundo de marca) */
-.card-destaque .btn:is(.danger, .btn-danger, .ldanger):not(table .btn, .item .btn){
+.card-destaque .btn:is(.danger, .btn-danger, .ldanger, .danger-soft):not(table .btn, .item .btn){
   --btn-bg:rgba(153,27,27,.38);   --btn-bd:rgba(153,27,27,.65);   --btn-fg:var(--dest-fg);
   --btn-bg-h:rgba(153,27,27,.52); --btn-bd-h:rgba(153,27,27,.65); --btn-fg-h:var(--dest-fg);
+}
+/* o contraponto verde, no mesmo desenho */
+.card-destaque .btn:is(.success, .btn-approve, .success-soft):not(table .btn, .item .btn){
+  --btn-bg:rgba(21,128,61,.40);   --btn-bd:rgba(21,128,61,.70);   --btn-fg:var(--dest-fg);
+  --btn-bg-h:rgba(21,128,61,.55); --btn-bd-h:rgba(21,128,61,.70); --btn-fg-h:var(--dest-fg);
 }
 /* desabilitado: cinza fixo, igual nos dois temas (declarar por ÚLTIMO) */
 .card-destaque .btn:disabled:not(table .btn, .item .btn),
@@ -618,6 +645,7 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 }
 .cm-titulo{ margin:0 0 6px; font-size:16px; font-weight:800; color:var(--ui-text); }
 .cm-titulo.perigo{ color:var(--ui-danger-fg); }
+.cm-titulo.ok{ color:var(--ui-st-ok-fg); }
 .cm-corpo{ margin:0 0 14px; font-size:13px; color:var(--ui-text); white-space:pre-line; line-height:1.5; }
 .cm-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
 .cm-opcao{ width:100%; justify-content:flex-start; }
@@ -638,6 +666,7 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .cm-ok:hover:not(:disabled){ filter:brightness(1.08); }
 .cm-ok:disabled{ opacity:.55; cursor:not-allowed; }
 .cm-ok.perigo{ background:var(--ui-danger-solid); border-color:var(--ui-danger-solid); color:#fff; }
+.cm-ok.ok{ background:var(--ui-success-solid); border-color:var(--ui-success-solid); color:#fff; }
 
 
 /* modal grande: só o ESQUELETO. O conteúdo (tabela, 3 colunas, só mensagem...)
