@@ -168,7 +168,7 @@ html[data-theme="dark"]{
   font-size:13px; font-weight:700; color:var(--ui-text);
 }
 .field :is(input, select, textarea), .input{
-  box-sizing:border-box; padding:11px 12px;
+  box-sizing:border-box; padding:11px 12px; min-height:var(--field-h, 43px);
   border:1px solid var(--field-border, var(--ui-border)); border-radius:10px;
   background:var(--field-bg, var(--ui-surface)); color:var(--ui-text);
   font-size:14px; font-family:'Nunito', ui-sans-serif, system-ui, sans-serif;
@@ -320,6 +320,8 @@ table.left :is(th, td){ text-align:left; }
 
 /* tamanho */
 .btn.small{ padding:6px 11px; font-size:13px; gap:6px; }
+/* botão ao lado de campo: mesma altura do .input/select (--field-h = 11+11 padding + 1+1 borda + ~19 de linha) */
+.btn.field-h{ min-height:var(--field-h, 43px); }
 
 /* ── primary ── (texto = --brand-fg: calculado p/ paleta clara, ex. Tan) */
 .btn:is(.primary, .btn-primary){
@@ -549,6 +551,8 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .info-tip.open .info-tip-bubble{ display:block; }
 .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
 .info-tip-bubble.align-right{ left:auto; right:0; }
+/* alinha à direita só em tela larga (640px+): ⓘ que fica na borda direita em grade de colunas, mas à esquerda no celular (1 coluna) */
+@media (min-width:641px){ .info-tip-bubble.align-right-md{ left:auto; right:0; } }
 
 
 /* ============================================================
