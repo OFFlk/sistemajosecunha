@@ -30,190 +30,42 @@
 
 <!-- CSS específico desta página -->
 <style>
-  /* ── Variáveis locais ── */
-  :root {
-    --card:    #ffffff;
-    --radius:  14px;
-    --shadow:  0 4px 20px rgba(0,0,0,0.06);
-    --chip:    var(--brand-faded, #f5f3ff);
-    --chipText: var(--brand-text, #6d28d9);
-  }
-  html[data-theme="dark"] {
-    --card:    #131c2e;
-    --shadow:  0 4px 24px rgba(0,0,0,0.4);
-    --chip:    var(--brand-faded-d, rgba(124,58,237,0.28));
-    --chipText: var(--brand-text-d, #c4b5fd);
-  }
+/* schema_ata (módulo atas). Só LAYOUT e componente próprio; a aparência vem do components.css.
+   Sem variáveis próprias: nada de :root local. */
 
-  /* ── Layout ── */
-  .container { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; }
-  .card { background: var(--card); border: 1px solid var(--border, #ddd6fe); border-radius: var(--radius); padding: 22px 26px; box-shadow: var(--shadow); margin-bottom: 18px; transition: background 0.3s, border-color 0.3s; }
+/* ── Layout ── */
+.container { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; }
+.container .card { --card-pad-y: 22px; --card-pad-x: 26px; --card-gap: 18px; }
 
-  /* ── Card de destaque: usa a cor de marca escolhida pela pessoa (mesma do
-     botão "Início", exposta por header.css como --btn-home-bg/border) —
-     mesmo padrão já usado em gestao-atas.html. .contraste-claro é ligada
-     por ThemeColors.ajustarContraste() (theme-colors.js) quando a cor
-     escolhida é clara demais pra texto branco. Só o FUNDO do card muda:
-     inputs/select/table continuam com o próprio background opaco deles
-     (var(--card) neutro), então "por baixo" tudo parece igual — só o h3 e
-     os <label> soltos (sem caixa própria) precisam de --dest-fg pra não
-     ficarem ilegíveis em cima da cor de marca. */
-  .card.card-destaque {
-    --dest-fg: #ffffff;
-    --dest-btn-bg: rgba(255,255,255,.18);
-    --dest-btn-bd: rgba(255,255,255,.40);
-    --dest-btn-hover: rgba(255,255,255,.28);
-    --dest-panel-bg: rgba(255,255,255,.10);
-    --table-cell-bg: #ffffff;
-    background: var(--btn-home-bg); border-color: var(--btn-home-border);
-  }
-  html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); --table-cell-bg: #0a1426; }
-  .card.card-destaque.contraste-claro {
-    --dest-fg: #0f172a;
-    --dest-btn-bg: rgba(0,0,0,.08);
-    --dest-btn-bd: rgba(0,0,0,.25);
-    --dest-btn-hover: rgba(0,0,0,.16);
-    --dest-panel-bg: rgba(0,0,0,.06);
-    border-color: var(--border, #ddd6fe);
-  }
-  .card-destaque h3 { color: var(--dest-fg); }
-  .card-destaque label { color: var(--dest-fg); }
-  /* Botões soltos direto no fundo do card, por variante — não dá pra
-     tratar ".btn" genérico igual pra todos (ficava tudo com a mesma cara,
-     inclusive o Excluir perdendo o vermelho de aviso). :not(table .btn)
-     em todas: deixa de fora as setas/Remover da tabela, que têm um
-     problema à parte (ver .btn-gray mais abaixo). */
-  /* Primário (Novo schema, Salvar, + Adicionar matéria): preenchido, no
-     mesmo "filtro" claro/escuro que o botão Recarregar já usa em
-     gestao-atas.html — em vez da cor pura, que ficava quase invisível em
-     cima do próprio fundo da mesma cor. */
-  .card-destaque .btn-primary:not(table .btn) {
-    background: var(--dest-btn-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg);
-  }
-  .card-destaque .btn-primary:not(table .btn):hover:not(:disabled) {
-    background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
-  }
-  /* Outline (Duplicar): sem preenchimento, só borda + texto na cor de
-     contraste calculada pro card (--dest-fg). */
-  .card-destaque .btn-outline:not(table .btn) {
-    background: transparent; border-color: var(--dest-fg); color: var(--dest-fg);
-  }
-  .card-destaque .btn-outline:not(table .btn):hover:not(:disabled) {
-    background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
-  }
-  .card-destaque .aviso-warn { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd);
-                               border-left-color: var(--dest-fg); color: var(--dest-fg); }
-  /* Danger (Excluir): de propósito SEM regra aqui — cai na própria
-     .btn-danger global (vermelho sólido), igual ao "Remover" da tabela do
-     card 4. Continua sendo um aviso de ação destrutiva mesmo dentro do
-     card de destaque. */
+/* D6 em aberto: h2/h3 ficam locais */
+h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
+h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
 
-  /* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (ver
-     guia-migracao-contraste-theme-colors.md, Parte 2). Checado antes de
-     colar: esta página já define --card/--border/--text nos mesmos moldes
-     do guia (ver seção 2.1.1), então não precisou remapear nada aqui. ===== */
-  .info-tip{
-    position:relative; display:inline-flex; align-items:center; justify-content:center;
-    width:16px; height:16px; margin-left:6px; border-radius:50%;
-    border:1.5px solid currentColor; color:inherit; opacity:.72;
-    font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-    line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-  }
-  .info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-  .info-tip-bubble{
-    display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-    width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-    background:var(--card); border:1.5px solid var(--border, #ddd6fe); color:var(--text, #1e1b4b);
-    box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; line-height:1.4;
-    white-space:normal; cursor:default;
-  }
-  .info-tip.open .info-tip-bubble{ display:block; }
-  /* Variante larga: cards com bastante largura sobrando e uma dica grande
-     (ex.: explicação de card inteiro) não precisam ficar espremidos em
-     260px só porque o padrão da maioria das dicas é curto. */
-  .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
-  /* Variante alinhada à direita: pra ícone perto da borda direita do card/
-     tabela (ex.: última coluna), abrir pra esquerda em vez de pra direita
-     evita o balão estourar pra fora do card. */
-  .info-tip-bubble.align-right{ left:auto; right:0; }
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 540px) { .grid { grid-template-columns: 1fr; } }
+.col-full { grid-column: 1 / -1; }
+.col-acao { display: flex; align-items: flex-end; }
+.w-100 { width: 100%; }
+.acoes { display: flex; gap: 10px; flex-wrap: wrap; }
+.acoes-linha { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
 
-  h2 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
-  h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
+/* campos dentro da tabela (fora de .field): aparência vem do .input global; largura é da página */
+td .input { width: 100%; }
+.tag-fora { display: block; margin-top: 4px; font-size: 11px; color: var(--ui-muted); }
 
-  .warn { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.30); padding: 12px 14px; border-radius: 10px; font-size: 13px; }
-  /* Aviso de card (guia 1.9): sem fundo amarelo — herda o contexto; o sinal de atenção é o ⚠️/ℹ️ e a faixa esquerda. */
-  .aviso-warn { background: var(--chip); border: 1px solid var(--border, #ddd6fe);
-                border-left: 4px solid #d97706; color: var(--text, #1e1b4b);
-                padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; }
-  .aviso-warn[hidden] { display: none; }
-  @keyframes toastSubir { from{opacity:0;transform:translateX(-50%) translateY(16px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
-  .modal-backdrop { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:50; }
-  .modal-backdrop input { width:100%; }
-  .tag-fora { display:block; margin-top:4px; font-size:11px; color: var(--muted, #6b7280); }
-
-  /* ── Form ── */
-  label { display: block; font-weight: 700; margin-bottom: 6px; font-size: 13px; }
-  /* Escopado a .container: o header (fetch de header-component.html) fica
-     FORA do .container, então isso nunca toca no <select> do school-pill. */
-  .container input, .container select, .container textarea {
-    width: 100%; padding: 10px 14px; border-radius: 10px;
-    border: 1px solid var(--border, #ddd6fe);
-    background: var(--card); color: var(--text, #1e1b4b);
-    outline: none; font-family: 'Nunito', system-ui, sans-serif; font-size: 14px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  html[data-theme="dark"] .container input,
-  html[data-theme="dark"] .container select,
-  html[data-theme="dark"] .container textarea { background: #0a1426; border-color: #1e2540; }
-  .container input:focus, .container select:focus, .container textarea:focus {
-    border-color: var(--brand, #7c3aed);
-    box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
-  }
-
-  .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
-  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-  @media (max-width: 540px) { .grid { grid-template-columns: 1fr; } }
-
-  /* ── Botões ── */
-  .btn-gray{background:var(--brand-faded,rgba(124,58,237,0.12));border:1px solid var(--brand,#7c3aed);color:var(--brand,#7c3aed);}
-  /* Tema escuro: antes usava --brand-faded-d (ainda roxo/azulado), que
-     quase some em cima do fundo azul de um card de destaque na mesma
-     família de cor. Troca pro mesmo tom neutro escuro que os inputs desta
-     página já usam (#0a1426) — aí o botão continua claramente separado do
-     fundo, tema claro ou escuro, dentro ou fora de card de destaque. */
-  html[data-theme="dark"] .btn-gray{background:#0a1426;border-color:var(--brand-d,#a78bfa);color:var(--brand-text-d,#c4b5fd);}
-  .btn-gray:hover{background:var(--brand-faded,#f5f3ff);border-color:var(--brand-border,#ddd6fe);color:var(--brand-text,#6d28d9);}
-  html[data-theme="dark"] .btn-gray:hover{background:var(--brand-d,#a78bfa);border-color:var(--brand-d,#a78bfa);color:#ffffff;}
-
-  /* ── Tabela ──
-     Sem overflow:hidden no <table>: isso cortava o balão do tooltip de
-     "Ações" (guia-migracao-contraste-theme-colors.md, novo item na 2.1.1 —
-     overflow:hidden em qualquer ancestral corta um .info-tip-bubble
-     absoluto lá dentro, mesmo que o ícone esteja "positioned"). Os cantos
-     arredondados agora são feitos célula a célula, não pelo clip do table. */
-  table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border-radius: 10px; border: 1px solid var(--border, #ddd6fe); }
-  thead tr:first-child th:first-child { border-top-left-radius: 9px; }
-  thead tr:first-child th:last-child  { border-top-right-radius: 9px; }
-  tbody tr:last-child td:first-child  { border-bottom-left-radius: 9px; }
-  tbody tr:last-child td:last-child   { border-bottom-right-radius: 9px; }
-  th, td { padding: 10px; border-bottom: 1px solid var(--border, #ddd6fe); text-align: center; font-size: 13px; }
-  th { background: var(--chip); font-weight: 800; font-size: 12px; color: var(--muted, #6b7280); }
-  tr:last-child td { border-bottom: none; }
-
-  /* ── Tabela dentro de card de destaque ──
-     Pedido: só o FUNDO DO CARD vira cor de marca; a tabela deve continuar
-     "neutra" igual sempre foi — células no tom de fundo de página (não no
-     tom do card), cabeçalho na MESMA cor de marca do card só que com um
-     filtro claro/escuro por cima pra se diferenciar (sem trocar de cor
-     entre os temas, só clareando/escurecendo). --dest-panel-bg e
-     --table-cell-bg seguem o mesmo padrão de --dest-fg/--dest-btn-bg:
-     um valor no card normal, outro em .contraste-claro. */
-  .card-destaque td { background: var(--table-cell-bg); }
-  .card-destaque th {
-    background: var(--dest-panel-bg);
-    color: var(--dest-fg);
-    font-weight: 900; font-size: 14px;
-  }
+/* ── Tabela (D1 em aberto: mantida como estava; só tokens trocados) ──
+   Sem overflow:hidden no <table>: cortaria o balão do ⓘ de "Ações". */
+table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border-radius: 10px; border: 1px solid var(--ui-border); }
+thead tr:first-child th:first-child { border-top-left-radius: 9px; }
+thead tr:first-child th:last-child  { border-top-right-radius: 9px; }
+tbody tr:last-child td:first-child  { border-bottom-left-radius: 9px; }
+tbody tr:last-child td:last-child   { border-bottom-right-radius: 9px; }
+th, td { padding: 10px; border-bottom: 1px solid var(--ui-border); text-align: center; font-size: 13px; }
+th { background: var(--ui-chip-bg); font-weight: 800; font-size: 12px; color: var(--ui-muted); }
+tr:last-child td { border-bottom: none; }
 </style>
 
 <title>Admin - Edição de Ata e Schema</title>
@@ -224,46 +76,46 @@
 
 <div class="container">
   <div class="card">
-    <div class="warn">
-      <b>Importante:</b> Alterações aqui <b>não</b> alteram turmas já salvas no banco.
-      Elas só valem para <b>novas turmas</b>.
-    </div>
+    <div class="aviso-warn">⚠️ <b>Importante:</b> Alterações aqui <b>não</b> alteram turmas já salvas no banco.
+      Elas só valem para <b>novas turmas</b>.</div>
   </div>
 
   <div class="card card-destaque">
-    <h3 style="margin-top:0;">Configuração atual
-      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-        i
-        <span class="info-tip-bubble wide">Schemas criados nessa página são listados na página de cadastro de turmas — com isso, é possível indicar qual schema de notas a turma cadastrada vai usar. Caso sua ata tenha matérias ou características diferentes do schema padrão que vem pré-selecionado, clique em "Novo schema" e crie um schema do zero, ou use "Duplicar" no schema padrão e edite a cópia nos cards seguintes desta página (o padrão em si não pode ser alterado).</span>
-      </span>
+    <h3>Configuração atual
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble wide">Schemas criados nessa página são listados na página de cadastro de turmas — com isso, é possível indicar qual schema de notas a turma cadastrada vai usar. Caso sua ata tenha matérias ou características diferentes do schema padrão que vem pré-selecionado, clique em "Novo schema" e crie um schema do zero, ou use "Duplicar" no schema padrão e edite a cópia nos cards seguintes desta página (o padrão em si não pode ser alterado).</span>
+          </span>
     </h3>
 
-    <div style="margin-top:12px;" class="grid">
-      <div style="grid-column: 1 / -1;">
-        <label><b>Schema salvo</b></label>
-        <select id="schemaSelect"></select>
+    <div class="grid mt-12">
+      <div class="col-full">
+        <div class="field">
+          <label for="schemaSelect"><b>Schema salvo</b></label>
+          <select id="schemaSelect"></select>
+        </div>
 
-        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-primary" type="button" onclick="novoSchema()">Novo schema</button>
-          <button class="btn btn-outline" type="button" onclick="duplicarSchema()">Duplicar</button>
-          <button class="btn btn-danger" id="btnExcluirSchema" type="button" onclick="excluirSchema()">Excluir</button>
+        <div class="acoes mt-10">
+          <button class="btn primary" type="button" onclick="novoSchema()">Novo schema</button>
+          <button class="btn outline" type="button" onclick="duplicarSchema()">Duplicar</button>
+          <button class="btn danger" id="btnExcluirSchema" type="button" onclick="excluirSchema()">Excluir</button>
         </div>
       </div>
     </div>
-    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn btn-primary" id="btnSalvarConfig" onclick="salvarConfig()">Salvar configuração</button>
+    <div class="acoes mt-12">
+      <button class="btn primary" id="btnSalvarConfig" type="button" onclick="salvarConfig()">Salvar configuração</button>
     </div>
 
-    <div id="avisoPadrao" class="aviso-warn" style="margin-top:12px;" hidden></div>
+    <div id="avisoPadrao" class="aviso-warn mt-12" hidden></div>
 
   </div>
 
   <div class="card">
-    <h3 style="margin-top:0;">Regras gerais</h3>
+    <h3>Regras gerais</h3>
     <div class="grid">
-      <div>
-        <label><b>Coluna "Série" ativa?</b>
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="field">
+        <label for="flagSerie"><b>Coluna "Série" ativa?</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Se desativar, o cadastro não exigirá série.</span>
           </span>
@@ -274,9 +126,9 @@
         </select>
       </div>
 
-      <div>
-        <label><b>Mostrar "Resultado Final"?</b>
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="field">
+        <label for="flagResultado"><b>Mostrar "Resultado Final"?</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Se desativar, o cadastro não exigirá resultado final.</span>
           </span>
@@ -287,9 +139,9 @@
         </select>
       </div>
 
-      <div>
-        <label><b>Ordenar alunos por</b>
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="field">
+        <label for="ordenacao"><b>Ordenar alunos por</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Indica a ordem de exibição dos alunos, após realização do cadastro de atas.</span>
           </span>
@@ -300,9 +152,9 @@
         </select>
       </div>
 
-      <div>
-        <label><b>Nome do schema</b>
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="field">
+        <label for="schemaNome"><b>Nome do schema</b>
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Nome que será exibido no seletor em cadastro-turmas.</span>
           </span>
@@ -313,35 +165,35 @@
   </div>
 
   <div class="card card-destaque">
-    <h3 style="margin-top:0;">Colunas de notas (matérias)
-      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-        i
-        <span class="info-tip-bubble wide">Aqui você adiciona/remove matérias. A ordem das matérias importa: a primeira de cima será a primeira da esquerda na ata — isso não interfere na importação de atas, apenas na exibição e exportação de documentos. Você pode alterar a ordem na coluna "Ações" da tabela abaixo; para mais detalhes, clique no (i) ao lado de "Ações".</span>
-      </span>
+    <h3>Colunas de notas (matérias)
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble wide">Aqui você adiciona/remove matérias. A ordem das matérias importa: a primeira de cima será a primeira da esquerda na ata — isso não interfere na importação de atas, apenas na exibição e exportação de documentos. Você pode alterar a ordem na coluna "Ações" da tabela abaixo; para mais detalhes, clique no (i) ao lado de "Ações".</span>
+          </span>
     </h3>
 
-    <div style="margin-top:12px;" class="grid">
-      <div>
-        <label>Chave (id) *
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+    <div class="grid mt-12">
+      <div class="field">
+        <label for="novaKey">Chave (id) *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Abreviatura da matéria. É exibida na visualização da ata dentro do sistema e em algumas exportações documentais. Só os códigos do catálogo do histórico (lp, mat, his, geo, cie, edf, art, er, ing) entram no Histórico Escolar.</span>
           </span>
         </label>
         <input id="novaKey" placeholder="ex: informatica" oninput="avisarMateriaFora()" />
       </div>
-      <div>
-        <label>Rótulo *
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="field">
+        <label for="novoLabel">Rótulo *
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Nome completo da matéria. Usado para verificação de erros e em algumas exportações documentais.</span>
           </span>
         </label>
         <input id="novoLabel" placeholder="ex: Inglês / Língua Estrangeira" />
       </div>
-      <div>
-        <label>Tipo
-          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <div class="field">
+        <label for="novoTipo">Tipo
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Método de avaliação. Nota = valor numérico quantitativo (ex.: 10,0). Texto = valor conceitual (ex.: CPLA).</span>
           </span>
@@ -351,11 +203,11 @@
           <option value="texto">Texto</option>
         </select>
       </div>
-      <div style="display:flex; align-items:flex-end;">
-        <button class="btn btn-primary" id="btnAddMateria" style="width:100%;" onclick="adicionarColuna()">+ Adicionar matéria</button>
+      <div class="col-acao">
+        <button class="btn primary w-100" id="btnAddMateria" type="button" onclick="adicionarColuna()">+ Adicionar matéria</button>
       </div>
     </div>
-    <div id="avisoNovaMateria" class="aviso-warn" style="margin-top:12px;" hidden></div>
+    <div id="avisoNovaMateria" class="aviso-warn mt-12" hidden></div>
 
     <table>
       <thead>
@@ -365,10 +217,10 @@
           <th>Rótulo</th>
           <th>Tipo</th>
           <th>Ações
-            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-              i
-              <span class="info-tip-bubble align-right">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" exclui a matéria da tabela do schema. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
-            </span>
+            <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble wide align-right">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" exclui a matéria da tabela do schema. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
+          </span>
           </th>
         </tr>
       </thead>
@@ -602,19 +454,19 @@ function render() {
       <td>
         <input type="checkbox" ${c.enabled ? "checked" : ""} ${dis} onchange="toggleEnabled(${idx}, this.checked)" />
       </td>
-      <td><input value="${escapeAttr(c.key)}" ${keyDis}${keyTitle} onchange="editKey(${idx}, this.value)" />${tag}</td>
-      <td><input value="${escapeAttr(c.label)}" ${dis} onchange="editLabel(${idx}, this.value)" /></td>
+      <td><input class="input" value="${escapeAttr(c.key)}" ${keyDis}${keyTitle} onchange="editKey(${idx}, this.value)" />${tag}</td>
+      <td><input class="input" value="${escapeAttr(c.label)}" ${dis} onchange="editLabel(${idx}, this.value)" /></td>
       <td>
-        <select ${(b || noCatalogo) ? "disabled" : ""} onchange="editType(${idx}, this.value)">
+        <select class="input" ${(b || noCatalogo) ? "disabled" : ""} onchange="editType(${idx}, this.value)">
           <option value="nota" ${c.type==="nota"?"selected":""}>Nota</option>
           <option value="texto" ${c.type==="texto"?"selected":""}>Texto</option>
         </select>
       </td>
       <td>
-        <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-          <button class="btn btn-gray" ${dis} onclick="moveUp(${idx})">&#8593;</button>
-          <button class="btn btn-gray" ${dis} onclick="moveDown(${idx})">&#8595;</button>
-          <button class="btn btn-danger" ${dis} onclick="removeCol(${idx})">Remover</button>
+        <div class="acoes-linha">
+          <button class="btn secondary small" type="button" ${dis} onclick="moveUp(${idx})">&#8593;</button>
+          <button class="btn secondary small" type="button" ${dis} onclick="moveDown(${idx})">&#8595;</button>
+          <button class="btn danger small" type="button" ${dis} onclick="removeCol(${idx})">Remover</button>
         </div>
       </td>
     `;
@@ -638,39 +490,43 @@ function falhaGravar(e, acao) {
   setMsg(perm ? `Sem permissão para ${acao}.` : `Não foi possível ${acao}. Verifique a conexão e tente de novo.`, "err");
 }
 
-// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
-function _showToast(msg, bg, shadow, duration){
+// ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina
+};
+function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
   if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
   const toast = document.createElement('div');
   toast.id = '_toastGlobal';
-  toast.style.cssText =
-    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-    `display:flex;align-items:center;gap:12px;`+
-    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
   const span = document.createElement('span');
+  span.className = 'toast-msg';
   span.textContent = msg;
-  span.style.cssText = 'flex:1;line-height:1.4;';
-  toast.appendChild(span);
-  const btnClose = document.createElement('button');
-  btnClose.type = 'button';
-  btnClose.textContent = '✕';
-  btnClose.setAttribute('aria-label','Fechar aviso');
-  btnClose.style.cssText =
-    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-  btnClose.onclick = () => toast.remove();
-  toast.appendChild(btnClose);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
   document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
 }
-function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
-function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
-function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
+// só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) t.remove();
+}
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
 
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -678,56 +534,83 @@ function setMsg(text, kind){
   if(kind === "err") _toastErro('⚠️ ' + t);
   else if(kind === "ok") _toastSucesso('✅ ' + t);
   else if(kind === "warn") _toastAviso('⚠️ ' + t);
-  else {
-    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
-    _toastAviso(t);
-  }
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else { console.warn('[toast] kind desconhecido:', JSON.stringify(kind)); _toastAviso(t); }
 }
 
-// ── Modais (substituem confirm()/prompt() nativos) ────────────────────
+// Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+window.addEventListener('unhandledrejection', () => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+});
+
+// ── Modais (substituem confirm()/prompt() nativos; visual em components.css: .modal-backdrop .cm-*) ──
 function _escHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function _modalBase({ titulo, corpoHtml, corDestaque, textoConfirmar, textoCancelar }, aoConfirmar){
+// corDestaque: 'danger' = ação destrutiva (título e botão vermelhos); 'ok' = contraponto positivo (verde);
+// qualquer outro = cor de marca. `corpo` é HTML: escape tudo que for dinâmico com _escHtml.
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
   return new Promise((resolve) => {
-    const cor = corDestaque || '#b45309';
+    const perigo = corDestaque === 'danger';
+    const positivo = corDestaque === 'ok';
+    const variante = perigo ? ' perigo' : positivo ? ' ok' : '';
     const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.style.display = 'flex';
+    backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div style="background:var(--card-bg,var(--card,#fff));border-radius:14px;padding:22px;max-width:440px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
-        `<div style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpoHtml || ''}</div>`+
-        `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
-          `<button type="button" class="btn btn-outline" id="_modalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" id="_modalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
-            `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
-            `${_escHtml(textoConfirmar || 'Continuar')}`+
-          `</button>`+
+      `<div class="cm-box" role="dialog" aria-modal="true">`+
+        `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<p class="cm-corpo">${corpo || ''}</p>`+
+        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
+        `<div class="cm-acoes">`+
+          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
+    const ok = backdrop.querySelector('#_confirmModalOk');
+    const cancelar = backdrop.querySelector('#_confirmModalCancelar');
+    const input = backdrop.querySelector('#_confirmModalInput');
     function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
-    function onKey(ev){ if(ev.key === 'Escape') fechar(null); else if(ev.key === 'Enter') backdrop.querySelector('#_modalOk').click(); }
+    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
     document.addEventListener('keydown', onKey);
-    backdrop.querySelector('#_modalOk').addEventListener('click', () => fechar(aoConfirmar(backdrop)));
-    backdrop.querySelector('#_modalCancelar').addEventListener('click', () => fechar(null));
-    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(null); });
-    const inp = backdrop.querySelector('input'); if(inp){ inp.focus(); inp.select(); }
+    ok.addEventListener('click', () => fechar(true));
+    cancelar.addEventListener('click', () => fechar(false));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
+    if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+    cancelar.focus();
   });
 }
-// confirmação sim/não → true | false
-async function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
-  const r = await _modalBase({ titulo, corpoHtml: _escHtml(corpo || ''), corDestaque, textoConfirmar, textoCancelar }, () => true);
-  return r === true;
-}
-// pede um texto → string (não vazia) | null
+
+// pede um texto → string (não vazia) | null. (O guia não traz este modelo: mesmas classes .cm-* do _confirmModal.)
 function _promptModal({ titulo, rotulo, valor, textoConfirmar }){
-  return _modalBase({
-    titulo, textoConfirmar: textoConfirmar || 'Salvar',
-    corpoHtml: `${_escHtml(rotulo || '')}<input type="text" id="_modalInput" value="${_escHtml(valor || '')}" style="margin-top:8px;" />`
-  }, (bd) => (bd.querySelector('#_modalInput').value || '').trim() || null);
+  return new Promise((resolve) => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop open';
+    backdrop.innerHTML =
+      `<div class="cm-box" role="dialog" aria-modal="true">`+
+        `<h3 class="cm-titulo">${_escHtml(titulo || 'Informar')}</h3>`+
+        `<p class="cm-corpo">${_escHtml(rotulo || '')}</p>`+
+        `<input type="text" class="cm-input" id="_modalInput" autocomplete="off" value="${_escHtml(valor || '')}">`+
+        `<div class="cm-acoes">`+
+          `<button type="button" class="btn secondary" id="_modalCancelar">Cancelar</button>`+
+          `<button type="button" class="cm-ok" id="_modalOk">${_escHtml(textoConfirmar || 'Salvar')}</button>`+
+        `</div>`+
+      `</div>`;
+    document.body.appendChild(backdrop);
+    const input = backdrop.querySelector('#_modalInput');
+    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+    function onKey(ev){
+      if(ev.key === 'Escape') fechar(null);
+      else if(ev.key === 'Enter') backdrop.querySelector('#_modalOk').click();
+    }
+    document.addEventListener('keydown', onKey);
+    backdrop.querySelector('#_modalOk').addEventListener('click', () => fechar((input.value || '').trim() || null));
+    backdrop.querySelector('#_modalCancelar').addEventListener('click', () => fechar(null));
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(null); });
+    input.focus(); input.select();
+  });
 }
 
 function onToggleSerie() {
@@ -801,7 +684,7 @@ async function excluirSchema() {
     setMsg("O schema padrão não pode ser excluído — ele é o que as turmas novas usam e não pode ser alterado nem excluído. Use Duplicar para criar uma variação.", "warn");
     return;
   }
-  if (!(await _confirmModal({ titulo: "Excluir schema", corpo: `Excluir o schema "${CONFIG.nome}"?\n\nTurmas já salvas não são afetadas.`, corDestaque: "#991b1b", textoConfirmar: "Excluir" }))) return;
+  if (!(await _confirmModal({ titulo: "Excluir schema", corpo: `Excluir o schema "${_escHtml(CONFIG.nome)}"?\n\nTurmas já salvas não são afetadas.`, corDestaque: "danger", textoConfirmar: "Excluir" }))) return;
 
   try { await removeSchema(CONFIG.id); } catch (e) { return falhaGravar(e, "excluir o schema"); }
   SCHEMAS = SCHEMAS.filter(s => s.id !== CONFIG.id);
@@ -903,7 +786,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // admin_escolas). Sem ele a tela não tem o que editar — só avisa.
   if (!SCHEMAS.some(s => s.id === PADRAO_ID)) {
     document.querySelector(".container").innerHTML =
-      '<div class="card"><div class="warn"><b>Esta escola ainda não tem o schema padrão.</b> ' +
+      '<div class="card"><div class="aviso-warn">⚠️ <b>Esta escola ainda não tem o schema padrão.</b> ' +
       'Peça ao admin global para criá-lo em Gerenciar escolas (botão "Schema padrão") e recarregue esta página.</div></div>';
     Loading.esconder();
     return;
@@ -919,7 +802,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ThemeColors.ajustarContraste() já cobre os dois `.card-destaque` desta
   // página ("Configuração atual" e "Colunas de notas") de uma vez —
   // theme-colors.js reage sozinho ao 'colorchange' depois disso.
-  if (window.ThemeColors) ThemeColors.ajustarContraste();
+  try{
+    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+  }catch(e){ console.warn('ajustarContraste:', e); }
 
   Loading.esconder();
 });
