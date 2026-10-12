@@ -131,7 +131,7 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
   <!-- ── SCHEMAS DE ATA ── -->
   <div class="card">
     <h3>🧩 Schemas de ata
-      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
         <span class="info-tip-bubble wide">"Schema" é a lista de matérias de uma ata e como as colunas da planilha são lidas na importação. Se uma turma tiver matérias diferentes das demais, crie, duplique ou edite outro schema e escolha qual deles ela vai usar ao ser cadastrada.</span>
       </span>
@@ -144,7 +144,7 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
   <!-- ── ÍNDICE DE ANOS ── -->
   <div class="card">
     <h3>📅 Índice de anos
-      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
         i
         <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
       </span>
@@ -201,7 +201,7 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
   <div class="card">
     <div class="sec-header" onclick="toggleSec('secApagar')">
       <h3>🗑️ Apagar turmas
-        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
           <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
         </span>
@@ -442,7 +442,9 @@ async function inicializar() {
   // (ver guia-migracao-contraste-theme-colors.md, Parte 1). O próprio
   // theme-colors.js já reage sozinho ao evento 'colorchange'; esta chamada
   // aqui é só a inicialização única, depois que o card já existe no DOM.
-  if (window.ThemeColors) ThemeColors.ajustarContraste();
+  try{
+    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+  }catch(e){ console.warn('ajustarContraste:', e); }
   // Esconde a tela de loading: a página já está utilizável (os números e as
   // turmas só carregam sob demanda).
   Loading.esconder();
@@ -574,6 +576,7 @@ async function reconstruirIndiceAnos() {
     setMsg('Não foi possível carregar as turmas — o índice não foi alterado. Tente de novo.', 'warn');
     return;
   }
+  _toastLimpar();   // turmas lidas: fecha o "Carregando turmas…" (não fica aberto atrás do modal)
   const turmas = lerTurmasDB();
 
   const { anos: novos, invalidas } = _anosDasTurmas(turmas);
@@ -642,7 +645,7 @@ const _TOAST = {
   ok:      { cls:'toast-ok',      ms:2500 },
   err:     { cls:'toast-err',     ms:4500 },
   warn:    { cls:'toast-warn',    ms:4000 },
-  loading: { cls:'toast-loading', ms:8000 },
+  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina (8.2-A)
 };
 function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
@@ -663,7 +666,12 @@ function _showToast(msg, tipo){
   btn.onclick = () => toast.remove();
   toast.append(span, btn);
   document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
+}
+// só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) t.remove();
 }
 function _toastSucesso(m){ _showToast(m,'ok'); }
 function _toastErro(m){ _showToast(m,'err'); }
@@ -680,22 +688,30 @@ function setMsg(text, kind){
   else { console.warn('[toast] kind desconhecido:', JSON.stringify(kind)); _toastAviso(t); }
 }
 
+// Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+window.addEventListener('unhandledrejection', () => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+});
+
 /* ── Modal de confirmação (CSS global: .modal-backdrop .cm-*). `corpo` é HTML: escape o dinâmico com esc().
-      corDestaque:'danger' = ação destrutiva. Esc cancela; foco inicial em Cancelar.
+      corDestaque:'danger' = ação destrutiva; 'ok' = contraponto positivo (verde). Esc cancela; foco inicial em Cancelar.
       (captura + stopPropagation no Esc mantidos da versão anterior: evitam fechar outro modal por baixo.) ── */
 function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
   return new Promise((resolve) => {
     const perigo = corDestaque === 'danger';
+    const positivo = corDestaque === 'ok';
+    const variante = perigo ? ' perigo' : positivo ? ' ok' : '';
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
       `<div class="cm-box" role="alertdialog" aria-modal="true">`+
-        `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${esc(titulo || 'Confirmar ação')}</h3>`+
+        `<h3 class="cm-titulo${variante}">${esc(titulo || 'Confirmar ação')}</h3>`+
         `<p class="cm-corpo">${corpo || ''}</p>`+
         (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${esc(digitar)}">` : '')+
         `<div class="cm-acoes">`+
           `<button type="button" class="btn secondary" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${esc(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${esc(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
