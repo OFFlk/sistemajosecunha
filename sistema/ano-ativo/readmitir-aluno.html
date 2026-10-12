@@ -14,6 +14,8 @@
 })();
 </script>
 
+<script src="../loading-overlay.js"></script>
+
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
@@ -38,7 +40,6 @@
 h1      { font-size: 24px; margin: 0 0 4px; font-weight: 800; }
 h2      { font-size: 16px; margin: 0 0 14px; font-weight: 800; }
 .sub    { color: var(--ui-muted); font-size: 13px; margin: 0; }
-.loading { font-size: 13px; color: var(--ui-muted); padding: 20px 0; text-align: center; }
 .grid2  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
 .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
@@ -99,9 +100,7 @@ h2      { font-size: 16px; margin: 0 0 14px; font-weight: 800; }
     </div>
   </div>
 
-  <div id="conteudo">
-    <div class="loading">Carregando dados do aluno…</div>
-  </div>
+  <div id="conteudo"></div>
 
 </div>
 
@@ -259,7 +258,7 @@ function _setupFotoWidget(alunoId){
         previewImg.hidden = false;
         placeholder.hidden = true;
         btnRemover.hidden = false;
-        setStatus(`Foto de uma matrícula anterior (${maisRecente.anoLetivo}) — mantenha ou clique em "Remover" pra trocar.`, 'var(--muted)');
+        setStatus(`Foto de uma matrícula anterior (${maisRecente.anoLetivo}) — mantenha ou clique em "Remover" pra trocar.`);
       }
     }catch(e){ console.warn('[foto-readmissao] falha ao buscar foto anterior:', e); }
   })();
@@ -530,7 +529,6 @@ function renderFicha(a){
 
 async function renderFormulario(aluno){
   const painel = document.getElementById('painelFormulario');
-  painel.innerHTML = `<div class="card"><div class="loading">Verificando matrícula atual…</div></div>`;
 
   const anosDisponiveis = Array.from(new Set(turmas.map(t => String(t.anoLetivo||'')).filter(Boolean)))
     .sort((a,b)=>Number(a)-Number(b));
@@ -714,7 +712,9 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
   });
 }
 
-init();
+init()
+  .catch(e => { console.error('init:', e); _toastErro('Erro ao iniciar a página.'); })
+  .finally(() => { if (window.Loading) Loading.esconder(); });
 
 })();
 </script>
