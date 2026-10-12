@@ -84,8 +84,13 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .detalhes-toggle:hover { text-decoration: underline; }
 .detalhes { margin-top: 6px; }
 
-/* Contraponto verde do btn danger ("Reativar"): a cor vem inline (--ui-st-ok-*); aqui só o hover */
-.btn-reativar:hover { filter: brightness(1.08); }
+/* Botões de perigo/confirmação "secundários" (nomes provisórios, candidatos a global — ver relatório).
+   Fundo translúcido + borda + texto, nos tokens de status; o hover reforça o fundo e a borda.
+   Uso: ação de perigo que não deve competir com um primary vizinho (ex.: Inativar / Reativar ao lado de Editar). */
+.btn.danger-soft  { background: var(--ui-st-bad-bg); border-color: var(--ui-st-bad-bd); color: var(--ui-st-bad-fg); }
+.btn.danger-soft:hover  { background: color-mix(in srgb, var(--ui-st-bad-fg) 20%, transparent); border-color: var(--ui-st-bad-fg); color: var(--ui-st-bad-fg); }
+.btn.success-soft { background: var(--ui-st-ok-bg);  border-color: var(--ui-st-ok-bd);  color: var(--ui-st-ok-fg); }
+.btn.success-soft:hover { background: color-mix(in srgb, var(--ui-st-ok-fg) 20%, transparent);  border-color: var(--ui-st-ok-fg);  color: var(--ui-st-ok-fg); }
 </style>
 </head>
 <body>
@@ -675,12 +680,10 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
         const btnStatus = document.createElement("button");
         btnStatus.type = "button";
         if(isInativa){
-          // contraponto verde do btn danger: mesma estrutura, cor do chip "ok" (ver relatório)
-          btnStatus.className = "btn danger btn-reativar";
-          btnStatus.setAttribute("style", "background:var(--ui-st-ok-bg);border-color:var(--ui-st-ok-bd);color:var(--ui-st-ok-fg);");
+          btnStatus.className = "btn success-soft";
           btnStatus.textContent = "Reativar";
         } else {
-          btnStatus.className = "btn danger";
+          btnStatus.className = "btn danger-soft";
           btnStatus.textContent = "Inativar";
         }
         btnStatus.addEventListener("click", ()=> toggleStatusTurma(t.turmaId));
