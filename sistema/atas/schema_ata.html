@@ -48,6 +48,7 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
 .col-acao { display: flex; align-items: flex-end; }
 .w-100 { width: 100%; }
 .acoes { display: flex; gap: 10px; flex-wrap: wrap; }
+.acoes-barra { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .acoes-linha { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .mt-10 { margin-top: 10px; }
 .mt-12 { margin-top: 12px; }
@@ -95,15 +96,19 @@ tr:last-child td { border-bottom: none; }
           <select id="schemaSelect"></select>
         </div>
 
-        <div class="acoes mt-10">
-          <button class="btn primary" type="button" onclick="novoSchema()">Novo schema</button>
-          <button class="btn outline" type="button" onclick="duplicarSchema()">Duplicar</button>
-          <button class="btn danger" id="btnExcluirSchema" type="button" onclick="excluirSchema()">Excluir</button>
+        <div class="acoes-barra mt-10">
+          <!-- grupo 1 (esquerda): ações externas ao schema -->
+          <div class="acoes">
+            <button class="btn primary" type="button" onclick="novoSchema()">Novo schema</button>
+            <button class="btn outline" type="button" onclick="duplicarSchema()">Duplicar</button>
+          </div>
+          <!-- grupo 2 (direita): ações internas ao schema escolhido; Excluir colado ao primary = danger-soft (D9) -->
+          <div class="acoes">
+            <button class="btn primary" id="btnSalvarConfig" type="button" onclick="salvarConfig()">Salvar configuração</button>
+            <button class="btn danger-soft" id="btnExcluirSchema" type="button" onclick="excluirSchema()">Excluir</button>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="acoes mt-12">
-      <button class="btn primary" id="btnSalvarConfig" type="button" onclick="salvarConfig()">Salvar configuração</button>
     </div>
 
     <div id="avisoPadrao" class="aviso-warn mt-12" hidden></div>
@@ -204,7 +209,7 @@ tr:last-child td { border-bottom: none; }
         </select>
       </div>
       <div class="col-acao">
-        <button class="btn primary w-100" id="btnAddMateria" type="button" onclick="adicionarColuna()">+ Adicionar matéria</button>
+        <button class="btn primary w-100" id="btnAddMateria" type="button" style="height:41px" onclick="adicionarColuna()">+ Adicionar matéria</button>
       </div>
     </div>
     <div id="avisoNovaMateria" class="aviso-warn mt-12" hidden></div>
