@@ -58,9 +58,13 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .stat-lbl { font-size:12px; color:var(--ui-muted); margin-top:4px; }
 
 /* ── Seção colapsável ── */
-.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; }
-.sec-header:hover h3 { color:var(--ui-brand-text); }
-.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; }
+.sec-header { display:flex; align-items:center; justify-content:space-between; user-select:none; }
+/* Recolher só pela seta (evita clique errado no título). Recolhido: o cabeçalho inteiro expande.
+   Hover do título só recolhido e fora do destaque (no destaque o hover = cor do fundo e o título sumiria). */
+.sec-header.collapsed { cursor:pointer; }
+.card:not(.card-destaque) .sec-header.collapsed:hover h3 { color:var(--ui-brand-text); }
+.sec-toggle { font-size:16px; line-height:1; transition:transform .2s; display:inline-block;
+              background:none; border:0; padding:4px 8px; margin:-4px -8px; color:inherit; font-family:inherit; cursor:pointer; }
 .sec-toggle.collapsed { transform:rotate(-90deg); }
 .sec-body.collapsed { display:none; }
 
@@ -143,24 +147,29 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 
   <!-- ── ÍNDICE DE ANOS ── -->
   <div class="card">
-    <h3>📅 Índice de anos
-      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
-        i
-        <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
-      </span>
-    </h3>
-    <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
-    <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
-    <div class="row-btns">
-      <button class="btn primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
+    <div class="sec-header" onclick="expandirSec('secIndice')">
+      <h3>📅 Índice de anos
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          i
+          <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
+        </span>
+      </h3>
+      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-label="Recolher ou expandir" onclick="event.stopPropagation(); toggleSec('secIndice')">▼</button>
+    </div>
+    <div class="sec-body" id="secIndice">
+      <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
+      <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
+      <div class="row-btns">
+        <button class="btn primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
+      </div>
     </div>
   </div>
 
   <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
   <div class="card card-destaque">
-    <div class="sec-header" onclick="toggleSec('secBackup')">
+    <div class="sec-header" onclick="expandirSec('secBackup')">
       <h3>💾 Backup do módulo de atas</h3>
-      <span class="sec-toggle" id="togSecBackup">▼</span>
+      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-label="Recolher ou expandir" onclick="event.stopPropagation(); toggleSec('secBackup')">▼</button>
     </div>
     <div class="sec-body" id="secBackup">
       <div class="bk-grid">
@@ -199,14 +208,14 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 
   <!-- ── APAGAR TURMAS ── -->
   <div class="card">
-    <div class="sec-header" onclick="toggleSec('secApagar')">
+    <div class="sec-header" onclick="expandirSec('secApagar')">
       <h3>🗑️ Apagar turmas
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
           <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
         </span>
       </h3>
-      <span class="sec-toggle" id="togSecApagar">▼</span>
+      <button type="button" class="sec-toggle" id="togSecApagar" aria-expanded="true" aria-label="Recolher ou expandir" onclick="event.stopPropagation(); toggleSec('secApagar')">▼</button>
     </div>
     <div class="sec-body" id="secApagar">
       <div class="row-btns mt-0">
@@ -631,7 +640,14 @@ function toggleSec(id) {
   const tog  = document.getElementById('togSec' + id.replace('sec','').replace(/^./,c=>c.toUpperCase()));
   if (!body) return;
   const col = body.classList.toggle('collapsed');
-  if (tog) tog.classList.toggle('collapsed', col);
+  if (tog) { tog.classList.toggle('collapsed', col); tog.setAttribute('aria-expanded', String(!col)); }
+  const head = body.previousElementSibling;
+  if (head && head.classList.contains('sec-header')) head.classList.toggle('collapsed', col);
+}
+// Clique no cabeçalho só EXPANDE (recolher é só pela seta, para não fechar por clique errado no título)
+function expandirSec(id) {
+  const body = document.getElementById(id);
+  if (body && body.classList.contains('collapsed')) toggleSec(id);
 }
 
 function esc(s) {
