@@ -15,12 +15,12 @@
 </script>
 
 <!-- Scripts globais -->
-<script src="../loading-overlay.js"></script>
-<script src="../auth.firebase.js"></script>
-<script src="../db.firebase.js"></script>
-<script src="../matricula-utils.js"></script>
-<script src="../identidade-aluno.js"></script>
-<script src="../theme-colors.js"></script>
+<script src="../loading-overlay.js?v=7"></script>
+<script src="../auth.firebase.js?v=7"></script>
+<script src="../db.firebase.js?v=7"></script>
+<script src="../matricula-utils.js?v=7"></script>
+<script src="../identidade-aluno.js?v=7"></script>
+<script src="../theme-colors.js?v=7"></script>
 
 <!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -35,110 +35,43 @@
 </script>
 
 <!-- CSS globais -->
-<link rel="stylesheet" href="/css/base.css">
-<link rel="stylesheet" href="/css/header.css">
-<link rel="stylesheet" href="/css/components.css">
+<link rel="stylesheet" href="/css/base.css?v=7">
+<link rel="stylesheet" href="/css/header.css?v=7">
+<link rel="stylesheet" href="/css/components.css?v=7">
 
 <!-- CSS específico desta página (só o que não está nos globais) -->
 <style>
-/* ── Variáveis do sistema ──
-   --bg, --ink, --muted, --line, --chip-bg/border/color/name, --mark-bg,
-   --sub-color, --school-bg/color NÃO ficam aqui: já existem em header.css.
-   Redeclará-las aqui (depois do header.css) sobrescreveria os valores
-   globais — foi exatamente esse bug que quebrou a cor do chip em outra
-   página. --chip, --chipText, --primary, --danger2 também foram removidas
-   por não serem usadas em lugar nenhum desta página (código morto). */
-:root {
-  --card:         #ffffff;
-  --text:         #1e1b4b;
-  --border:       var(--brand-border, #ddd6fe);
-  --shadow:       0 4px 20px rgba(0,0,0,0.06);
-  --danger:       #b91c1c;
-  --radius:       14px;
-  --radius2:      10px;
-  --field-bg:     #ffffff;
-  --field-border: var(--brand-border, #ddd6fe);
-  --accent:       var(--brand, #7c3aed);
-}
-html[data-theme="dark"] {
-  --card:         #131c2e;
-  --text:         #e2e8f0;
-  --border:       #2a3a5c;
-  --shadow:       0 4px 24px rgba(0,0,0,0.4);
-  --field-bg:     #0a1426;
-  --field-border: #1e2540;
-  --accent:       var(--brand-d, #7c3aed);
-}
+/* Prefixo de variáveis desta página: cad- (cadastro-aluno-ativo). */
+:root { --cad-brand-sutil: color-mix(in srgb, var(--ui-brand) 38%, #ffffff); }
+html[data-theme="dark"] { --cad-brand-sutil: color-mix(in srgb, var(--ui-brand) 50%, #000000); }
 
 /* ── Layout ── */
 .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
-
-/* ── Cards e painéis ── */
-.card, .panel {
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow);
-  padding: 18px; margin-bottom: 16px;
-  transition: background 0.3s, border-color 0.3s;
-}
-.card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
 h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
-.sub, .muted { color: var(--muted); font-size: 13px; }
-.subnote { color: var(--muted); font-size: 12px; margin-top: 6px; min-height: 14px; }
+.sec-tit { margin: 0 0 10px; }
+.sub, .muted { color: var(--ui-muted); font-size: 13px; }
 
-/* ── Botões ── */
-.btn {
-  border: 1px solid var(--border); background: var(--card); color: var(--text);
-  padding: 9px 14px; border-radius: 10px; font-weight: 700; font-size: 14px;
-  text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
-  cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap;
-  transition: background 0.18s, border-color 0.18s, transform 0.06s;
-}
-.btn:active { transform: translateY(1px); }
-.btn.primary, .btn-primary { background: var(--brand, #7c3aed); border-color: var(--brand, #7c3aed); color: var(--brand-fg, #fff); }
-.btn.primary:hover, .btn-primary:hover { background: var(--brand-hover, #6d28d9); border-color: var(--brand-hover, #6d28d9); }
-html[data-theme="dark"] .btn.primary, html[data-theme="dark"] .btn-primary { background: var(--brand-d, #7c3aed); border-color: var(--brand-d, #7c3aed); }
-html[data-theme="dark"] .btn.primary:hover, html[data-theme="dark"] .btn-primary:hover { background: var(--brand-hover-d, #6d28d9); }
-.btn.danger, .btn-danger { background: rgba(185,28,28,0.10); border-color: rgba(185,28,28,0.30); color: var(--danger); }
-.btn.danger:hover { background: rgba(185,28,28,0.18); }
-.btn.ghost, .btn.secondary { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
-.btn.outline:hover:not(:disabled){ background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
-html[data-theme="dark"] .btn.outline:hover:not(:disabled){ background: var(--brand-faded-d, rgba(124,58,237,.18)); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-.btn.ghost:hover, .btn.secondary:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
-.btn.small { padding: 7px 11px; font-size: 13px; }
-.btn.cancel { background: var(--card); border-color: var(--border); color: var(--muted); }
+/* Seletores de elemento: mantidos (o header e identidade-aluno.js também geram label/table; ver relatório) */
+label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.table-wrap { overflow: auto; border: 1px solid var(--ui-border); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 980px; }
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--ui-border); font-size: 13px; vertical-align: top; }
+th { background: var(--ui-chip-bg); position: sticky; top: 0; z-index: 1; font-size: 12px; font-weight: 700; color: var(--ui-muted); }
+tr:hover td { background: var(--ui-chip-bg); }
 
-/* ── Campos ── */
-.field label { display: block; font-size: 13px; font-weight: 700; margin: 0 0 6px; color: var(--text); }
-.field input, .field select,
+/* Campos soltos dentro de .card (D6: candidato; mantidos como estavam) */
 .card select, .card input[type="text"], .card input[type="number"], .card input[type="date"] {
   width: 100%; padding: 11px 12px; border: 1px solid var(--field-border);
-  border-radius: 10px; background: var(--field-bg); color: var(--text);
+  border-radius: 10px; background: var(--field-bg); color: var(--ui-text);
   font-size: 14px; font-family: 'Nunito', sans-serif; outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.field input:focus, .field select:focus,
-.card select:focus, .card input:focus {
-  border-color: var(--brand, #7c3aed);
-  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
-}
-html[data-theme="dark"] .field input, html[data-theme="dark"] .field select,
-html[data-theme="dark"] .card input, html[data-theme="dark"] .card select {
-  background: var(--field-bg); color: var(--text); border-color: var(--field-border);
-}
-html[data-theme="dark"] input::placeholder,
-html[data-theme="dark"] textarea::placeholder { color: rgba(226,232,240,0.45); }
-label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.card select:focus, .card input:focus { border-color: var(--ui-brand); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }   /* D6/D32: segue local */
+.obs { min-height: 80px; resize: vertical; }
 
-/* ── Tabelas ── */
-.table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
-table { width: 100%; border-collapse: collapse; min-width: 980px; }
-th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
-th { background: var(--chip-bg); position: sticky; top: 0; z-index: 1; font-size: 12px; font-weight: 700; color: var(--muted); }
-tr:hover td { background: var(--chip-bg); opacity: 0.7; }
-html[data-theme="dark"] tr:hover td { opacity: 1; }
-
-/* ── Grids ── */
+/* ── Grids e layout ── */
 .grid   { display: grid; grid-template-columns: 260px 1fr auto; gap: 14px; align-items: start; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; align-items: start; }
 .grid2  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -149,21 +82,9 @@ html[data-theme="dark"] tr:hover td { opacity: 1; }
 .inline > * { flex: 1; min-width: 180px; }
 .inline-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; align-items: start; }
 .split { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.inline-check { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--muted); font-size: 13px; user-select: none; cursor: pointer; white-space: nowrap; }
-.inline-check input { margin: 0; width: 16px; height: 16px; accent-color: var(--accent); }
 @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr; } .card .inline { grid-template-columns: 1fr; } }
 @media (max-width: 920px) { .grid2, .grid3, .form-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
-
-/* ── Pills, chips, badges ── */
-.pill  { display: inline-flex; align-items: center; border: 1px solid var(--border); background: var(--chip-bg); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--chip-color); }
-.badge { display: inline-flex; align-items: center; border: 1px solid var(--border); background: var(--chip-bg); border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 800; color: var(--text); }
-.chip  { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--chip-border); background: var(--chip-bg); color: var(--chip-color); padding: 8px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-.chip button { border: 0; background: transparent; cursor: pointer; color: var(--chip-color); font-weight: 900; font-size: 14px; line-height: 1; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.count { background: var(--chip-bg); border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-
-/* ── Misc ── */
 .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .top-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .stack { display: flex; flex-direction: column; }
@@ -173,507 +94,216 @@ html[data-theme="dark"] tr:hover td { opacity: 1; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .panel-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .actions-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.list { display: flex; flex-direction: column; gap: 10px; }
-.item { border: 1px solid var(--border); border-radius: var(--radius2); padding: 10px; background: var(--card); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; transition: background 0.3s; }
 .head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.help { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.2; min-height: 14px; }
-.help.err { color: var(--danger); font-weight: 700; }
-.help.ok  { color: #1f8f4a; font-weight: 700; }
-.req { color: #ef4444; font-weight: 700; margin-left: 6px; }
-.loading { font-size: 12px; color: var(--muted); margin-top: 8px; }
-.warn { padding: 10px 12px; border-radius: 10px; background: rgba(185,28,28,0.08); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); font-size: 14px; }
-.ok-msg { padding: 10px 12px; border-radius: 10px; background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #15803d; font-size: 14px; }
-html[data-theme="dark"] .ok-msg { color: #4ade80; }
-.divider { height: 1px; background: var(--border); margin: 12px 0; }
-.modebox { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--chip-bg); }
-
-/* ── Turno toggle (radio-style) ── */
-.turno-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.turno-btn {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
-  border: 1.5px solid var(--border); background: var(--card); color: var(--muted);
-  cursor: pointer; font-family: 'Nunito', sans-serif;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  user-select: none;
-}
-.turno-btn:hover { border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
-.turno-btn.selected {
-  background: var(--chip-bg); border-color: var(--brand, #7c3aed);
-  color: var(--brand-text, #6d28d9);
-}
-html[data-theme="dark"] .turno-btn { background: var(--card); color: var(--muted); border-color: var(--border); }
-html[data-theme="dark"] .turno-btn.selected { background: var(--chip-bg); border-color: var(--brand-d, #7c3aed); color: var(--brand-text-d, #c4b5fd); }
-
-/* ── Integral toggle ── */
-@keyframes fadeSlide {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes toastSubir {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-.statusline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-
-/* ── Banner aluno encontrado ── */
-#bannerAlunoEncontrado { display: none; }
-#bannerAlunoEncontrado.visible { display: flex !important; }
-.field-locked input, .field-locked select, .field-locked .nat-input-real { background: var(--chip-bg) !important; color: var(--muted) !important; cursor: default !important; pointer-events: none; }
-.field-locked label::after { content: " 🔒"; font-size: 11px; opacity: .6; }
-
-/* ── Naturalidade autocomplete ── */
-.nat-wrap { position: relative; }
-.nat-ghost-layer { position: absolute; inset: 0; padding: 12px; border: 1px solid transparent; border-radius: 10px; font-size: 14px; font-family: inherit; pointer-events: none; white-space: nowrap; overflow: hidden; color: transparent; }
-.nat-ghost-layer span.ghost-tail { color: #adb5bd; }
-.nat-input-real { position: relative; width: 100%; padding: 11px 12px; border: 1px solid var(--field-border); border-radius: 10px; background: transparent; outline: none; font-size: 14px; }
-.nat-input-real:focus { border-color: var(--brand, #7c3aed); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
-.nat-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.10); max-height: 200px; overflow-y: auto; display: none; }
-.nat-dropdown.open { display: block; }
-.nat-opt { padding: 10px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.nat-opt:hover, .nat-opt.active { background: var(--chip-bg); }
-.nat-opt .nat-uf { font-size: 11px; font-weight: 800; color: var(--chip-color); background: var(--chip-bg); border-radius: 999px; padding: 2px 7px; flex-shrink: 0; }
-html[data-theme="dark"] .nat-input-real { background: transparent; color: var(--text); }
-
-/* ── Modal ── */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 50; }
-.modal { width: min(1100px, 96vw); max-height: 86vh; overflow: auto; background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
-.modal-head { position: sticky; top: 0; background: var(--card); display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
-.modal-head h3 { margin: 0; font-size: 16px; font-weight: 800; }
-.modal-body { padding: 14px; }
-
-/* ══════════════════════════════════════════════
-   WIZARD — STEPPER
-══════════════════════════════════════════════ */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* Etapas */
-.wz-etapa { display: none; }
-.wz-etapa.ativa { display: block; }
-
-/* ══════════════════════════════════════════════
-   NEE — bloco Sim/Não + painel
-══════════════════════════════════════════════ */
-
-
-
-
-
-
-
-
-
-
-/* ── Botões Sim/Não ──────────────────────────────────────────────
-   Padrão de 3 estados:
-   • Neutro (nenhum): borda cinza discreta, sem fundo, texto muted
-   • Sim selecionado: fundo brand preenchido, texto branco
-   • Não selecionado: borda cinza, sem fundo, texto muted (igual ao neutro)
-─────────────────────────────────────────────────────────────── */
-
-
-
-/* SIM selecionado → fundo sólido brand */
-
-
-/* NÃO selecionado → discreto, igual ao estado neutro */
-
-
-/* Card com feedback visual quando "Sim" está ativo */
-
-
-
-
-
-
-
-
-
-@media(max-width:540px){ .nee-simple-grid { grid-template-columns: 1fr; } }
-
-/* Itens das deficiências — hover e checked usam brand */
-
-
-
-
-
-
-
-/* Transtornos — mesma lógica mas com --yellow-* via chip amarelo */
-
-
-/* checked do transtorno mantém distinção amarela */
-
-
-
-/* Categorias com sub-opções */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* ══════════════════════════════════════════════
-   CEP — status badge
-══════════════════════════════════════════════ */
-.cep-status {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 700; margin-top: 5px;
-  padding: 3px 10px; border-radius: 999px;
-}
-.cep-status.loading { background: var(--chip-bg); color: var(--brand-text, #6d28d9); border: 1px solid var(--brand, #7c3aed); }
-.cep-status.ok  { background: rgba(22,163,74,0.10); color: #166534; border: 1px solid rgba(22,163,74,0.30); }
-.cep-status.err { background: rgba(239,68,68,0.08); color: #b91c1c; border: 1px solid rgba(239,68,68,0.30); }
-html[data-theme="dark"] .cep-status.ok  { color: #4ade80; }
-html[data-theme="dark"] .cep-status.err { color: #fca5a5; }
-.field input.cep-locked { background: var(--chip-bg) !important; color: var(--muted) !important; cursor: default; }
-
-/* ══════════════════════════════════════════════
-   BADGE DE COMPLETUDE (listagem futura)
-══════════════════════════════════════════════ */
-.badge-completude {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800;
-}
-.badge-completude.verde   { background: rgba(22,163,74,0.10);  border: 1px solid rgba(22,163,74,0.30);  color: #166534; }
-.badge-completude.amarelo { background: rgba(234,179,8,0.10);  border: 1px solid rgba(234,179,8,0.35);  color: #854d0e; }
-.badge-completude.vermelho{ background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.30);  color: #b91c1c; }
-html[data-theme="dark"] .badge-completude.verde   { color: #4ade80; }
-html[data-theme="dark"] .badge-completude.amarelo { color: #fde047; }
-html[data-theme="dark"] .badge-completude.vermelho{ color: #fca5a5; }
-
-/* ── Stepper — badge de aviso etapa incompleta ── */
-
-
-
-
-
-
-/* ── Modo somente leitura (aluno inativo) ── */
-.modo-readonly { pointer-events: none; opacity: .5; user-select: none; }
-.modo-readonly-overlay {
-  position: absolute; inset: 0; z-index: 10; cursor: not-allowed;
-}
-/* ── Fila de docs — separador fixo ── */
-.docs-fila-sep-fixo {
-  font-size: 12px; font-weight: 700; color: var(--muted);
-  padding: 6px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
-}
-
-/* Ações com botão esquerdo */
+.divider { height: 1px; background: var(--ui-border); margin: 12px 0; }
+.col-full { grid-column: 1 / -1; }
+.mt-8  { margin-top: 8px; }
+.mb-10 { margin-bottom: 10px; }
+.mt-10 { margin-top: 10px; }
+.mt-12 { margin-top: 12px; }
+.nat-label-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.nat-label-row label { margin: 0; }
+.nat-label-row .check { font-size: 12px; }
 .actions-wizard { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; align-items: center; }
 .actions-wizard .left { margin-right: auto; display: flex; gap: 8px; }
 
-/* ── Modo edição ── */
-.modo-edicao-banner {
-  display: none; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 16px; margin-bottom: 14px;
-  background: rgba(234,179,8,0.10); border: 1px solid rgba(234,179,8,0.40);
-  border-radius: 12px;
+/* ── Chip removível, chips e contagem (D: candidatos a global; sem uso nesta página hoje) ── */
+.chip  { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); background: var(--ui-cell-bg); color: var(--ui-text); padding: 8px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-text); font-weight: 900; font-size: 14px; line-height: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.count { background: var(--ui-chip-bg); border: 1px solid var(--ui-border); padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+
+/* ── Toggle de turno e animação (usada pelo .nee-panel) ── */
+.turno-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.turno-btn {
+  display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  border: 1.5px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-muted);
+  cursor: pointer; font-family: 'Nunito', sans-serif; transition: background 0.15s, border-color 0.15s, color 0.15s; user-select: none;
 }
+.turno-btn:hover { border-color: var(--ui-brand); color: var(--ui-brand-text); }
+.turno-btn.selected { background: var(--ui-chip-bg); border-color: var(--ui-brand); color: var(--ui-brand-text); }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Banner "aluno encontrado" e campos travados ── */
+#bannerAlunoEncontrado { display: none; }
+#bannerAlunoEncontrado.visible { display: flex !important; }
+.field-locked input, .field-locked select, .field-locked .nat-input-real { background: var(--ui-chip-bg) !important; color: var(--ui-muted) !important; cursor: default !important; pointer-events: none; }
+.field-locked label::after { content: " 🔒"; font-size: 11px; opacity: .6; }
+
+/* ── Naturalidade / cidade: autocomplete ── */
+.nat-wrap { position: relative; }
+.nat-ghost-layer { position: absolute; inset: 0; padding: 12px; border: 1px solid transparent; border-radius: 10px; font-size: 14px; font-family: inherit; pointer-events: none; white-space: nowrap; overflow: hidden; color: transparent; }
+.nat-ghost-layer span.ghost-tail { color: var(--ui-muted); }
+.nat-input-real { position: relative; width: 100%; padding: 11px 12px; border: 1px solid var(--field-border); border-radius: 10px; background: transparent; outline: none; font-size: 14px; color: var(--ui-text); }
+.nat-input-real:focus { border-color: var(--ui-brand); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+.nat-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 40; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 10px; box-shadow: 0 8px 24px rgba(15,23,42,.10); max-height: 200px; overflow-y: auto; display: none; }
+.nat-dropdown.open { display: block; }
+.nat-opt { padding: 10px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nat-opt:hover, .nat-opt.active { background: var(--ui-chip-bg); }
+.nat-opt .nat-uf { font-size: 11px; font-weight: 800; color: var(--ui-chip-color); background: var(--ui-chip-bg); border-radius: 999px; padding: 2px 7px; flex-shrink: 0; }
+
+/* ══ WIZARD — etapas e stepper (dentro do destaque, usa --dest-*) ══ */
+.wz-etapa { display: none; }
+.wz-etapa.ativa { display: block; }
+.wz-etapa.bloqueada { opacity: .5; filter: grayscale(.35); pointer-events: none; user-select: none; }
+.card-destaque .inline > div > label { color: var(--dest-fg); }
+.topo-destaque .wz-stepper { margin-top: 18px; }
+.wz-stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 700px) { .wz-stepper { grid-template-columns: 1fr; } }
+.wz-step { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; padding: 8px 18px 8px 10px; border-radius: 12px; transition: background .15s; }
+.wz-step:hover { background: var(--dest-btn-hover); }
+.wz-step.active, .wz-step.active:hover { background: var(--bg); }
+.wz-step-num { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 2px solid var(--dest-btn-bd); background: var(--dest-panel-bg); color: var(--dest-fg); transition: all .25s; }
+.wz-step.active .wz-step-num { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
+.wz-step.done .wz-step-num { background: var(--dest-btn-bg); border-color: var(--dest-fg); color: var(--dest-fg); }
+.wz-step:not(.active) .wz-step-num.aviso { background: var(--dest-btn-bg) !important; border: 2px dashed var(--dest-fg) !important; color: var(--dest-fg) !important; }
+.wz-step-label { font-size: 11px; font-weight: 700; color: var(--dest-fg); opacity: .75; text-transform: uppercase; letter-spacing: .05em; }
+.wz-step-title { font-size: 14px; font-weight: 800; color: var(--dest-fg); }
+.wz-step.active .wz-step-label { color: var(--ui-muted); opacity: 1; }
+.wz-step.active .wz-step-title { color: var(--ui-text); }
+.wz-sep { display: none; }   /* o JS ainda mexe na classe; elemento mantido */
+#anoLetivo:disabled, #turmaSelect:disabled { background: color-mix(in srgb, var(--dest-fg, var(--ui-text)) 16%, transparent); border-color: color-mix(in srgb, var(--dest-fg, var(--ui-text)) 40%, transparent); color: var(--dest-fg, var(--ui-text)); opacity: 1; cursor: not-allowed; }
+#naturalidadeCidade:disabled, #naturalidadeUF:disabled { background: var(--ui-brand-faded); border-color: var(--cad-brand-sutil); color: var(--ui-text); opacity: 1; cursor: not-allowed; }
+
+/* ── Foto do aluno ── */
+.foto-box { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; padding: 14px; border: 1.5px dashed var(--ui-border); border-radius: 14px; background: var(--ui-surface); transition: border-color .15s, background .15s; }
+.foto-box:hover { border-color: var(--ui-brand); background: var(--ui-brand-faded); }
+.foto-circulo { width: 88px; height: 88px; border-radius: 50%; overflow: hidden; background: var(--ui-chip-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid var(--ui-border); }
+.foto-circulo img { width: 100%; height: 100%; object-fit: cover; }
+.foto-vazia { font-size: 30px; }
+.foto-info { flex: 1; min-width: 0; }
+.foto-tit { font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+.foto-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.foto-info .help { margin-top: 6px; }
+
+/* ── Documentos: fila de arquivos (sub-card, D19) e progresso ── */
+.docs-fila-lista { display: flex; flex-direction: column; gap: 6px; }
+.docs-fila-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-text); }
+.docs-fila-icon { font-size: 18px; flex-shrink: 0; }
+.docs-fila-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+.docs-fila-info { flex: 1; min-width: 0; }
+.docs-fila-nome { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.docs-fila-meta { font-size: 11px; color: var(--ui-muted); }
+.docs-fila-label { width: 100%; margin-top: 4px; padding: 5px 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--field-bg); color: var(--ui-text); font-size: 12px; font-family: 'Nunito', sans-serif; outline: none; }
+.docs-fila-label:focus { border-color: var(--ui-brand); }
+.docs-fila-size { font-size: 11px; color: var(--ui-muted); flex-shrink: 0; }
+.docs-fila-rm { background: none; border: none; cursor: pointer; font-size: 15px; color: var(--ui-muted); padding: 0 2px; line-height: 1; transition: color .15s; }
+.docs-fila-rm:hover { color: var(--ui-st-bad-fg); }
+.docs-fila-sep-fixo { font-size: 12px; font-weight: 700; color: var(--ui-muted); padding: 6px 0 8px; border-bottom: 1px solid var(--ui-border); margin-bottom: 6px; }
+.docs-existente-sep { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .05em; margin: 8px 0 6px; }
+.docs-fila-item.docs-existente { opacity: .85; }
+.docs-prog-wrap { height: 3px; border-radius: 999px; background: var(--ui-border); margin-top: 4px; overflow: hidden; display: none; }
+.docs-prog-wrap.show { display: block; }
+.docs-prog-bar { height: 100%; border-radius: 999px; background: var(--ui-brand); width: 0%; transition: width .3s; }
+
+/* ── Mensagens de status de ação (D3: candidatas a global; tokens --ui-st-*) ── */
+.cep-status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; margin-top: 5px; padding: 3px 10px; border-radius: 999px; }
+.cep-status.loading { background: var(--ui-chip-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand); }
+.cep-status.ok  { background: var(--ui-st-ok-bg);  color: var(--ui-st-ok-fg);  border: 1px solid var(--ui-st-ok-bd); }
+.cep-status.err { background: var(--ui-st-bad-bg); color: var(--ui-st-bad-fg); border: 1px solid var(--ui-st-bad-bd); }
+.field input.cep-locked { background: var(--ui-chip-bg) !important; color: var(--ui-muted) !important; cursor: default; }
+.docs-status { display: none; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px; margin-top: 8px; }
+.docs-status.show { display: block; }
+.docs-status.ok { background: var(--ui-st-ok-bg); color: var(--ui-st-ok-fg); border: 1px solid var(--ui-st-ok-bd); }
+.docs-status.err { background: var(--ui-st-bad-bg); color: var(--ui-st-bad-fg); border: 1px solid var(--ui-st-bad-bd); }
+.docs-status.loading { background: var(--ui-chip-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-border); }
+.badge-completude { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.badge-completude.verde    { background: var(--ui-st-ok-bg);   border: 1px solid var(--ui-st-ok-bd);   color: var(--ui-st-ok-fg); }
+.badge-completude.amarelo  { background: var(--ui-st-warn-bg); border: 1px solid var(--ui-st-warn-bd); color: var(--ui-st-warn-fg); }
+.badge-completude.vermelho { background: var(--ui-st-bad-bg);  border: 1px solid var(--ui-st-bad-bd);  color: var(--ui-st-bad-fg); }
+
+/* ── Modo somente leitura, modo edição e campos com desbloqueio manual (âmbar → --ui-st-warn-*, D7) ── */
+.modo-readonly { pointer-events: none; opacity: .5; user-select: none; }
+.modo-readonly-overlay { position: absolute; inset: 0; z-index: 10; cursor: not-allowed; }
+.modo-edicao-banner { display: none; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; margin-bottom: 14px; background: var(--ui-st-warn-bg); border: 1px solid var(--ui-st-warn-bd); border-radius: 12px; }
 .modo-edicao-banner.show { display: flex; }
 .modo-edicao-banner-icon { font-size: 20px; }
-.modo-edicao-banner-text { flex: 1; font-size: 13px; font-weight: 700; color: #854d0e; }
-html[data-theme="dark"] .modo-edicao-banner-text { color: #fde047; }
-.modo-edicao-banner-btn {
-  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;
-  border: 1px solid rgba(234,179,8,0.50); background: transparent;
-  color: #854d0e; cursor: pointer; font-family: 'Nunito', sans-serif; transition: background .15s;
-}
-.modo-edicao-banner-btn:hover { background: rgba(234,179,8,0.15); }
-html[data-theme="dark"] .modo-edicao-banner-btn { color: #fde047; }
-/* ── Semilock — campos com desbloqueio manual ── */
+.modo-edicao-banner-text { flex: 1; font-size: 13px; font-weight: 700; color: var(--ui-st-warn-fg); }
+.modo-edicao-banner-btn { padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; border: 1px solid var(--ui-st-warn-bd); background: transparent; color: var(--ui-st-warn-fg); cursor: pointer; font-family: 'Nunito', sans-serif; transition: background .15s; }
+.modo-edicao-banner-btn:hover { background: var(--ui-st-warn-bg); }
 .campo-semilock-wrap { position: relative; }
-.campo-semilock-overlay {
-  position: absolute; inset: 0; border-radius: 10px;
-  background: var(--field-bg); opacity: .55;
-  cursor: pointer; z-index: 2;
-  display: flex; align-items: center; justify-content: flex-end;
-  padding-right: 10px; transition: opacity .15s;
-}
+.campo-semilock-overlay { position: absolute; inset: 0; border-radius: 10px; background: var(--field-bg); opacity: .55; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; transition: opacity .15s; }
 .campo-semilock-overlay:hover { opacity: .35; }
-.campo-semilock-overlay .lock-icon {
-  font-size: 15px; pointer-events: none;
-}
-.campo-semilock-aviso {
-  display: none; margin-top: 5px; padding: 7px 10px;
-  background: rgba(234,179,8,0.10); border: 1px solid rgba(234,179,8,0.40);
-  border-radius: 8px; font-size: 12px; font-weight: 700; color: #854d0e;
-  align-items: center; gap: 8px;
-}
-html[data-theme="dark"] .campo-semilock-aviso { color: #fde047; }
+.campo-semilock-overlay .lock-icon { font-size: 15px; pointer-events: none; }
+.campo-semilock-aviso { display: none; margin-top: 5px; padding: 7px 10px; background: var(--ui-st-warn-bg); border: 1px solid var(--ui-st-warn-bd); border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ui-st-warn-fg); align-items: center; gap: 8px; }
 .campo-semilock-aviso.show { display: flex; }
-.campo-semilock-aviso-btn {
-  padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 800;
-  border: 1px solid rgba(234,179,8,0.50); background: transparent;
-  color: #854d0e; cursor: pointer; font-family: 'Nunito', sans-serif;
-  white-space: nowrap;
-}
-html[data-theme="dark"] .campo-semilock-aviso-btn { color: #fde047; border-color: rgba(234,179,8,.5); }
-.campo-semilock-aviso-btn:hover { background: rgba(234,179,8,0.15); }
+.campo-semilock-aviso-btn { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; border: 1px solid var(--ui-st-warn-bd); background: transparent; color: var(--ui-st-warn-fg); cursor: pointer; font-family: 'Nunito', sans-serif; white-space: nowrap; }
+.campo-semilock-aviso-btn:hover { background: var(--ui-st-warn-bg); }
 
-</style>
-<style id="drive-docs-css">
-/* ── Drop area ── */
-.docs-drop-area {
-  border: 2px dashed var(--border); border-radius: 12px; padding: 20px 16px;
-  text-align: center; cursor: pointer;
-  transition: border-color .2s, background .2s; background: var(--field-bg);
-}
-.docs-drop-area:hover, .docs-drop-area.over {
-  border-color: var(--brand, #7c3aed); background: var(--chip-bg);
-}
-.docs-drop-area input[type="file"] { display: none; }
-.docs-drop-icon { font-size: 26px; margin-bottom: 4px; }
-.docs-drop-text { font-size: 13px; font-weight: 700; color: var(--muted); }
-.docs-drop-text span { color: var(--brand-text, #6d28d9); cursor: pointer; text-decoration: underline; }
+/* ── NEE: blocos Sim/Não, painéis, categorias ── */
+.nee-block { border: 1px solid var(--ui-border); border-radius: 12px; overflow: visible; }
+.nee-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: var(--ui-chip-bg); flex-wrap: wrap; border-radius: 12px; }
+.nee-block:has(.nee-panel.open) .nee-header { border-radius: 12px 12px 0 0; }
+.nee-header-label { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.nee-toggle { display: flex; gap: 6px; }
+.nee-sim-nao, .integral-btn { padding: 6px 18px; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1.5px solid var(--cad-brand-sutil); background: var(--ui-surface); color: var(--ui-muted); cursor: pointer; font-family: 'Nunito', sans-serif; transition: background .15s, border-color .15s, color .15s, filter .15s; }
+.nee-sim-nao:hover, .integral-btn:hover { background: var(--ui-brand-faded); border-color: var(--ui-brand); color: var(--ui-text); }
+.nee-sim-nao.sim, .nee-sim-nao.nao, .integral-btn.selected-sim, .integral-btn.selected-nao { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
+.nee-sim-nao.sim:hover, .nee-sim-nao.nao:hover, .integral-btn.selected-sim:hover, .integral-btn.selected-nao:hover { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); filter: brightness(.92); }
+.nee-panel { display: none; padding: 16px; border-top: 1px solid var(--ui-border); }
+.nee-panel.open { display: block; animation: fadeSlide .18s ease; }
+.nee-section-title { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; }
+.nee-simple-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+@media (max-width: 540px) { .nee-simple-grid { grid-template-columns: 1fr; } }
+.nee-simple-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; border: 1.5px solid var(--ui-border); background: var(--ui-surface); font-size: 13px; font-weight: 700; color: var(--ui-text); transition: background .15s, border-color .15s; user-select: none; }
+.nee-simple-item:hover { border-color: var(--ui-brand); background: var(--ui-brand-faded); }
+.nee-simple-item.checked { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
+.nee-simple-item input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; margin: 0; }
+.nee-simple-item.checked input[type="checkbox"] { accent-color: var(--ui-brand-fg); }
+.nee-category { border: 1px solid var(--ui-border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.nee-category:last-child { margin-bottom: 0; }
+.nee-cat-header { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; background: var(--ui-surface); transition: background .15s; user-select: none; }
+.nee-cat-header:hover { background: var(--ui-chip-bg); }
+.nee-check { width: 18px; height: 18px; flex-shrink: 0; cursor: pointer; }
+.nee-cat-name { font-size: 13px; font-weight: 800; flex: 1; }
+.nee-cat-badge { display: none; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--ui-brand); border: 1px solid var(--ui-brand); color: var(--ui-brand-fg); }
+.nee-cat-badge.visible { display: inline-flex; align-items: center; gap: 4px; }
+.nee-sub { display: none; padding: 10px 14px 12px 42px; border-top: 1px solid var(--ui-border); background: var(--field-bg); gap: 6px; flex-direction: column; }
+.nee-sub.open { display: flex; animation: fadeSlide .15s ease; }
+.nee-radio-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: background .12s; user-select: none; }
+.nee-radio-item:hover { background: var(--ui-brand-faded); }
+.nee-radio-item.selected { background: var(--ui-brand); color: var(--ui-brand-fg); }
+.nee-radio-item input[type="radio"] { width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; margin: 0; }
+.nee-radio-item.selected input[type="radio"] { accent-color: var(--ui-brand-fg); }
 
-/* ── Fila de arquivos pendentes ── */
-.docs-fila-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--card);
-}
-.docs-fila-icon { font-size: 18px; flex-shrink: 0; }
-.docs-fila-info { flex: 1; min-width: 0; }
-.docs-fila-nome { font-size: 13px; font-weight: 700;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.docs-fila-label {
-  width: 100%; margin-top: 4px; padding: 5px 8px;
-  border: 1px solid var(--field-border); border-radius: 8px;
-  background: var(--field-bg); color: var(--text);
-  font-size: 12px; font-family: 'Nunito', sans-serif; outline: none;
-}
-.docs-fila-label:focus { border-color: var(--brand, #7c3aed); }
-.docs-fila-size { font-size: 11px; color: var(--muted); flex-shrink: 0; }
-.docs-fila-rm {
-  background: none; border: none; cursor: pointer;
-  font-size: 15px; color: var(--muted); padding: 0 2px; line-height: 1;
-  transition: color .15s;
-}
-.docs-fila-rm:hover { color: #b91c1c; }
+/* ── Zona de perigo (Trocar de turma / Encerrar matrícula): visual próprio, pílula vermelha (guia 13.2) ── */
+.nee-block.danger { border-color: var(--ui-st-bad-bd); }
+.nee-block.danger .nee-header { background: var(--ui-st-bad-bg); }
+.dz-row { flex-wrap: nowrap !important; gap: 16px; align-items: center; }
+.dz-row > div { flex: 1 1 auto; min-width: 0; }
+.dz-row > button { flex: 0 0 auto; white-space: nowrap; }
+.dz-row.dz-primeira { border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--ui-st-bad-bd); }
+.dz-row.dz-ultima { border-radius: 0 0 12px 12px; }
+@media (max-width: 560px) { .dz-row { flex-wrap: wrap !important; } }
+.dz-wrap { width: 100%; margin-top: 10px; }
+.dz-desc { font-size: 12px; color: var(--ui-muted); margin-top: 3px; font-weight: 600; }
+.dz-btn { padding: 6px 18px; border-radius: 999px; font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; background: var(--ui-st-bad-bg); border: 1.5px solid var(--ui-st-bad-bd); color: var(--ui-st-bad-fg); }
+.dz-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-st-bad-fg) 20%, transparent); border-color: var(--ui-st-bad-fg); }
+.dz-btn:disabled { opacity: .5; cursor: not-allowed; }
+.cm-opcoes { display: flex; flex-direction: column; gap: 8px; }
+.cm-box.cm-box-420 { max-width: 420px; }
+.cm-nota { margin: 12px 0 0; font-size: 12px; }
 
-/* ── Status ── */
-.docs-status {
-  display: none; font-size: 12px; font-weight: 700;
-  padding: 6px 12px; border-radius: 8px; margin-top: 8px;
-}
-.docs-status.show   { display: block; }
-.docs-status.ok     { background: rgba(22,163,74,.10); color: #166534; border: 1px solid rgba(22,163,74,.30); }
-.docs-status.err    { background: rgba(239,68,68,.08); color: #b91c1c; border: 1px solid rgba(239,68,68,.30); }
-.docs-status.loading{ background: var(--chip-bg); color: var(--brand-text,#6d28d9); border: 1px solid var(--border); }
-html[data-theme="dark"] .docs-status.ok  { color: #4ade80; }
-html[data-theme="dark"] .docs-status.err { color: #fca5a5; }
-
-/* ── Barra de progresso por arquivo ── */
-.docs-prog-wrap { height: 3px; border-radius: 999px; background: var(--border); margin-top: 4px; overflow: hidden; display: none; }
-.docs-prog-wrap.show { display: block; }
-.docs-prog-bar  { height: 100%; border-radius: 999px; background: var(--brand,#7c3aed); width: 0%; transition: width .3s; }
-</style>
-
-<style id="padrao-visual-ano-ativo">
-/* Padrão visual de cadastro-funcionario.html (guia de contraste, partes 1, 2 e 5) */
-:root{
-  --pf-brand:var(--brand,#7c3aed);
-  --pf-brand-text:var(--brand-text,#6d28d9);
-  --pf-brand-faded:var(--brand-faded,#f5f3ff);
-  --pf-body-bg:var(--bg,#ffffff);
-  --pf-brand-sutil:color-mix(in srgb, var(--pf-brand) 38%, #ffffff);
-}
-html[data-theme="dark"]{
-  --pf-brand:var(--brand-d,#8b5cf6);
-  --pf-brand-text:var(--brand-text-d,#c4b5fd);
-  --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
-  --pf-body-bg:var(--bg,#0b1220);
-  --pf-brand-sutil:color-mix(in srgb, var(--pf-brand) 50%, #000000);
-}
-
-/* Card de destaque (contraste calculado por ThemeColors.ajustarContraste()) */
-.card.card-destaque{
-  --dest-fg:#ffffff; --dest-btn-bg:rgba(255,255,255,.18); --dest-btn-bd:rgba(255,255,255,.40);
-  --dest-btn-hover:rgba(255,255,255,.28); --dest-panel-bg:rgba(255,255,255,.10);
-  background:var(--btn-home-bg); border-color:var(--btn-home-border);
-}
-html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); border-color:var(--btn-home-border); }
-.card.card-destaque.contraste-claro{
-  --dest-fg:#0f172a; --dest-btn-bg:rgba(0,0,0,.08); --dest-btn-bd:rgba(0,0,0,.25);
-  --dest-btn-hover:rgba(0,0,0,.16); --dest-panel-bg:rgba(0,0,0,.06); border-color:var(--border);
-}
-.card-destaque h2, .card-destaque h3, .card-destaque .field > label, .card-destaque .inline > div > label{ color:var(--dest-fg); }
-.card-destaque .req{ color:var(--dest-fg); }
-.card-destaque .subnote{ color:var(--dest-fg); opacity:.85; }
-
-/* Ícone de dica (ⓘ) */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia,"Times New Roman",serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px,70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card); border:1.5px solid var(--border); color:var(--text);
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal; line-height:1.4;
-  white-space:normal; cursor:default; text-align:left; text-transform:none; letter-spacing:normal;
-}
-.info-tip.open .info-tip-bubble{ display:block; }
-
-/* Card do topo: turma + etapas */
-.topo-destaque .wz-stepper{ margin-top:18px; }
-
-/* Stepper dentro do destaque */
-.wz-stepper{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-@media(max-width:700px){ .wz-stepper{ grid-template-columns:1fr; } }
-.wz-step{ display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; padding:8px 18px 8px 10px; border-radius:12px; transition:background .15s; }
-.wz-step:hover{ background:var(--dest-btn-hover); }
-.wz-step.active, .wz-step.active:hover{ background:var(--pf-body-bg); }
-.wz-step-num{ width:32px; height:32px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; border:2px solid var(--dest-btn-bd); background:var(--dest-panel-bg); color:var(--dest-fg); transition:all .25s; }
-.wz-step.active .wz-step-num{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
-.wz-step.done .wz-step-num{ background:var(--dest-btn-bg); border-color:var(--dest-fg); color:var(--dest-fg); }
-.wz-step:not(.active) .wz-step-num.aviso{ background:var(--dest-btn-bg) !important; border:2px dashed var(--dest-fg) !important; color:var(--dest-fg) !important; }
-.wz-step-label{ font-size:11px; font-weight:700; color:var(--dest-fg); opacity:.75; text-transform:uppercase; letter-spacing:.05em; }
-.wz-step-title{ font-size:14px; font-weight:800; color:var(--dest-fg); }
-.wz-step.active .wz-step-label{ color:var(--muted); opacity:1; }
-.wz-step.active .wz-step-title{ color:var(--text); }
-.wz-sep{ display:none; } /* o JS ainda mexe na classe; elemento mantido */
-
-/* Formulário bloqueado até escolher a turma (os valores dos campos NÃO são apagados) */
-.wz-etapa.bloqueada{ opacity:.5; filter:grayscale(.35); pointer-events:none; user-select:none; }
-
-/* Aviso "Etapa 1 incompleta" — chip neutro (guia 1.9), sem fundo amarelo */
-.wz-etapa2-aviso{
-  display:none; align-items:center; gap:8px;
-  background:var(--chip-bg); border:1px solid var(--chip-border); border-left:4px solid #d97706;
-  color:var(--ink); padding:12px 14px; border-radius:12px; margin-bottom:12px;
-  font-size:13px; font-weight:700; line-height:1.4;
-}
-.wz-etapa2-aviso.show{ display:flex; }
-
-/* Foto do aluno: hover de marca na caixa e nos botões */
-.foto-box{ display:flex; align-items:center; gap:16px; margin-bottom:16px; padding:14px; border:1.5px dashed var(--border,#ddd6fe); border-radius:14px; background:var(--card); transition:border-color .15s,background .15s; }
-.foto-box:hover{ border-color:var(--pf-brand); background:var(--pf-brand-faded); }
-.foto-box .btn.small{ transition:background .15s,border-color .15s,color .15s; }
-.foto-box .btn.small:hover:not(:disabled){ background:var(--pf-brand-faded); border-color:var(--pf-brand); color:var(--text); }
-
-/* Área de documentos: hover com par escuro (tokens --pf-*) */
-.docs-drop-area:hover, .docs-drop-area.over{ border-color:var(--pf-brand); background:var(--chip-bg); }
-.docs-drop-text span{ color:var(--pf-brand-text); }
-
-/* NEE — mesmo desenho do cadastro de funcionários (classes do aluno mantidas: .nee-sim-nao) */
-.nee-block{ border:1px solid var(--border); border-radius:12px; overflow:hidden; }
-.nee-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; background:var(--chip-bg,#f5f3ff); flex-wrap:wrap; }
-.nee-header-label{ font-size:13px; font-weight:800; display:flex; align-items:center; gap:8px; }
-.nee-toggle{ display:flex; gap:6px; }
-/* Botões do cabeçalho (NEE, AEE e Modelo de ensino): mesmo desenho */
-.nee-sim-nao, .integral-btn{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; border:1.5px solid var(--pf-brand-sutil); background:var(--card); color:var(--muted); cursor:pointer; font-family:'Nunito',sans-serif; transition:background .15s,border-color .15s,color .15s,filter .15s; }
-.nee-sim-nao:hover, .integral-btn:hover{ background:var(--pf-brand-faded); border-color:var(--pf-brand); color:var(--text); }
-.nee-sim-nao.sim, .nee-sim-nao.nao, .integral-btn.selected-sim, .integral-btn.selected-nao{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
-.nee-sim-nao.sim:hover, .nee-sim-nao.nao:hover, .integral-btn.selected-sim:hover, .integral-btn.selected-nao:hover{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); filter:brightness(.92); }
-.nee-panel{ display:none; padding:16px; border-top:1px solid var(--border); }
-.nee-panel.open{ display:block; animation:fadeSlide .18s ease; }
-.nee-section-title{ font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:0 0 8px; }
-.nee-simple-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
-.nee-simple-item{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer; border:1.5px solid var(--border); background:var(--card); font-size:13px; font-weight:700; color:var(--text); transition:background .15s,border-color .15s; user-select:none; }
-.nee-simple-item:hover{ border-color:var(--pf-brand); background:var(--pf-brand-faded); }
-.nee-simple-item.checked{ background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff); }
-.nee-simple-item input[type="checkbox"]{ width:16px; height:16px; flex-shrink:0; accent-color:var(--pf-brand); cursor:pointer; margin:0; }
-.nee-simple-item.checked input[type="checkbox"]{ accent-color:var(--brand-fg,#fff); }
-.nee-category{ border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:8px; }
-.nee-category:last-child{ margin-bottom:0; }
-.nee-cat-header{ display:flex; align-items:center; gap:10px; padding:11px 14px; cursor:pointer; background:var(--card); transition:background .15s; user-select:none; }
-.nee-cat-header:hover{ background:var(--chip-bg,#f5f3ff); }
-.nee-check{ width:18px; height:18px; flex-shrink:0; accent-color:var(--pf-brand); cursor:pointer; }
-.nee-cat-name{ font-size:13px; font-weight:800; flex:1; }
-.nee-cat-badge{ display:none; font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; background:var(--pf-brand); border:1px solid var(--pf-brand); color:var(--brand-fg,#fff); }
-.nee-cat-badge.visible{ display:inline-flex; align-items:center; gap:4px; }
-.nee-sub{ display:none; padding:10px 14px 12px 42px; border-top:1px solid var(--border); background:var(--field-bg); gap:6px; flex-direction:column; }
-.nee-sub.open{ display:flex; animation:fadeSlide .15s ease; }
-.nee-radio-item{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; padding:6px 10px; border-radius:8px; cursor:pointer; transition:background .12s; user-select:none; }
-.nee-radio-item:hover{ background:var(--pf-brand-faded); }
-.nee-radio-item.selected{ background:var(--pf-brand); color:var(--brand-fg,#fff); }
-.nee-radio-item input[type="radio"]{ width:15px; height:15px; flex-shrink:0; accent-color:var(--pf-brand); cursor:pointer; margin:0; }
-.nee-radio-item.selected input[type="radio"]{ accent-color:var(--brand-fg,#fff); }
-
-/* Zona de perigo (mesmo desenho do .nee-block, em vermelho translúcido) e modais */
-.nee-block.danger{ border-color:rgba(185,28,28,.35); }
-.nee-block.danger .nee-header{ background:rgba(185,28,28,.06); }
-.dz-row{ flex-wrap:nowrap !important; gap:16px; align-items:center; }
-.dz-row > div{ flex:1 1 auto; min-width:0; }
-.dz-row > button{ flex:0 0 auto; white-space:nowrap; }
-@media (max-width:560px){ .dz-row{ flex-wrap:wrap !important; } }
-#anoLetivo:disabled, #turmaSelect:disabled{ background:color-mix(in srgb, var(--dest-fg, var(--text)) 16%, transparent); border-color:color-mix(in srgb, var(--dest-fg, var(--text)) 40%, transparent); color:var(--dest-fg, var(--text)); opacity:1; cursor:not-allowed; }
-#naturalidadeCidade:disabled, #naturalidadeUF:disabled{ background:var(--pf-brand-faded); border-color:var(--pf-brand-sutil); color:var(--text); opacity:1; cursor:not-allowed; }
-.id-banner.dup{ border-color:rgba(185,28,28,.40); border-left-color:var(--danger); background:rgba(185,28,28,.08); }
-.id-banner.dup .id-banner-nome{ color:var(--danger); }
-html[data-theme="dark"] .id-banner.dup .id-banner-nome{ color:#fca5a5; }
-.id-banner.dup .id-banner-sub{ color:var(--text); font-weight:700; }
-.dz-desc{ font-size:12px; color:var(--muted); margin-top:3px; font-weight:600; }
-.dz-btn{ padding:6px 18px; border-radius:999px; font-size:12px; font-weight:800; font-family:inherit; cursor:pointer; background:rgba(185,28,28,.10); border:1.5px solid rgba(185,28,28,.35); color:var(--danger); }
-.dz-btn:hover:not(:disabled){ background:rgba(185,28,28,.20); border-color:rgba(185,28,28,.60); }
-.dz-btn:disabled{ opacity:.5; cursor:not-allowed; }
-html[data-theme="dark"] .dz-btn{ color:#fca5a5; border-color:rgba(248,113,113,.45); }
-html[data-theme="dark"] .dz-btn:hover:not(:disabled){ background:rgba(248,113,113,.34); border-color:rgba(248,113,113,.70); color:#fecaca; }
-.cm-box{ background:var(--card-bg,var(--card,#fff)); border:1px solid var(--border); border-radius:14px; padding:22px; max-width:440px; width:100%; box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto; }
-.cm-titulo{ margin:0 0 6px; font-size:16px; font-weight:800; color:var(--text); }
-.cm-titulo.perigo{ color:var(--danger); }
-html[data-theme="dark"] .cm-titulo.perigo{ color:#fca5a5; }
-.cm-corpo{ margin:0 0 14px; font-size:13px; color:var(--text); white-space:pre-line; line-height:1.5; }
-.cm-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
-.cm-ok{ padding:9px 16px; border-radius:8px; font-size:13px; font-weight:800; font-family:'Nunito',sans-serif; cursor:pointer; background:var(--brand); border:1px solid var(--brand); color:var(--brand-fg,#fff); }
-.cm-ok:hover:not(:disabled){ filter:brightness(1.08); }
-.cm-ok:disabled{ opacity:.55; cursor:not-allowed; }
-.cm-ok.perigo{ background:var(--danger); border-color:var(--danger); color:#fff; }
-html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626; }
-.cm-opcao{ width:100%; justify-content:flex-start; }
-
-/* Identificação do aluno (CPF / Nome) */
-.nee-block{ overflow:visible; }
-.nee-header{ border-radius:12px; }
-.nee-block:has(.nee-panel.open) .nee-header{ border-radius:12px 12px 0 0; }
-.ident-trava{ opacity:.5; filter:grayscale(.35); pointer-events:none; user-select:none; }
-.id-banner{ display:none; align-items:center; gap:14px; flex-wrap:wrap; background:var(--chip-bg); border:1px solid var(--chip-border); border-left:4px solid var(--pf-brand); color:var(--ink,var(--text)); padding:12px 14px; border-radius:12px; margin-bottom:12px; }
-.id-banner-ico{ font-size:22px; }
-.id-banner-txt{ flex:1; min-width:0; }
-.id-banner-nome{ font-weight:800; font-size:14px; }
-.id-banner-sub{ font-size:12px; color:var(--muted); margin-top:2px; }
-.id-resultados{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
-.id-resultados[hidden]{ display:none; }
-.id-res-item{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; width:100%; padding:10px 12px; border-radius:10px; border:1.5px solid var(--pf-brand-sutil); background:var(--card); color:var(--text); font-family:'Nunito',sans-serif; cursor:pointer; transition:background .15s,border-color .15s; }
-.id-res-item:hover, .id-res-item:focus-visible{ background:var(--pf-brand-faded); border-color:var(--pf-brand); outline:none; }
-.id-res-nome{ font-size:13px; font-weight:800; }
-.id-res-meta{ font-size:11px; color:var(--muted); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.id-tag{ padding:1px 8px; border-radius:999px; border:1px solid var(--chip-border); background:var(--chip-bg); color:var(--ink,var(--text)); font-weight:700; }
-.id-res-novo{ flex-direction:row; align-items:center; font-size:13px; font-weight:800; border-style:dashed; }
+/* ── Identificação do aluno (CPF / Nome) ── */
+.ident-trava { opacity: .5; filter: grayscale(.35); pointer-events: none; user-select: none; }
+.id-banner { display: none; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--ui-chip-bg); border: 1px solid var(--ui-chip-border); border-left: 4px solid var(--ui-brand); color: var(--ui-text); padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; }
+.id-banner.dup { border-color: var(--ui-st-bad-bd); border-left-color: var(--ui-st-bad-fg); background: var(--ui-st-bad-bg); }
+.id-banner.dup .id-banner-nome { color: var(--ui-st-bad-fg); }
+.id-banner.dup .id-banner-sub { color: var(--ui-text); font-weight: 700; }
+.id-banner-ico { font-size: 22px; }
+.id-banner-txt { flex: 1; min-width: 0; }
+.id-banner-nome { font-weight: 800; font-size: 14px; }
+.id-banner-sub { font-size: 12px; color: var(--ui-muted); margin-top: 2px; }
+.id-resultados { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.id-resultados[hidden] { display: none; }
+.id-res-item { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; width: 100%; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--cad-brand-sutil); background: var(--ui-surface); color: var(--ui-text); font-family: 'Nunito', sans-serif; cursor: pointer; transition: background .15s, border-color .15s; }
+.id-res-item:hover, .id-res-item:focus-visible { background: var(--ui-brand-faded); border-color: var(--ui-brand); outline: none; }
+.id-res-nome { font-size: 13px; font-weight: 800; }
+.id-res-meta { font-size: 11px; color: var(--ui-muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.id-res-vazio { padding: 4px 2px; }
+.id-tag { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--ui-chip-border); background: var(--ui-chip-bg); color: var(--ui-text); font-weight: 700; }
+.id-res-novo { flex-direction: row; align-items: center; font-size: 13px; font-weight: 800; border-style: dashed; }
 </style>
 
 <title>Cadastro de alunos • Ano Ativo</title>
@@ -685,13 +315,13 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 <main class="wrap">
 <section class="card card-destaque topo-destaque">
 <div class="card-head">
-<h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno. Na edição, turma e ano ficam travados (a série pode ser corrigida aqui); para mudar o aluno de turma, use o botão “Trocar de turma” no fim da página.</span></span></h2>
+<h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno. Na edição, turma e ano ficam travados (a série pode ser corrigida aqui); para mudar o aluno de turma, use o botão “Trocar de turma” no fim da página.</span></span></h2>
 </div>
 <div class="inline">
 <div>
 <label for="turmaSelect">Turma<span class="req">*</span></label>
 <select id="turmaSelect">
-<option value="">— Selecione —</option>
+<option value="" disabled hidden selected></option>
 </select>
 </div>
 <div>
@@ -730,25 +360,23 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 <div class="wz-etapa ativa" id="wzEtapa1">
 
 <section class="card">
-<h2><span id="paginaTitulo">Dados do aluno</span> <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Todos os campos abaixo são obrigatórios, menos a foto do aluno! Caso o aluno não tenha as condições dos 2 últimos campos (deficiências e transtornos), marque-os como “Não”!</span></span></h2>
-<div class="warn" id="msgForm" style="display:none"></div>
+<h2><span id="paginaTitulo">Dados do aluno</span> <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Todos os campos abaixo são obrigatórios, menos a foto do aluno! Caso o aluno não tenha as condições dos 2 últimos campos (deficiências e transtornos), marque-os como “Não”!</span></span></h2>
+<div class="aviso-warn" id="msgForm" hidden></div>
 
 <!-- Foto do aluno -->
 <div id="fotoAlunoBox" class="foto-box">
-  <div id="fotoAlunoPreviewWrap" style="width:88px;height:88px;border-radius:50%;overflow:hidden;
-    background:var(--chip-bg,#f3f0ff);display:flex;align-items:center;justify-content:center;flex-shrink:0;
-    border:2px solid var(--border,#ddd6fe);">
-    <img id="fotoAlunoPreview" src="" alt="Foto do aluno" style="display:none;width:100%;height:100%;object-fit:cover;">
-    <span id="fotoAlunoPlaceholder" style="font-size:30px;">🧑</span>
+  <div id="fotoAlunoPreviewWrap" class="foto-circulo">
+    <img id="fotoAlunoPreview" src="" alt="Foto do aluno" hidden>
+    <span id="fotoAlunoPlaceholder" class="foto-vazia">🧑</span>
   </div>
-  <div style="flex:1;min-width:0;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:10px;">Foto do aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Aparece na ficha individual (PDF) e na visualização na pesquisa. Comprimida automaticamente antes de enviar.</span></span></div>
-    <input type="file" id="inpFotoAluno" accept="image/*" style="display:none;">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+  <div class="foto-info">
+    <div class="foto-tit">Foto do aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Aparece na ficha individual (PDF) e na visualização na pesquisa. Comprimida automaticamente antes de enviar.</span></span></div>
+    <input type="file" id="inpFotoAluno" accept="image/*" hidden>
+    <div class="foto-acoes">
       <button type="button" class="btn small" id="btnEscolherFoto" onclick="document.getElementById('inpFotoAluno').click()">📷 Escolher foto</button>
-      <button type="button" class="btn small" id="btnRemoverFoto" style="display:none;">🗑️ Remover</button>
+      <button type="button" class="btn small" id="btnRemoverFoto" hidden>🗑️ Remover</button>
     </div>
-    <div id="fotoAlunoStatus" style="font-size:12px;margin-top:6px;"></div>
+    <div id="fotoAlunoStatus" class="help"></div>
   </div>
 </div>
 
@@ -770,15 +398,15 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
     <div class="id-banner-nome" id="bannerNome">—</div>
     <div class="id-banner-sub" id="bannerSub">—</div>
   </div>
-  <button type="button" class="btn small ghost" id="btnLimparAutoFill">↺ Refazer identificação</button>
+  <button type="button" class="btn small secondary" id="btnLimparAutoFill">↺ Refazer identificação</button>
 </div>
 
 <div class="grid-3">
   <!-- Seletor de identificação -->
-  <div class="field ident-keep" id="fieldIdentModo" style="grid-column:1/-1;">
+  <div class="field ident-keep col-full" id="fieldIdentModo">
     <div class="nee-block">
       <div class="nee-header">
-        <div class="nee-header-label">🔎 Identificar por <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>CPF:</b> procura o aluno primeiro entre os do ano-ativo (cria uma nova matrícula) e depois no histórico das atas.<br><br><b>Nome:</b> use quando o aluno já estudou na escola e você quer vincular o cadastro ao histórico dele. Digite o nome e tecle Enter (mínimo 2 palavras). São exibidos apenas 3 resultados — quanto mais completo o nome, mais preciso.<br><br>O CPF continua obrigatório nos dois casos.<br><br><b>Aluno já matriculado no ano letivo:</b> o cadastro fica bloqueado para evitar duas matrículas (ou dois documentos) do mesmo aluno. Para corrigir dados, série ou mudar de turma, use a edição do aluno na pesquisa (botão “Trocar de turma”); se a matrícula estiver encerrada, use a readmissão.</span></span></div>
+        <div class="nee-header-label">🔎 Identificar por <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>CPF:</b> procura o aluno primeiro entre os do ano-ativo (cria uma nova matrícula) e depois no histórico das atas.<br><br><b>Nome:</b> use quando o aluno já estudou na escola e você quer vincular o cadastro ao histórico dele. Digite o nome e tecle Enter (mínimo 2 palavras). São exibidos apenas 3 resultados — quanto mais completo o nome, mais preciso.<br><br>O CPF continua obrigatório nos dois casos.<br><br><b>Aluno já matriculado no ano letivo:</b> o cadastro fica bloqueado para evitar duas matrículas (ou dois documentos) do mesmo aluno. Para corrigir dados, série ou mudar de turma, use a edição do aluno na pesquisa (botão “Trocar de turma”); se a matrícula estiver encerrada, use a readmissão.</span></span></div>
         <div class="nee-toggle">
           <button type="button" class="integral-btn selected-sim" id="btnModoCPF" onclick="_setModoId('cpf')">CPF</button>
           <button type="button" class="integral-btn" id="btnModoNome" onclick="_setModoId('nome')">Nome</button>
@@ -819,7 +447,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="field">
     <label for="sexo">Sexo <span class="req">*</span></label>
     <select id="sexo" required>
-      <option value="">— selecione —</option>
+      <option value="" disabled hidden selected></option>
       <option value="F">Feminino</option>
       <option value="M">Masculino</option>
       <option value="O">Outro</option>
@@ -827,9 +455,9 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   </div>
 
   <div class="field">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;">
-      <label style="margin:0;">Naturalidade <span class="req">*</span></label>
-      <label style="margin:0;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer;"><input type="checkbox" id="natEstrangeiro" style="width:15px;height:15px;cursor:pointer;"/> Estrangeiro</label>
+    <div class="nat-label-row">
+      <label>Naturalidade <span class="req">*</span></label>
+      <label class="check"><input type="checkbox" id="natEstrangeiro"/> Estrangeiro</label>
     </div>
     <div class="inline-2">
       <div class="nat-wrap">
@@ -839,7 +467,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
         <div class="nat-dropdown" id="natDropdown" role="listbox"></div>
       </div>
       <select id="naturalidadeUF" required>
-        <option value="">--</option>
+        <option value="" disabled hidden selected></option>
         <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
         <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
         <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
@@ -854,8 +482,8 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="field">
     <label for="pai">Nome do pai <span class="req">*</span></label>
     <input id="pai" placeholder="Nome do pai" required oninput="this.value=this.value.toUpperCase()" />
-    <label class="inline-check" style="margin-top:8px;">
-      <input type="checkbox" id="paiNaoInformado" style="transform:scale(1.05)"/>
+    <label class="check mt-8">
+      <input type="checkbox" id="paiNaoInformado"/>
       <span>Pai não informado</span>
     </label>
   </div>
@@ -876,14 +504,14 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="field">
     <label for="serieAluno">Série do aluno na turma <span class="req">*</span></label>
     <select id="serieAluno" required>
-      <option value="">— Selecione a turma primeiro —</option>
+      <option value="" disabled hidden selected></option>
     </select>
   </div>
 
-  <div class="field" style="grid-column:1/-1;">
+  <div class="field col-full">
     <div class="nee-block">
       <div class="nee-header">
-        <div class="nee-header-label">📚 Modelo de ensino <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble"><b>Regular:</b> o aluno estuda em apenas um turno, cursando a sua série pedagógica.<br><br><b>Integral:</b> o aluno estuda o ensino regular no turno da turma e, no contraturno, participa de aulas e atividades extras.</span></span></div>
+        <div class="nee-header-label">📚 Modelo de ensino <span class="req">*</span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Regular:</b> o aluno estuda em apenas um turno, cursando a sua série pedagógica.<br><br><b>Integral:</b> o aluno estuda o ensino regular no turno da turma e, no contraturno, participa de aulas e atividades extras.</span></span></div>
         <div class="nee-toggle">
           <button type="button" class="integral-btn" id="btnIntegralNao" onclick="_setIntegral(false)">Regular</button>
           <button type="button" class="integral-btn" id="btnIntegralSim" onclick="_setIntegral(true)">Integral</button>
@@ -898,7 +526,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 
 <!-- NEE — Deficiências -->
 <div class="divider"></div>
-<div class="nee-block" style="margin-bottom:10px;">
+<div class="nee-block mb-10">
   <div class="nee-header">
     <div class="nee-header-label">♿ Aluno(a) com deficiência, TEA ou altas habilidades / superdotação?</div>
     <div class="nee-toggle">
@@ -972,7 +600,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
      habilidades OU transtorno) foi marcada. Campo OPCIONAL: não é obrigatório
      vincular um profissional mesmo com NEE marcada. Lista vem do módulo de
      Funcionários (função "Profissional de Apoio"). -->
-<div class="field" id="blocoProfissionalApoio" style="display:none;margin-top:12px;">
+<div class="field mt-12" id="blocoProfissionalApoio" hidden>
   <label for="neeProfissionalApoio">🧑‍🏫 Profissional de apoio (opcional)</label>
   <select id="neeProfissionalApoio">
     <option value="">— nenhum selecionado —</option>
@@ -984,7 +612,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
      padrão visual dos blocos de deficiência/transtorno acima, e só aparece
      depois que alguma NEE (deficiência OU transtorno) for marcada como
      "Sim" — mesma regra do bloco de Profissional de Apoio. -->
-<div class="nee-block" id="blocoAee" style="display:none;margin-top:12px;">
+<div class="nee-block mt-12" id="blocoAee" hidden>
   <div class="nee-header">
     <div class="nee-header-label">🏫 Frequenta a sala do AEE (Atendimento Educacional Especializado)?</div>
     <div class="nee-toggle">
@@ -992,7 +620,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
       <button type="button" class="nee-sim-nao" id="btnAeeNao" onclick="_aeeSet(false)">Não</button>
     </div>
   </div>
-  <input type="checkbox" id="aeeFrequenta" style="display:none;">
+  <input type="checkbox" id="aeeFrequenta" hidden>
 </div>
 
 <div class="actions-wizard">
@@ -1015,10 +643,10 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 <h2>Dados complementares <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Todos os campos abaixo são opcionais — enriquecem o cadastro para o censo escolar e consultas futuras.</span></span></h2>
 
 <!-- Aviso etapa 1 incompleta -->
-<div class="wz-etapa2-aviso" id="wzAviso1Incompleta">⚠️ Etapa 1 incompleta: faltam dados obrigatórios do aluno. Clique em “Identificação e matrícula”, no topo da página, para completá-los antes de salvar.</div>
+<div class="aviso-warn" id="wzAviso1Incompleta" hidden>⚠️ Etapa 1 incompleta: faltam dados obrigatórios do aluno. Clique em “Identificação e matrícula”, no topo da página, para completá-los antes de salvar.</div>
 
 <!-- Documentos -->
-<h3 style="margin:0 0 10px;">📄 Documentos</h3>
+<h3 class="sec-tit">📄 Documentos</h3>
 <div class="grid-3">
   <div class="field">
     <label for="compRG">RG</label>
@@ -1037,7 +665,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 <div class="divider"></div>
 
 <!-- Endereço -->
-<h3 style="margin:0 0 10px;">📍 Endereço</h3>
+<h3 class="sec-tit">📍 Endereço</h3>
 <div class="grid-3">
   <div class="field">
     <label for="compPais">País</label>
@@ -1049,7 +677,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="field">
     <label for="compZona">Zona</label>
     <select id="compZona">
-      <option value="">— selecione —</option>
+      <option value=""></option>
       <option value="URBANA">Urbana</option>
       <option value="RURAL">Rural</option>
     </select>
@@ -1066,7 +694,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
   <div class="field">
     <label for="compUF">UF</label>
     <select id="compUF">
-      <option value="">--</option>
+      <option value=""></option>
       <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
       <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
       <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
@@ -1090,29 +718,29 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 <div class="divider"></div>
 
 <!-- Observações -->
-<h3 style="margin:0 0 10px;">📝 Observações</h3>
+<h3 class="sec-tit">📝 Observações</h3>
 <div class="field">
-  <textarea id="compObs" placeholder="Informações adicionais, observações pedagógicas, anotações…" style="width:100%;min-height:80px;padding:10px 12px;border:1px solid var(--field-border);border-radius:10px;background:var(--field-bg);color:var(--text);font-size:14px;font-family:'Nunito',sans-serif;outline:none;resize:vertical;"></textarea>
+  <textarea id="compObs" class="obs" placeholder="Informações adicionais, observações pedagógicas, anotações…"></textarea>
 </div>
 
 <div class="divider"></div>
 
 <!-- Documentos — fila de arquivos, upload junto ao salvar -->
-<h3 style="margin:0 0 10px;">📎 Documentos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Arquivos selecionados serão enviados ao salvar.</span></span></h3>
+<h3 class="sec-tit">📎 Documentos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Arquivos selecionados serão enviados ao salvar.</span></span></h3>
 
-<div class="docs-drop-area" id="docsDropArea">
-  <input type="file" id="docsFileInput" multiple
+<div class="drop-area" id="docsDropArea">
+  <input type="file" id="docsFileInput" multiple hidden
     accept=".pdf,.jpg,.jpeg,.png,.webp"/>
-  <div class="docs-drop-icon">📂</div>
-  <div class="docs-drop-text">
+  <div class="drop-icon">📂</div>
+  <div class="drop-text">
     Arraste arquivos aqui ou <span onclick="document.getElementById('docsFileInput').click()">clique para selecionar</span>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-top:4px;">Imagens (JPG, PNG, WEBP) ou PDF — PDFs são convertidos em imagens — máx. 10 MB · PDFs máx. 12 páginas</div>
+  <div class="help">Imagens (JPG, PNG, WEBP) ou PDF — PDFs são convertidos em imagens — máx. 10 MB · PDFs máx. 12 páginas</div>
 </div>
 
 <!-- Fila de arquivos selecionados (ainda não enviados) -->
-<div id="docsFilaWrap" style="display:none;margin-top:0;">
-  <div id="docsFilaLista" style="display:flex;flex-direction:column;gap:6px;"></div>
+<div id="docsFilaWrap" hidden>
+  <div id="docsFilaLista" class="docs-fila-lista"></div>
 </div>
 
 <div class="docs-status" id="docsStatus"></div>
@@ -1129,7 +757,7 @@ html[data-theme="dark"] .cm-ok.perigo{ background:#dc2626; border-color:#dc2626;
 </main>
 
 <!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
-<script src="../header-logic.js"></script>
+<script src="../header-logic.js?v=7"></script>
 
 <!-- 2. Scripts específicos da página (wizard de cadastro + upload de documentos) -->
 <script>
@@ -1272,7 +900,7 @@ function normSerie(s){
     // O span "msgForm" antigo ficava fora de vista quando a página estava
     // rolada — some sempre e vira toast fixo (independe de scroll).
     const el = document.getElementById("msgForm");
-    if(el) el.style.display = "none";
+    if(el) el.hidden = true;
     const t = (text||"").toString();
     if(!t) return;
     if(kind === "err") _toastErro('⚠️ ' + t);
@@ -1371,8 +999,8 @@ function normSerie(s){
     const ativo = isAnoAtivo(anoLetivo.value);
 
     if(ativo){
-      wrapPadrao.style.display = 'none';
-      fieldAluno.style.display = 'none';
+      wrapPadrao.hidden = true;
+      fieldAluno.hidden = true;
       statusPadrao.innerHTML = '';
       statusAluno.innerHTML = '';
       return;
@@ -1380,12 +1008,12 @@ function normSerie(s){
 
     // na edição só existe a situação da matrícula aberta; a "padrão" só vale para cadastro novo
     const emEdicao = new URLSearchParams(window.location.search).has('editar');
-    wrapPadrao.style.display = emEdicao ? 'none' : '';
-    fieldAluno.style.display = '';
+    wrapPadrao.hidden = !!emEdicao;
+    fieldAluno.hidden = false;
     if(labelPadrao) labelPadrao.textContent = 'Situação padrão da matrícula';
     if(labelAluno)  labelAluno.textContent  = 'Situação';
 
-    const optsHtml = '<option value="">— selecione —</option>' +
+    const optsHtml = '<option value="" disabled hidden selected></option>' +
       SITUACOES_OPCOES.map(o => `<option value="${o.v}">${o.t}</option>`).join('');
 
     const padraoAnterior = statusPadrao.value;
@@ -1404,7 +1032,7 @@ function normSerie(s){
       ? allTurmas.filter(t => String(t.anoLetivo||"") === anoFiltro)
       : allTurmas;
 
-    turmaSelect.innerHTML = '<option value="">— Selecione —</option>';
+    turmaSelect.innerHTML = '<option value="" disabled hidden selected></option>';
     // ordenar por ano desc, depois nome
     turmas.sort((a,b)=> {
       const ay = parseInt(a.anoLetivo||0,10);
@@ -1436,7 +1064,7 @@ function normSerie(s){
     if(!t){
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = "— Selecione a turma primeiro —";
+      opt.textContent = ""; opt.disabled = true; opt.hidden = true; opt.selected = true;
       serieAluno.appendChild(opt);
       return;
     }
@@ -1917,93 +1545,86 @@ function normSerie(s){
     }
   }
 
-  // Toast fixo — aparece no centro/base da tela, independente do scroll
-  //
-  // Padrão de cores (definido com o usuário):
-  //   sucesso/salvo     → verde   (_toastSucesso)
-  //   aviso/cancelar    → amarelo (_toastAviso)
-  //   carregando        → azul    (_toastCarregando)
-  //   erro              → vermelho (_toastErro)
-  // Qualquer tipo novo que não se encaixe nesses 4 deve ser perguntado
-  // antes de decidir a cor — por segurança, cai em "aviso" (amarelo) em
-  // vez de vermelho, já que vermelho passa a mensagem errada (erro) pra
-  // algo que pode não ser um erro de verdade.
-  function _toastSucesso(msg){
-    _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500);
-  }
-  function _toastErro(msg){
-    _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500);
-  }
-  function _toastAviso(msg){
-    _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000);
-  }
-  function _toastCarregando(msg){
-    _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000);
-  }
-  function _showToast(msg, bg, shadow, duration){
+  // ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) — guia v7, 8.2 ──
+  const _TOAST = {
+    ok:      { cls:'toast-ok',      ms:2500 },
+    err:     { cls:'toast-err',     ms:4500 },
+    warn:    { cls:'toast-warn',    ms:4000 },
+    loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: some quando a operação termina
+  };
+  function _showToast(msg, tipo){
     const existing = document.getElementById('_toastGlobal');
     if(existing) existing.remove();
+    const cfg = _TOAST[tipo] || _TOAST.warn;
     const toast = document.createElement('div');
     toast.id = '_toastGlobal';
-    toast.style.cssText =
-      `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-      `display:flex;align-items:center;gap:12px;`+
-      `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-      `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-      `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+    toast.className = 'toast ' + cfg.cls;
+    toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
     const span = document.createElement('span');
+    span.className = 'toast-msg';
     span.textContent = msg;
-    span.style.cssText = 'flex:1;line-height:1.4;';
-    toast.appendChild(span);
-    const btnClose = document.createElement('button');
-    btnClose.type = 'button';
-    btnClose.textContent = '✕';
-    btnClose.setAttribute('aria-label','Fechar aviso');
-    btnClose.style.cssText =
-      'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-      'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-      'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-    btnClose.onclick = () => toast.remove();
-    toast.appendChild(btnClose);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-close';
+    btn.textContent = '✕';
+    btn.setAttribute('aria-label','Fechar aviso');
+    btn.onclick = () => toast.remove();
+    toast.append(span, btn);
     document.body.appendChild(toast);
-    setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+    if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
   }
+  // só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+  function _toastLimpar(){
+    const t = document.getElementById('_toastGlobal');
+    if(t && t.classList.contains('toast-loading')) t.remove();
+  }
+  function _toastSucesso(m){ _showToast(m,'ok'); }
+  function _toastErro(m){ _showToast(m,'err'); }
+  function _toastAviso(m){ _showToast(m,'warn'); }
+  function _toastCarregando(m){ _showToast(m,'loading'); }
+
+  // Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+  window.addEventListener('unhandledrejection', () => {
+    const t = document.getElementById('_toastGlobal');
+    if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+  });
 
   function _escHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  // Modal de confirmação customizado — substitui o confirm() nativo do
-  // navegador (que não pode ser estilizado) pelo mesmo visual usado no
-  // modal de "Encerrar matrícula" (.modal-backdrop). Retorna uma
-  // Promise<boolean>: true = confirmou, false = cancelou/fechou fora.
-  // Por padrão usa a cor de aviso (amarelo) — é o único tipo de confirmação
-  // que existe no sistema hoje; se surgir um caso de outra cor, ajustamos
-  // corDestaque então.
-  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  // ── Modal de confirmação (substitui confirm() nativo) — guia v7, 8.3 ──
+  // corDestaque: 'danger' = ação destrutiva (título e botão vermelhos); 'ok' = contraponto positivo (verde);
+  // qualquer outro = cor de marca.
+  function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
     return new Promise((resolve) => {
-      const perigo = corDestaque === 'danger';   // senão, cores da marca (tokens do tema)
+      const perigo = corDestaque === 'danger';
+      const positivo = corDestaque === 'ok';
+      const variante = perigo ? ' perigo' : positivo ? ' ok' : '';
       const backdrop = document.createElement('div');
-      backdrop.className = 'modal-backdrop';
-      backdrop.style.display = 'flex';
+      backdrop.className = 'modal-backdrop open';
       backdrop.innerHTML =
-        `<div class="cm-box">`+
-          `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
+        `<div class="cm-box" role="dialog" aria-modal="true">`+
+          `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
           `<p class="cm-corpo">${corpo || ''}</p>`+
+          (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
           `<div class="cm-acoes">`+
-            `<button type="button" class="btn ghost" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-            `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk">${_escHtml(textoConfirmar || 'Continuar')}</button>`+
+            `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+            `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
           `</div>`+
         `</div>`;
       document.body.appendChild(backdrop);
-      function fechar(resultado){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(resultado); }
+      const ok = backdrop.querySelector('#_confirmModalOk');
+      const cancelar = backdrop.querySelector('#_confirmModalCancelar');
+      const input = backdrop.querySelector('#_confirmModalInput');
+      function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
       function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
       document.addEventListener('keydown', onKey);
-      backdrop.querySelector('#_confirmModalOk').addEventListener('click', () => fechar(true));
-      backdrop.querySelector('#_confirmModalCancelar').addEventListener('click', () => fechar(false));
+      ok.addEventListener('click', () => fechar(true));
+      cancelar.addEventListener('click', () => fechar(false));
       backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
-      backdrop.querySelector('#_confirmModalCancelar').focus();   // lado seguro
+      if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+      cancelar.focus();   // lado seguro
     });
   }
 
@@ -2035,8 +1656,8 @@ function normSerie(s){
 
       if(!aluno){
         document.getElementById('msgForm').textContent = '⚠️ Aluno não encontrado ou sem permissão de acesso.';
-        document.getElementById('msgForm').style.display = '';
-        document.getElementById('msgForm').className = 'warn';
+        document.getElementById('msgForm').hidden = false;
+        _toastErro('⚠️ Aluno não encontrado ou sem permissão de acesso.');
         return;
       }
 
@@ -2060,14 +1681,14 @@ function normSerie(s){
 
       // ── Oculta "Limpar campos" no modo edição ──
       const btnLimpar = document.getElementById('btnLimparCampos');
-      if(btnLimpar) btnLimpar.style.display = 'none';
+      if(btnLimpar) btnLimpar.hidden = true;
 
       // ── Botão Cancelar (volta para pesquisa sem salvar) ──
       const _cancelE1 = document.querySelector('#wzEtapa1 .actions-wizard .left');
       const _cancelE2 = document.querySelector('#wzEtapa2 .actions-wizard .left');
       const mkCancel  = () => {
         const btn = document.createElement('button');
-        btn.type = 'button'; btn.className = 'btn ghost';
+        btn.type = 'button'; btn.className = 'btn secondary';
         btn.textContent = '✕ Cancelar';
         btn.onclick = () => { location.href = 'pesquisa-ano-ativo.html'; };
         return btn;
@@ -2163,15 +1784,15 @@ function normSerie(s){
       const _acE1 = document.querySelector('#wzEtapa1 .actions-wizard');
       if(_acE1){
         const wrapEncerrar = document.createElement('div');
-        wrapEncerrar.style.cssText = 'width:100%;margin-top:10px;';
+        wrapEncerrar.className = 'dz-wrap';
         wrapEncerrar.innerHTML =
           '<div class="nee-block danger">'+
-            '<div class="nee-header dz-row" style="border-radius:12px 12px 0 0;border-bottom:1px solid rgba(185,28,28,.25);">'+
+            '<div class="nee-header dz-row dz-primeira">'+
               '<div><div class="nee-header-label">🔁 Trocar de turma</div>'+
               '<div class="dz-desc">Move o aluno para outra turma do mesmo ano. A matrícula atual deixa de existir e a nova mantém a data de cadastro e a foto. Para voltar, basta trocar de turma de novo.</div></div>'+
               '<button id="btnTrocarTurma" type="button" class="dz-btn">Trocar de turma</button>'+
             '</div>'+
-            '<div class="nee-header dz-row" style="border-radius:0 0 12px 12px;">'+
+            '<div class="nee-header dz-row dz-ultima">'+
               '<div><div class="nee-header-label">🚪 Encerrar matrícula</div>'+
               '<div class="dz-desc">Encerra a matrícula na turma atual. O cadastro do aluno é preservado e ele pode ser readmitido depois.</div></div>'+
               '<button id="btnEncerrarMatricula" type="button" class="dz-btn">Encerrar matrícula</button>'+
@@ -2183,15 +1804,15 @@ function normSerie(s){
         modalEncerrar.className = 'modal-backdrop';
         modalEncerrar.id = 'modalEncerrarMatricula';
         modalEncerrar.innerHTML =
-          '<div class="cm-box" style="max-width:420px;">'+
+          '<div class="cm-box cm-box-420">'+
             '<h3 class="cm-titulo perigo">Encerrar matrícula</h3>'+
             '<p class="cm-corpo">Selecione o motivo do encerramento:</p>'+
-            '<div style="display:flex;flex-direction:column;gap:8px;">'+
-              '<button type="button" class="btn ghost cm-opcao" data-situacao="TRANSFERIDO">🔁 Transferido</button>'+
-              '<button type="button" class="btn ghost cm-opcao" data-situacao="DESISTENTE">🚫 Desistente</button>'+
-              '<button type="button" class="btn ghost cm-opcao" data-situacao="FALECIDO">🕊️ Faleceu</button>'+
+            '<div class="cm-opcoes">'+
+              '<button type="button" class="btn secondary cm-opcao" data-situacao="TRANSFERIDO">🔁 Transferido</button>'+
+              '<button type="button" class="btn secondary cm-opcao" data-situacao="DESISTENTE">🚫 Desistente</button>'+
+              '<button type="button" class="btn secondary cm-opcao" data-situacao="FALECIDO">🕊️ Faleceu</button>'+
             '</div>'+
-            '<div class="cm-acoes"><button type="button" class="btn ghost" id="btnCancelarEncerramento">Cancelar</button></div>'+
+            '<div class="cm-acoes"><button type="button" class="btn secondary" id="btnCancelarEncerramento">Cancelar</button></div>'+
           '</div>';
         document.body.appendChild(modalEncerrar);
 
@@ -2200,20 +1821,20 @@ function normSerie(s){
         modalTrocar.className = 'modal-backdrop';
         modalTrocar.id = 'modalTrocarTurma';
         modalTrocar.innerHTML =
-          '<div class="cm-box" style="max-width:420px;">'+
+          '<div class="cm-box cm-box-420">'+
             '<h3 class="cm-titulo">Trocar de turma</h3>'+
             '<p class="cm-corpo">Só aparecem turmas ativas do mesmo ano letivo da matrícula.</p>'+
             '<div class="field"><label for="trocarTurma">Nova turma</label><select id="trocarTurma"></select></div>'+
-            '<div class="field" style="margin-top:10px;"><label for="trocarSerie">Série</label><select id="trocarSerie"></select></div>'+
-            '<p class="cm-corpo" style="margin:12px 0 0;font-size:12px;">⚠️ O modelo de ensino (Regular/Integral) pode ficar em branco na nova matrícula. Depois da troca, abra a edição do aluno na turma nova e informe o modelo.</p>'+
-            '<div class="cm-acoes"><button type="button" class="btn ghost" id="btnTrocarCancelar">Cancelar</button>'+
+            '<div class="field mt-10"><label for="trocarSerie">Série</label><select id="trocarSerie"></select></div>'+
+            '<p class="cm-corpo cm-nota">⚠️ O modelo de ensino (Regular/Integral) pode ficar em branco na nova matrícula. Depois da troca, abra a edição do aluno na turma nova e informe o modelo.</p>'+
+            '<div class="cm-acoes"><button type="button" class="btn secondary" id="btnTrocarCancelar">Cancelar</button>'+
             '<button type="button" class="cm-ok" id="btnTrocarOk">Trocar de turma</button></div>'+
           '</div>';
         document.body.appendChild(modalTrocar);
-        const _fecharTrocar = () => { modalTrocar.style.display = 'none'; };
+        const _fecharTrocar = () => { modalTrocar.classList.remove('open'); };
         document.getElementById('btnTrocarCancelar').addEventListener('click', _fecharTrocar);
         modalTrocar.addEventListener('click', (ev) => { if(ev.target === modalTrocar) _fecharTrocar(); });
-        document.addEventListener('keydown', (ev) => { if(ev.key === 'Escape'){ _fecharTrocar(); modalEncerrar.style.display = 'none'; } });
+        document.addEventListener('keydown', (ev) => { if(ev.key === 'Escape'){ _fecharTrocar(); modalEncerrar.classList.remove('open'); } });
 
         document.getElementById('btnTrocarTurma').addEventListener('click', async () => {
           const matId = window._modoEdicaoMatId;
@@ -2232,7 +1853,7 @@ function normSerie(s){
             };
             selT.onchange = fillSeries; fillSeries();
             modalTrocar._mat = mat; modalTrocar._opcoes = opcoes;
-            modalTrocar.style.display = 'flex';
+            modalTrocar.classList.add('open');
           }catch(e){ console.error('Erro ao abrir troca de turma:', e); _toastErro('❌ Erro ao carregar a matrícula: ' + (e && e.message ? e.message : e)); }
         });
 
@@ -2277,8 +1898,8 @@ function normSerie(s){
           }finally{ btnOk.disabled = false; }
         });
 
-        function abrirModalEncerrar(){ modalEncerrar.style.display = 'flex'; }
-        function fecharModalEncerrar(){ modalEncerrar.style.display = 'none'; }
+        function abrirModalEncerrar(){ modalEncerrar.classList.add('open'); }
+        function fecharModalEncerrar(){ modalEncerrar.classList.remove('open'); }
 
         document.getElementById('btnEncerrarMatricula')?.addEventListener('click', abrirModalEncerrar);
         document.getElementById('btnCancelarEncerramento')?.addEventListener('click', fecharModalEncerrar);
@@ -2542,7 +2163,7 @@ function normSerie(s){
       document.getElementById('wzStep2').classList.add('active');
       // Mostra/oculta aviso no topo da etapa 2
       const avisoEl = document.getElementById('wzAviso1Incompleta');
-      if(avisoEl) avisoEl.classList.toggle('show', !completa);
+      if(avisoEl) avisoEl.hidden = completa;
       window.scrollTo({top:0,behavior:'smooth'});
     }
 
@@ -2606,14 +2227,14 @@ function normSerie(s){
       const blocoAee = document.getElementById('blocoAee');
       const mostrar = _neeE.def === true || _neeE.trans === true;
       if(bloco){
-        bloco.style.display = mostrar ? '' : 'none';
+        bloco.hidden = !mostrar;
         if(!mostrar){
           const sel = document.getElementById('neeProfissionalApoio');
           if(sel) sel.value = '';
         }
       }
       if(blocoAee){
-        blocoAee.style.display = mostrar ? '' : 'none';
+        blocoAee.hidden = !mostrar;
         if(!mostrar && window._aeeSet) window._aeeSet(false, true);
       }
     }
@@ -2921,7 +2542,7 @@ function normSerie(s){
   (function(){
     const cnEl  = document.getElementById('compCertidao');
     const cnMsg = document.createElement('small');
-    cnMsg.className = 'help'; cnMsg.style.display='block';
+    cnMsg.className = 'help';
     cnEl?.parentNode?.appendChild(cnMsg);
     if(!cnEl) return;
 
@@ -3448,7 +3069,7 @@ function normSerie(s){
         return `<button type="button" class="id-res-item" data-i="${i}"><span class="id-res-nome">${_escHtml(c.nome)}</span>` +
                `<span class="id-res-meta">ID nas atas: ${_escHtml(c.atasId)} ${tags.join(' ')}</span></button>`;
       }).join('');
-      const vazio = _cands.length ? '' : '<div class="id-res-meta" style="padding:4px 2px;">Nenhum aluno encontrado nas atas com esse nome.</div>';
+      const vazio = _cands.length ? '' : '<div class="id-res-meta id-res-vazio">Nenhum aluno encontrado nas atas com esse nome.</div>';
       resBox.innerHTML = vazio + itens + '<button type="button" class="id-res-item id-res-novo" data-novo="1">➕ Nenhum deles — cadastrar como novo aluno</button>';
       resBox.hidden = false;
     }
@@ -3491,7 +3112,7 @@ function normSerie(s){
       if(ok){ clearFields(); aplicarTrava(); }
     });
     window._identModoEdicao = function(){
-      const m = $('fieldIdentModo'); if(m) m.style.display = 'none';
+      const m = $('fieldIdentModo'); if(m) m.hidden = true;
       banner.classList.remove('visible'); resBox.hidden = true;
       aplicarTrava();
     };
@@ -3591,9 +3212,9 @@ function normSerie(s){
   let _fotoMatriculaId = null; // _id do doc em anoAtivoMatriculas onde a foto é salva (modo edição)
   let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
 
-  function _setStatus(txt, cor){
+  function _setStatus(txt, tipo){            // tipo: 'err' | 'ok' | omitido (neutro) — .help do guia 5-B
     statusEl.textContent = txt || '';
-    statusEl.style.color = cor || 'var(--muted)';
+    statusEl.className = txt ? ('help' + (tipo ? ' ' + tipo : '')) : 'help';
   }
 
   // Chamado no modo edição, com a foto já existente (se houver). A foto
@@ -3608,9 +3229,9 @@ function normSerie(s){
     _fotoFileIdAtual = fotoFileId || null;
     if(fotoUrl){
       previewImg.src = fotoUrl;
-      previewImg.style.display = 'block';
-      placeholder.style.display = 'none';
-      btnRemover.style.display = '';
+      previewImg.hidden = false;
+      placeholder.hidden = true;
+      btnRemover.hidden = false;
     }
   };
 
@@ -3643,7 +3264,7 @@ function normSerie(s){
 
   async function _enviarFoto(alunoId, ano, matriculaId, base64, mimeType){
     if(!ano || !matriculaId){
-      _setStatus('❌ Falha ao enviar foto: ano/matrícula não identificados.', '#b91c1c');
+      _setStatus('❌ Falha ao enviar foto: ano/matrícula não identificados.', 'err');
       console.error('[foto-aluno] _enviarFoto chamado sem ano/matriculaId:', { alunoId, ano, matriculaId });
       return;
     }
@@ -3663,10 +3284,10 @@ function normSerie(s){
       const salvo = await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
       console.log('[foto-aluno] salvo no Firestore (anoAtivoMatriculas):', salvo);
       _fotoFileIdAtual = data.fotoFileId;
-      _setStatus('✅ Foto salva.', '#166534');
+      _setStatus('✅ Foto salva.', 'ok');
     }catch(e){
       console.error('[foto-aluno] falha ao enviar/salvar foto:', e);
-      _setStatus('❌ Falha ao enviar foto: ' + e.message, '#b91c1c');
+      _setStatus('❌ Falha ao enviar foto: ' + e.message, 'err');
     }
   }
 
@@ -3674,34 +3295,34 @@ function normSerie(s){
     const file = inpFoto.files[0];
     if(!file) return;
     if(!file.type.startsWith('image/')){
-      _setStatus('⚠️ Selecione um arquivo de imagem.', '#b91c1c');
+      _setStatus('⚠️ Selecione um arquivo de imagem.', 'err');
       return;
     }
     _setStatus('Comprimindo...');
     try{
       const { base64, mimeType, preview } = await _comprimir(file);
       previewImg.src = preview;
-      previewImg.style.display = 'block';
-      placeholder.style.display = 'none';
-      btnRemover.style.display = '';
+      previewImg.hidden = false;
+      placeholder.hidden = true;
+      btnRemover.hidden = false;
 
       if(_fotoAlunoId){
         await _enviarFoto(_fotoAlunoId, _fotoAno, _fotoMatriculaId, base64, mimeType);
       } else {
         _fotoPendente = { base64, mimeType };
-        _setStatus('Foto pronta — será enviada ao salvar o aluno.', '#166534');
+        _setStatus('Foto pronta — será enviada ao salvar o aluno.', 'ok');
       }
     }catch(e){
-      _setStatus('❌ Falha ao processar a foto: ' + e.message, '#b91c1c');
+      _setStatus('❌ Falha ao processar a foto: ' + e.message, 'err');
     }
   });
 
   btnRemover.addEventListener('click', async () => {
     const fileIdAntigo = _fotoFileIdAtual;
-    previewImg.style.display = 'none';
+    previewImg.hidden = true;
     previewImg.src = '';
-    placeholder.style.display = '';
-    btnRemover.style.display = 'none';
+    placeholder.hidden = false;
+    btnRemover.hidden = true;
     inpFoto.value = '';
     _fotoFileIdAtual = null;
     _setStatus('');
@@ -3744,10 +3365,10 @@ function normSerie(s){
     _fotoMatriculaId = null;
     _fotoFileIdAtual = null;
     inpFoto.value = '';
-    previewImg.style.display = 'none';
+    previewImg.hidden = true;
     previewImg.src = '';
-    placeholder.style.display = '';
-    btnRemover.style.display = 'none';
+    placeholder.hidden = false;
+    btnRemover.hidden = true;
     _setStatus('');
   };
 
@@ -3819,10 +3440,10 @@ function normSerie(s){
       if(maisRecente){
         _fotoPendente = { reaproveitar: true, fotoUrl: maisRecente.fotoUrl, anoOrigem: maisRecente.anoLetivo };
         previewImg.src = maisRecente.fotoUrl;
-        previewImg.style.display = 'block';
-        placeholder.style.display = 'none';
-        btnRemover.style.display = '';
-        _setStatus(`Foto de uma matrícula anterior deste aluno (${maisRecente.anoLetivo}) — mantenha ou clique em "Remover" pra trocar.`, 'var(--muted)');
+        previewImg.hidden = false;
+        placeholder.hidden = true;
+        btnRemover.hidden = false;
+        _setStatus(`Foto de uma matrícula anterior deste aluno (${maisRecente.anoLetivo}) — mantenha ou clique em "Remover" pra trocar.`);
       }
     }catch(e){ console.warn('[foto-aluno] falha ao buscar foto de matrícula anterior:', e); }
   };
@@ -3834,10 +3455,10 @@ function normSerie(s){
     if(_fotoPendente && _fotoPendente.reaproveitar){
       _fotoPendente = null;
       _fotoFileIdAtual = null;
-      previewImg.style.display = 'none';
+      previewImg.hidden = true;
       previewImg.src = '';
-      placeholder.style.display = '';
-      btnRemover.style.display = 'none';
+      placeholder.hidden = false;
+      btnRemover.hidden = true;
       _setStatus('');
     }
   };
@@ -3877,19 +3498,19 @@ function normSerie(s){
     lista.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
     const temExistente = lista.querySelector('.docs-existente');
     if(!_fila.length){
-      wrap.style.display  = temExistente ? '' : 'none';
-      if(sep) sep.style.display = 'none';
+      wrap.hidden = !temExistente;
+      if(sep) sep.hidden = true;
       return;
     }
-    wrap.style.display = '';
-    if(sep) sep.style.display = '';
+    wrap.hidden = false;
+    if(sep) sep.hidden = false;
 
     _fila.forEach((item, idx) => {
       const div = document.createElement('div');
       div.className = 'docs-fila-item docs-fila-pendente';
       const previewSrc  = item.base64 ? `data:${item.mimeType};base64,${item.base64}` : '';
       const previewHtml = previewSrc
-        ? `<img src="${previewSrc}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;" />`
+        ? `<img class="docs-fila-thumb" src="${previewSrc}" />`
         : `<span class="docs-fila-icon">${iconForMime(item.mimeType)}</span>`;
       div.innerHTML =
         previewHtml+
@@ -4039,10 +3660,9 @@ function normSerie(s){
       // próprio widget — não deve aparecer aqui como documento anexado.
       const files = data.files || [];
       if(!files.length) return;
-      wrap && (wrap.style.display = '');
+      wrap && (wrap.hidden = false);
       const sep = document.createElement('div');
-      sep.className = 'docs-existente';
-      sep.style.cssText = 'font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:6px;';
+      sep.className = 'docs-existente docs-existente-sep';
       sep.textContent = 'Documentos já anexados';
       lista.appendChild(sep);
       files.forEach(f => {
@@ -4050,15 +3670,13 @@ function normSerie(s){
         const data_fmt = f.createdAt ? new Date(f.createdAt).toLocaleDateString('pt-BR') : '';
         const item     = document.createElement('div');
         item.className = 'docs-fila-item docs-existente';
-        item.style.cssText = 'opacity:.85;';
-        item.innerHTML =
+                item.innerHTML =
           `<span class="docs-fila-icon">${icon}</span>`+
           '<div class="docs-fila-info">'+
             `<div class="docs-fila-nome">${escHtml(f.label||f.fileName)}</div>`+
-            `<div style="font-size:11px;color:var(--muted)">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
+            `<div class="docs-fila-meta">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
           '</div>'+
-          `<a href="${f.webViewLink}" target="_blank" rel="noopener"`+
-            ` style="padding:4px 10px;border-radius:8px;font-size:12px;font-weight:800;border:1px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;white-space:nowrap;">👁️ Ver</a>`+
+          `<a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>`+
           `<button class="docs-fila-rm" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Remover">🗑️</button>`;
         lista.appendChild(item);
       });
@@ -4066,7 +3684,7 @@ function normSerie(s){
         btn.addEventListener('click', async () => {
           const confirmou = await _confirmModal({
             titulo: '⚠️ Remover documento',
-            corDestaque: '#b91c1c',
+            corDestaque: 'danger',
             corpo: `Remover "${btn.dataset.name}"?\n\nEssa ação não pode ser desfeita.`,
             textoConfirmar: 'Sim, remover',
           });
