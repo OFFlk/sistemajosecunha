@@ -222,6 +222,19 @@ html[data-theme="dark"]{
 .list-item .left{ display:flex; flex-direction:column; gap:3px; }
 .list-item .right{ display:flex; gap:6px; }
 
+/* ── SUB-CARD: item de resultado dentro de um card de listagem (campos de informação + botão "Abrir") ──
+   Só a APARÊNCIA da caixa. O conteúdo (esquerda/direita, título, meta) é layout da página.
+   Receita:  <div class="item subcard">  — a .item local fica só com display/gap/alinhamento.
+   .selected = item escolhido (por JS). Seleção por :has(:checked) continua local, com --ui-brand-faded.
+   Ajuste: --subcard-pad (padrão 14px). */
+.subcard{
+  background:var(--ui-surface); color:var(--ui-text);
+  border:1px solid var(--ui-border); border-radius:10px;
+  padding:var(--subcard-pad, 14px);
+  transition:background .15s, border-color .15s;
+}
+.subcard.selected{ background:var(--ui-brand-faded); border-color:var(--ui-brand); }
+
 /* ── CHIP DE INFORMAÇÃO: .badge — 5 cores ──
    dado curto, NÃO clicável (clicável é botão). A cor diz o GRAU DE PRIORIDADE do
    dado NAQUELA TELA (a página ordena em até 3 níveis; não é fixo por tipo de dado):
@@ -446,37 +459,37 @@ html[data-theme="dark"] .config-card.card-destaque{
 .card-destaque > h2{ margin:0 0 18px; }
 .card-destaque .subnote{ color:var(--dest-fg); opacity:.85; }
 /* .help solto sobre o destaque. Fora: .help dentro de .dest-painel / .item / tabela / aviso (têm fundo próprio) */
-.card-destaque .help:not(.item .help, .dest-painel .help, table .help, .aviso-warn .help){ color:var(--dest-fg); opacity:.85; }
+.card-destaque .help:not(.item .help, .subcard .help, .dest-painel .help, table .help, .aviso-warn .help){ color:var(--dest-fg); opacity:.85; }
 /* texto corrido SOLTO no cabeçalho do destaque (filho direto ou dentro de .card-head).
    Dentro de .dest-painel / .item / tabela NÃO entra (têm fundo e cor próprios). */
 .card-destaque > :is(p, strong),
 .card-destaque .card-head :is(p, strong){ color:var(--dest-fg); }
 
 /* botões soltos no fundo do destaque: reatribuem os tokens --btn-*.
-   Ficam de FORA: botão de tabela e botão de sub-card (.item), que já
+   Ficam de FORA: botão de tabela e botão de sub-card (.item / .subcard), que já
    têm fundo neutro próprio (guia partes 3 e 4). */
-.card-destaque .btn:not(table .btn, .item .btn){
+.card-destaque .btn:not(table .btn, .item .btn, .subcard .btn){
   --btn-bg:transparent; --btn-bd:var(--dest-btn-bd); --btn-fg:var(--dest-fg);
   --btn-bg-h:var(--dest-btn-hover); --btn-bd-h:var(--dest-fg); --btn-fg-h:var(--dest-fg);
   --btn-ring:none;
 }
-.card-destaque .btn:is(.primary, .btn-primary):not(table .btn, .item .btn){
+.card-destaque .btn:is(.primary, .btn-primary):not(table .btn, .item .btn, .subcard .btn){
   --btn-bg:var(--dest-btn-bg);
 }
 /* perigo de verdade continua vermelho dentro do destaque: vermelho-escuro
    translúcido, nunca sólido e nunca só o tom claro (some no fundo de marca) */
-.card-destaque .btn:is(.danger, .btn-danger, .ldanger, .danger-soft):not(table .btn, .item .btn){
+.card-destaque .btn:is(.danger, .btn-danger, .ldanger, .danger-soft):not(table .btn, .item .btn, .subcard .btn){
   --btn-bg:rgba(153,27,27,.38);   --btn-bd:rgba(153,27,27,.65);   --btn-fg:var(--dest-fg);
   --btn-bg-h:rgba(153,27,27,.52); --btn-bd-h:rgba(153,27,27,.65); --btn-fg-h:var(--dest-fg);
 }
 /* o contraponto verde, no mesmo desenho */
-.card-destaque .btn:is(.success, .btn-approve, .success-soft):not(table .btn, .item .btn){
+.card-destaque .btn:is(.success, .btn-approve, .success-soft):not(table .btn, .item .btn, .subcard .btn){
   --btn-bg:rgba(21,128,61,.40);   --btn-bd:rgba(21,128,61,.70);   --btn-fg:var(--dest-fg);
   --btn-bg-h:rgba(21,128,61,.55); --btn-bd-h:rgba(21,128,61,.70); --btn-fg-h:var(--dest-fg);
 }
 /* desabilitado: cinza fixo, igual nos dois temas (declarar por ÚLTIMO) */
-.card-destaque .btn:disabled:not(table .btn, .item .btn),
-.card-destaque .btn[aria-disabled="true"]:not(table .btn, .item .btn){
+.card-destaque .btn:disabled:not(table .btn, .item .btn, .subcard .btn),
+.card-destaque .btn[aria-disabled="true"]:not(table .btn, .item .btn, .subcard .btn){
   --btn-bg:rgba(128,128,128,.28); --btn-bd:rgba(128,128,128,.50); --btn-fg:#6b7280;
   opacity:1;
 }
