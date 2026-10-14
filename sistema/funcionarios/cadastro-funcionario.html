@@ -88,13 +88,6 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .foto-tit{font-weight:700;font-size:13px;margin-bottom:10px;}
 .foto-btns{display:flex;gap:8px;flex-wrap:wrap;}
 
-/* ── CPF: ícone de status dentro do campo ── */
-.cpf-wrap{position:relative;}
-.cpf-wrap input{padding-right:34px;}
-.cpf-status-icon{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:900;line-height:1;pointer-events:none;}
-.cpf-status-icon.ok{color:var(--ui-st-ok-fg);}
-.cpf-status-icon.err{color:var(--ui-st-bad-fg);}
-
 /* ── "É profissional de apoio?" alinhado ao select de Função (rótulo-espaçador invisível ocupa a altura do rótulo ao lado) ── */
 .apoio-spacer{visibility:hidden;}
 .apoio-row{display:flex;align-items:center;min-height:var(--field-h,43px);}
@@ -105,7 +98,22 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .turnos-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:2px;}
 .turnos-group .turno-check{display:inline-flex;align-items:center;justify-content:center;gap:8px;flex:1;min-width:120px;margin:0;padding:9px 14px;border:1.5px solid var(--field-border);border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;color:var(--ui-text);background:var(--field-bg);user-select:none;transition:border-color .15s,background .15s,color .15s;}
 .turno-check input{display:none;}
+.turnos-group .turno-check:not(.checked):hover{border-color:var(--ui-brand);background:var(--ui-brand-faded);}
 .turnos-group .turno-check.checked{border-color:var(--ui-brand);background:var(--ui-chip-bg);color:var(--ui-chip-color);}
+
+/* ── Identificação por CPF (mesmo visual do cadastro de aluno) ── */
+.ident-trava{opacity:.5;filter:grayscale(.35);pointer-events:none;user-select:none;}
+.field-locked input,.field-locked select,.field-locked .nat-input-real{background:var(--ui-chip-bg) !important;color:var(--ui-muted) !important;cursor:default !important;pointer-events:none;}
+.field-locked label::after{content:" 🔒";font-size:11px;opacity:.6;}
+.id-banner{display:none;align-items:center;gap:14px;flex-wrap:wrap;background:var(--ui-chip-bg);border:1px solid var(--ui-chip-border);border-left:4px solid var(--ui-brand);color:var(--ui-text);padding:12px 14px;border-radius:12px;margin-bottom:12px;}
+.id-banner.visible{display:flex;}
+.id-banner.dup{border-color:var(--ui-st-bad-bd);border-left-color:var(--ui-st-bad-fg);background:var(--ui-st-bad-bg);}
+.id-banner.dup .id-banner-nome{color:var(--ui-st-bad-fg);}
+.id-banner.dup .id-banner-sub{color:var(--ui-text);font-weight:700;}
+.id-banner-ico{font-size:22px;}
+.id-banner-txt{flex:1;min-width:0;}
+.id-banner-nome{font-weight:800;font-size:14px;}
+.id-banner-sub{font-size:12px;color:var(--ui-muted);margin-top:2px;}
 
 /* ── Naturalidade ── */
 .nat-grid{margin-top:4px;}
@@ -180,9 +188,9 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .outros-add-row{display:flex;gap:8px;align-items:flex-end;}
 .outros-add-row .field{flex:1;margin:0;}
 .outros-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
-/* Chip removível (com ×): local, D24 */
-.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--ui-cell-bg);border:1px solid var(--ui-border);color:var(--ui-text);}
-.chip button{background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1;color:var(--ui-text);opacity:.7;}
+/* Chip removível (com ×): a cor é do .badge global (nível 1); aqui só o botão × e o espaçamento interno */
+.chip{display:inline-flex;align-items:center;gap:6px;margin-left:0;}
+.chip button{background:none;border:none;cursor:pointer;padding:0;font-size:13px;line-height:1;color:inherit;opacity:.7;}
 .chip button:hover{opacity:1;}
 
 /* ── Naturalidade / cidade: autocomplete com texto-fantasma (a aparência do campo vem do .field input) ── */
@@ -300,14 +308,21 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         </div>
       </div>
 
+      <!-- Resultado da identificação por CPF -->
+      <div id="bannerFuncEncontrado" class="id-banner">
+        <span class="id-banner-ico" id="bannerIcone">✅</span>
+        <div class="id-banner-txt">
+          <div class="id-banner-nome" id="bannerNome">—</div>
+          <div class="id-banner-sub" id="bannerSub">—</div>
+        </div>
+        <button type="button" class="btn small secondary" id="btnLimparAutoFill">↺ Refazer identificação</button>
+      </div>
+
       <div class="form-grid">
-        <div class="field">
+        <div class="field" id="fieldCpf">
           <label for="cpf">CPF <span class="req">*</span></label>
-          <div class="cpf-wrap">
-            <input id="cpf" placeholder="000.000.000-00" inputmode="numeric" maxlength="14" autocomplete="off"/>
-            <span class="cpf-status-icon" id="cpfIcon"></span>
-          </div>
-          <small class="help" aria-hidden="true"></small>
+          <input id="cpf" placeholder="Digite o CPF para buscar o funcionário" inputmode="numeric" maxlength="14" autocomplete="off"/>
+          <small class="help" id="cpfMsg" aria-live="polite"></small>
         </div>
         <div class="field">
           <label for="rgCnh">RG</label>
@@ -627,7 +642,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       <div class="secao-body open" id="bodyGrad">
         <div class="lista-itens" id="listaGrad"></div>
         <p class="lista-vazia" id="vaziaGrad">Nenhum curso adicionado.</p>
-        <button type="button" class="btn secondary small" id="btnAbrirFormGrad">+ Adicionar graduação</button>
+        <button type="button" class="btn secondary" id="btnAbrirFormGrad">+ Adicionar graduação</button>
         <div class="form-add" id="formGrad" style="display:none;">
           <p class="form-add-title">Nova graduação</p>
           <div class="form-grid">
@@ -701,8 +716,8 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             </div>
           </div>
           <div class="form-add-actions">
-            <button type="button" class="btn secondary small" id="btnFecharFormGrad">Cancelar</button>
-            <button type="button" class="btn primary small" id="btnSalvarGrad">✓ Adicionar</button>
+            <button type="button" class="btn secondary" id="btnFecharFormGrad">Cancelar</button>
+            <button type="button" class="btn primary" id="btnSalvarGrad">✓ Adicionar</button>
           </div>
         </div>
       </div>
@@ -717,7 +732,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       <div class="secao-body" id="bodyComp">
         <div class="lista-itens" id="listaComp"></div>
         <p class="lista-vazia" id="vaziaComp">Nenhuma complementação adicionada.</p>
-        <button type="button" class="btn secondary small" id="btnAbrirFormComp">+ Adicionar complementação</button>
+        <button type="button" class="btn secondary" id="btnAbrirFormComp">+ Adicionar complementação</button>
         <div class="form-add" id="formComp" style="display:none;">
           <p class="form-add-title">Nova complementação pedagógica</p>
           <div class="form-grid">
@@ -735,8 +750,8 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             </div>
           </div>
           <div class="form-add-actions">
-            <button type="button" class="btn secondary small" id="btnFecharFormComp">Cancelar</button>
-            <button type="button" class="btn primary small" id="btnSalvarComp">✓ Adicionar</button>
+            <button type="button" class="btn secondary" id="btnFecharFormComp">Cancelar</button>
+            <button type="button" class="btn primary" id="btnSalvarComp">✓ Adicionar</button>
           </div>
         </div>
       </div>
@@ -751,7 +766,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       <div class="secao-body" id="bodyPos">
         <div class="lista-itens" id="listaPos"></div>
         <p class="lista-vazia" id="vaziaPos">Nenhuma pós-graduação adicionada.</p>
-        <button type="button" class="btn secondary small" id="btnAbrirFormPos">+ Adicionar pós-graduação</button>
+        <button type="button" class="btn secondary" id="btnAbrirFormPos">+ Adicionar pós-graduação</button>
         <div class="form-add" id="formPos" style="display:none;">
           <p class="form-add-title">Nova pós-graduação</p>
           <div class="form-grid">
@@ -776,8 +791,8 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             </div>
           </div>
           <div class="form-add-actions">
-            <button type="button" class="btn secondary small" id="btnFecharFormPos">Cancelar</button>
-            <button type="button" class="btn primary small" id="btnSalvarPos">✓ Adicionar</button>
+            <button type="button" class="btn secondary" id="btnFecharFormPos">Cancelar</button>
+            <button type="button" class="btn primary" id="btnSalvarPos">✓ Adicionar</button>
           </div>
         </div>
       </div>
@@ -1256,19 +1271,32 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   /* ════════════════════════════════════════
      Máscaras e validações etapa 1
   ════════════════════════════════════════ */
-  // CPF
-  document.getElementById('cpf').addEventListener('input', function(){
-    this.value = maskCPF(this.value);
-    const d = stripNum(this.value);
-    const icon = document.getElementById('cpfIcon');
-    icon.textContent = ''; icon.className = 'cpf-status-icon';
-    if(!d) return;
-    if(isValidCPF(d)){
-      icon.textContent = '✓'; icon.className = 'cpf-status-icon ok';
-    } else if(d.length === 11){
-      icon.textContent = '✗'; icon.className = 'cpf-status-icon err';
-    }
-  });
+  // CPF: máscara + confirmação ("CPF válido" / "CPF inválido") — a busca por cadastro existente é do módulo de identificação
+  function setCpfMsg(kind, text){
+    const el = document.getElementById('cpfMsg');
+    if(!el) return;
+    el.textContent = text || '';
+    el.classList.remove('err', 'ok');
+    if(kind) el.classList.add(kind);
+  }
+  function checkCpfField(){
+    const d = stripNum(document.getElementById('cpf').value);
+    setCpfMsg(null, '');
+    if(!d || d.length < 11) return true;           // vazio ou ainda digitando
+    if(!isValidCPF(d)){ setCpfMsg('err', 'CPF inválido'); return false; }
+    setCpfMsg('ok', 'CPF válido');
+    return true;
+  }
+  (function(){
+    const cpfEl = document.getElementById('cpf');
+    const aplicar = () => {
+      const m = maskCPF(cpfEl.value);
+      if(cpfEl.value !== m) cpfEl.value = m;
+      checkCpfField();
+    };
+    cpfEl.addEventListener('input', aplicar);
+    cpfEl.addEventListener('blur', aplicar);
+  })();
 
   // RG
   document.getElementById('rgCnh').addEventListener('input', function(){
@@ -1767,7 +1795,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     if(!WIZ.outrosCursos.length){ cont.appendChild(vazia); vazia.style.display=''; return; }
     WIZ.outrosCursos.forEach(val => {
       const chip = document.createElement('span');
-      chip.className = 'chip';
+      chip.className = 'badge chip';
       const btn = document.createElement('button');
       btn.type = 'button'; btn.textContent = '✕';
       btn.addEventListener('click', () => removerOutro(val));
@@ -1802,7 +1830,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       document.getElementById('chk'+t).checked = false;
       document.getElementById('lbl'+t).classList.remove('checked');
     });
-    const icon = document.getElementById('cpfIcon'); icon.textContent=''; icon.className='cpf-status-icon';
+    setCpfMsg(null, '');
     const nomeMsg = document.getElementById('nomeMsg'); nomeMsg.textContent='0/50'; nomeMsg.className='help';
     document.getElementById('editBanner').style.display='none';
     document.getElementById('btnCancelarEdicao').style.display='none';
@@ -1837,6 +1865,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     _editandoViaURL = false;
 
     if(window.limparFotoFuncionario) window.limparFotoFuncionario();
+    if(window._identFunc) window._identFunc.limpar();   // volta a travar o formulário até o CPF ser informado
   }
 
   document.getElementById('btnLimpar').addEventListener('click', limparFormulario);
@@ -1929,6 +1958,9 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     // pra etapa 1 e mostra o toast. ──
     if(!isValidCPF(stripNum(document.getElementById('cpf').value))){
       _toastErro('⚠️ CPF inválido.'); voltarEtapa1(); return;
+    }
+    if(window._identFunc && !window._identFunc.pronta()){
+      _toastErro('⚠️ Conclua a identificação do funcionário pelo CPF antes de salvar.'); voltarEtapa1(); return;
     }
     if(!document.getElementById('nome').value.trim()){
       _toastErro('⚠️ Nome obrigatório.'); voltarEtapa1(); return;
@@ -2130,20 +2162,9 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
      Editar funcionário (chamado externamente
      se necessário no futuro)
   ════════════════════════════════════════ */
-  function iniciarEdicao(f, viaURL){
-    limparFormulario();
-    _editandoId = f.funcId;
-    _editandoViaURL = !!viaURL;
-
-    if(window.initFotoFuncionario) window.initFotoFuncionario(f.funcId, f.fotoUrl || '', f.fotoFileId || '');
-
-    // Ano letivo do registro — preserva o ano original, não sobrescreve com o ano ativo
-    const anoDoRegistro = parseInt(f.anoLetivo, 10);
-    anoAtivo = !isNaN(anoDoRegistro) ? anoDoRegistro : anoAtivoReal;
-    anoLetivoInput.value = anoAtivo;
-
-    // Etapa 1
-    document.getElementById('cpf').value = f.cpf||''; document.getElementById('cpf').dispatchEvent(new Event('input'));
+  // Blocos de preenchimento do formulário a partir de um registro (usados na edição e ao carregar um cadastro de outro ano)
+  const _clonar = a => JSON.parse(JSON.stringify(a));   // não compartilha listas com o registro original em memória
+  function _setPessoais(f){
     document.getElementById('rgCnh').value = f.rgCnh||'';
     document.getElementById('nome').value = f.nome||''; document.getElementById('nome').dispatchEvent(new Event('input'));
     document.getElementById('nasc').value = f.dataNascimento||'';
@@ -2159,6 +2180,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       document.getElementById('natUFText').value = f.naturalidadeUF||'';
     }
     document.getElementById('natCidade').value = f.naturalidadeCidade||'';
+  }
+  function _setFuncionais(f){
     const opts = Array.from(document.getElementById('funcao').options).map(o=>o.value);
     if(opts.includes(f.funcao||'')){
       document.getElementById('funcao').value = f.funcao;
@@ -2177,6 +2200,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       document.getElementById('lbl'+t).classList.toggle('checked', checked);
     });
 
+  }
+  function _setNEE(f){
     // NEE
     if(f.deficiencia){
       if(f.deficiencia.possui) setNEE('def', true);
@@ -2190,6 +2215,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       });
     }
 
+  }
+  function _setEtapa2(f){
     // Etapa 2
     document.getElementById('cep').value = f.cep||'';
     document.getElementById('endUF').value = f.endUF||'';
@@ -2198,12 +2225,33 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     document.getElementById('escolaridade').value = f.escolaridade||'';
     document.getElementById('escolaridade').dispatchEvent(new Event('change'));
     document.getElementById('tipoEnsino').value = f.tipoEnsino||'';
-    if(Array.isArray(f.graduacoes)) WIZ.graduacoes = f.graduacoes;
-    if(Array.isArray(f.posGraduacoes)) WIZ.posGraduacoes = f.posGraduacoes;
-    if(Array.isArray(f.complementacoes)) WIZ.complementacoes = f.complementacoes;
+    if(Array.isArray(f.graduacoes)) WIZ.graduacoes = _clonar(f.graduacoes);
+    if(Array.isArray(f.posGraduacoes)) WIZ.posGraduacoes = _clonar(f.posGraduacoes);
+    if(Array.isArray(f.complementacoes)) WIZ.complementacoes = _clonar(f.complementacoes);
     else if(f.complementacaoPedagogica && f.complementacaoNome){ WIZ.complementacoes = [{id:Date.now(), nome:f.complementacaoNome, ano:'', inst:''}]; }
-    if(Array.isArray(f.outrosCursos)) WIZ.outrosCursos = f.outrosCursos;
+    if(Array.isArray(f.outrosCursos)) WIZ.outrosCursos = _clonar(f.outrosCursos);
     renderListaGrad(); renderListaPos(); renderOutros(); renderListaComp();
+  }
+
+  function iniciarEdicao(f, viaURL){
+    limparFormulario();
+    _editandoId = f.funcId;
+    _editandoViaURL = !!viaURL;
+
+    if(window.initFotoFuncionario) window.initFotoFuncionario(f.funcId, f.fotoUrl || '', f.fotoFileId || '');
+
+    // Ano letivo do registro — preserva o ano original, não sobrescreve com o ano ativo
+    const anoDoRegistro = parseInt(f.anoLetivo, 10);
+    anoAtivo = !isNaN(anoDoRegistro) ? anoDoRegistro : anoAtivoReal;
+    anoLetivoInput.value = anoAtivo;
+
+    // Etapa 1
+    document.getElementById('cpf').value = f.cpf||''; document.getElementById('cpf').dispatchEvent(new Event('input'));
+    _setPessoais(f);
+    _setFuncionais(f);
+    _setNEE(f);
+    _setEtapa2(f);
+
 
     document.getElementById('editBanner').innerHTML = `✏️ <b>Editando:</b> ${f.nome} (CPF: ${f.cpf})`;
     document.getElementById('editBanner').style.display = 'block';
@@ -2221,10 +2269,140 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
     // ── Documentos já anexados a este funcionário ──
     if(window.initDocsFuncionario) window.initDocsFuncionario(f.funcId);
+    if(window._identFunc) window._identFunc.refresh();
   }
 
   // Expõe para uso externo (ex: integração futura com tabela)
   window.iniciarEdicaoFuncionario = iniciarEdicao;
+
+
+  /* ════════════════════════════════════════
+     Identificação por CPF — mesmo fluxo do cadastro de aluno
+     • sem CPF válido o resto do formulário fica travado;
+     • CPF já cadastrado em OUTRO ano: carrega os dados e cria um cadastro novo no ano escolhido;
+     • CPF já cadastrado NO ano escolhido: bloqueia (duas fichas do mesmo funcionário no ano);
+     • CPF novo: libera o formulário em branco.
+     A busca é em memória (`funcionarios` já foi lida em carregarDB): não há leitura extra no banco.
+  ════════════════════════════════════════ */
+  (function(){
+    const $ = id => document.getElementById(id);
+    const dig = s => String(s || '').replace(/\D/g, '');
+    const cpfEl = $('cpf'), banner = $('bannerFuncEncontrado'), etapa1 = $('etapa1');
+    if(!cpfEl || !banner || !etapa1) return;
+
+    // Dados que costumam mudar de um ano para o outro (função, carga, vínculo, turnos, apoio).
+    // false = ficam em branco para serem preenchidos; true = vêm do cadastro do ano anterior.
+    const CARREGAR_FUNCIONAIS = false;
+    const CAMPOS_AUTOPREENCH = ['nome','nasc','mae','pai','sexo','corRaca','natPais','natUF','natUFText','natCidade'];
+
+    const ID = { pronto:false, regs:null, base:null, dup:null, novo:false, preenchido:false };
+    const emEdicao = () => !!_editandoId;
+    const anoSel = () => String(anoLetivoInput.value || '');
+    const anoDe = r => String(r.anoLetivo || r.ano || '');
+
+    /* ── Travas ── */
+    function setLocked(locked){
+      CAMPOS_AUTOPREENCH.forEach(id => {
+        const el = $(id); if(!el) return;
+        const field = el.closest('.field') || el.parentElement;
+        if(!locked){ field.classList.remove('field-locked'); if(el.tagName === 'INPUT') el.readOnly = false; return; }
+        if(String(el.value || '').trim() !== ''){   // campo vazio continua editável
+          field.classList.add('field-locked');
+          if(el.tagName === 'INPUT') el.readOnly = true;
+        }
+      });
+    }
+    function aplicarTrava(){
+      const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup);
+      const fieldCpf = $('fieldCpf');
+      const alvos = Array.from(etapa1.querySelectorAll('.form-grid > .field, .foto-box, .nee-block, .actions .btn'));
+      alvos.push($('step2'));
+      alvos.forEach(el => {
+        if(!el || el === fieldCpf || el.id === 'btnLimpar' || el.id === 'btnCancelarEdicao') return;
+        if(el.parentElement && el.parentElement.closest('.field')) return;   // já travado pelo contêiner (evita opacidade dupla)
+        el.classList.toggle('ident-trava', bloquear);
+        if(bloquear) el.setAttribute('inert', ''); else el.removeAttribute('inert');
+      });
+      // identificado: o CPF só muda com "Refazer identificação"
+      const travaCpf = ID.pronto && !emEdicao();
+      cpfEl.readOnly = travaCpf;
+      fieldCpf.classList.toggle('field-locked', travaCpf);
+    }
+
+    /* ── Banner ── */
+    function mostrar(icone, titulo, sub, dup){
+      banner.classList.toggle('dup', !!dup);
+      $('bannerIcone').textContent = icone;
+      $('bannerNome').textContent = titulo;
+      $('bannerSub').textContent = sub;
+      banner.classList.add('visible');
+    }
+    function limparEstado(){
+      ID.pronto = false; ID.regs = null; ID.base = null; ID.dup = null; ID.novo = false; ID.preenchido = false;
+      banner.classList.remove('visible', 'dup');
+      setLocked(false);
+      aplicarTrava();
+    }
+
+    /* ── Carrega um cadastro anterior no formulário ── */
+    function preencher(f){
+      _setPessoais(f);
+      _setNEE(f);
+      _setEtapa2(f);
+      if(CARREGAR_FUNCIONAIS) _setFuncionais(f);
+      // a foto e os documentos NÃO acompanham: ficam no cadastro do ano de origem
+    }
+    const maisRecente = regs => regs.slice().sort((a, b) => (parseInt(anoDe(b), 10) || 0) - (parseInt(anoDe(a), 10) || 0))[0];
+
+    /* ── Avalia o resultado (roda na busca e quando o ano letivo muda) ── */
+    function avaliar(avisar){
+      const ano = anoSel();
+      const regs = ID.regs || [];
+      const dup = regs.find(r => anoDe(r) === ano) || null;
+      const mudouDup = !!dup !== !!ID.dup;
+      ID.dup = dup;
+      if(!regs.length){
+        ID.novo = true; ID.base = null;
+        mostrar('🆕', 'Novo funcionário', `CPF ${formatCPF(dig(cpfEl.value))} não encontrado. Preencha os dados do funcionário.`);
+      } else if(dup){
+        ID.novo = false;
+        const orient = 'Para corrigir dados, abra a edição do funcionário na pesquisa.';
+        mostrar('⛔', dup.nome || dup.funcId, `Este funcionário já está cadastrado em ${ano}. ${orient}`, true);
+        if(mudouDup || avisar) _toastAviso('⚠️ Funcionário já cadastrado em ' + ano + '. ' + orient);
+      } else {
+        ID.novo = false;
+        const base = maisRecente(regs);
+        ID.base = base;
+        if(!ID.preenchido){ preencher(base); ID.preenchido = true; setLocked(true); }
+        mostrar('✅', base.nome || base.funcId, `Funcionário já cadastrado em ${anoDe(base)} (ID ${base.funcId}). Um novo cadastro será criado em ${ano} com os dados carregados.`);
+      }
+      ID.pronto = true;
+      aplicarTrava();
+    }
+
+    /* ── Eventos ── */
+    cpfEl.addEventListener('input', () => {
+      if(emEdicao()) return;
+      const d = dig(cpfEl.value);
+      if(d.length !== 11 || !isValidCPF(d) || ID.pronto) return;
+      ID.regs = funcionarios.filter(f => dig(f.cpf) === d);
+      avaliar(true);
+    });
+    ['input', 'change'].forEach(ev => anoLetivoInput.addEventListener(ev, () => {
+      if(ID.pronto && ID.regs && !emEdicao()) avaliar(false);
+    }));
+    $('btnLimparAutoFill').addEventListener('click', async () => {
+      const ok = await _confirmModal({ titulo:'Refazer a identificação?', corpo:'O formulário será limpo para recomeçar a identificação.', textoConfirmar:'Sim, limpar' });
+      if(ok) limparFormulario();
+    });
+
+    window._identFunc = {
+      limpar: limparEstado,
+      refresh(){ if(emEdicao()) banner.classList.remove('visible', 'dup'); aplicarTrava(); },
+      pronta: () => emEdicao() || (ID.pronto && !ID.dup),
+    };
+    aplicarTrava();
+  })();
 
   /* ════════════════════════════════════════
      Autocomplete de naturalidade e endereço
