@@ -102,7 +102,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .mb-10 { margin-bottom: 10px; }
 .mt-10 { margin-top: 10px; }
 .mt-12 { margin-top: 12px; }
-.nat-label-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.nat-label-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
 .nat-label-row label { margin: 0; }
 .nat-label-row .check { font-size: 12px; }
 .actions-wizard { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; align-items: center; }
@@ -126,6 +126,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 @keyframes fadeSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ── Banner "aluno encontrado" e campos travados ── */
+/* Campo indicador ativo e vazio (só nesta página): borda acesa + brilho suave + placeholder em negrito.
+   Some assim que há texto (volta ao padrão). A classe é posta pelo JS (aplicarTrava) só no campo ativo, fora do modo edição. */
+.ident-aguardando input:placeholder-shown { border-color: var(--ui-brand); box-shadow: 0 0 0 3px var(--ui-brand-faded); animation: cadPulso 2.4s ease-in-out infinite; }
+.ident-aguardando input:placeholder-shown::placeholder { font-weight: 800; color: var(--ui-brand-text); opacity: .9; }
+@keyframes cadPulso { 0%, 100% { box-shadow: 0 0 0 2px var(--ui-brand-faded); } 50% { box-shadow: 0 0 0 5px var(--ui-brand-faded); } }
+@media (prefers-reduced-motion: reduce) { .ident-aguardando input:placeholder-shown { animation: none; } }
+
 #bannerAlunoEncontrado { display: none; }
 #bannerAlunoEncontrado.visible { display: flex !important; }
 .field-locked input, .field-locked select, .field-locked .nat-input-real { background: var(--ui-chip-bg) !important; color: var(--ui-muted) !important; cursor: default !important; pointer-events: none; }
@@ -164,7 +171,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .wz-step.active .wz-step-title { color: var(--ui-text); }
 .wz-sep { display: none; }   /* o JS ainda mexe na classe; elemento mantido */
 #anoLetivo:disabled, #turmaSelect:disabled { background: color-mix(in srgb, var(--dest-fg, var(--ui-text)) 16%, transparent); border-color: color-mix(in srgb, var(--dest-fg, var(--ui-text)) 40%, transparent); color: var(--dest-fg, var(--ui-text)); opacity: 1; cursor: not-allowed; }
-#naturalidadeCidade:disabled, #naturalidadeUF:disabled { background: var(--ui-brand-faded); border-color: var(--cad-brand-sutil); color: var(--ui-text); opacity: 1; cursor: not-allowed; }
+#naturalidadeCidade:disabled, #naturalidadeUF:disabled { opacity: .5; filter: grayscale(.35); cursor: not-allowed; }   /* travado (aguardando UF / estrangeiro), igual a .ident-trava */
 
 /* ── Foto do aluno ── */
 .foto-box { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; padding: 14px; border: 1.5px dashed var(--ui-border); border-radius: 14px; background: var(--ui-surface); transition: border-color .15s, background .15s; }
@@ -175,7 +182,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .foto-info { flex: 1; min-width: 0; }
 .foto-tit { font-weight: 700; font-size: 13px; margin-bottom: 10px; }
 .foto-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
-.foto-info .help { margin-top: 6px; }
+.foto-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.foto-status:empty { display: none; }
 
 /* ── Documentos: fila de arquivos (sub-card, D19) e progresso ── */
 .docs-fila-lista { display: flex; flex-direction: column; gap: 6px; }
@@ -187,6 +195,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .docs-fila-meta { font-size: 11px; color: var(--ui-muted); }
 .docs-fila-label { width: 100%; margin-top: 4px; padding: 5px 8px; border: 1px solid var(--field-border); border-radius: 8px; background: var(--field-bg); color: var(--ui-text); font-size: 12px; font-family: 'Nunito', sans-serif; outline: none; }
 .docs-fila-label:focus { border-color: var(--ui-brand); }
+.docs-fila-item .btn { flex-shrink: 0; white-space: nowrap; }
 .docs-fila-size { font-size: 11px; color: var(--ui-muted); flex-shrink: 0; }
 .docs-fila-rm { background: none; border: none; cursor: pointer; font-size: 15px; color: var(--ui-muted); padding: 0 2px; line-height: 1; transition: color .15s; }
 .docs-fila-rm:hover { color: var(--ui-st-bad-fg); }
@@ -376,7 +385,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
       <button type="button" class="btn small" id="btnEscolherFoto" onclick="document.getElementById('inpFotoAluno').click()">📷 Escolher foto</button>
       <button type="button" class="btn small" id="btnRemoverFoto" hidden>🗑️ Remover</button>
     </div>
-    <div id="fotoAlunoStatus" class="help"></div>
+    <div id="fotoAlunoStatus" class="foto-status"></div>
   </div>
 </div>
 
@@ -1628,6 +1637,11 @@ function normSerie(s){
     });
   }
 
+  // Os scripts irmãos (foto e documentos) rodam em outro escopo e usam estes helpers
+  window._confirmModal = _confirmModal;
+  window.setMsg = setMsg;
+  window._toastLimpar = _toastLimpar;
+
   // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──────────────────────────────
   (function(){
     const params  = new URLSearchParams(window.location.search);
@@ -2832,6 +2846,8 @@ function normSerie(s){
         if(bloquear) el.setAttribute('inert',''); else el.removeAttribute('inert');
       });
       ativo.classList.remove('ident-trava'); ativo.removeAttribute('inert');
+      // destaque do campo indicador enquanto espera CPF/nome (o CSS só acende com o campo vazio)
+      ['fieldCpf','fieldNome'].forEach(id => { const f = $(id); if(f) f.classList.toggle('ident-aguardando', f === ativo && !emEdicao() && !ID.pronto); });
       const fSerie = $('serieAluno') && $('serieAluno').closest('.field');   // série também é bloqueada (faz parte da matrícula)
       if(fSerie){ fSerie.classList.toggle('ident-trava', bloquear); if(bloquear) fSerie.setAttribute('inert',''); else fSerie.removeAttribute('inert'); }
       // resolvido por CPF: o CPF não pode mais ser trocado sem "Refazer identificação"
@@ -3212,10 +3228,29 @@ function normSerie(s){
   let _fotoMatriculaId = null; // _id do doc em anoAtivoMatriculas onde a foto é salva (modo edição)
   let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
 
-  function _setStatus(txt, tipo){            // tipo: 'err' | 'ok' | omitido (neutro) — .help do guia 5-B
-    statusEl.textContent = txt || '';
-    statusEl.className = txt ? ('help' + (tipo ? ' ' + tipo : '')) : 'help';
+  // Status da foto: chips ok/bad curtos (com legenda quando algo aguarda o salvamento).
+  // Carregamento e erros vão para o toast geral (setMsg), não para o status.
+  function _limparStatus(){ statusEl.textContent = ''; }
+  function _chip(tipo, texto, legenda){
+    _limparStatus();
+    const b = document.createElement('span');
+    b.className = 'badge small ' + tipo; b.textContent = texto;
+    statusEl.appendChild(b);
+    if(legenda){
+      const l = document.createElement('div');
+      l.className = 'help'; l.textContent = legenda;
+      statusEl.appendChild(l);
+    }
   }
+  function _setStatus(txt){                  // nota neutra (ex.: foto sugerida de matrícula anterior); vazio limpa
+    _limparStatus();
+    if(!txt) return;
+    const l = document.createElement('div');
+    l.className = 'help'; l.textContent = txt;
+    statusEl.appendChild(l);
+  }
+  const _msg = (t, k) => { if(window.setMsg) window.setMsg(t, k); };
+  const _limparToast = () => { if(window._toastLimpar) window._toastLimpar(); };
 
   // Chamado no modo edição, com a foto já existente (se houver). A foto
   // vive por matrícula/ano agora — por isso recebe alunoId (usado como
@@ -3264,11 +3299,12 @@ function normSerie(s){
 
   async function _enviarFoto(alunoId, ano, matriculaId, base64, mimeType){
     if(!ano || !matriculaId){
-      _setStatus('❌ Falha ao enviar foto: ano/matrícula não identificados.', 'err');
+      _msg('Falha ao enviar foto: ano/matrícula não identificados.', 'err');
       console.error('[foto-aluno] _enviarFoto chamado sem ano/matriculaId:', { alunoId, ano, matriculaId });
       return;
     }
-    _setStatus('Enviando foto...');
+    _limparStatus();
+    _msg('Enviando foto…', 'loading');
     try{
       const resp = await fetch('/api/avatar-upload', {
         method: 'POST', headers: {'Content-Type':'application/json'},
@@ -3284,10 +3320,11 @@ function normSerie(s){
       const salvo = await window.DB.anoAtivoMatriculas.save({ _id: matriculaId, fotoUrl: data.fotoUrl, fotoFileId: data.fotoFileId });
       console.log('[foto-aluno] salvo no Firestore (anoAtivoMatriculas):', salvo);
       _fotoFileIdAtual = data.fotoFileId;
-      _setStatus('✅ Foto salva.', 'ok');
+      _limparToast();
+      _chip('ok', 'Foto enviada');
     }catch(e){
       console.error('[foto-aluno] falha ao enviar/salvar foto:', e);
-      _setStatus('❌ Falha ao enviar foto: ' + e.message, 'err');
+      _msg('Falha ao enviar foto: ' + e.message, 'err');
     }
   }
 
@@ -3295,10 +3332,9 @@ function normSerie(s){
     const file = inpFoto.files[0];
     if(!file) return;
     if(!file.type.startsWith('image/')){
-      _setStatus('⚠️ Selecione um arquivo de imagem.', 'err');
+      _msg('Selecione um arquivo de imagem.', 'warn');
       return;
     }
-    _setStatus('Comprimindo...');
     try{
       const { base64, mimeType, preview } = await _comprimir(file);
       previewImg.src = preview;
@@ -3310,10 +3346,10 @@ function normSerie(s){
         await _enviarFoto(_fotoAlunoId, _fotoAno, _fotoMatriculaId, base64, mimeType);
       } else {
         _fotoPendente = { base64, mimeType };
-        _setStatus('Foto pronta — será enviada ao salvar o aluno.', 'ok');
+        _chip('ok', 'Foto adicionada', 'Aguardando o salvamento do aluno para aplicar a foto…');
       }
     }catch(e){
-      _setStatus('❌ Falha ao processar a foto: ' + e.message, 'err');
+      _msg('Falha ao processar a foto: ' + e.message, 'err');
     }
   });
 
@@ -3325,33 +3361,32 @@ function normSerie(s){
     btnRemover.hidden = true;
     inpFoto.value = '';
     _fotoFileIdAtual = null;
-    _setStatus('');
+    _limparStatus();
     if(_fotoAlunoId){
       // Modo edição: a matrícula já é definitiva, remove no Cloudinary/Firestore na hora.
       _fotoPendente = null;
-      try{ await window.DB.anoAtivoMatriculas.save({ _id: _fotoMatriculaId, fotoUrl: null, fotoFileId: null }); }
-      catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
-      if(fileIdAntigo){
-        try{
-          await fetch('/api/drive-delete', {
-            method: 'DELETE', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
-          });
-        }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+      _msg('Apagando foto…', 'loading');
+      try{
+        await window.DB.anoAtivoMatriculas.save({ _id: _fotoMatriculaId, fotoUrl: null, fotoFileId: null });
+        if(fileIdAntigo){
+          try{
+            await fetch('/api/drive-delete', {
+              method: 'DELETE', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+            });
+          }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+        }
+        _limparToast();
+        _chip('bad', 'Foto apagada');
+      }catch(e){
+        console.warn('Erro ao limpar foto no Firestore:', e);
+        _msg('Falha ao apagar a foto: ' + e.message, 'err');
       }
-    } else if(_fotoPendente && _fotoPendente.reaproveitar){
-      // Cadastro novo com foto sugerida de uma matrícula anterior do mesmo
-      // aluno (CPF/nome já identificado): usuário recusou a sugestão.
-      // Diferente do modelo antigo (foto global por aluno), aqui a foto
-      // sugerida pertence a OUTRA matrícula (outro ano) que não é tocada
-      // por essa recusa — nada foi copiado/salvo ainda pra matrícula nova,
-      // então só resetar local já basta, sem chamar drive-delete (isso
-      // apagaria a foto viva da matrícula antiga, o que seria um bug).
-      _fotoPendente = null;
     } else {
-      // Cadastro novo, sem alunoId ainda e sem sugestão — só reseta local,
-      // nada tinha sido enviado ao servidor ainda.
+      // Cadastro novo: nada foi enviado ao servidor ainda (inclusive a foto sugerida de matrícula anterior,
+      // que pertence a OUTRA matrícula e não deve ser tocada) — só reseta local.
       _fotoPendente = null;
+      _chip('bad', 'Foto removida');
     }
   });
 
@@ -3490,6 +3525,18 @@ function normSerie(s){
     if(kind==='ok'&&text) setTimeout(()=>{ el.className='docs-status'; el.textContent=''; }, 4000);
   }
 
+  // Pré-visualização de um arquivo ainda na fila (antes de salvar), em nova aba, via blob
+  function _abrirPreview(item){
+    try{
+      const bin = atob(item.base64 || '');
+      const bytes = new Uint8Array(bin.length);
+      for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: item.mimeType || 'image/jpeg' }));
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }catch(e){ console.warn('[docs] falha ao abrir pré-visualização:', e); }
+  }
+
   function renderFila(){
     const wrap  = document.getElementById('docsFilaWrap');
     const lista = document.getElementById('docsFilaLista');
@@ -3520,12 +3567,19 @@ function normSerie(s){
           `<div class="docs-prog-wrap" id="docsProgItem${idx}"><div class="docs-prog-bar"></div></div>`+
         '</div>'+
         `<span class="docs-fila-size">${fmtSize(item._size||item.file.size)}</span>`+
+        `<button type="button" class="btn secondary small docs-ver" data-idx="${idx}">👁️ Ver</button>`+
         `<button class="docs-fila-rm docs-fila-pendente" data-idx="${idx}" title="Remover">✕</button>`;
       lista.insertBefore(div, lista.querySelector('.docs-existente')||null);
     });
 
     lista.querySelectorAll('.docs-fila-label').forEach(inp => {
       inp.addEventListener('input', e => { _fila[parseInt(e.target.dataset.idx)].label = e.target.value; });
+    });
+    lista.querySelectorAll('button.docs-ver').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const it = _fila[parseInt(e.currentTarget.dataset.idx)];
+        if(it) _abrirPreview(it);
+      });
     });
     lista.querySelectorAll('button.docs-fila-rm.docs-fila-pendente').forEach(btn => {
       btn.addEventListener('click', e => {
@@ -3677,10 +3731,10 @@ function normSerie(s){
             `<div class="docs-fila-meta">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
           '</div>'+
           `<a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>`+
-          `<button class="docs-fila-rm" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Remover">🗑️</button>`;
+          `<button type="button" class="btn danger-soft small docs-rm-existente" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Apagar documento">🗑️ Apagar</button>`;
         lista.appendChild(item);
       });
-      lista.querySelectorAll('.docs-existente .docs-fila-rm').forEach(btn => {
+      lista.querySelectorAll('.docs-existente .docs-rm-existente').forEach(btn => {
         btn.addEventListener('click', async () => {
           const confirmou = await _confirmModal({
             titulo: '⚠️ Remover documento',
