@@ -163,25 +163,27 @@ html[data-theme="dark"]{
      <label class="lbl">   rótulo solto (acima de um select, por ex.)
      <select class="input"> controle solto (em .row-btns, barra de filtro...)
      <label class="check"><input type="checkbox"> texto</label>   caixa de marcar */
-.field label, .lbl{
+.field label:where(:not(.check)), .lbl{
   display:block; margin:0 0 6px;
   font-size:13px; font-weight:700; color:var(--ui-text);
 }
-.field :is(input, select, textarea), .input{
+/* Controles de TEXTO. Checkbox, radio, file, range e botões ficam de fora: dentro de um .field eles
+   continuam nativos (um <label class="check"> dentro de .field também NÃO leva o estilo de rótulo). */
+.field :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])), select, textarea), .input{
   box-sizing:border-box; padding:11px 12px; min-height:var(--field-h, 43px);
   border:1px solid var(--field-border, var(--ui-border)); border-radius:10px;
   background:var(--field-bg, var(--ui-surface)); color:var(--ui-text);
   font-size:14px; font-family:'Nunito', ui-sans-serif, system-ui, sans-serif;
   outline:none; transition:border-color .15s, box-shadow .15s;
 }
-.field :is(input, select, textarea){ width:100%; }   /* .input avulso: largura é da página */
-.field :is(input, select, textarea):focus, .input:focus{
+.field :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])), select, textarea){ width:100%; }   /* .input avulso: largura é da página */
+.field :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])), select, textarea):focus, .input:focus{
   border-color:var(--ui-brand); box-shadow:0 0 0 3px var(--ui-brand-faded);
 }
-.field :is(input, textarea)::placeholder, .input::placeholder{
+.field :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])), textarea)::placeholder, .input::placeholder{
   color:color-mix(in srgb, var(--ui-text) 45%, transparent);
 }
-.field :is(input, select, textarea):disabled, .input:disabled{ opacity:.6; cursor:not-allowed; }
+.field :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])), select, textarea):disabled, .input:disabled{ opacity:.6; cursor:not-allowed; }
 
 .check{
   display:inline-flex; align-items:center; gap:8px;
