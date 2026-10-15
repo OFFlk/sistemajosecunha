@@ -38,11 +38,15 @@
 .note-box { border-radius: 12px; padding: 16px 18px; border: 1px solid var(--ui-border); background: var(--bg); margin-bottom: 14px; }
 .note-box-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 
-/* ── Tabelas (aparência é global; aqui só rolagem e alinhamento) ── */
+/* ── Tabelas (aparência é global; aqui só rolagem, larguras e alinhamento) ── */
 .tbl-wrap { overflow-x: auto; }
-.col-r { text-align: right; }
-.row-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+.col-nome   { min-width: 130px; }
+.col-email  { min-width: 180px; overflow-wrap: anywhere; }
+.col-escola { min-width: 110px; }
+.col-fit    { width: 1%; white-space: nowrap; }
+/* coluna de ações: encolhe ao tamanho dos botões e fica centralizada (exceção ao alinhamento à esquerda) */
+.col-acoes  { width: 1%; white-space: nowrap; text-align: center; padding-left: 14px; padding-right: 14px; }
+.row-actions { display: flex; gap: 8px; justify-content: center; }
 
 /* ── Formulário (layout) ── */
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -81,7 +85,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         </div>
         <div class="tbl-wrap" id="pendingWrap" hidden>
           <table>
-            <thead><tr><th>Nome</th><th>Email</th><th>schoolId</th><th>Data</th><th class="col-r">Ações</th></tr></thead>
+            <thead id="pendingThead"></thead>
             <tbody id="pendingTbody"></tbody>
           </table>
         </div>
@@ -98,7 +102,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         </div>
         <div class="tbl-wrap" id="usersWrap" hidden>
           <table>
-            <thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>schoolId</th><th class="mono">uid</th><th>Ações</th></tr></thead>
+            <thead id="usersThead"></thead>
             <tbody id="usersTbody"></tbody>
           </table>
         </div>
@@ -130,7 +134,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         </div>
         <div class="tbl-wrap" id="adminsWrap" hidden>
           <table>
-            <thead><tr><th>Nome</th><th>Email</th><th>schoolId</th><th class="mono">uid</th><th>Ações</th></tr></thead>
+            <thead id="adminsThead"></thead>
             <tbody id="adminsTbody"></tbody>
           </table>
         </div>
@@ -147,7 +151,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         </div>
         <div class="tbl-wrap" id="delReqWrap" hidden>
           <table>
-            <thead><tr><th>Usuário</th><th>Escola</th><th>Solicitado por</th><th>Data</th><th class="col-r">Ações</th></tr></thead>
+            <thead id="delReqThead"></thead>
             <tbody id="delReqTbody"></tbody>
           </table>
         </div>
@@ -312,15 +316,52 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
     }catch(_){ return ''; }
   }
 
+  // Escolas: lê uma vez e guarda schoolId → nome curto (displayName; cai para name e depois para o id).
+  var _schoolNames = {};
+  async function loadSchools(){
+    var schools = window.Auth && typeof Auth.listSchools === 'function' ? (Auth.listSchools()||[]) : [];
+    if(!schools.length && window.Auth && window.Auth.db){
+      var snap = await Auth.db.collection('schools').get();
+      snap.docs.forEach(function(d){ schools.push(Object.assign({schoolId:d.id},d.data())); });
+    }
+    schools.forEach(function(sc){
+      var id = String(sc.schoolId||sc.id||'').trim();
+      if(id) _schoolNames[id] = sc.displayName || sc.name || id;
+    });
+    return schools;
+  }
+  function escolaNome(sid){
+    sid = String(sid||'').trim();
+    if(!sid) return '—';
+    if(sid.toUpperCase() === 'ADMIN') return 'Todas as escolas';
+    return _schoolNames[sid] || sid;
+  }
+  // Nível de acesso exibido: admin com escola = gestor; admin com schoolId ADMIN = admin; user = usuário.
+  function nivelDe(u){
+    var r = String(u.role||'').trim().toLowerCase();
+    if(r === 'admin') return String(u.schoolId||'').trim().toUpperCase() === 'ADMIN' ? 'admin' : 'gestor';
+    if(r === 'user' || !r) return 'usuário';
+    return String(u.role).trim();
+  }
+
+  // Monta cabeçalho e linhas a partir de colunas { th, cls, td(item) }. O item fica em tr._item.
+  function montarTabela(prefix, cols, itens){
+    var head = el(prefix+'Thead'), body = el(prefix+'Tbody');
+    head.innerHTML = '<tr>'+cols.map(function(c){ return '<th'+(c.cls?' class="'+c.cls+'"':'')+'>'+c.th+'</th>'; }).join('')+'</tr>';
+    body.innerHTML = '';
+    itens.forEach(function(it){
+      var tr = document.createElement('tr');
+      tr.innerHTML = cols.map(function(c){ return '<td'+(c.cls?' class="'+c.cls+'"':'')+'>'+c.td(it)+'</td>'; }).join('');
+      tr._item = it;
+      body.appendChild(tr);
+    });
+  }
+
   async function populateSchoolSelect(){
     var sel = el('aSchool');
     if(!sel) return;
     try{
-      var schools = window.Auth && typeof Auth.listSchools === 'function' ? (Auth.listSchools()||[]) : [];
-      if(!schools.length && window.Auth && window.Auth.db){
-        var snap = await Auth.db.collection('schools').get();
-        snap.docs.forEach(function(d){ schools.push(Object.assign({schoolId:d.id},d.data())); });
-      }
+      var schools = await loadSchools();
       sel.innerHTML = '';
       var opt0 = document.createElement('option'); opt0.value=''; sel.appendChild(opt0);   // select sem escolha fica em branco
       schools.sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||''),'pt-BR'); }).forEach(function(sc){
@@ -360,7 +401,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
   // adicionar depois, junto do ajuste da página de aprovação.
   function userActionCellHtml(u, isGlobalAdminFlag){
     var rotulo = isGlobalAdminFlag ? 'Excluir' : 'Solicitar exclusão';
-    return '<button type="button" class="btn danger small" data-del-uid="'+escapeAttr(u.uid)+'" data-del-name="'+escapeAttr(u.name||u.email||'?')+'">'+rotulo+'</button>';
+    return '<button type="button" class="btn danger-soft small" data-del-uid="'+escapeAttr(u.uid)+'" data-del-name="'+escapeAttr(u.name||u.email||'?')+'">'+rotulo+'</button>';
   }
 
   // NOTA PRA IMPLEMENTAÇÃO: preciso ver a página onde o admin global revisa
@@ -421,30 +462,36 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         return;
       }
       setEstadoLista('delReqWrap', 'delReqAviso', true);
-      // "Solicitado por" é só um uid no doc — tenta achar nome/email na
-      // lista de usuários já carregada; se a escola não estiver na visão
-      // atual (filtro do cabeçalho), mostra o uid puro mesmo.
+      // Email, nível e "solicitado por" vêm da lista de usuários. Se o filtro do cabeçalho
+      // deixou alguém de fora, lê a lista completa uma vez (só o admin global chega aqui).
       var byUid = {};
       (knownUsers||[]).forEach(function(u){ byUid[u.uid] = u; });
-      reqs.forEach(function(r){
-        var targetName = (r.changes && r.changes.targetName) || (r.changes && r.changes.targetUid) || '—';
-        var requester = byUid[r.requestedBy];
-        var requesterLabel = requester ? (requester.name || requester.email) : (r.requestedBy || '—');
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td><b>'+escapeHtml(targetName)+'</b></td>'
-          + '<td><span class="badge mono">'+escapeHtml(r.schoolId||'—')+'</span></td>'
-          + '<td>'+escapeHtml(requesterLabel)+'</td>'
-          + '<td>'+escapeHtml(fmtDate(r.requestedAt))+'</td>'
-          + '<td class="col-r"><div class="row-actions">'
-          + '<button type="button" class="btn success small" data-req-act="approve" data-req-id="'+escapeAttr(r._id)+'">Aprovar</button>'
-          + '<button type="button" class="btn danger small" data-req-act="reject" data-req-id="'+escapeAttr(r._id)+'">Reprovar</button>'
-          + '</div></td>';
-        tr._req = r;
-        tbody.appendChild(tr);
+      var faltam = reqs.some(function(r){
+        var t = r.changes && r.changes.targetUid;
+        return (t && !byUid[t]) || (r.requestedBy && !byUid[r.requestedBy]);
       });
+      if(faltam){
+        try{ (await Auth.listUsers()).forEach(function(u){ byUid[u.uid] = u; }); }
+        catch(e){ console.error('listUsers (exclusões):', e); }
+      }
+      function alvo(r){ return byUid[r.changes && r.changes.targetUid] || null; }
+      var cols = [
+        { th:'Usuário', cls:'col-nome', td:function(r){ return '<b>'+escapeHtml((r.changes && r.changes.targetName) || (r.changes && r.changes.targetUid) || '—')+'</b>'; } },
+        { th:'Email',   cls:'col-email', td:function(r){ var t = alvo(r); return escapeHtml((t && t.email) || '—'); } },
+        { th:'Nível',   cls:'col-fit', td:function(r){ var t = alvo(r); return t ? '<span class="badge neutral">'+escapeHtml(nivelDe(t))+'</span>' : '—'; } },
+        { th:'Escola',  cls:'col-escola', td:function(r){ return '<span class="badge">'+escapeHtml(escolaNome(r.schoolId))+'</span>'; } },
+        { th:'Solicitado por', td:function(r){ var q = byUid[r.requestedBy]; return escapeHtml(q ? (q.name || q.email) : (r.requestedBy || '—')); } },
+        { th:'Data',    cls:'col-fit', td:function(r){ return escapeHtml(fmtDate(r.requestedAt)); } },
+        { th:'Ações',   cls:'col-acoes', td:function(r){
+            return '<div class="row-actions">'
+              + '<button type="button" class="btn success-soft small" data-req-act="approve" data-req-id="'+escapeAttr(r._id)+'">Aprovar</button>'
+              + '<button type="button" class="btn danger-soft small" data-req-act="reject" data-req-id="'+escapeAttr(r._id)+'">Reprovar</button>'
+              + '</div>'; } }
+      ];
+      montarTabela('delReq', cols, reqs);
       tbody.querySelectorAll('button[data-req-act]').forEach(function(btn){
         btn.addEventListener('click', async function(){
-          var tr = btn.closest('tr'), req = tr && tr._req;
+          var tr = btn.closest('tr'), req = tr && tr._item;
           if(!req) return;
           var act = btn.dataset.reqAct;
           btn.disabled = true;
@@ -499,6 +546,17 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       var users   = filtered.filter(function(u){ var r=String(u.role||'').trim().toLowerCase(); return r!=='pending'&&r!=='admin'; });
       var admins  = filtered.filter(function(u){ return String(u.role||'').trim().toLowerCase() === 'admin'; });
 
+      // Colunas. Gestor só vê a própria escola: sem coluna de escola. Ninguém vê uid.
+      // Nível: chip único (variável) para o gestor; neutro quando há o chip de escola ao lado (nível 1).
+      var nivelCls = isGlobalAdmin ? 'badge neutral' : 'badge';
+      var cNome   = { th:'Nome',   cls:'col-nome',   td:function(u){ return '<b>'+escapeHtml(u.name||'—')+'</b>'; } };
+      var cEmail  = { th:'Email',  cls:'col-email',  td:function(u){ return escapeHtml(u.email||'—'); } };
+      var cEscola = { th:'Escola', cls:'col-escola', td:function(u){ return '<span class="badge">'+escapeHtml(escolaNome(u.schoolId))+'</span>'; } };
+      var cNivel  = { th:'Nível',  cls:'col-fit',    td:function(u){ return '<span class="'+nivelCls+'">'+escapeHtml(nivelDe(u))+'</span>'; } };
+      var cData   = { th:'Data',   cls:'col-fit',    td:function(u){ return escapeHtml(fmtDate(u.createdAt)); } };
+      var escola  = isGlobalAdmin ? [cEscola] : [];
+      function cAcoes(fn){ return { th:'Ações', cls:'col-acoes', td:fn }; }
+
       // Solicitações
       setContagem('pendingCount', pending.length, 'pendente(s)');
       var pbody = el('pendingTbody');
@@ -507,11 +565,12 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         setEstadoLista('pendingWrap', 'pendingAviso', false, 'ℹ️ Nenhuma solicitação pendente.');
       } else {
         setEstadoLista('pendingWrap', 'pendingAviso', true);
-        pending.forEach(function(r){
-          var tr = document.createElement('tr');
-          tr.innerHTML = '<td><b>'+escapeHtml(r.name||'—')+'</b></td><td>'+escapeHtml(r.email||'—')+'</td><td><span class="badge mono">'+escapeHtml(r.schoolId||'—')+'</span></td><td>'+escapeHtml(fmtDate(r.createdAt))+'</td><td class="col-r"><div class="row-actions"><button type="button" class="btn success small" data-act="approve" data-uid="'+escapeAttr(r.uid)+'">Aprovar</button><button type="button" class="btn danger small" data-act="reject" data-uid="'+escapeAttr(r.uid)+'">Reprovar</button></div></td>';
-          pbody.appendChild(tr);
-        });
+        montarTabela('pending', [cNome, cEmail].concat(escola, [cData, cAcoes(function(r){
+          return '<div class="row-actions">'
+            + '<button type="button" class="btn success-soft small" data-act="approve" data-uid="'+escapeAttr(r.uid)+'">Aprovar</button>'
+            + '<button type="button" class="btn danger-soft small" data-act="reject" data-uid="'+escapeAttr(r.uid)+'">Reprovar</button>'
+            + '</div>';
+        })]), pending);
         pbody.querySelectorAll('button[data-act]').forEach(function(b){
           b.addEventListener('click', async function(){
             var uid=b.dataset.uid, act=b.dataset.act; b.disabled=true;
@@ -532,11 +591,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         setEstadoLista('usersWrap', 'usersAviso', false, 'ℹ️ Nenhum usuário cadastrado.');
       } else {
         setEstadoLista('usersWrap', 'usersAviso', true);
-        users.forEach(function(u){
-          var tr = document.createElement('tr');
-          tr.innerHTML = '<td><b>'+escapeHtml(u.name||'—')+'</b></td><td>'+escapeHtml(u.email||'—')+'</td><td><span class="badge neutral">'+escapeHtml(String(u.role||'user'))+'</span></td><td><span class="badge mono">'+escapeHtml(u.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(u.uid||'—')+'</td><td>'+userActionCellHtml(u,isGlobalAdmin)+'</td>';
-          ubody.appendChild(tr);
-        });
+        montarTabela('users', [cNome, cEmail].concat(escola, [cNivel, cAcoes(function(u){ return userActionCellHtml(u, isGlobalAdmin); })]), users);
         ubody.querySelectorAll('[data-del-uid]').forEach(function(btn){
           btn.addEventListener('click', async function(){
             btn.disabled = true;
@@ -561,12 +616,10 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         setEstadoLista('adminsWrap', 'adminsAviso', false, 'ℹ️ Nenhum admin cadastrado.');
       } else {
         setEstadoLista('adminsWrap', 'adminsAviso', true);
-        admins.forEach(function(a){
-          var tr = document.createElement('tr');
+        montarTabela('admins', [cNome, cEmail].concat(escola, [cNivel, cAcoes(function(a){
           var canDelete = isGlobalAdmin && a.uid !== (session && session.uid);
-          tr.innerHTML = '<td><b>'+escapeHtml(a.name||'—')+'</b></td><td>'+escapeHtml(a.email||'—')+'</td><td><span class="badge mono">'+escapeHtml(a.schoolId||'—')+'</span></td><td class="mono">'+escapeHtml(a.uid||'—')+'</td><td>'+(canDelete?'<button type="button" class="btn danger small" data-del-uid="'+escapeAttr(a.uid)+'" data-del-name="'+escapeAttr(a.name||a.email||'?')+'">Excluir</button>':'—')+'</td>';
-          abody.appendChild(tr);
-        });
+          return canDelete ? userActionCellHtml(a, true) : '—';
+        })]), admins);
         if(isGlobalAdmin){ abody.querySelectorAll('[data-del-uid]').forEach(function(btn){ btn.addEventListener('click',async function(){ btn.disabled=true; try{ var ok=await deleteUserById(btn.dataset.delUid,btn.dataset.delName); if(ok){setMsg('Admin excluído.', 'ok');await refresh();}else btn.disabled=false; }catch(err){console.error('exclusão de admin:', err);setMsg(String(err&&err.message||err||'Erro'),'err');btn.disabled=false;} }); }); }
       }
 
