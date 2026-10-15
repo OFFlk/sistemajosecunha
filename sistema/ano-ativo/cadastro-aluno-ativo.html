@@ -202,6 +202,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .docs-fila-sep-fixo { font-size: 12px; font-weight: 700; color: var(--ui-muted); padding: 6px 0 8px; border-bottom: 1px solid var(--ui-border); margin-bottom: 6px; }
 .docs-existente-sep { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .05em; margin: 8px 0 6px; }
 .docs-fila-item.docs-existente { opacity: .85; }
+.docs-fila-item.docs-existente.docs-marcado { opacity: .6; }
+.docs-marcado .docs-fila-nome { text-decoration: line-through; }
+.docs-marca { margin-top: 4px; }
 .docs-prog-wrap { height: 3px; border-radius: 999px; background: var(--ui-border); margin-top: 4px; overflow: hidden; display: none; }
 .docs-prog-wrap.show { display: block; }
 .docs-prog-bar { height: 100%; border-radius: 999px; background: var(--ui-brand); width: 0%; transition: width .3s; }
@@ -1539,6 +1542,13 @@ function normSerie(s){
         ops.push(window.Identidade.prepararElo({ atasId: elo.atasId, ...(mudouNome ? { nome } : {}), ...(mudouCpf ? { cpf: cpfNum } : {}) }));
       }
       await window.DB.batchWrite(ops);
+
+      // Foto e documentos só mudam no banco de imagens agora, junto com o salvamento (cancelar não altera nada)
+      if(window.aplicarFotoEdicao) await window.aplicarFotoEdicao();
+      if(window.aplicarRemocoesDocs){
+        const errosDocs = await window.aplicarRemocoesDocs();
+        if(errosDocs.length) throw new Error('os dados foram salvos, mas ' + errosDocs.length + ' documento(s) não puderam ser apagados: ' + errosDocs.join(' | '));
+      }
 
       if(window.initDocs)        window.initDocs(alunoId);
       if(window.uploadDocsQueue) await window.uploadDocsQueue();
@@ -3227,6 +3237,9 @@ function normSerie(s){
   let _fotoAno      = null; // ano letivo da matrícula em edição (public_id no Cloudinary é alunoId/ano)
   let _fotoMatriculaId = null; // _id do doc em anoAtivoMatriculas onde a foto é salva (modo edição)
   let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
+  let _fotoTinhaSalva = false; // modo edição: já existe foto salva nesta matrícula
+  let _fotoRemover    = false; // modo edição: remoção pedida, só aplicada ao salvar o formulário
+  const LEGENDA_PENDENTE = 'Aguardando o salvamento do aluno para aplicar a foto…';
 
   // Status da foto: chips ok/bad curtos (com legenda quando algo aguarda o salvamento).
   // Carregamento e erros vão para o toast geral (setMsg), não para o status.
@@ -3262,6 +3275,8 @@ function normSerie(s){
     _fotoAno         = ano || null;
     _fotoMatriculaId = matriculaId || null;
     _fotoFileIdAtual = fotoFileId || null;
+    _fotoTinhaSalva  = !!fotoUrl;
+    _fotoRemover     = false;
     if(fotoUrl){
       previewImg.src = fotoUrl;
       previewImg.hidden = false;
@@ -3301,7 +3316,7 @@ function normSerie(s){
     if(!ano || !matriculaId){
       _msg('Falha ao enviar foto: ano/matrícula não identificados.', 'err');
       console.error('[foto-aluno] _enviarFoto chamado sem ano/matriculaId:', { alunoId, ano, matriculaId });
-      return;
+      return false;
     }
     _limparStatus();
     _msg('Enviando foto…', 'loading');
@@ -3322,9 +3337,11 @@ function normSerie(s){
       _fotoFileIdAtual = data.fotoFileId;
       _limparToast();
       _chip('ok', 'Foto enviada');
+      return true;
     }catch(e){
       console.error('[foto-aluno] falha ao enviar/salvar foto:', e);
       _msg('Falha ao enviar foto: ' + e.message, 'err');
+      return false;
     }
   }
 
@@ -3342,53 +3359,61 @@ function normSerie(s){
       placeholder.hidden = true;
       btnRemover.hidden = false;
 
-      if(_fotoAlunoId){
-        await _enviarFoto(_fotoAlunoId, _fotoAno, _fotoMatriculaId, base64, mimeType);
-      } else {
-        _fotoPendente = { base64, mimeType };
-        _chip('ok', 'Foto adicionada', 'Aguardando o salvamento do aluno para aplicar a foto…');
-      }
+      // Cadastro e edição: a foto só vai para o banco de imagens quando o formulário é salvo
+      _fotoPendente = { base64, mimeType };
+      _fotoRemover  = false;
+      _chip('ok', (_fotoAlunoId && _fotoTinhaSalva) ? 'Foto trocada' : 'Foto adicionada', LEGENDA_PENDENTE);
     }catch(e){
       _msg('Falha ao processar a foto: ' + e.message, 'err');
     }
   });
 
-  btnRemover.addEventListener('click', async () => {
-    const fileIdAntigo = _fotoFileIdAtual;
+  btnRemover.addEventListener('click', () => {
     previewImg.hidden = true;
     previewImg.src = '';
     placeholder.hidden = false;
     btnRemover.hidden = true;
     inpFoto.value = '';
-    _fotoFileIdAtual = null;
-    _limparStatus();
-    if(_fotoAlunoId){
-      // Modo edição: a matrícula já é definitiva, remove no Cloudinary/Firestore na hora.
-      _fotoPendente = null;
-      _msg('Apagando foto…', 'loading');
-      try{
-        await window.DB.anoAtivoMatriculas.save({ _id: _fotoMatriculaId, fotoUrl: null, fotoFileId: null });
-        if(fileIdAntigo){
-          try{
-            await fetch('/api/drive-delete', {
-              method: 'DELETE', headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
-            });
-          }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
-        }
-        _limparToast();
-        _chip('bad', 'Foto apagada');
-      }catch(e){
-        console.warn('Erro ao limpar foto no Firestore:', e);
-        _msg('Falha ao apagar a foto: ' + e.message, 'err');
-      }
+    _fotoPendente = null;
+    if(_fotoAlunoId && _fotoTinhaSalva){
+      // Modo edição com foto salva: a remoção só é aplicada (Firestore + Cloudinary) ao salvar o formulário.
+      _fotoRemover = true;
+      _chip('bad', 'Foto apagada', LEGENDA_PENDENTE);
     } else {
-      // Cadastro novo: nada foi enviado ao servidor ainda (inclusive a foto sugerida de matrícula anterior,
-      // que pertence a OUTRA matrícula e não deve ser tocada) — só reseta local.
-      _fotoPendente = null;
+      // Cadastro novo (inclui a foto sugerida de matrícula anterior, que pertence a OUTRA matrícula e não é tocada)
+      // ou edição sem foto salva: nada existe no servidor, só reseta local.
+      _fotoFileIdAtual = _fotoAlunoId ? _fotoFileIdAtual : null;
       _chip('bad', 'Foto removida');
     }
   });
+
+  // Modo edição: chamado por _atualizarAluno() depois que os dados foram gravados.
+  // Aplica a foto nova (ou a remoção) no Cloudinary/Firestore; lança erro se falhar.
+  window.aplicarFotoEdicao = async function(){
+    if(!_fotoAlunoId) return;
+    if(_fotoPendente && !_fotoPendente.reaproveitar){
+      const { base64, mimeType } = _fotoPendente;
+      const ok = await _enviarFoto(_fotoAlunoId, _fotoAno, _fotoMatriculaId, base64, mimeType);
+      if(!ok) throw new Error('os dados foram salvos, mas a foto não pôde ser enviada');
+      _fotoPendente = null; _fotoRemover = false; _fotoTinhaSalva = true;
+      return;
+    }
+    if(_fotoRemover){
+      _msg('Apagando foto…', 'loading');
+      const fileIdAntigo = _fotoFileIdAtual;
+      await window.DB.anoAtivoMatriculas.save({ _id: _fotoMatriculaId, fotoUrl: null, fotoFileId: null });
+      if(fileIdAntigo){
+        try{
+          await fetch('/api/drive-delete', {
+            method: 'DELETE', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+          });
+        }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+      }
+      _limparToast();
+      _fotoFileIdAtual = null; _fotoRemover = false; _fotoTinhaSalva = false;
+    }
+  };
 
   // Reseta o widget de foto pro estado vazio — chamado por clearFields()
   // depois de salvar um cadastro novo, senão a foto continua no slot e
@@ -3399,6 +3424,8 @@ function normSerie(s){
     _fotoAno      = null;
     _fotoMatriculaId = null;
     _fotoFileIdAtual = null;
+    _fotoTinhaSalva  = false;
+    _fotoRemover     = false;
     inpFoto.value = '';
     previewImg.hidden = true;
     previewImg.src = '';
@@ -3508,6 +3535,7 @@ function normSerie(s){
 
   let _fila    = [];
   let _alunoId = null;
+  const _remocoes = new Map();   // modo edição: documentos marcados para apagar, aplicados só ao salvar o formulário
 
   function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
   function fmtSize(b){
@@ -3694,6 +3722,23 @@ function normSerie(s){
     else { setStatus('ok', '✅ Todos os documentos enviados!'); }
   };
 
+  // Modo edição: chamado por _atualizarAluno() depois que os dados foram gravados. Devolve a lista de erros.
+  window.aplicarRemocoesDocs = async function(){
+    const erros = [];
+    for(const r of Array.from(_remocoes.values())){
+      try{
+        const resp = await fetch('/api/drive-delete', {
+          method: 'DELETE', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ fileId: r.fileId, resourceType: r.resourceType }),
+        });
+        const d = await resp.json().catch(() => ({}));
+        if(!resp.ok) throw new Error(d.error || 'erro no servidor');
+        _remocoes.delete(r.fileId);
+      }catch(e){ erros.push(r.name + ': ' + e.message); }
+    }
+    return erros;
+  };
+
   window.initDocs = function(alunoId){
     if(!alunoId) return;
     _alunoId = String(alunoId);
@@ -3706,6 +3751,7 @@ function normSerie(s){
     const lista = document.getElementById('docsFilaLista');
     if(!lista) return;
     lista.querySelectorAll('.docs-existente').forEach(el => el.remove());
+    _remocoes.clear();
     try{
       const resp = await fetch(`/api/drive-list?alunoId=${encodeURIComponent(_alunoId)}`);
       const data = await resp.json();
@@ -3729,28 +3775,25 @@ function normSerie(s){
           '<div class="docs-fila-info">'+
             `<div class="docs-fila-nome">${escHtml(f.label||f.fileName)}</div>`+
             `<div class="docs-fila-meta">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
+            '<span class="badge small bad docs-marca" hidden>Será apagado ao salvar</span>'+
           '</div>'+
           `<a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>`+
           `<button type="button" class="btn danger-soft small docs-rm-existente" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Apagar documento">🗑️ Apagar</button>`;
         lista.appendChild(item);
       });
+      // Apagar só MARCA o documento (reversível com "Desfazer"); a remoção real acontece ao salvar o formulário
       lista.querySelectorAll('.docs-existente .docs-rm-existente').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const confirmou = await _confirmModal({
-            titulo: '⚠️ Remover documento',
-            corDestaque: 'danger',
-            corpo: `Remover "${btn.dataset.name}"?\n\nEssa ação não pode ser desfeita.`,
-            textoConfirmar: 'Sim, remover',
-          });
-          if(!confirmou) return;
-          setStatus('loading','⏳ Removendo…');
-          try{
-            const r = await fetch('/api/drive-delete',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:btn.dataset.fileid,resourceType:btn.dataset.restype||'image'})});
-            const d = await r.json();
-            if(!r.ok) throw new Error(d.error);
-            btn.closest('.docs-existente').remove();
-            setStatus('ok','✅ Documento removido.');
-          }catch(e){ setStatus('err','❌ Erro ao remover: '+e.message); }
+        btn.addEventListener('click', () => {
+          const item   = btn.closest('.docs-existente');
+          const id     = btn.dataset.fileid;
+          const marcar = !item.classList.contains('docs-marcado');
+          item.classList.toggle('docs-marcado', marcar);
+          const chip = item.querySelector('.docs-marca'); if(chip) chip.hidden = !marcar;
+          btn.textContent = marcar ? '↩ Desfazer' : '🗑️ Apagar';
+          btn.classList.toggle('danger-soft', !marcar);
+          btn.classList.toggle('secondary', marcar);
+          if(marcar) _remocoes.set(id, { fileId: id, resourceType: btn.dataset.restype || 'image', name: btn.dataset.name });
+          else _remocoes.delete(id);
         });
       });
     }catch(err){ console.warn('[docs] Erro ao carregar:', err.message); }
