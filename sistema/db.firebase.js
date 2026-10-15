@@ -665,6 +665,12 @@
     notasTrimestrais: makeCollection('notasTrimestrais'),
     notasSchemas: makeCollection('notasSchemas'),
 
+    // ── Histórico de exportações do historico_auto.html ──
+    // Guarda só as últimas 4 por escola: a cada exportação nova, a página grava a nova e apaga as que passam
+    // do limite no mesmo DB.batchWrite (atômico). Ler a coleção inteira custa no máximo 4 documentos.
+    // Campos: { nome, tipo, anoRef, schemaCH, ts }  (ts = Date.now(); ID 'EXP-{ts}-{rand}')
+    exportacoes: makeCollection('exportacoes'),
+
     // ── Compartilhados ──
     escola:    escolaStore,
     schemas:   schemasStore,
