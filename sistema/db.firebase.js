@@ -406,7 +406,7 @@
    */
   const FUNC_CAMPOS = {
     identidade: ['cpf', 'cpfNum', 'rgCnh', 'nome', 'dataNascimento', 'filiacaoMae', 'filiacaoPai', 'sexo', 'corRaca',
-                 'naturalidadePais', 'naturalidadeUF', 'naturalidadeCidade', 'fotoUrl', 'fotoFileId'],
+                 'naturalidadeEstrangeiro', 'naturalidadeUF', 'naturalidadeCidade', 'fotoUrl', 'fotoFileId'],
     perfil:     ['deficiencia', 'cep', 'endUF', 'endCidade', 'zonaResidencia', 'escolaridade', 'tipoEnsino',
                  'graduacoes', 'posGraduacoes', 'complementacoes', 'outrosCursos'],
     ano:        ['funcao', 'profissionalApoio', 'cargaHoraria', 'status', 'turnos'],
