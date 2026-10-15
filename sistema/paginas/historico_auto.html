@@ -103,8 +103,8 @@
     <h3 class="section-title">Pesquisa de aluno</h3>
     <div class="row">
       <div class="field f-busca">
-        <label for="qAluno">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por ID ou nome do aluno: números pesquisam pelo ID (o prefixo ALU é ignorado) e texto pesquisa pelo nome. Para que a listagem seja feita, é necessário digitar pelo menos 3 caracteres. São exibidos no máximo 5 resultados: quanto mais completo for o nome ou o ID, mais precisa será a pesquisa.</span></span></label>
-        <input id="qAluno" oninput="autoSearch()" placeholder="Ex.: 000138 ou ADRIANA">
+        <label for="qAluno">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por ID ou nome do aluno: números pesquisam pelo ID (o prefixo ALU é ignorado) e texto pesquisa pelo nome. A pesquisa é feita ao clicar em Pesquisar ou apertar Enter, e o nome precisa ter pelo menos 3 caracteres. São exibidos no máximo 5 resultados: quanto mais completo for o nome ou o ID, mais precisa será a pesquisa.</span></span></label>
+        <input id="qAluno" placeholder="Ex.: 000138 ou ADRIANA">
       </div>
       <button type="button" class="btn primary field-h" onclick="pesquisar()">Pesquisar</button>
       <button type="button" class="btn outline field-h" onclick="limpar()">Limpar</button>
@@ -156,14 +156,14 @@
     </div>
   </div>
 
-  <!-- 5) Diagnóstico | 6) Histórico local de exportações -->
+  <!-- 5) Diagnóstico | 6) Histórico de exportações -->
   <div class="cols">
     <div class="card" id="cardDiagExport">
       <h3 class="section-title">Diagnóstico e validação de exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Aluno selecionado:</b> nome completo do aluno.<br><b>Resumo por ano:</b> quantidade de anos em que o aluno estudou na escola.<br><b>CH:</b> identifica divergências entre o schema de carga horária e o schema encontrado na turma do aluno.<br><b>Notas faltando:</b> identifica notas ausentes, com base no que o schema de carga horária esperava.<br><b>CH faltando:</b> identifica a carga horária por matéria que está ausente, com base no que o schema de carga horária esperava.<br><b>Campos essenciais:</b> identifica campos obrigatórios do documento que não foram preenchidos.</span></span></h3>
       <div id="diagExportStatus"><div class="aviso-warn">ℹ️ Selecione um aluno para ver o diagnóstico.</div></div>
     </div>
     <div class="card" id="cardExportHist">
-      <h3 class="section-title">Histórico local de exportações (últimas 6)</h3>
+      <h3 class="section-title">Histórico de exportações (últimas 4)</h3>
       <div id="exportHistoryBox"><div class="aviso-warn">ℹ️ Nenhuma exportação registrada.</div></div>
     </div>
   </div>
@@ -383,36 +383,52 @@ async function carregarDB(){
 
 // ===== Pesquisa por consulta direcionada (sem carregar a base inteira) =====
 // state.index = resultados da ÚLTIMA pesquisa: [{key, alunoId, nome, oc, anosArr, seriesArr, matriculas}]
-let _pesqTimer = null, _pesqSeq = 0, _selSeq = 0;
-function autoSearch(){
-  clearTimeout(_pesqTimer);
-  const q = (document.getElementById('qAluno').value||'').trim();
-  if(q.length >= 3) _pesqTimer = setTimeout(pesquisar, 400);   // debounce: 1 consulta por pausa na digitação
-  else if(!q){ _pesqSeq++; document.getElementById('resultados').innerHTML = avisoHtml('Digite parte do nome ou ID.'); }
+let _pesqSeq = 0, _selSeq = 0;
+
+// ===== Cache em memória: some quando a página fecha (padrão das outras páginas de pesquisa) =====
+// Repetir a mesma pesquisa ou selecionar de novo o mesmo aluno não relê o servidor. Guarda a PROMISE:
+// duas chamadas iguais ao mesmo tempo (duplo clique) compartilham uma única leitura. Falha não fica em cache.
+const _cachePesq = new Map();    // consulta normalizada → { p: Promise<{alunos, temMais, mats}> }
+const _cacheAluno = new Map();   // alunoId → { p: Promise<[turmas, pessoal]> }
+function _cacheGet(map, key){ const c = map.get(key); return c ? c.p : null; }
+function _cacheSet(map, key, p){
+  map.set(key, { p });
+  p.catch(() => { const c = map.get(key); if(c && c.p === p) map.delete(key); });
+  return p;
+}
+function _cacheLimpar(){ _cachePesq.clear(); _cacheAluno.clear(); }
+
+// As ÚNICAS leituras de uma pesquisa: alunos (pelo ID ou pelo início do nome) + matrículas deles.
+async function _lerPesquisa(q, mId, limite){
+  let alunos = [], temMais = false;
+  if(mId){
+    const a = await Identidade.buscarAtasPorId('ALU-' + mId[1].padStart(6,'0'));
+    if(a && a.alunoId) alunos = [a];
+  } else {
+    const r = await Identidade.buscarAtasPorNome(q, limite + 1);
+    temMais = r.length > limite; alunos = r.slice(0, limite);
+  }
+  const mats = alunos.length ? await DB.matriculas.whereIn('alunoId', alunos.map(a=>a.alunoId)) : [];
+  return { alunos, temMais, mats };
 }
 async function pesquisar(){
-  clearTimeout(_pesqTimer);
   const raw=document.getElementById('qAluno').value, out=document.getElementById('resultados');
   const q=nrm(raw);
   if(!q){ _pesqSeq++; out.innerHTML=avisoHtml('Digite parte do nome ou ID.'); return; }
+  // Regra: só números (ou "ALU" + números) → busca pelo ID (completado a 6 dígitos); qualquer texto → busca pelo NOME (início do nome).
+  const mId = q.match(/^(?:alu[-\s]*)?(\d+)$/);
+  if(!mId && q.length < 3){ setMsg('Digite pelo menos 3 caracteres do nome (ou o ID do aluno).', 'warn'); return; }
   if(!(window.Identidade && Identidade.buscarAtasPorNome && Identidade.buscarAtasPorId && window.DB && DB.matriculas && DB.matriculas.whereIn)){
     out.innerHTML=avisoHtml('Módulo de busca indisponível.','⚠️'); setMsg('Erro ao iniciar a busca.', 'err'); return;
   }
   const seq = ++_pesqSeq;
   out.innerHTML=avisoHtml('Buscando…');
-  // Regra: só números (ou "ALU" + números) → busca pelo ID (completado a 6 dígitos); qualquer texto → busca pelo NOME (início do nome).
-  const mId = q.match(/^(?:alu[-\s]*)?(\d+)$/);
   const LIMITE = 5;
+  const chave = mId ? 'id:' + mId[1].padStart(6,'0') : 'nome:' + q;
   try{
-    let alunos = [], temMais = false;
-    if(mId){
-      const a = await Identidade.buscarAtasPorId('ALU-' + mId[1].padStart(6,'0'));
-      if(a && a.alunoId) alunos = [a];
-    } else {
-      const r = await Identidade.buscarAtasPorNome(q, LIMITE + 1);
-      temMais = r.length > LIMITE; alunos = r.slice(0, LIMITE);
-    }
-    const mats = alunos.length ? await DB.matriculas.whereIn('alunoId', alunos.map(a=>a.alunoId)) : [];
+    let p = _cacheGet(_cachePesq, chave);
+    if(!p) p = _cacheSet(_cachePesq, chave, _lerPesquisa(q, mId, LIMITE));
+    const { alunos, temMais, mats } = await p;
     if(seq !== _pesqSeq) return;   // chegou uma pesquisa mais nova: descarta esta
     const porAluno = new Map();
     mats.forEach(m=>{ const id=String(m?.alunoId||'').trim(); if(!porAluno.has(id)) porAluno.set(id,[]); porAluno.get(id).push(m); });
@@ -597,6 +613,7 @@ async function salvarDadosPessoais(){
     const dadosPessoais = dpParaArmazenar({ ...pf, rgCnTipo: rgCnTipoVal, nascimentoEstrangeiro: (state.edits.pessoais||{}).nascimentoEstrangeiro || '0' });
     await Identidade.salvarElo({ atasId, nome, cpf: cpfDig, dadosPessoais }); // sem anoAtivoId → não marca vinculadoEm
     state.selected.enrich = { ...(state.selected.enrich||{}), ...pf };
+    _cacheAluno.delete(atasId);   // a próxima seleção deste aluno relê os dados pessoais já salvos
     setMsg('Dados pessoais salvos.', 'ok');
   }catch(e){
     console.warn('salvarDadosPessoais:', e);
@@ -609,8 +626,12 @@ async function selecionarAluno(key){
   const seq = ++_selSeq;
   setMsg('Carregando histórico do aluno…', 'loading');
   let turmas, pessoal;
+  const chaveAluno = item.alunoId || item.key;
   try{
-    [turmas, pessoal] = await Promise.all([carregarTurmasDoAluno(item), carregarPessoalDoAluno(item)]);
+    let p = _cacheGet(_cacheAluno, chaveAluno);
+    if(!p) p = _cacheSet(_cacheAluno, chaveAluno, Promise.all([carregarTurmasDoAluno(item), carregarPessoalDoAluno(item)]));
+    [turmas, pessoal] = await p;
+    if(pessoal && pessoal.erro) _cacheAluno.delete(chaveAluno);   // leitura que falhou (tratada dentro da função) não fica em cache
   }catch(e){
     if(seq !== _selSeq) return;
     console.warn('selecionarAluno:', e);
@@ -1245,30 +1266,45 @@ function validarSemExportar(){
   ].join('');
   _infoModal({ titulo: r.ok ? 'Validação concluída' : 'Validação encontrou bloqueios', corpo: msg, corDestaque: r.ok ? 'ok' : undefined });
 }
-function carregarHistoricoExport(){
+// ===== Histórico de exportações (servidor: schools/{escola}/exportacoes) =====
+// Guarda só as últimas HIST_MAX: ao gravar a nova, as que passam do limite saem no MESMO batch (atômico).
+// A coleção nunca passa de HIST_MAX documentos, então ler tudo (list) custa no máximo HIST_MAX leituras.
+const HIST_MAX = 4;
+let _historicoExports = [];
+const _porMaisRecente = (a, b) => (b.ts || 0) - (a.ts || 0);
+async function carregarHistoricoExport(){
   try{
-    const arr = JSON.parse(localStorage.getItem('historicoAutoExports_v1')||'[]');
-    return Array.isArray(arr)?arr:[];
-  }catch(e){ return []; }
+    const docs = await DB.exportacoes.list();
+    _historicoExports = docs.slice().sort(_porMaisRecente).slice(0, HIST_MAX);
+  }catch(e){
+    console.error('carregarHistoricoExport:', e);
+    _historicoExports = [];
+    if(!_semEscola()) setMsg('Não foi possível carregar o histórico de exportações.', 'err');
+  }
 }
-function salvarHistoricoExportItem(item){
-  try{
-    const arr = carregarHistoricoExport();
-    arr.unshift(item);
-    localStorage.setItem('historicoAutoExports_v1', JSON.stringify(arr.slice(0,20)));
-  }catch(e){}
+async function registrarExportacao(item){
+  const agora = Date.now();
+  const id = `EXP-${agora}-${Math.random().toString(36).slice(2,6)}`;
+  const existentes = (await DB.exportacoes.list()).slice().sort(_porMaisRecente);
+  const manter = existentes.slice(0, HIST_MAX - 1);        // as mais novas que continuam
+  const excedentes = existentes.slice(HIST_MAX - 1);       // a mais antiga (e qualquer sobra de outro PC) sai
+  const ops = [
+    { col:'exportacoes', op:'set', id, data:{ ...item, ts: agora } },
+    ...excedentes.map(e => ({ col:'exportacoes', op:'delete', id: e._id })),
+  ];
+  await DB.batchWrite(ops);
+  _historicoExports = [{ _id: id, ...item, ts: agora }, ...manter];
 }
 function renderHistoricoExport(){
   const box=document.getElementById('exportHistoryBox');
   if(!box) return;
-  const arr = carregarHistoricoExport().slice(0,6);
+  const arr = _historicoExports.slice(0, HIST_MAX);
   if(!arr.length){ box.innerHTML=avisoHtml('Nenhuma exportação registrada.'); return; }
-  box.innerHTML = arr.map((r,i)=>`<div class="hist-item">
+  box.innerHTML = arr.map(r=>`<div class="hist-item">
     <div><b>${esc(r.nome||'aluno')}</b> <span class="badge small gray">${esc(r.tipo||r.formato||'')}</span></div>
-    <div class="muted">${esc(r.dataHora||'')} • ano ref: ${esc(r.anoRef||'—')} • CH: ${esc(r.schemaCH||'—')}</div>
+    <div class="muted">${esc(r.ts ? new Date(r.ts).toLocaleString('pt-BR') : '')} • ano ref: ${esc(r.anoRef||'—')} • CH: ${esc(r.schemaCH||'—')}</div>
   </div>`).join('');
 }
-
 
 async function exportarDOCX(){
   try {
@@ -1322,15 +1358,18 @@ async function exportarDOCX(){
     else setMsg('DOCX gerado com sucesso.', 'ok');
     try{
       const schemaTxt = (document.getElementById('schemaCHResumo')?.textContent || '').trim();
-      salvarHistoricoExportItem({
+      await registrarExportacao({
         nome: (state.selected?.nome)||'',
-        dataHora: new Date().toLocaleString('pt-BR'),
         tipo: 'DOCX',
         anoRef: (data.CERT_ANO_LETIVO_FINAL || data.ANO_LETIVO_GERAL || ''),
         schemaCH: schemaTxt.replace(/^Usando\s+/i,'').slice(0,80)
       });
       renderHistoricoExport();
-    }catch(e){}
+    }catch(e){
+      // o DOCX já foi baixado: falha no histórico não invalida a exportação
+      console.error('registrarExportacao:', e);
+      setMsg('DOCX gerado, mas não foi possível registrar no histórico de exportações.', 'warn');
+    }
   } catch(err) {
     console.error('exportarDOCX:', err);
     _toastLimpar();   // não deixa o "Gerando DOCX…" aberto atrás do modal de erro
@@ -1341,6 +1380,7 @@ async function exportarDOCX(){
 
 function limpar(){ document.getElementById('qAluno').value=''; document.getElementById('resultados').innerHTML=avisoHtml('Digite parte do nome ou ID e clique em pesquisar.'); }
 async function recarregarDB(){
+  _cacheLimpar();   // recarga explícita: descarta o cache de pesquisas e alunos
   await carregarDB();
   if(state.selected){
     const k=state.selected.key;
@@ -1366,11 +1406,13 @@ async function init(){
     const d=new Date(); document.getElementById('inData').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     await carregarDB(); // aguarda cache local + Firestore antes de liberar a tela
     carregarExportOpts();
+    try{ localStorage.removeItem('historicoAutoExports_v1'); }catch(e){}   // cópia local antiga: o histórico agora fica no servidor
+    if(!_semEscola()) await carregarHistoricoExport();
     renderHistoricoExport();
     try{ const v=localStorage.getItem('historicoCHModo_v1'); if(v && document.getElementById('schemaCHModo')) document.getElementById('schemaCHModo').value=v; }catch(e){}
     atualizarSchemaCHResumo();
     document.getElementById('qAluno').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); pesquisar(); }});
-    // a pesquisa automática (com debounce) já vem do oninput="autoSearch()" no input
+    // a pesquisa só acontece no botão Pesquisar ou no Enter (sem pesquisa automática: cada busca custa leituras)
     if(_semEscola()){ const av=document.getElementById('avisoSemEscola'); if(av) av.hidden=false; }
   } finally {
     // cards .card-destaque (texto pelo contraste da marca), depois de os cards existirem
