@@ -26,303 +26,59 @@
 
 <title>Histórico Escolar</title>
 <style>
-/* ── Variáveis sobrescritas por esta página ── */
-:root {
-  --card-bg:      #ffffff;
-  --card-border:  var(--brand-border, #ddd6fe);
-  --field-bg:     #ffffff;
-  --field-border: var(--brand-border, #ddd6fe);
-  --shadow:       0 4px 20px rgba(0,0,0,0.06);
-  --radius:       14px;
-  --danger:       #b91c1c;
-  --danger2:      #991b1b;
-}
-html[data-theme="dark"] {
-  --card-bg:      #131c2e;
-  --card-border:  #2a3a5c;
-  --field-bg:     #0a1426;
-  --field-border: #1e2540;
-  --shadow:       0 4px 24px rgba(0,0,0,0.4);
-}
+/* Sigla desta página: ha (historico_auto). Sem variáveis próprias: tudo vem dos tokens --ui-*. */
 
 /* ===== Layout ===== */
-.container{ max-width:1100px; margin:22px auto 48px; padding:0 18px; }
-.top-actions{ display:flex; gap:10px; justify-content:flex-end; margin-bottom:14px; flex-wrap:wrap; }
-
-/* ===== Botões (body) ===== */
-.btn, a.btn, button.btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 9px 16px; border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--card-bg); color: var(--ink);
-  cursor: pointer; font-weight: 700; font-size: 14px;
-  font-family: 'Nunito', sans-serif;
-  text-decoration: none; white-space: nowrap;
-  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
-}
-html[data-theme="dark"] .btn { background: var(--card-bg); border-color: var(--border); color: var(--ink); }
-/* btn-primary — especificidade reforçada para não ser sobrescrito pelo .btn base */
-.btn.btn-primary,
-a.btn.btn-primary,
-button.btn-primary,
-button.btn.btn-primary {
-  background: var(--brand, #7c3aed);
-  border-color: var(--brand, #7c3aed);
-  color: var(--brand-fg, #fff);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-}
-.btn.btn-primary:hover,
-button.btn-primary:hover,
-button.btn.btn-primary:hover {
-  background: var(--brand-hover, #6d28d9);
-  border-color: var(--brand-hover, #6d28d9);
-  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
-}
-html[data-theme="dark"] .btn.btn-primary,
-html[data-theme="dark"] button.btn-primary,
-html[data-theme="dark"] button.btn.btn-primary {
-  background: var(--brand-d, #7c3aed);
-  border-color: var(--brand-d, #7c3aed);
-}
-html[data-theme="dark"] .btn.btn-primary:hover,
-html[data-theme="dark"] button.btn-primary:hover {
-  background: var(--brand-hover-d, #6d28d9);
-  border-color: var(--brand-hover-d, #6d28d9);
-}
-.btn-gray { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-color); }
-.btn-gray:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); color: var(--brand-text, #6d28d9); }
-
-/* Botão editar na tabela */
-.btn-edit {
-  padding: 5px 10px; font-size: 12px; border-radius: 8px; font-weight: 700;
-  background: var(--chip-bg); border: 1px solid var(--chip-border); color: var(--chip-color);
-  cursor: pointer; white-space: nowrap; font-family: 'Nunito', sans-serif;
-}
-.btn-edit:hover { background: var(--brand-faded, #f5f3ff); border-color: var(--brand, #7c3aed); }
-
-/* Botões de ação de série (outline brand) */
-.btn-serie {
-  padding: 8px 12px; font-size: 13px; font-weight: 700; border-radius: 10px;
-  background: transparent; cursor: pointer; white-space: nowrap;
-  border: 1px solid var(--brand, #7c3aed); color: var(--brand, #7c3aed);
-  font-family: 'Nunito', sans-serif; transition: background 0.18s;
-}
-html[data-theme="dark"] .btn-serie { border-color: var(--brand-d, #7c3aed); color: var(--brand-d, #7c3aed); }
-.btn-serie:hover { background: var(--brand-faded, #f5f3ff); }
-html[data-theme="dark"] .btn-serie:hover { background: var(--brand-faded-d, rgba(124,58,237,0.28)); }
-
-/* ===== Card ===== */
-.card{
-  background:var(--card-bg);
-  border:1px solid var(--line);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  padding:20px;
-  margin-bottom:16px;
-}
-
-
-/* ===== Formulário ===== */
-.row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
-@media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
-@media(max-width:540px){ .row{grid-template-columns:1fr;} }
-.campo{ display:flex; flex-direction:column; min-width:0; }
-label{ font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block; }
-/* input/select consolidados mais abaixo, escopados a .wrap (evita vazar pro
-   <select> do header/school-pill) — este bloco duplicava o de baixo e
-   ainda tinha o mesmo bug de seletor solto, então foi removido */
-.form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
-.actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
-
-/* ===== Tabela ===== */
-.table-wrap{ overflow-x:auto; padding-bottom:6px; border:1px solid var(--line); border-radius:14px; margin-top:14px; }
-table{ width:max-content; min-width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
-th, td{ border:1px solid var(--line); padding:6px; text-align:center; vertical-align:middle; }
-th{ background:var(--chip-bg); font-weight:700; text-align:left; color:var(--muted); }
-html[data-theme="dark"] table{ color:var(--ink); }
-html[data-theme="dark"] th{ background:var(--chip-bg); color:var(--muted); border-color:var(--border); }
-html[data-theme="dark"] td{ background:var(--field-bg); color:var(--ink); border-color:var(--border); }
-th.th-vertical{ width:34px; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; padding:10px 4px; font-size:12px; line-height:1; }
-th.th-num{ width:42px; }
-th.th-nome{ width:220px; }
-td.col-nome{ text-align:left; padding-left:8px; word-break:break-word; }
-th.th-nota, td.col-nota{ width:42px; font-size:11px; }
-
-
-
-
-
-
-
-
-/* ── Específico: Histórico Escolar ── */
-.hrow { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
-.wrap { max-width:1300px; margin:0 auto; padding:24px 16px 48px; }
-.card { background:var(--card-bg); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; margin-bottom:14px; transition:background 0.3s,border-color 0.3s; }
-html[data-theme="dark"] .card { background:var(--card-bg); border-color:var(--border); }
-.row  { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-.row > div { flex:1; min-width:210px; }
-.cols { display:grid; grid-template-columns:1.1fr .9fr; gap:12px; }
+.wrap{ --card-gap:14px; max-width:1300px; margin:0 auto; padding:24px 16px 48px; }
+.wrap .card > .section-title{ margin:0 0 8px; }
+.wrap .card-destaque > .section-title{ margin-bottom:0; }
+.ha-aviso{ margin-bottom:14px; }
+.wrap .aviso-warn:last-child{ margin-bottom:0; }          /* aviso de estado no fim do card/painel não empurra o card */
+.cols{ display:grid; grid-template-columns:1.1fr .9fr; gap:12px; }
 @media(max-width:980px){ .cols{ grid-template-columns:1fr; } }
-.grid2 { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:10px; }
+.grid2{ display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:10px; }
 @media(max-width:760px){ .grid2{ grid-template-columns:1fr; } }
-label { font-size:13px; color:var(--text); font-weight:700; margin-bottom:6px; display:block; }
-/* Escopado a .wrap: o header (fetch de header-component.html) fica FORA do
-   .wrap, então esses seletores nunca tocam no <select> do school-pill nem
-   nos <button> do menu do usuário (theme-toggle, menu-btn). */
-.wrap input, .wrap select, .wrap textarea {
-  width:100%; box-sizing:border-box;
-  border:1px solid var(--field-border); border-radius:10px;
-  background:var(--field-bg); color:var(--ink);
-  outline:none; font-size:14px; font-family:'Nunito',sans-serif;
-  padding:10px 12px; transition:border-color 0.15s, box-shadow 0.15s;
-}
-.wrap input:focus, .wrap select:focus, .wrap textarea:focus { border-color:var(--brand,#7c3aed); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
-html[data-theme="dark"] .wrap input, html[data-theme="dark"] .wrap select, html[data-theme="dark"] .wrap textarea {
-  background:var(--field-bg); border-color:var(--brand-border-d, var(--brand-border, #7c3aed)); color:var(--ink);
-}
-html[data-theme="dark"] .wrap input::placeholder, html[data-theme="dark"] .wrap textarea::placeholder { color:rgba(226,232,240,0.45); }
-.wrap textarea { min-height:180px; font-family:Consolas,monospace; font-size:12px; }
-.mini-input { border-radius:8px; padding:6px 8px; font-size:12px; border:1px solid var(--field-border); }
-.wrap button, .wrap .btn {
-  border:1px solid var(--border); cursor:pointer; padding:9px 14px; border-radius:10px;
-  font-weight:700; background:var(--card-bg); color:var(--ink);
-  text-decoration:none; display:inline-flex; align-items:center; gap:7px;
-  font-family:'Nunito',sans-serif; font-size:14px; white-space:nowrap;
-  transition:background 0.18s, border-color 0.18s;
-}
-/* Primário agora é EXPLÍCITO: class="btn btn-primary" (Pesquisar, Exportar DOCX, Salvar dados pessoais).
-   Antes, qualquer botão sem .gray/.out virava primário automaticamente. */
-.wrap button.gray, .wrap .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
-.wrap button.gray:hover, .wrap .btn.gray:hover { background:var(--brand-faded,#f5f3ff); border-color:var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
-.wrap button.out, .wrap .btn.out { background:transparent; border:1px solid var(--brand,#7c3aed); color:var(--brand-text,#6d28d9); }
-.wrap button.out:hover, .wrap .btn.out:hover { background:var(--brand-faded,#f5f3ff); }
-html[data-theme="dark"] .wrap button.out, html[data-theme="dark"] .wrap .btn.out { border-color:var(--brand-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
-html[data-theme="dark"] .wrap button.out:hover, html[data-theme="dark"] .wrap .btn.out:hover { background:var(--brand-faded-d,rgba(124,58,237,0.28)); }
-html[data-theme="dark"] .wrap button.gray:hover, html[data-theme="dark"] .wrap .btn.gray:hover { background:var(--brand-faded-d,rgba(124,58,237,0.28)); border-color:var(--brand-d,#7c3aed); color:var(--brand-text-d,#c4b5fd); }
-html[data-theme="dark"] .wrap button.gray, html[data-theme="dark"] .wrap .btn.gray { background:var(--chip-bg); border-color:var(--chip-border); color:var(--chip-color); }
-.toolbar { display:flex; gap:8px; flex-wrap:wrap; }
-table { width:100%; border-collapse:collapse; font-size:12px; }
-th, td { border:1px solid var(--border); padding:6px; vertical-align:top; }
-th { background:var(--chip-bg); text-align:left; font-weight:700; color:var(--muted); }
-html[data-theme="dark"] th { background:var(--chip-bg); color:var(--muted); }
-html[data-theme="dark"] td { border-color:var(--border); }
-.list { border:1px solid var(--border); border-radius:12px; overflow:hidden; }
-.item { padding:10px 12px; border-top:1px solid var(--border); cursor:pointer; background:var(--card-bg); transition:background 0.15s; }
-.item:first-child { border-top:none; }
-.item:hover { background:var(--chip-bg); }
-html[data-theme="dark"] .item { background:var(--card-bg); }
-html[data-theme="dark"] .item:hover { background:var(--chip-bg); }
-.small { font-size:12px; color:var(--muted); }
-.muted { color:var(--muted); }
-.mono { font-family:Consolas,monospace; }
-.pill { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--chip-border); background:var(--chip-bg); color:var(--chip-color); border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; margin-left:6px; }
-.warn { color:#b45309; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.30); padding:8px 12px; border-radius:8px; font-size:13px; }
-.aviso-warn { background: var(--chip-bg); border: 1px solid var(--chip-border);
-  border-left: 4px solid #d97706; color: var(--ink);
-  padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 13px; }
-.aviso-warn a,
-html[data-theme="dark"] .aviso-warn a,
-html[data-theme="dark"] .aviso-warn a:hover { color: inherit; font-weight: 700; text-decoration: underline; }
-.hidden { display:none !important; }
-/* toast + modal (guia-toasts) */
-@keyframes toastSubir { from{opacity:0;transform:translateX(-50%) translateY(16px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
-.modal-backdrop{ position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:9000; }
-.schemaChInline { display:flex; flex-direction:column; gap:6px; }
-.schemaChInline select { width:100%; flex:1; }
-/* Força o campo Schema CH a ter a mesma altura que os campos vizinhos */
-.row > div:has(.schemaChInline) { display:flex; flex-direction:column; }
-.row > div:has(.schemaChInline) > label { flex-shrink:0; }
-.row > div:has(.schemaChInline) > .schemaChInline { flex:1; }
+.row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:15px; }
+.row > .field{ flex:1; min-width:210px; }
+.row > .f-busca{ flex:2; min-width:280px; }
+#topFieldsRow{ align-items:flex-start; }                  /* o Schema CH é mais alto (select + botão) */
+.schemaChInline{ display:flex; flex-direction:column; gap:6px; }
+.toolbar{ display:flex; gap:8px; flex-wrap:wrap; }
+.mt-10{ margin-top:10px; }
+.nowrap{ white-space:nowrap; }
+.muted{ color:var(--ui-muted); }
 
+/* resultados da pesquisa: cada item é um sub-card (.item = layout; .subcard = aparência global) */
+.res-lista{ display:flex; flex-direction:column; gap:8px; }
+.res-lista .aviso-warn{ margin:0; }
+.item{ cursor:pointer; }
 
-/* ===== Tabelas: sem hover de linha + cabeçalho legível e centralizado ===== */
-/* hover removido (prejudicava a leitura em várias paletas): a linha mantém a cor de repouso.
-   As cores de repouso são repetidas aqui porque o hover original vem do CSS global. */
-.wrap tbody tr:hover,
-.wrap tbody tr:hover td { background: transparent; }
-html[data-theme="dark"] .wrap tbody tr:hover td { background: var(--field-bg); }
-/* cabeçalho: fundo da paleta (--chip-bg) + texto em --ink (contraste garantido nos dois temas),
-   no lugar do cinza fixo (--muted); centralizado como o conteúdo */
-.wrap th,
-html[data-theme="dark"] .wrap th { background: var(--chip-bg); color: var(--ink); text-align: center; }
+/* editor de dados pessoais */
+.g-rg{ display:grid; grid-template-columns:90px 1fr; gap:8px; }
+.g-nat{ display:grid; grid-template-columns:1fr 92px; gap:8px; }
+.nat-topo{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
+.nat-topo .lbl, .nat-topo .check{ margin:0; }
 
-/* Prévia das notas: cores de borda/linha por tema (claro = tons suaves; escuro = tokens da página) */
-.notas-prev{ --nt-border:#dbe2ef; --nt-td:#fff; --nt-zebra:#fcfdff; }
-html[data-theme="dark"] .notas-prev{ --nt-border:var(--border); --nt-td:var(--field-bg); --nt-zebra:var(--chip-bg); }
+/* tabelas (aparência vem do global; aqui só largura, colunas e rolagem) */
+.tab-fixa{ width:100%; table-layout:fixed; }
+.tab-fixa td .input{ width:100%; }
+.resumo-topo{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+.notas-scroll{ overflow:auto; }
+.notas-tab{ width:100%; min-width:760px; }
+.notas-tab th, .notas-tab td{ white-space:nowrap; }
+.notas-tab th:first-child, .notas-tab td:first-child{ position:sticky; left:0; z-index:1; }
+.notas-tab th:first-child{ z-index:2; }
+.notas-tab td:first-child{ font-weight:600; }
 
-/* ===== Título de card (todo card da página tem título no topo-esquerdo) ===== */
-.card-title{ margin:0 0 8px; font-size:inherit; font-weight:700; line-height:1.3; }
+/* histórico local de exportações */
+.hist-item{ padding:6px 0; }
+.hist-item + .hist-item{ border-top:1px solid var(--ui-border); }
 
-/* ===== Card de destaque (criado do zero nesta página; contraste via ThemeColors.ajustarContraste) ===== */
-.card.card-destaque {
-  --dest-fg: #ffffff;
-  --dest-btn-bg: rgba(255,255,255,.18);
-  --dest-btn-bd: rgba(255,255,255,.40);
-  --dest-btn-hover: rgba(255,255,255,.28);
-  --dest-panel-bg: rgba(255,255,255,.10);
-  background: var(--btn-home-bg); border-color: var(--btn-home-border);
-}
-html[data-theme="dark"] .card.card-destaque { background: var(--btn-home-bg); border-color: var(--btn-home-border); }
-.card.card-destaque.contraste-claro {
-  --dest-fg: #0f172a;
-  --dest-btn-bg: rgba(0,0,0,.08);
-  --dest-btn-bd: rgba(0,0,0,.25);
-  --dest-btn-hover: rgba(0,0,0,.16);
-  --dest-panel-bg: rgba(0,0,0,.06);
-  border-color: var(--border);
-}
-.card-destaque h3, .card-destaque .card-title { color: var(--dest-fg); }
-.card-destaque > .card-title { margin-bottom:0; }
-.card-destaque .row > div > label { color: var(--dest-fg); }
-/* botões dentro do destaque (5.5): primário = véu + borda; outline = só contorno.
-   Prefixo .wrap .card.card-destaque vence os overrides dark do próprio CSS da página. */
-.wrap .card.card-destaque .btn-primary,
-html[data-theme="dark"] .wrap .card.card-destaque .btn-primary {
-  background: var(--dest-btn-bg); border: 1.5px solid var(--dest-fg); color: var(--dest-fg); font-weight: 800; box-shadow: none;
-}
-.wrap .card.card-destaque .btn-primary:hover:not(:disabled),
-html[data-theme="dark"] .wrap .card.card-destaque .btn-primary:hover:not(:disabled) {
-  background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
-}
-.wrap .card.card-destaque .btn-outline,
-html[data-theme="dark"] .wrap .card.card-destaque .btn-outline {
-  background: transparent; border: 1.5px solid var(--dest-btn-bd); color: var(--dest-fg);
-}
-.wrap .card.card-destaque .btn-outline:hover:not(:disabled),
-html[data-theme="dark"] .wrap .card.card-destaque .btn-outline:hover:not(:disabled) {
-  background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg);
-}
+/* diagnóstico: campos essenciais faltando (cor de status com par claro/escuro) */
+.diag-warn{ color:var(--ui-st-warn-fg); font-weight:700; }
 
-/* checkbox: .wrap input (width:100% + padding) não pode valer pra caixa de seleção */
-.wrap input[type="checkbox"] { width:auto; padding:0; margin:0; flex:0 0 auto; }
-/* linha de status do DOCX some quando vazia (só aparece durante/depois de exportar) */
-
-/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2).
-   Tokens reais desta página: --card-bg / --card-border (definidos no :root acima) e --ink (base.css). ===== */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-  text-transform:none; letter-spacing:normal;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card-bg, #ffffff); border:1.5px solid var(--card-border, #cbd5e1); color:var(--ink, #1e293b);
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal;
-  font-family:'Nunito',sans-serif; line-height:1.4; text-align:left; text-transform:none; letter-spacing:normal;
-  white-space:normal; cursor:default;
-}
-.info-tip.open .info-tip-bubble{ display:block; }
-html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
-/* card Definições: rótulos na mesma linha (o Schema CH é mais alto por ter select + botão) */
-#topFieldsRow{ align-items:flex-start; }
-.info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
-.info-tip-bubble.align-right{ left:auto; right:0; }
+/* link dentro de .aviso-warn: herda a cor do texto (mantido da página; candidato a global) */
+.aviso-warn a{ color:inherit; font-weight:700; text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -339,60 +95,63 @@ html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
 
 <div class="wrap">
 
+  <!-- Admin global sem escola escolhida (guia 18.3): só avisa, no topo, isolado dos cards -->
+  <div class="aviso-warn ha-aviso" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no topo da página para pesquisar alunos e exportar históricos.</div>
+
   <!-- 1) Pesquisa (card de destaque) -->
   <div class="card card-destaque">
-    <h3 class="card-title">Pesquisa de aluno</h3>
+    <h3 class="section-title">Pesquisa de aluno</h3>
     <div class="row">
-      <div style="flex:2;min-width:280px">
-        <label>Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Busca por ID ou nome do aluno: números pesquisam pelo ID (o prefixo ALU é ignorado) e texto pesquisa pelo nome. Para que a listagem seja feita, é necessário digitar pelo menos 3 caracteres. São exibidos no máximo 5 resultados: quanto mais completo for o nome ou o ID, mais precisa será a pesquisa.</span></span></label>
+      <div class="field f-busca">
+        <label for="qAluno">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por ID ou nome do aluno: números pesquisam pelo ID (o prefixo ALU é ignorado) e texto pesquisa pelo nome. Para que a listagem seja feita, é necessário digitar pelo menos 3 caracteres. São exibidos no máximo 5 resultados: quanto mais completo for o nome ou o ID, mais precisa será a pesquisa.</span></span></label>
         <input id="qAluno" oninput="autoSearch()" placeholder="Ex.: 000138 ou ADRIANA">
       </div>
-      <div style="flex:0 0 auto;min-width:auto"><button type="button" class="btn btn-primary" onclick="pesquisar()">Pesquisar</button></div>
-      <div style="flex:0 0 auto;min-width:auto"><button type="button" class="btn btn-outline" onclick="limpar()">Limpar</button></div>
+      <button type="button" class="btn primary field-h" onclick="pesquisar()">Pesquisar</button>
+      <button type="button" class="btn outline field-h" onclick="limpar()">Limpar</button>
     </div>
   </div>
 
   <!-- 2) Resultados | 3) Aluno selecionado -->
   <div class="cols">
     <div class="card">
-      <div class="card-title">Resultados <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Clique em um resultado abaixo para que os dados do aluno sejam exibidos nos demais campos da página.</span></span></div>
-      <div id="resultados" class="list"><div class="item muted">Digite parte do nome ou ID e clique em pesquisar.</div></div>
+      <h3 class="section-title">Resultados <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Clique em um resultado abaixo para que os dados do aluno sejam exibidos nos demais campos da página.</span></span></h3>
+      <div id="resultados" class="res-lista"><div class="aviso-warn">ℹ️ Digite parte do nome ou ID e clique em pesquisar.</div></div>
     </div>
     <div class="card">
-      <div class="card-title">Aluno selecionado</div>
-      <div id="resumoAluno" class="small muted">Nenhum aluno selecionado.</div>
-      <div class="toolbar" style="margin-top:10px;flex-wrap:wrap">
-        <button type="button" class="btn btn-primary" onclick="exportarDOCX()">Exportar DOCX</button>
+      <h3 class="section-title">Aluno selecionado</h3>
+      <div id="resumoAluno"><div class="aviso-warn">ℹ️ Nenhum aluno selecionado.</div></div>
+      <div class="toolbar mt-10">
+        <button type="button" class="btn primary" onclick="exportarDOCX()">Exportar DOCX</button>
       </div>
-      </div>
+    </div>
   </div>
 
   <!-- 4) Definições da exportação (card de destaque) -->
   <div class="card card-destaque" id="cardDefinicoes">
-    <h3 class="card-title">Definições da exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os campos abaixo são regras e textos que preenchem lacunas no documento final: o nome da escola, a cidade e a data de emissão que saem no documento, e como a carga horária (CH) é aplicada.</span></span></h3>
+    <h3 class="section-title">Definições da exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os campos abaixo são regras e textos que preenchem lacunas no documento final: o nome da escola, a cidade e a data de emissão que saem no documento, e como a carga horária (CH) é aplicada.</span></span></h3>
     <div class="row" id="topFieldsRow">
-      <div>
-        <label>Escola padrão (fallback)</label>
+      <div class="field">
+        <label for="inEscola">Escola padrão (fallback)</label>
         <input id="inEscola" placeholder="Se vazio usa dadosEscola/localStorage" oninput="refreshSaida()">
       </div>
-      <div>
-        <label>Cidade emissão</label>
+      <div class="field">
+        <label for="inCidade">Cidade emissão</label>
         <input id="inCidade" placeholder="Ex.: Valente" oninput="refreshSaida()">
       </div>
-      <div>
-        <label>Data emissão</label>
+      <div class="field">
+        <label for="inData">Data emissão</label>
         <input id="inData" type="date" oninput="refreshSaida()">
       </div>
-      <div>
-        <label>Schema CH (Carga Horária)</label>
+      <div class="field">
+        <label for="schemaCHModo">Schema CH (Carga Horária)</label>
         <div class="schemaChInline">
           <select id="schemaCHModo" onchange="onSchemaCHModoMudou()">
             <option value="GLOBAL">Usar regras cadastradas (global)</option>
             <option value="OFF">Não aplicar CH automática</option>
           </select>
-          <a id="btnSchemaCH" class="btn btn-outline" href="/paginas/schema_ch.html" rel="noopener" style="white-space:nowrap;text-decoration:none">Schema CH</a>
+          <a id="btnSchemaCH" class="btn outline" href="/paginas/schema_ch.html" rel="noopener">Schema CH</a>
         </div>
-        <div class="small muted hidden" id="schemaCHResumo" style="margin-top:4px;display:none !important">Carregando regras...</div>
+        <div id="schemaCHResumo" hidden>Carregando regras...</div>
       </div>
     </div>
   </div>
@@ -400,39 +159,37 @@ html[data-theme="dark"] .info-tip-bubble{ color:var(--ink, #e5e7eb); }
   <!-- 5) Diagnóstico | 6) Histórico local de exportações -->
   <div class="cols">
     <div class="card" id="cardDiagExport">
-      <div class="card-title">Diagnóstico e validação de exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Aluno selecionado:</b> nome completo do aluno.<br><b>Resumo por ano:</b> quantidade de anos em que o aluno estudou na escola.<br><b>CH:</b> identifica divergências entre o schema de carga horária e o schema encontrado na turma do aluno.<br><b>Notas faltando:</b> identifica notas ausentes, com base no que o schema de carga horária esperava.<br><b>CH faltando:</b> identifica a carga horária por matéria que está ausente, com base no que o schema de carga horária esperava.<br><b>Campos essenciais:</b> identifica campos obrigatórios do documento que não foram preenchidos.</span></span></div>
-      <div id="diagExportStatus" class="small muted">Selecione um aluno para ver o diagnóstico.</div>
+      <h3 class="section-title">Diagnóstico e validação de exportação <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Aluno selecionado:</b> nome completo do aluno.<br><b>Resumo por ano:</b> quantidade de anos em que o aluno estudou na escola.<br><b>CH:</b> identifica divergências entre o schema de carga horária e o schema encontrado na turma do aluno.<br><b>Notas faltando:</b> identifica notas ausentes, com base no que o schema de carga horária esperava.<br><b>CH faltando:</b> identifica a carga horária por matéria que está ausente, com base no que o schema de carga horária esperava.<br><b>Campos essenciais:</b> identifica campos obrigatórios do documento que não foram preenchidos.</span></span></h3>
+      <div id="diagExportStatus"><div class="aviso-warn">ℹ️ Selecione um aluno para ver o diagnóstico.</div></div>
     </div>
     <div class="card" id="cardExportHist">
-      <div class="card-title">Histórico local de exportações (últimas 6)</div>
-      <div id="exportHistoryBox" class="small muted">Nenhuma exportação registrada.</div>
+      <h3 class="section-title">Histórico local de exportações (últimas 6)</h3>
+      <div id="exportHistoryBox"><div class="aviso-warn">ℹ️ Nenhuma exportação registrada.</div></div>
     </div>
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
-      <div class="card-title" style="margin:0">Dados pessoais <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Aqui você pode adicionar os dados pessoais do aluno. Eles costumam ser preenchidos automaticamente com os dados do módulo Ano Ativo. Se o aluno só tiver dados no módulo de atas, adicione-os aqui e salve: assim, se precisar refazer a exportação, todos os dados continuarão salvos.</span></span></div>
-      <button type="button" id="btnSalvarPessoais" onclick="salvarDadosPessoais()" style="display:none;" class="btn btn-primary">💾 Salvar dados pessoais</button>
+    <div class="card-head">
+      <h3 class="section-title">Dados pessoais <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Aqui você pode adicionar os dados pessoais do aluno. Eles costumam ser preenchidos automaticamente com os dados do módulo Ano Ativo. Se o aluno só tiver dados no módulo de atas, adicione-os aqui e salve: assim, se precisar refazer a exportação, todos os dados continuarão salvos.</span></span></h3>
+      <button type="button" id="btnSalvarPessoais" onclick="salvarDadosPessoais()" hidden class="btn primary">💾 Salvar dados pessoais</button>
     </div>
-    <div id="dadosPessoaisWrap" class="small muted">Selecione um aluno para preencher/editar dados pessoais.</div>
+    <div id="dadosPessoaisWrap"><div class="aviso-warn">ℹ️ Selecione um aluno para preencher/editar dados pessoais.</div></div>
   </div>
 
   <div class="card">
-    <div class="card-title">Linha do tempo encontrada <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Na tabela abaixo são apresentados, em ordem cronológica, todos os registros de frequência do aluno, listando o ano letivo, a série e a turma que ele frequentou.</span></span></div>
-    <div id="timeline" style="margin-top:10px" class="small muted">Selecione um aluno.</div>
+    <h3 class="section-title">Linha do tempo encontrada <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Na tabela abaixo são apresentados, em ordem cronológica, todos os registros de frequência do aluno, listando o ano letivo, a série e a turma que ele frequentou.</span></span></h3>
+    <div id="timeline" class="mt-10"><div class="aviso-warn">ℹ️ Selecione um aluno.</div></div>
   </div>
 
   <div class="card">
-    <div class="card-title">Resumo por ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Usando a lista da tabela acima, é montada a lista apresentada na tabela abaixo. Essa mesma ordem será importada para o campo “ESTABELECIMENTO DE ENSINO” do documento oficial. Você pode editar a ordem e todos os campos.</span></span></div>
-    <div id="resumoEditavel" style="margin-top:10px" class="small muted">Selecione um aluno.</div>
+    <h3 class="section-title">Resumo por ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Usando a lista da tabela acima, é montada a lista apresentada na tabela abaixo. Essa mesma ordem será importada para o campo “ESTABELECIMENTO DE ENSINO” do documento oficial. Você pode editar a ordem e todos os campos. São no máximo 9 linhas (A1 a A9): adicione e mova as linhas.</span></span></h3>
+    <div id="resumoEditavel" class="mt-10"><div class="aviso-warn">ℹ️ Selecione um aluno.</div></div>
   </div>
 
   <div class="card">
-    <div class="card-title">Prévia das notas</div>
-    <div id="notasPreviewDocx" style="margin-top:10px" class="small muted">Selecione um aluno.</div>
+    <h3 class="section-title">Prévia das notas</h3>
+    <div id="notasPreviewDocx" class="mt-10"><div class="aviso-warn">ℹ️ Selecione um aluno.</div></div>
   </div>
-
-
 
 </div>
 
@@ -463,42 +220,44 @@ function chCanonSerie(txt){
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 
-// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
-function _showToast(msg, bg, shadow, duration){
+// ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina
+};
+function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
   if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
   const toast = document.createElement('div');
   toast.id = '_toastGlobal';
-  toast.style.cssText =
-    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-    `display:flex;align-items:center;gap:12px;`+
-    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
   const span = document.createElement('span');
+  span.className = 'toast-msg';
   span.textContent = msg;
-  span.style.cssText = 'flex:1;line-height:1.4;';
-  toast.appendChild(span);
-  const btnClose = document.createElement('button');
-  btnClose.type = 'button';
-  btnClose.textContent = '✕';
-  btnClose.setAttribute('aria-label','Fechar aviso');
-  btnClose.style.cssText =
-    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;padding:0;justify-content:center;';
-  btnClose.onclick = () => toast.remove();
-  toast.appendChild(btnClose);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
   document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
 }
-function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
-function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
-function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
-function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); const t=document.getElementById('_toastGlobal'); if(t) t.dataset.loading='1'; }
-// Fecha o toast só se ainda for o de "carregando" (não apaga um erro/aviso mostrado depois)
-function _toastFecharCarregando(){ const t=document.getElementById('_toastGlobal'); if(t && t.dataset.loading==='1') t.remove(); }
+// só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) t.remove();
+}
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
+
 // Ponto de entrada único: setMsg(texto, kind) — ok | warn | loading | err
 function setMsg(text, kind){
   const t = (text||"").toString();
@@ -509,24 +268,59 @@ function setMsg(text, kind){
   else if(kind === "loading") _toastCarregando('⏳ ' + t);
   else { console.warn('[toast] kind desconhecido:', JSON.stringify(kind)); _toastAviso(t); }
 }
+
+// Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+window.addEventListener('unhandledrejection', () => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+});
+
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 // Modal informativo (substitui alert() quando a mensagem é longa/em lista): um botão "Entendi".
+// Usa o esqueleto global (.modal-backdrop / .cm-*). corDestaque: 'danger' (vermelho), 'ok' (verde); omitido = cor de marca.
 function _infoModal({ titulo, corpo, corDestaque }){
   return new Promise((resolve) => {
-    const cor = corDestaque || '#b45309';
+    const perigo = corDestaque === 'danger';
+    const positivo = corDestaque === 'ok';
+    const variante = perigo ? ' perigo' : positivo ? ' ok' : '';
     const backdrop = document.createElement('div');
-    backdrop.className = 'modal-backdrop';
-    backdrop.style.display = 'flex';
+    backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div style="background:var(--card,#fff);border-radius:14px;padding:22px;max-width:480px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25);max-height:80vh;overflow-y:auto;">`+
-        `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${esc(titulo||'Aviso')}</h3>`+
-        `<p style="margin:0 0 18px;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${esc(corpo||'')}</p>`+
-        `<div style="display:flex;justify-content:flex-end;">`+
-          `<button type="button" id="_infoModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">Entendi</button>`+
-        `</div></div>`;
+      `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true">`+
+        `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Aviso')}</h3>`+
+        `<p class="cm-corpo">${_escHtml(corpo || '')}</p>`+
+        `<div class="cm-acoes"><button type="button" class="cm-ok${variante}" id="_infoModalOk">Entendi</button></div>`+
+      `</div>`;
     document.body.appendChild(backdrop);
-    const fechar=()=>{ backdrop.remove(); resolve(); };
-    backdrop.querySelector('#_infoModalOk').addEventListener('click', fechar);
-    backdrop.addEventListener('click', ev=>{ if(ev.target===backdrop) fechar(); });
+    function fechar(){ document.removeEventListener('keydown', onKey, true); backdrop.remove(); resolve(); }
+    // Esc em CAPTURA + stopPropagation: fecha só este modal
+    function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(); } }
+    document.addEventListener('keydown', onKey, true);
+    const ok = backdrop.querySelector('#_infoModalOk');
+    ok.addEventListener('click', fechar);
+    backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(); });
+    ok.focus();
+  });
+}
+
+// Estado de painel/lista = aviso (guia 7.2 e 9): ℹ️ orientação ou vazio, ⚠️ atenção ou falha. O texto é sempre literal da página.
+function avisoHtml(texto, emoji){ return `<div class="aviso-warn">${emoji||'ℹ️'} ${texto}</div>`; }
+
+// Admin global com "Todas as escolas": Auth.getActiveSchoolId() devolve o marcador 'ADMIN' (não é escola)
+function _semEscola(){
+  const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : '';
+  return !sid || String(sid).trim().toUpperCase() === 'ADMIN';
+}
+// Espera o Auth ficar pronto antes de ler o banco (teto de 8 s, como a página já fazia)
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+    if(!window.Auth) return resolve();
+    const t = setTimeout(resolve, 8000);
+    const fim = () => { clearTimeout(t); resolve(); };
+    if(Auth.onReady) Auth.onReady(fim); else document.addEventListener('auth:ready', fim, { once: true });
   });
 }
 function fmtBRDate(v){ const s=String(v||''); if(/^\d{4}-\d{2}-\d{2}$/.test(s)){ const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`;} return s; }
@@ -577,18 +371,13 @@ async function carregarDB(){
   state.db = { dadosEscola:{}, alunosDB:[], matriculasDB:[], turmasDB:[], atasDB:[] };
   if(!(window.DB && DB.escola && typeof DB.escola.get === 'function')){ setMsg('Banco de dados indisponível.', 'err'); return; }
   try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      if(!window.Auth) return res();
-      const t = setTimeout(res, 8000);
-      document.addEventListener('auth:ready', ()=>{ clearTimeout(t); res(); }, {once:true});
-    });
+    await _authPronto();
     state.db.dadosEscola = (await DB.escola.get()) || {};
     _atualizarDbInfo();
     _prePopulaEscolaFields();
   }catch(e){
-    console.warn('carregarDB Firestore:', e);
-    setMsg('Não foi possível carregar os dados do servidor. Recarregue a página.', 'err');
+    console.error('carregarDB Firestore:', e);
+    if(!_semEscola()) setMsg('Não foi possível carregar os dados do servidor. Recarregue a página.', 'err');   // sem escola o toast seria enganoso
   }
 }
 
@@ -599,18 +388,18 @@ function autoSearch(){
   clearTimeout(_pesqTimer);
   const q = (document.getElementById('qAluno').value||'').trim();
   if(q.length >= 3) _pesqTimer = setTimeout(pesquisar, 400);   // debounce: 1 consulta por pausa na digitação
-  else if(!q){ _pesqSeq++; document.getElementById('resultados').innerHTML = '<div class="item muted">Digite parte do nome ou ID.</div>'; }
+  else if(!q){ _pesqSeq++; document.getElementById('resultados').innerHTML = avisoHtml('Digite parte do nome ou ID.'); }
 }
 async function pesquisar(){
   clearTimeout(_pesqTimer);
   const raw=document.getElementById('qAluno').value, out=document.getElementById('resultados');
   const q=nrm(raw);
-  if(!q){ _pesqSeq++; out.innerHTML='<div class="item muted">Digite parte do nome ou ID.</div>'; return; }
+  if(!q){ _pesqSeq++; out.innerHTML=avisoHtml('Digite parte do nome ou ID.'); return; }
   if(!(window.Identidade && Identidade.buscarAtasPorNome && Identidade.buscarAtasPorId && window.DB && DB.matriculas && DB.matriculas.whereIn)){
-    out.innerHTML='<div class="item muted">Módulo de busca indisponível.</div>'; return;
+    out.innerHTML=avisoHtml('Módulo de busca indisponível.','⚠️'); setMsg('Erro ao iniciar a busca.', 'err'); return;
   }
   const seq = ++_pesqSeq;
-  out.innerHTML='<div class="item muted">Buscando…</div>';
+  out.innerHTML=avisoHtml('Buscando…');
   // Regra: só números (ou "ALU" + números) → busca pelo ID (completado a 6 dígitos); qualquer texto → busca pelo NOME (início do nome).
   const mId = q.match(/^(?:alu[-\s]*)?(\d+)$/);
   const LIMITE = 5;
@@ -633,14 +422,15 @@ async function pesquisar(){
       const seriesArr = [...new Set(ms.map(m=>String(m?.serie||'')).filter(Boolean))];
       return { key:a.alunoId, alunoId:a.alunoId, nome:a.nome, oc:ms.length, anosArr, seriesArr, matriculas:ms };
     });
-    if(!state.index.length){ out.innerHTML='<div class="item muted">Nenhum resultado.' + (mId ? '' : ' A busca por nome considera o início do nome.') + '</div>'; return; }
-    out.innerHTML = state.index.map(x=>`<div class="item" data-k="${esc(x.key)}"><div><b>${esc(x.nome||'(sem nome)')}</b> ${x.alunoId?`<span class="pill">${esc(x.alunoId)}</span>`:''}</div><div class="small">ocorrências: ${x.oc} • anos: ${esc(x.anosArr.join(', ')||'—')} • séries: ${esc(x.seriesArr.join(', ')||'—')}</div></div>`).join('')
-      + (temMais ? '<div class="item muted">Há mais resultados — digite mais do nome para refinar.</div>' : '');
+    if(!state.index.length){ out.innerHTML=avisoHtml('Nenhum resultado.' + (mId ? '' : ' A busca por nome considera o início do nome.')); return; }
+    out.innerHTML = state.index.map(x=>`<div class="item subcard" data-k="${esc(x.key)}"><div><b>${esc(x.nome||'(sem nome)')}</b> ${x.alunoId?`<span class="badge small">${esc(x.alunoId)}</span>`:''}</div><div class="subnote">ocorrências: ${x.oc} • anos: ${esc(x.anosArr.join(', ')||'—')} • séries: ${esc(x.seriesArr.join(', ')||'—')}</div></div>`).join('')
+      + (temMais ? avisoHtml('Há mais resultados — digite mais do nome para refinar.') : '');
     out.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('click',()=>selecionarAluno(el.getAttribute('data-k'))));
   }catch(e){
     if(seq !== _pesqSeq) return;
-    console.warn('pesquisar:', e);
-    out.innerHTML='<div class="item muted">Não foi possível pesquisar agora. Tente novamente.</div>';
+    console.error('pesquisar:', e);
+    out.innerHTML=avisoHtml('Não foi possível pesquisar agora. Tente novamente.','⚠️');
+    setMsg('Erro ao pesquisar o aluno.', 'err');
   }
 }
 // Turmas SÓ do aluno: ids vêm das matrículas dele (doc da turma = turmaId; se não achar, tenta o campo turmaId).
@@ -801,7 +591,7 @@ async function salvarDadosPessoais(){
     const elo = await Identidade.buscarElo(atasId);
     if(elo && elo.anoAtivoId){
       state.selected.temMatriculaAtiva = true; renderDadosPessoaisEditor();
-      const btn = document.getElementById('btnSalvarPessoais'); if(btn) btn.style.display='none';
+      const btn = document.getElementById('btnSalvarPessoais'); if(btn) btn.hidden = true;
       setMsg('Este aluno acabou de ser vinculado ao Ano Ativo — recarregue a seleção.', 'warn'); return;
     }
     const dadosPessoais = dpParaArmazenar({ ...pf, rgCnTipo: rgCnTipoVal, nascimentoEstrangeiro: (state.edits.pessoais||{}).nascimentoEstrangeiro || '0' });
@@ -827,7 +617,7 @@ async function selecionarAluno(key){
     setMsg('Não foi possível carregar as turmas deste aluno. Tente selecioná-lo de novo.', 'err'); return;
   }
   if(seq !== _selSeq) return;   // o usuário já clicou em outro aluno
-  _toastFecharCarregando();
+  _toastLimpar();
   // dados lidos só deste aluno — as funções abaixo (getTurmaAlunoRowsFor/enrichAluno) continuam lendo de state.db
   state.db.turmasDB = turmas;
   state.db.alunosDB = _normalizarAlunosDB([{ alunoId:item.alunoId, nome:item.nome }]);
@@ -839,7 +629,7 @@ async function selecionarAluno(key){
   state.selected.temMatriculaAtiva = !!pessoal.anoAtivoId;
   state.selected.pessoalErro = !!pessoal.erro;
   state.selected.pessoalOrigem = pessoal.origem;
-  const btnSP = document.getElementById('btnSalvarPessoais'); if(btnSP) btnSP.style.display = (state.selected.temMatriculaAtiva || state.selected.pessoalErro) ? 'none' : 'inline-flex';
+  const btnSP = document.getElementById('btnSalvarPessoais'); if(btnSP) btnSP.hidden = !!(state.selected.temMatriculaAtiva || state.selected.pessoalErro);
   state.edits = { pessoais:{}, anos:{}, meta:{} };
   renderResumoSelecionado(); renderDadosPessoaisEditor(); renderTimeline(); renderResumoEditavel(); refreshSaida();
   const fora = materiasForaDoCatalogo(state.selected);
@@ -853,9 +643,9 @@ function getPessoalFinal(){
   return { nome:pv('nome',e.nome||state.selected.nome||''), id:pv('id',e.id||state.selected.alunoId||''), cpf:maskCPF(pv('cpf',e.cpf||'')), rgCn:pv('rgCn',e.rgCn||''), nis:pv('nis',e.nis||''), dataNascimento:pv('dataNascimento',fmtBRDate(e.dataNascimento||'')), naturalidade:pv('naturalidade',e.naturalidade||''), ufNascimento:estrangeiro?'':pv('ufNascimento',e.ufNascimento||'').toUpperCase(), mae:pv('mae',e.mae||''), pai:pv('pai',e.pai||''), sexo:pv('sexo',e.sexo||'').toUpperCase().slice(0,1) };
 }
 function renderResumoSelecionado(){
-  const el=document.getElementById('resumoAluno'); if(!state.selected){ el.innerHTML='Nenhum aluno selecionado.'; return; }
+  const el=document.getElementById('resumoAluno'); if(!state.selected){ el.innerHTML=avisoHtml('Nenhum aluno selecionado.'); return; }
   const e=getPessoalFinal();
-  el.innerHTML=`<div><b>${esc(e.nome||'(sem nome)')}</b> ${state.selected.alunoId?`<span class="pill">${esc(state.selected.alunoId)}</span>`:''}</div><div>Ocorrências em turmas/atas: <b>${state.selected.registros.length}</b></div><div class="small">CPF: ${esc(e.cpf||'—')} • Nasc.: ${esc(e.dataNascimento||'—')} • Mãe: ${esc(e.mae||'—')}</div>`;
+  el.innerHTML=`<div><b>${esc(e.nome||'(sem nome)')}</b> ${state.selected.alunoId?`<span class="badge small">${esc(state.selected.alunoId)}</span>`:''}</div><div>Ocorrências em turmas/atas: <b>${state.selected.registros.length}</b></div><div class="subnote">CPF: ${esc(e.cpf||'—')} • Nasc.: ${esc(e.dataNascimento||'—')} • Mãe: ${esc(e.mae||'—')}</div>`;
 }
 
 const UFS_BR = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
@@ -890,7 +680,7 @@ function persistResumoRows(rows){
 const URL_ANO_ATIVO = '/ano-ativo/ano-ativo'; // hub do módulo (link propositalmente genérico)
 
 function renderDadosPessoaisEditor(){
-  const box=document.getElementById('dadosPessoaisWrap'); if(!state.selected){ box.innerHTML='Selecione um aluno para preencher/editar dados pessoais.'; return; }
+  const box=document.getElementById('dadosPessoaisWrap'); if(!state.selected){ box.innerHTML=avisoHtml('Selecione um aluno para preencher/editar dados pessoais.'); return; }
   const e=state.selected.enrich||{}, ed=state.edits.pessoais||{}; const v=(k,fb='')=>ed[k]??fb;
   const rgTipo = v('rgCnTipo', inferRgCnTipo(v('rgCn', e.rgCn||'')));
   const nasc = fmtBRDate(v('dataNascimento', e.dataNascimento||''));
@@ -901,16 +691,16 @@ function renderDadosPessoaisEditor(){
   const dis = travado ? 'disabled' : '';
   const aviso = travado ? `<div class="aviso-warn">⚠️ ${state.selected.pessoalErro ? 'Não foi possível ler os dados pessoais deste aluno — os campos ficam bloqueados para não sobrescrever o cadastro.' : `Este aluno já tem cadastro no módulo <a href="${URL_ANO_ATIVO}">Ano Ativo</a>. Os dados pessoais são editados por lá — os campos abaixo ficam bloqueados aqui (somente leitura) para não haver divergência entre os dois cadastros.`}</div>` : '';
   box.innerHTML = `${aviso}<div class="grid2">
-    <div><label>Nome do aluno</label><input class="mini-input" data-pf="nome" value="${esc(v('nome',e.nome||state.selected.nome||''))}" ${dis}></div>
-    <div><label>ID interno</label><input class="mini-input" data-pf="id" value="${esc(v('id',e.id||state.selected.alunoId||''))}" ${dis}></div>
-    <div><label>CPF</label><input class="mini-input" inputmode="numeric" maxlength="14" data-pf="cpf" value="${esc(maskCPF(v('cpf',e.cpf||'')))}" ${dis}></div>
-    <div><label>RG/CN</label><div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><select class="mini-input" data-pf="rgCnTipo" ${dis}><option value="RG" ${rgTipo==='RG'?'selected':''}>RG</option><option value="CN" ${rgTipo==='CN'?'selected':''}>CN</option></select><input class="mini-input" inputmode="numeric" data-pf="rgCn" value="${esc(v('rgCn',e.rgCn||''))}" placeholder="Digite apenas números" ${dis}></div></div>
-    <div><label>NIS</label><input class="mini-input" data-pf="nis" value="${esc(v('nis',e.nis||''))}" ${dis}></div>
-    <div><label>Sexo</label><select class="mini-input" data-pf="sexo" ${dis}><option value=""></option><option value="M" ${String(v('sexo',e.sexo||'')).toUpperCase()==='M'?'selected':''}>M</option><option value="F" ${String(v('sexo',e.sexo||'')).toUpperCase()==='F'?'selected':''}>F</option></select></div>
-    <div><label>Data nascimento</label><input type="date" class="mini-input" data-pf="dataNascimento_iso" value="${esc(dateISO)}" ${dis}></div>
-    <div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px"><label style="margin:0">Naturalidade</label><label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:400;font-size:12px"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div><div style="display:grid;grid-template-columns:1fr 92px;gap:8px"><input class="mini-input" data-pf="naturalidade" value="${esc(v('naturalidade',e.naturalidade||''))}" ${dis}><select class="mini-input" data-pf="ufNascimento" ${nascEstr?'disabled':''} ${dis}><option value="">UF</option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div></div>
-    <div><label>Mãe</label><input class="mini-input" data-pf="mae" value="${esc(v('mae',e.mae||''))}" ${dis}></div>
-    <div><label>Pai</label><input class="mini-input" data-pf="pai" value="${esc(v('pai',e.pai||''))}" ${dis}></div>
+    <div class="field"><label for="pfNome">Nome do aluno</label><input id="pfNome" data-pf="nome" value="${esc(v('nome',e.nome||state.selected.nome||''))}" ${dis}></div>
+    <div class="field"><label for="pfId">ID interno</label><input id="pfId" data-pf="id" value="${esc(v('id',e.id||state.selected.alunoId||''))}" ${dis}></div>
+    <div class="field"><label for="pfCpf">CPF</label><input id="pfCpf" inputmode="numeric" maxlength="14" data-pf="cpf" value="${esc(maskCPF(v('cpf',e.cpf||'')))}" ${dis}></div>
+    <div class="field"><label for="pfRg">RG/CN</label><div class="g-rg"><select data-pf="rgCnTipo" aria-label="Tipo do documento" ${dis}><option value="RG" ${rgTipo==='RG'?'selected':''}>RG</option><option value="CN" ${rgTipo==='CN'?'selected':''}>CN</option></select><input id="pfRg" inputmode="numeric" data-pf="rgCn" value="${esc(v('rgCn',e.rgCn||''))}" placeholder="Digite apenas números" ${dis}></div></div>
+    <div class="field"><label for="pfNis">NIS</label><input id="pfNis" data-pf="nis" value="${esc(v('nis',e.nis||''))}" ${dis}></div>
+    <div class="field"><label for="pfSexo">Sexo</label><select id="pfSexo" data-pf="sexo" ${dis}><option value=""></option><option value="M" ${String(v('sexo',e.sexo||'')).toUpperCase()==='M'?'selected':''}>M</option><option value="F" ${String(v('sexo',e.sexo||'')).toUpperCase()==='F'?'selected':''}>F</option></select></div>
+    <div class="field"><label for="pfNasc">Data nascimento</label><input id="pfNasc" type="date" data-pf="dataNascimento_iso" value="${esc(dateISO)}" ${dis}></div>
+    <div class="field"><div class="nat-topo"><label class="lbl" for="pfNat">Naturalidade</label><label class="check"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div><div class="g-nat"><input id="pfNat" data-pf="naturalidade" value="${esc(v('naturalidade',e.naturalidade||''))}" ${dis}><select data-pf="ufNascimento" aria-label="UF de nascimento" ${nascEstr?'disabled':''} ${dis}><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div></div>
+    <div class="field"><label for="pfMae">Mãe</label><input id="pfMae" data-pf="mae" value="${esc(v('mae',e.mae||''))}" ${dis}></div>
+    <div class="field"><label for="pfPai">Pai</label><input id="pfPai" data-pf="pai" value="${esc(v('pai',e.pai||''))}" ${dis}></div>
   </div>`;
   if(travado) return;
   const rer=()=>{ renderResumoSelecionado(); refreshSaida(); };
@@ -935,10 +725,10 @@ function renderDadosPessoaisEditor(){
 }
 function getFilteredRegs(){ if(!state.selected) return []; return (state.selected.registros||[]).filter(r=>formatoPermite(r.serieAluno||r.serieTextoTurma)); }
 function renderTimeline(){
-  const box=document.getElementById('timeline'); if(!state.selected){ box.innerHTML='Selecione um aluno.'; return; }
+  const box=document.getElementById('timeline'); if(!state.selected){ box.innerHTML=avisoHtml('Selecione um aluno.'); return; }
   const regs=getFilteredRegs();
-  if(!regs.length){ box.innerHTML='<span class="warn">Sem registros compatíveis com o formato.</span>'; return; }
-  box.innerHTML = `<table><thead><tr><th>#</th><th>Ano</th><th>Série</th><th>Aba</th><th>Turno</th><th>Resultado</th><th>ID turma</th></tr></thead><tbody>${
+  if(!regs.length){ box.innerHTML=avisoHtml('Sem registros compatíveis com o formato.','⚠️'); return; }
+  box.innerHTML = `<table class="tab-fixa center"><thead><tr><th>#</th><th>Ano</th><th>Série</th><th>Aba</th><th>Turno</th><th>Resultado</th><th>ID turma</th></tr></thead><tbody>${
     regs.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.anoLetivo||'—')}</td><td>${esc(r.serieAluno||r.serieTextoTurma||'—')}</td><td>${esc(r.aba||'—')}</td><td>${esc(r.turno||'—')}</td><td>${esc(r.resultado||'—')}</td><td>${esc(r.turmaId||'—')}</td></tr>`).join('')
   }</tbody></table>`;
 }
@@ -961,9 +751,9 @@ function getResumoRowsSequencial(){
   });
 }
 function renderResumoEditavel(){
-  const box=document.getElementById('resumoEditavel'); if(!state.selected){ box.innerHTML='Selecione um aluno.'; return; }
+  const box=document.getElementById('resumoEditavel'); if(!state.selected){ box.innerHTML=avisoHtml('Selecione um aluno.'); return; }
   let rows=getResumoRowsForEditor();
-  box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><div class="small muted">Máx. 9 linhas (A1..A9). Adicione e mova as linhas.</div><div><button type="button" class="btn" id="btnAddResumoLinha">+ Adicionar linha</button></div></div><table><thead><tr><th>Ordem</th><th>Etapa</th><th>Ano letivo</th><th>Escola</th><th>Município</th><th>UF</th><th>Resultado</th><th>Ações</th></tr></thead><tbody>${ rows.map((r,idx)=>`<tr><td><b>A${idx+1}</b></td><td><input class="mini-input" data-row="${idx}" data-f="etapa" value="${esc(r.etapa||'')}"></td><td><input class="mini-input" inputmode="numeric" data-row="${idx}" data-f="anoLetivo" value="${esc(r.anoLetivo||'')}"></td><td><input class="mini-input" data-row="${idx}" data-f="escola" value="${esc(r.escola||'')}"></td><td><input class="mini-input" data-row="${idx}" data-f="municipio" value="${esc(r.municipio||'')}"></td><td><select class="mini-input" data-row="${idx}" data-f="uf"><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${String(r.uf||'').toUpperCase()===uf?'selected':''}>${uf}</option>`).join('')}</select></td><td><input class="mini-input" data-row="${idx}" data-f="resultado" value="${esc(r.resultado||'')}"></td><td style="white-space:nowrap"><button type="button" class="btn" data-act="up" data-row="${idx}">↑</button> <button type="button" class="btn" data-act="down" data-row="${idx}">↓</button> <button type="button" class="btn" data-act="del" data-row="${idx}">✕</button></td></tr>`).join('') || '<tr><td colspan="8">Sem linhas. Clique em <b>Adicionar linha</b>.</td></tr>' }</tbody></table>`;
+  box.innerHTML = `<div class="resumo-topo"><button type="button" class="btn" id="btnAddResumoLinha">+ Adicionar linha</button></div>${ rows.length ? `<table class="tab-fixa center"><thead><tr><th>Ordem</th><th>Etapa</th><th>Ano letivo</th><th>Escola</th><th>Município</th><th>UF</th><th>Resultado</th><th>Ações</th></tr></thead><tbody>${ rows.map((r,idx)=>`<tr><td><b>A${idx+1}</b></td><td><input class="input" data-row="${idx}" data-f="etapa" value="${esc(r.etapa||'')}"></td><td><input class="input" inputmode="numeric" data-row="${idx}" data-f="anoLetivo" value="${esc(r.anoLetivo||'')}"></td><td><input class="input" data-row="${idx}" data-f="escola" value="${esc(r.escola||'')}"></td><td><input class="input" data-row="${idx}" data-f="municipio" value="${esc(r.municipio||'')}"></td><td><select class="input" data-row="${idx}" data-f="uf"><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${String(r.uf||'').toUpperCase()===uf?'selected':''}>${uf}</option>`).join('')}</select></td><td><input class="input" data-row="${idx}" data-f="resultado" value="${esc(r.resultado||'')}"></td><td class="nowrap"><button type="button" class="btn small" data-act="up" data-row="${idx}">↑</button> <button type="button" class="btn small" data-act="down" data-row="${idx}">↓</button> <button type="button" class="btn small" data-act="del" data-row="${idx}">✕</button></td></tr>`).join('') }</tbody></table>` : avisoHtml('Sem linhas. Clique em <b>Adicionar linha</b>.') }`;
   const saveRows=()=>{ persistResumoRows(rows.map((r,i)=>({...r,slot:i+1}))); state.edits.meta.resumoVisibleCount=rows.length; refreshSaida(); };
   box.querySelectorAll('[data-row][data-f]').forEach(inp=>inp.addEventListener(inp.tagName==='SELECT'?'change':'input', ()=>{
     const i=+inp.dataset.row, f=inp.dataset.f; if(!rows[i]) return; let v=inp.value;
@@ -1151,7 +941,7 @@ function buildPlaceholders(){
 function renderNotasPreviewDocx(){
   const el=document.getElementById('notasPreviewDocx');
   if(!el) return;
-  if(!state.selected || !state.placeholders){ el.innerHTML='Selecione um aluno para ver a prévia das notas.'; return; }
+  if(!state.selected || !state.placeholders){ el.innerHTML=avisoHtml('Selecione um aluno para ver a prévia das notas.'); return; }
   const p=state.placeholders||{};
   const disciplinas=[
     ['LP','Língua Portuguesa'],['EFI','Educação Física'],['ART','Arte'],['MAT','Matemática'],['HIS','História'],['GEO','Geografia'],['CIE','Ciências'],['REL','Ensino Religioso'],['ING','Língua Inglesa']
@@ -1161,7 +951,7 @@ function renderNotasPreviewDocx(){
   for(let i=1;i<=9;i++) headCols.push(`${i}º`);
   let rows='';
   for(const [cod,nome] of disciplinas){
-    let tds=`<td style="position:sticky;left:0;background:var(--field-bg);color:var(--ink);font-weight:600;z-index:1">${nome}</td>`;
+    let tds=`<td>${nome}</td>`;
     let rowHas=false;
     for(let i=1;i<=9;i++) {
       const nc = p[`A${i}_${cod}_NC`] ?? (cod==='EFI'?p[`A${i}_EDF_NC`]:cod==='REL'?p[`A${i}_ER_NC`]: '');
@@ -1169,29 +959,12 @@ function renderNotasPreviewDocx(){
       const slotAno = String(p[`A${i}_ANO_LETIVO`]||'').trim();
       const display = v || (slotAno ? '---' : '');
       if(display) { hasAny=true; rowHas=true; }
-      tds += `<td style="text-align:center;white-space:nowrap">${esc(display)}</td>`;
+      tds += `<td>${esc(display)}</td>`;
     }
     rows += `<tr>${tds}</tr>`;
   }
-  if(!hasAny){ el.innerHTML='Nenhuma nota encontrada ainda.'; return; }
-  // Cores vêm de variáveis CSS (.notas-prev, definidas no <style>): acompanham o tema ao vivo.
-  // Antes eram decididas aqui, pelo tema do instante do render — se o tema mudasse depois, ficavam congeladas.
-  const borderCol = 'var(--nt-border)';
-  const thBg      = 'var(--chip-bg)'; // igual às outras tabelas: acompanha a paleta nos dois temas
-  const tdBg      = 'var(--nt-td)';
-  const zebraBg   = 'var(--nt-zebra)';
-  el.innerHTML = `
-    <div class="notas-prev" style="overflow:auto;border:1px solid ${borderCol};border-radius:10px">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;color:var(--ink)">
-        <thead><tr>${headCols.map((h,idx)=>`<th style="border-bottom:1px solid ${borderCol};padding:6px;text-align:center;position:${idx===0?'sticky':'static'};left:${idx===0?'0':'auto'};background:${thBg};color:var(--ink);z-index:${idx===0?2:1}">${h}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-  // linhas/zebrado simples
-  el.querySelectorAll('tbody tr').forEach((tr,ri)=>{
-    tr.style.background = ri%2===1 ? zebraBg : tdBg;
-    tr.querySelectorAll('td').forEach(td=>{ td.style.borderBottom=`1px solid ${borderCol}`; td.style.padding='5px 6px'; td.style.color='var(--ink)'; });
-  });
+  if(!hasAny){ el.innerHTML=avisoHtml('Nenhuma nota encontrada ainda.'); return; }
+  el.innerHTML = `<div class="notas-scroll"><table class="notas-tab center"><thead><tr>${headCols.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // state.placeholders = dados que alimentam o DOCX, as validações e a prévia (NÃO é só visual: o card de JSON foi removido, os dados não).
@@ -1224,17 +997,14 @@ function patchTemplateZip(zip){
 const chState = { rules: [] };
 (async function initCHRulesHist(){
   try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
+    await _authPronto();
     chState.rules = (await DB.schemas.listRules()) || [];
     _chRegrasAtualizadas();
     // Atualiza em tempo real quando o Schema CH salva/exclui
     DB.schemas.onSnapshot(docs=>{ chState.rules = docs || []; _chRegrasAtualizadas(); });
   }catch(e){
-    console.warn('initCHRulesHist:', e);
-    setMsg('Não foi possível carregar as regras de carga horária — a CH sairá em branco. Recarregue a página.', 'err');
+    console.error('initCHRulesHist:', e);
+    if(!_semEscola()) setMsg('Não foi possível carregar as regras de carga horária — a CH sairá em branco. Recarregue a página.', 'err');
   }
 })();
 function _chRegrasAtualizadas(){
@@ -1416,7 +1186,7 @@ function analisarDiagnosticoExport(placeholders){
 function renderDiagExport(){
   const el = document.getElementById('diagExportStatus');
   if(!el) return;
-  if(!state.selected){ el.innerHTML='Selecione um aluno para ver o diagnóstico.'; return; }
+  if(!state.selected){ el.innerHTML=avisoHtml('Selecione um aluno para ver o diagnóstico.'); return; }
   const p = state.placeholders || buildPlaceholders();
   const d = analisarDiagnosticoExport(p);
   const okAluno = !!String(p.ALUNO_NOME||'').trim();
@@ -1430,7 +1200,7 @@ function renderDiagExport(){
   html.push(`<div>• ${d.chFaltando.length?'⚠️':'✅'} CH faltando (com regra): <b>${d.chFaltando.length}</b>${d.chFaltando.length?` <span class="muted">(${d.chFaltando.slice(0,8).join(', ')}${d.chFaltando.length>8?'...':''})</span>`:''}</div>`);
   html.push(`<div>• ${(d.faltasPessoais.length||d.faltasEscola.length)?'⚠️':'✅'} campos essenciais: ${
     (d.faltasPessoais.length||d.faltasEscola.length)
-      ? `<span style="color:#b45309;font-weight:700">${[...d.faltasPessoais, ...d.faltasEscola].join(', ')}</span>`
+      ? `<span class="diag-warn">${[...d.faltasPessoais, ...d.faltasEscola].join(', ')}</span>`
       : 'ok'
   }</div>`);
   html.push(`<div>• ${okTemplate?'✅':'⚠️'} template DOCX embutido ${okTemplate?'carregado':'indisponível'}</div>`);
@@ -1473,7 +1243,7 @@ function validarSemExportar(){
     r.bloqueios.length ? ('\nBloqueios:\n- ' + r.bloqueios.join('\n- ')) : '',
     r.avisos.length ? ('\nAvisos:\n- ' + r.avisos.join('\n- ')) : ''
   ].join('');
-  _infoModal({ titulo: r.ok ? 'Validação concluída' : 'Validação encontrou bloqueios', corpo: msg, corDestaque: r.ok ? '#166534' : '#b45309' });
+  _infoModal({ titulo: r.ok ? 'Validação concluída' : 'Validação encontrou bloqueios', corpo: msg, corDestaque: r.ok ? 'ok' : undefined });
 }
 function carregarHistoricoExport(){
   try{
@@ -1492,9 +1262,9 @@ function renderHistoricoExport(){
   const box=document.getElementById('exportHistoryBox');
   if(!box) return;
   const arr = carregarHistoricoExport().slice(0,6);
-  if(!arr.length){ box.innerHTML='Nenhuma exportação registrada.'; return; }
-  box.innerHTML = arr.map((r,i)=>`<div style="padding:6px 0;${i? 'border-top:1px solid #eee;':''}">
-    <div><b>${esc(r.nome||'aluno')}</b> <span class="pill">${esc(r.tipo||r.formato||'')}</span></div>
+  if(!arr.length){ box.innerHTML=avisoHtml('Nenhuma exportação registrada.'); return; }
+  box.innerHTML = arr.map((r,i)=>`<div class="hist-item">
+    <div><b>${esc(r.nome||'aluno')}</b> <span class="badge small gray">${esc(r.tipo||r.formato||'')}</span></div>
     <div class="muted">${esc(r.dataHora||'')} • ano ref: ${esc(r.anoRef||'—')} • CH: ${esc(r.schemaCH||'—')}</div>
   </div>`).join('');
 }
@@ -1562,24 +1332,25 @@ async function exportarDOCX(){
       renderHistoricoExport();
     }catch(e){}
   } catch(err) {
-    console.error(err);
+    console.error('exportarDOCX:', err);
+    _toastLimpar();   // não deixa o "Gerando DOCX…" aberto atrás do modal de erro
     const msg = err?.properties?.errors?.map(e=>e.properties?.explanation||e.message).join('\n') || err?.message || String(err);
-    _infoModal({ titulo: 'Erro ao gerar DOCX', corpo: msg, corDestaque: '#b91c1c' });
+    _infoModal({ titulo: 'Erro ao gerar DOCX', corpo: msg, corDestaque: 'danger' });
   }
 }
 
-function limpar(){ document.getElementById('qAluno').value=''; document.getElementById('resultados').innerHTML='<div class="item muted">Digite parte do nome ou ID e clique em pesquisar.</div>'; }
+function limpar(){ document.getElementById('qAluno').value=''; document.getElementById('resultados').innerHTML=avisoHtml('Digite parte do nome ou ID e clique em pesquisar.'); }
 async function recarregarDB(){
   await carregarDB();
   if(state.selected){
     const k=state.selected.key;
     state.selected=null;
     await pesquisar();   // renova state.index (matrículas) antes de reabrir o aluno
-  const btnSP2 = document.getElementById('btnSalvarPessoais'); if(btnSP2) btnSP2.style.display='none';
+  const btnSP2 = document.getElementById('btnSalvarPessoais'); if(btnSP2) btnSP2.hidden = true;
     state.edits={pessoais:{},anos:{}};
-    document.getElementById('timeline').innerHTML='Selecione um aluno.';
-    document.getElementById('resumoEditavel').innerHTML='Selecione um aluno.';
-    document.getElementById('dadosPessoaisWrap').innerHTML='Selecione um aluno para preencher/editar dados pessoais.';
+    document.getElementById('timeline').innerHTML=avisoHtml('Selecione um aluno.');
+    document.getElementById('resumoEditavel').innerHTML=avisoHtml('Selecione um aluno.');
+    document.getElementById('dadosPessoaisWrap').innerHTML=avisoHtml('Selecione um aluno para preencher/editar dados pessoais.');
     const f=state.index.find(x=>x.key===k);
     if(f) selecionarAluno(f.key);
   }
@@ -1590,18 +1361,27 @@ document.addEventListener("click", ()=>{
   document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
 });
 
-document.addEventListener('DOMContentLoaded', async ()=>{
-  if (window.ThemeColors) ThemeColors.ajustarContraste(); // cards .card-destaque (texto pelo contraste da marca)
-  const d=new Date(); document.getElementById('inData').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  await carregarDB(); // aguarda cache local + Firestore antes de liberar a tela
-  carregarExportOpts();
-  renderHistoricoExport();
-  try{ const v=localStorage.getItem('historicoCHModo_v1'); if(v && document.getElementById('schemaCHModo')) document.getElementById('schemaCHModo').value=v; }catch(e){}
-  atualizarSchemaCHResumo();
-  document.getElementById('qAluno').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); pesquisar(); }});
-  // a pesquisa automática (com debounce) já vem do oninput="autoSearch()" no input
-
-  Loading.esconder(); // ← linha adicionada
+async function init(){
+  try{
+    const d=new Date(); document.getElementById('inData').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    await carregarDB(); // aguarda cache local + Firestore antes de liberar a tela
+    carregarExportOpts();
+    renderHistoricoExport();
+    try{ const v=localStorage.getItem('historicoCHModo_v1'); if(v && document.getElementById('schemaCHModo')) document.getElementById('schemaCHModo').value=v; }catch(e){}
+    atualizarSchemaCHResumo();
+    document.getElementById('qAluno').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); pesquisar(); }});
+    // a pesquisa automática (com debounce) já vem do oninput="autoSearch()" no input
+    if(_semEscola()){ const av=document.getElementById('avisoSemEscola'); if(av) av.hidden=false; }
+  } finally {
+    // cards .card-destaque (texto pelo contraste da marca), depois de os cards existirem
+    try{ if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+    catch(e){ console.warn('ajustarContraste:', e); }
+    try{ Loading.esconder(); }catch(_){}
+  }
+}
+// DOMContentLoaded (e não chamada direta): preserva a ordem original com o script de regras de CH, que vem depois
+document.addEventListener('DOMContentLoaded', () => {
+  init().catch((e) => { console.error('init:', e); setMsg('Erro ao carregar a página.', 'err'); });
 });
 </script>
 
