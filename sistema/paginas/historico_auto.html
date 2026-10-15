@@ -72,6 +72,7 @@
 
 /* histórico local de exportações */
 .hist-item{ padding:6px 0; }
+.hist-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
 .hist-item + .hist-item{ border-top:1px solid var(--ui-border); }
 
 /* diagnóstico: campos essenciais faltando (cor de status com par claro/escuro) */
@@ -1272,6 +1273,8 @@ function validarSemExportar(){
 const HIST_MAX = 4;
 let _historicoExports = [];
 const _porMaisRecente = (a, b) => (b.ts || 0) - (a.ts || 0);
+// motivo curto do erro para o toast (código do Firestore, ex.: permission-denied, ou a mensagem)
+const _motivoErro = (e) => String((e && (e.code || e.message)) || 'erro desconhecido').slice(0, 90);
 async function carregarHistoricoExport(){
   try{
     const docs = await DB.exportacoes.list();
@@ -1279,7 +1282,7 @@ async function carregarHistoricoExport(){
   }catch(e){
     console.error('carregarHistoricoExport:', e);
     _historicoExports = [];
-    if(!_semEscola()) setMsg('Não foi possível carregar o histórico de exportações.', 'err');
+    if(!_semEscola()) setMsg(`Não foi possível carregar o histórico de exportações (${_motivoErro(e)}).`, 'err');
   }
 }
 async function registrarExportacao(item){
@@ -1300,10 +1303,13 @@ function renderHistoricoExport(){
   if(!box) return;
   const arr = _historicoExports.slice(0, HIST_MAX);
   if(!arr.length){ box.innerHTML=avisoHtml('Nenhuma exportação registrada.'); return; }
-  box.innerHTML = arr.map(r=>`<div class="hist-item">
-    <div><b>${esc(r.nome||'aluno')}</b> <span class="badge small gray">${esc(r.tipo||r.formato||'')}</span></div>
-    <div class="muted">${esc(r.ts ? new Date(r.ts).toLocaleString('pt-BR') : '')} • ano ref: ${esc(r.anoRef||'—')} • CH: ${esc(r.schemaCH||'—')}</div>
-  </div>`).join('');
+  box.innerHTML = arr.map(r=>{
+    const d = r.ts ? new Date(r.ts) : null;
+    const quando = d ? `<div class="hist-chips"><span class="badge small neutral" title="Data da exportação">📅 ${esc(d.toLocaleDateString('pt-BR'))}</span><span class="badge small neutral" title="Hora da exportação">🕒 ${esc(d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}))}</span></div>` : '';
+    return `<div class="hist-item">
+    <div><b>${esc(r.nome||'aluno')}</b> <span class="badge small gray">${esc(r.tipo||r.formato||'')}</span></div>${quando}
+  </div>`;
+  }).join('');
 }
 
 async function exportarDOCX(){
@@ -1368,7 +1374,7 @@ async function exportarDOCX(){
     }catch(e){
       // o DOCX já foi baixado: falha no histórico não invalida a exportação
       console.error('registrarExportacao:', e);
-      setMsg('DOCX gerado, mas não foi possível registrar no histórico de exportações.', 'warn');
+      setMsg(`DOCX gerado, mas não foi possível registrar no histórico de exportações (${_motivoErro(e)}).`, 'warn');
     }
   } catch(err) {
     console.error('exportarDOCX:', err);
