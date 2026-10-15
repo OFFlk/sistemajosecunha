@@ -398,6 +398,20 @@
     },
   };
 
+  /* ─── Funcionários: grupos de campos do modelo pessoa × ano ───
+   * identidade = quem a pessoa é; copiada para TODAS as matrículas dela quando muda (e a foto idem).
+   * perfil     = situação datada (NEE, endereço, formação): a matrícula guarda o retrato daquele ano e o
+   *              doc da pessoa guarda o do ano mais recente.
+   * ano        = só existe na matrícula.
+   */
+  const FUNC_CAMPOS = {
+    identidade: ['cpf', 'cpfNum', 'rgCnh', 'nome', 'dataNascimento', 'filiacaoMae', 'filiacaoPai', 'sexo', 'corRaca',
+                 'naturalidadePais', 'naturalidadeUF', 'naturalidadeCidade', 'fotoUrl', 'fotoFileId'],
+    perfil:     ['deficiencia', 'cep', 'endUF', 'endCidade', 'zonaResidencia', 'escolaridade', 'tipoEnsino',
+                 'graduacoes', 'posGraduacoes', 'complementacoes', 'outrosCursos'],
+    ano:        ['funcao', 'profissionalApoio', 'cargaHoraria', 'status', 'turnos'],
+  };
+
   /* ─── Utilitário: migração do localStorage para o Firestore ─── */
   const migrate = {
     /**
@@ -457,6 +471,118 @@
       });
 
       console.log(`Migração concluída: ${arr.length} funcionários migrados e funcionariosDB removido do doc da escola.`);
+    },
+
+    /**
+     * Converte `funcionarios` do formato antigo (1 doc por funcionário POR ANO, com funcId + anoLetivo) para o
+     * modelo pessoa × ano:  funcionarios (pessoa) + funcionariosAnos + funcionariosMatriculas.
+     *
+     *   await DB.migrate.migrarFuncionariosParaMatriculas()                 // SIMULAÇÃO (padrão): só mostra o que faria
+     *   await DB.migrate.migrarFuncionariosParaMatriculas({ dryRun:false }) // grava de verdade
+     *
+     * Regras:
+     *  - agrupa os docs antigos pelo CPF (11 dígitos); sem CPF válido, cada doc vira uma pessoa;
+     *  - o ID da pessoa é o funcId do cadastro MAIS RECENTE (a foto e os documentos no Cloudinary seguem esse ID);
+     *    os funcId dos anos mais antigos somem do Firestore — a mídia deles, se houver, continua no Cloudinary
+     *    sob o ID antigo (aparece no relatório em `idsAntigosComMidia`);
+     *  - cada doc antigo vira uma matrícula 'FMAT|{ano}|{funcId}' com o retrato daquele ano (anoLetivo vira número);
+     *  - dois docs do mesmo CPF no mesmo ano: fica o primeiro; o outro é listado em `descartados` e ganha
+     *    `migracaoDescartado:true` (NÃO é apagado: confira e apague à mão);
+     *  - docs no formato novo (sem anoLetivo/ano) e os marcados `migracaoDescartado` são ignorados; pode rodar de novo sem duplicar.
+     * Cada pessoa é gravada num único batch (atômico). Rode a simulação primeiro e confira o relatório.
+     */
+    async migrarFuncionariosParaMatriculas(opts = {}) {
+      const dryRun = opts.dryRun !== false;
+      await waitAuth();
+      if (!dryRun) guardWrite('migrarFuncionariosParaMatriculas', 'funcionarios');
+      const dig = v => String(v == null ? '' : v).replace(/\D/g, '');
+      const anoDe = d => Number(d.anoLetivo != null ? d.anoLetivo : d.ano);
+
+      const snap = await col('funcionarios').get();
+      const todos = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      const legados = todos.filter(d => (d.anoLetivo != null || d.ano != null) && !d.migracaoDescartado);
+      if (!legados.length) {
+        console.log('[migrarFuncionarios] Nada a migrar (' + todos.length + ' docs, nenhum no formato antigo).');
+        return { dryRun, legados: 0, pessoas: 0, matriculas: 0 };
+      }
+
+      const grupos = new Map();
+      legados.forEach(d => {
+        const cpf = dig(d.cpf);
+        const k = cpf.length === 11 ? 'CPF|' + cpf : 'ID|' + d._id;
+        if (!grupos.has(k)) grupos.set(k, []);
+        grupos.get(k).push(d);
+      });
+
+      const agora = new Date().toISOString();
+      const C = FUNC_CAMPOS;
+      const anos = new Set();
+      const lotes = [];            // cada item = ops de UMA pessoa
+      const relatorio = [];
+      const descartados = [];
+      const idsAntigosComMidia = [];
+      let nMat = 0;
+
+      grupos.forEach((docs, k) => {
+        docs.sort((a, b) => (anoDe(b) || 0) - (anoDe(a) || 0));
+        const recente = docs[0];
+        const funcId = recente._id;
+        const cpfNum = k.startsWith('CPF|') ? k.slice(4) : '';
+        const comFoto = docs.find(d => d.fotoUrl);
+
+        const pessoa = { funcId, criadoEm: recente.criadoEm || agora };
+        [...C.identidade, ...C.perfil].forEach(f => { if (recente[f] !== undefined) pessoa[f] = recente[f]; });
+        if (cpfNum) pessoa.cpfNum = cpfNum;
+        if (comFoto) { pessoa.fotoUrl = comFoto.fotoUrl; pessoa.fotoFileId = comFoto.fotoFileId || null; }
+
+        const ops = [{ col: 'funcionarios', op: 'set', id: funcId, data: pessoa, merge: false }];   // substitui o doc antigo (sem anoLetivo/funcao/...)
+        const vistos = new Set();
+        const anosDaPessoa = [];
+        docs.forEach(d => {
+          const ano = anoDe(d);
+          const descartar = motivo => {      // não apaga: marca, para a migração não tratá-lo como pessoa nova numa 2ª execução
+            descartados.push({ _id: d._id, nome: d.nome, motivo });
+            ops.push({ col: 'funcionarios', op: 'set', id: d._id, data: { migracaoDescartado: true, migracaoMotivo: motivo } });
+          };
+          if (!Number.isFinite(ano)) { descartar('ano inválido'); return; }
+          const matId = 'FMAT|' + ano + '|' + funcId;
+          if (vistos.has(matId)) { descartar('mesmo CPF e mesmo ano (' + ano + ') de outro doc'); return; }
+          vistos.add(matId);
+          const mat = { matriculaId: matId, funcId, anoLetivo: ano, criadoEm: d.criadoEm || agora };
+          [...C.identidade, ...C.perfil, ...C.ano].forEach(f => { if (d[f] !== undefined) mat[f] = d[f]; });
+          if (cpfNum) mat.cpfNum = cpfNum;
+          if (pessoa.fotoUrl) { mat.fotoUrl = pessoa.fotoUrl; mat.fotoFileId = pessoa.fotoFileId; }
+          ops.push({ col: 'funcionariosMatriculas', op: 'set', id: matId, data: mat });
+          anos.add(ano); anosDaPessoa.push(ano); nMat++;
+          if (d._id !== funcId) {
+            ops.push({ col: 'funcionarios', op: 'delete', id: d._id });
+            if (d.fotoFileId) idsAntigosComMidia.push({ idAntigo: d._id, nome: d.nome, fotoFileId: d.fotoFileId });
+          }
+        });
+        lotes.push(ops);
+        relatorio.push({ chave: k, nome: recente.nome || '(sem nome)', funcId, anos: anosDaPessoa.join(','), docsAntigos: docs.length });
+      });
+
+      const resumo = { dryRun, legados: legados.length, pessoas: lotes.length, matriculas: nMat, anos: [...anos].sort(),
+                       descartados, idsAntigosComMidia };
+      console.table(relatorio);
+      console.log('[migrarFuncionarios] resumo:', resumo);
+      if (dryRun) { console.log('[migrarFuncionarios] SIMULAÇÃO — nada foi gravado. Rode com { dryRun:false } para aplicar.'); return resumo; }
+
+      // grava: junta pessoas em batches de até 450 ops (cada pessoa inteira no mesmo batch)
+      let atual = [];
+      const flush = async () => { if (atual.length) { await window.DB.batchWrite(atual); atual = []; } };
+      for (const ops of lotes) {
+        if (atual.length + ops.length > 450) await flush();
+        atual.push(...ops);
+      }
+      for (const a of anos) {
+        if (atual.length >= 450) await flush();
+        atual.push({ col: 'funcionariosAnos', op: 'set', id: String(a), data: { anoLetivo: a, criadoEm: agora } });
+      }
+      await flush();
+      console.log('[migrarFuncionarios] Migração concluída.');
+      return resumo;
     },
 
     /**
@@ -523,8 +649,16 @@
     anoAtivoAlunos:    makeCollection('anoAtivoAlunos'),
     anoAtivoMatriculas: makeCollection('anoAtivoMatriculas'),
 
-    // ── Módulo de Funcionários (Educacenso) ──
+    // ── Módulo de Funcionários (Educacenso) — mesmo desenho do Ano-Ativo dos alunos ──
+    //   funcionarios            = a PESSOA (1 doc por funcionário, ID FUN-000001): identidade + perfil + foto.
+    //                             Equivale a anoAtivoAlunos. Busca por CPF: whereEquals('cpfNum', ...).
+    //   funcionariosAnos        = os ANOS LETIVOS (1 doc por ano, ID = '2026'). Equivale a anoAtivoTurmas.
+    //   funcionariosMatriculas  = o VÍNCULO pessoa × ano (ID 'FMAT|{ano}|{funcId}'). Equivale a anoAtivoMatriculas,
+    //                             mas guarda uma CÓPIA de todos os dados pessoais: a pesquisa lê SÓ esta coleção
+    //                             (ex.: whereEquals('anoLetivo', 2026)). Quem edita dados pessoais grava os dois lados.
     funcionarios: makeCollection('funcionarios'),
+    funcionariosAnos: makeCollection('funcionariosAnos'),
+    funcionariosMatriculas: makeCollection('funcionariosMatriculas'),
 
     // ── Módulo de Notas Trimestrais (bridge p/ colar no Access) ──
     // Isolado dos demais módulos, sem interação com turmas/alunos/atas.
