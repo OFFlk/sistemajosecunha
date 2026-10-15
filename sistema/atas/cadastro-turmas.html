@@ -73,13 +73,9 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .id-badge-row .label-inline { font-size: 12px; color: var(--ui-muted); font-weight: 700; }
 .mono { font-family: ui-monospace, monospace; font-size: 12px; }
 
-/* ── Chip removível (série escolhida, com ×): não é .badge (guia, seção 6).
-   Nível 2 (neutro): a listagem ao lado já usa a série em nível 1, então o formulário não compete com ela. ── */
-.chip {
-  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-chip-neutral-border);
-  background: var(--ui-chip-neutral-bg); color: var(--ui-chip-neutral-color); padding: 6px 10px; border-radius: 999px;
-  font-size: 13px; font-weight: 700;
-}
+/* ── Chip removível (série escolhida, com ×): LAYOUT só. A cor vem do global (.badge.neutral, nível 2):
+   a listagem ao lado já usa a série em nível 1, então o formulário não compete com ela (guia, seção 6). ── */
+.chip { display: inline-flex; align-items: center; gap: 8px; }
 .chip button { border: 0; background: transparent; cursor: pointer; color: inherit; font-weight: 900; font-size: 14px; line-height: 1; padding: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .chips-series { margin-top: 10px; }
@@ -625,7 +621,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     const travado = !!editingTurmaId;   // edição: série bloqueada, chip sem ×
     for(const s of seriesSel){
       const chip = document.createElement("span");
-      chip.className = "chip";
+      chip.className = "chip badge neutral";
       chip.append(document.createTextNode(s));
       if(!travado){
         const btn = document.createElement("button");
