@@ -976,12 +976,12 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
       ? f.complementacoes
       : (f.complementacaoPedagogica && f.complementacaoNome ? [{ nome: f.complementacaoNome }] : []);
     if(complementacoes.length){
-      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Complementações pedagógicas</div>` +
+      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Complementações</div>` +
         complementacoes.map(c => `<div style="font-size:13px;">• ${escapeHtml(c.nome||'—')}${c.ano?' · '+escapeHtml(String(c.ano)):''}</div>`).join(''));
     }
     if(Array.isArray(f.outrosCursos) && f.outrosCursos.length){
       blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Outros cursos</div>` +
-        f.outrosCursos.map(o => `<div style="font-size:13px;">• ${escapeHtml(o.nome||o.curso||'—')}</div>`).join(''));
+        f.outrosCursos.map(o => `<div style="font-size:13px;">• ${escapeHtml(typeof o === 'string' ? o : (o.nome||o.curso||'—'))}</div>`).join(''));
     }
     return blocos.length ? blocos.join('') : `<div style="font-size:13px;color:var(--muted);">Nenhuma formação adicional registrada.</div>`;
   }
@@ -990,7 +990,10 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     const f = funcionarios.find(x => matIdDe(x) === matId);
     if(!f) return;
     const funcId = f.funcId || '';              // documentos e foto são da PESSOA (pasta por funcId)
-    const nat  = [f.naturalidadeCidade || f.naturalidade, f.naturalidadeUF].filter(Boolean).join(' / ') || '—';
+    // Naturalidade: modelo novo (naturalidadeEstrangeiro) e registros antigos (naturalidadePais != 'BR')
+    const natEstr  = f.naturalidadeEstrangeiro != null ? f.naturalidadeEstrangeiro === true : (!!f.naturalidadePais && f.naturalidadePais !== 'BR');
+    const natLocal = [f.naturalidadeCidade || f.naturalidade, f.naturalidadeUF].filter(Boolean).join(natEstr ? ' - ' : ' / ');
+    const nat  = natEstr ? ('Estrangeiro' + (natLocal ? ' — ' + natLocal : '')) : (natLocal || '—');
     const nasc = formatDate(f.dataNascimento) || '—';
     const idade = calcAge(f.dataNascimento) || '—';
 

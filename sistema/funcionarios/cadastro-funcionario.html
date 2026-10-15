@@ -116,8 +116,10 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .id-banner-sub{font-size:12px;color:var(--ui-muted);margin-top:2px;}
 
 /* ── Naturalidade ── */
-.nat-grid{margin-top:4px;}
-.field .nat-sublbl{font-weight:600;font-size:12px;color:var(--ui-muted);}
+.inline-2{display:grid;grid-template-columns:2fr 1fr;gap:10px;align-items:start;}
+.nat-label-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px;}
+.nat-label-row label{margin:0;}
+.nat-label-row .check{font-size:12px;}
 .field-note{font-weight:600;color:var(--ui-muted);}
 
 /* ── NEE ── */
@@ -232,16 +234,6 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 /* ── Zona de perigo (card comum; o vermelho vem do botão .danger e do título) ── */
 .zona-perigo h3{margin:0 0 4px;color:var(--ui-st-bad-fg);}
 .zona-perigo p{margin:0 0 12px;font-size:13px;color:var(--ui-muted);}
-
-/* ── Resumo final (card de sucesso próprio da página) ── */
-.resumo-card{display:none;background:var(--ui-st-ok-bg);border:1px solid var(--ui-st-ok-bd);border-radius:14px;padding:20px;margin-bottom:14px;}
-.resumo-card.show{display:block;animation:fadeSlide .3s ease;}
-.resumo-card h3{margin:0 0 12px;font-size:15px;font-weight:800;color:var(--ui-st-ok-fg);}
-.resumo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
-@media(max-width:480px){.resumo-grid{grid-template-columns:1fr;}}
-.resumo-item{font-size:13px;}
-.resumo-item strong{font-weight:800;display:block;font-size:11px;text-transform:uppercase;color:var(--ui-muted);letter-spacing:.04em;}
-.resumo-acoes{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 </style>
 </head>
 
@@ -367,40 +359,30 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
           </select>
         </div>
 
-        <!-- Naturalidade -->
+        <!-- Naturalidade — mesmo fluxo do cadastro de aluno: UF primeiro (a cidade só destrava com ela).
+             "Estrangeiro": UF desabilitada e salva vazia; a cidade vira texto livre. -->
         <div class="field col-full">
-          <label>Naturalidade <span class="req">*</span></label>
-          <div class="form-grid nat-grid">
-            <div class="field">
-              <label for="natPais" class="nat-sublbl">País</label>
-              <select id="natPais">
-                <option value="BR">Brasil</option>
-                <option value="OUTRO">Outro país</option>
-              </select>
+          <div class="nat-label-row">
+            <label>Naturalidade <span class="req">*</span></label>
+            <label class="check"><input type="checkbox" id="natEstrangeiro"/> Estrangeiro</label>
+          </div>
+          <div class="inline-2">
+            <div class="nat-wrap">
+              <div class="nat-ghost-layer" id="natCidadeGhost" aria-hidden="true"></div>
+              <input id="natCidade" class="nat-input-real" placeholder="Selecione a UF primeiro"
+                     autocomplete="off" autocorrect="off" spellcheck="false" disabled/>
+              <div class="nat-dropdown" id="natCidadeDropdown" role="listbox"></div>
             </div>
-            <div class="field">
-              <label for="natUF" class="nat-sublbl">UF</label>
-              <select id="natUF">
-                <option value="">--</option>
-                <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
-                <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
-                <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
-                <option>MT</option><option>PA</option><option>PB</option><option>PE</option>
-                <option>PI</option><option>PR</option><option>RJ</option><option>RN</option>
-                <option>RO</option><option>RR</option><option>RS</option><option>SC</option>
-                <option>SE</option><option>SP</option><option>TO</option>
-              </select>
-              <input id="natUFText" placeholder="País / região de origem" style="display:none;"/>
-            </div>
-            <div class="field col-full">
-              <label for="natCidade" class="nat-sublbl">Cidade</label>
-              <div class="nat-wrap">
-                <div class="nat-ghost-layer" id="natCidadeGhost" aria-hidden="true"></div>
-                <input id="natCidade" class="nat-input-real" placeholder="Município de nascimento"
-                       autocomplete="off" autocorrect="off" spellcheck="false"/>
-                <div class="nat-dropdown" id="natCidadeDropdown" role="listbox"></div>
-              </div>
-            </div>
+            <select id="natUF">
+              <option value="">--</option>
+              <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
+              <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+              <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
+              <option>MT</option><option>PA</option><option>PB</option><option>PE</option>
+              <option>PI</option><option>PR</option><option>RJ</option><option>RN</option>
+              <option>RO</option><option>RR</option><option>RS</option><option>SC</option>
+              <option>SE</option><option>SP</option><option>TO</option>
+            </select>
           </div>
         </div>
       </div>
@@ -724,9 +706,9 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 
       <div class="divider"></div>
 
-      <!-- Complementação pedagógica -->
+      <!-- Complementação -->
       <div class="secao-toggle" id="togComp">
-        <div class="secao-toggle-label">📚 Complementação pedagógica</div>
+        <div class="secao-toggle-label">📚 Complementação</div>
         <span class="secao-toggle-arrow">▼</span>
       </div>
       <div class="secao-body" id="bodyComp">
@@ -734,11 +716,11 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <p class="lista-vazia" id="vaziaComp">Nenhuma complementação adicionada.</p>
         <button type="button" class="btn secondary" id="btnAbrirFormComp">+ Adicionar complementação</button>
         <div class="form-add" id="formComp" style="display:none;">
-          <p class="form-add-title">Nova complementação pedagógica</p>
+          <p class="form-add-title">Nova complementação</p>
           <div class="form-grid">
             <div class="field col-full">
               <label for="cNome">Nome / descrição <span class="req">*</span></label>
-              <input id="cNome" placeholder="Ex: Complementação Pedagógica em Matemática — PARFOR"/>
+              <input id="cNome" placeholder="Ex: Complementação em Matemática — PARFOR"/>
             </div>
             <div class="field">
               <label for="cAno">Ano de conclusão</label>
@@ -886,15 +868,6 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
     </section>
 
   </div><!-- /etapa2 -->
-
-  <!-- Resumo final -->
-  <div class="resumo-card" id="resumoFinal">
-    <h3>✅ Funcionário salvo com sucesso!</h3>
-    <div class="resumo-grid" id="resumoGrid"></div>
-    <div class="resumo-acoes">
-      <button class="btn secondary" id="btnNovoFunc" type="button">+ Novo funcionário</button>
-    </div>
-  </div>
 
 </main>
 
@@ -1170,7 +1143,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     if(!document.getElementById('mae').value.trim()) return false;
     if(!document.getElementById('sexo').value) return false;
     if(!document.getElementById('corRaca').value) return false;
-    if(document.getElementById('natPais').value === 'BR'){
+    if(!document.getElementById('natEstrangeiro').checked){
       if(!document.getElementById('natUF').value || !document.getElementById('natCidade').value.trim()) return false;
     }
     if(!document.getElementById('funcao').value) return false;
@@ -1335,12 +1308,28 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     });
   });
 
-  // Naturalidade — país
-  document.getElementById('natPais').addEventListener('change', function(){
-    const outro = this.value === 'OUTRO';
-    document.getElementById('natUF').style.display = outro ? 'none' : '';
-    document.getElementById('natUFText').style.display = outro ? 'block' : 'none';
+  // Naturalidade — mesmo fluxo do cadastro de aluno: UF primeiro; a cidade só destrava com a UF.
+  // "Estrangeiro": UF desabilitada e salva vazia; a cidade vira texto livre (sem lista de municípios).
+  window._natSync = function(){
+    const est = document.getElementById('natEstrangeiro').checked;
+    const sc = document.getElementById('natCidade'), su = document.getElementById('natUF');
+    if(est){
+      su.value = ''; su.disabled = true;
+      sc.disabled = false;
+      sc.placeholder = 'Cidade / país de nascimento (exterior)';
+      return;
+    }
+    su.disabled = false;
+    const sem = !su.value;
+    sc.disabled = sem;
+    if(sem) sc.value = '';
+    sc.placeholder = sem ? 'Selecione a UF primeiro' : 'Município de nascimento';
+  };
+  document.getElementById('natEstrangeiro').addEventListener('change', function(){
+    document.getElementById('natCidade').value = '';   // o que havia (município da lista ou texto livre) não vale no outro modo
+    window._natSync();
   });
+  document.getElementById('natUF').addEventListener('change', window._natSync);
 
   /* ════════════════════════════════════════
      NEE
@@ -1607,10 +1596,10 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   }
 
   /* ════════════════════════════════════════
-     Complementação pedagógica
+     Complementação
   ════════════════════════════════════════ */
   /* ════════════════════════════════════════
-     Complementação pedagógica (lista)
+     Complementação (lista)
   ════════════════════════════════════════ */
   document.getElementById('btnAbrirFormComp').addEventListener('click', () => abrirFormComp());
   document.getElementById('btnFecharFormComp').addEventListener('click', fecharFormComp);
@@ -1811,20 +1800,21 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
      Limpar formulário completo
   ════════════════════════════════════════ */
   function limparFormulario(){
-    // Ano letivo — volta pro ano ativo padrão
-    anoLetivoInput.value = anoAtivoReal;
-    anoAtivo = anoAtivoReal;
+    // Ano letivo: NÃO é resetado (dá para cadastrar em sequência no mesmo ano). Só volta ao ano ativo ao sair de uma edição.
+    if(_editandoId){
+      anoLetivoInput.value = anoAtivoReal;
+      anoAtivo = anoAtivoReal;
+    }
 
     // Etapa 1
-    ['cpf','rgCnh','nome','nasc','mae','pai','natCidade','natUFText'].forEach(id => {
+    ['cpf','rgCnh','nome','nasc','mae','pai','natCidade'].forEach(id => {
       const el = document.getElementById(id); if(el) el.value='';
     });
     ['sexo','corRaca','natUF','funcao','status'].forEach(id => {
       const el = document.getElementById(id); if(el) el.selectedIndex=0;
     });
-    document.getElementById('natPais').value = 'BR';
-    document.getElementById('natUF').style.display = '';
-    document.getElementById('natUFText').style.display = 'none';
+    document.getElementById('natEstrangeiro').checked = false;
+    window._natSync();
     document.getElementById('wrapFuncaoOutro').style.display = 'none';
     document.getElementById('funcaoOutro').value = '';
     document.getElementById('cargaHoraria').value = '';
@@ -2023,9 +2013,9 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     if(!document.getElementById('corRaca').value){
       _toastErro('⚠️ Cor / Raça obrigatória.'); voltarEtapa1(); return;
     }
-    if(document.getElementById('natPais').value === 'BR'){
+    if(!document.getElementById('natEstrangeiro').checked){
       if(!document.getElementById('natUF').value || !document.getElementById('natCidade').value.trim()){
-        _toastErro('⚠️ Preencha a naturalidade completa (UF e cidade).'); voltarEtapa1(); return;
+        _toastErro('⚠️ Preencha a naturalidade completa (UF e cidade) ou marque “Estrangeiro”.'); voltarEtapa1(); return;
       }
     }
     if(!document.getElementById('funcao').value){
@@ -2090,10 +2080,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       filiacaoPai: normUpper(document.getElementById('pai').value),
       sexo: document.getElementById('sexo').value,
       corRaca: document.getElementById('corRaca').value,
-      naturalidadePais: document.getElementById('natPais').value,
-      naturalidadeUF: document.getElementById('natPais').value === 'BR'
-        ? document.getElementById('natUF').value
-        : document.getElementById('natUFText').value.trim(),
+      naturalidadeEstrangeiro: document.getElementById('natEstrangeiro').checked,
+      naturalidadeUF: document.getElementById('natEstrangeiro').checked ? '' : document.getElementById('natUF').value,
       naturalidadeCidade: normUpper(document.getElementById('natCidade').value),
     };
     const perfil = {
@@ -2125,6 +2113,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
     const btnSalvar = document.getElementById('btnSalvar');
     const _falha = m => Object.assign(new Error(m), { amigavel: true });
+    let recarregando = false;
     window._salvandoFunc = true;
     btnSalvar.disabled = true; btnSalvar.textContent = '⏳ Salvando…';
 
@@ -2184,34 +2173,23 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         return;
       }
 
-      // Cadastro novo (ou edição direto nesta página): mostra o resumo pra continuar cadastrando.
-      const escOpts = document.getElementById('escolaridade').options;
-      const escLabel = escOpts[escOpts.selectedIndex]?.text || '—';
-      document.getElementById('resumoGrid').innerHTML =
-        `<div class="resumo-item"><strong>Nome</strong>${_escHtml(identidade.nome)}</div>` +
-        `<div class="resumo-item"><strong>CPF</strong>${_escHtml(identidade.cpf)}</div>` +
-        `<div class="resumo-item"><strong>Nascimento</strong>${_escHtml(identidade.dataNascimento)}</div>` +
-        `<div class="resumo-item"><strong>Ano letivo</strong>${ano}</div>` +
-        `<div class="resumo-item"><strong>Escolaridade</strong>${_escHtml(escLabel)}</div>`;
-      document.getElementById('resumoFinal').classList.add('show');
-      window.scrollTo({top:0,behavior:'smooth'});
+      // Cadastro novo / nova matrícula: hard refresh para já cadastrar o próximo (igual ao cadastro de aluno).
+      // Só o ano letivo é mantido; o aviso de sucesso é mostrado depois do reload.
+      try{
+        sessionStorage.setItem('funcionario:retomar', JSON.stringify({ ano, msg: 'Funcionário salvo com sucesso!', kind: 'ok' }));
+      }catch(_){}
+      recarregando = true;
+      location.reload();
     } catch(e){
       console.error('[salvar funcionário]', e);
       if(e && e.amigavel){ _toastErro('⚠️ ' + e.message); voltarEtapa1(); }
       else mostrarErroSalvar('❌ Erro ao salvar: ' + (e.message||e));
     } finally {
-      window._salvandoFunc = false;
-      btnSalvar.disabled = false; btnSalvar.textContent = '💾 Salvar funcionário';
+      if(!recarregando){       // recarregando: o botão fica travado até a página reiniciar (evita duplo clique)
+        window._salvandoFunc = false;
+        btnSalvar.disabled = false; btnSalvar.textContent = '💾 Salvar funcionário';
+      }
     }
-  });
-
-  /* ════════════════════════════════════════
-     Novo funcionário
-  ════════════════════════════════════════ */
-  document.getElementById('btnNovoFunc').addEventListener('click', function(){
-    document.getElementById('resumoFinal').classList.remove('show');
-    limparFormulario();
-    voltarEtapa1();
   });
 
   /* ════════════════════════════════════════
@@ -2228,14 +2206,15 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     document.getElementById('pai').value = f.filiacaoPai||'';
     document.getElementById('sexo').value = f.sexo||'';
     document.getElementById('corRaca').value = f.corRaca||'';
-    document.getElementById('natPais').value = f.naturalidadePais||'BR';
-    document.getElementById('natPais').dispatchEvent(new Event('change'));
-    if(f.naturalidadePais === 'BR'){
-      document.getElementById('natUF').value = f.naturalidadeUF||'';
-    } else {
-      document.getElementById('natUFText').value = f.naturalidadeUF||'';
-    }
-    document.getElementById('natCidade').value = f.naturalidadeCidade||'';
+    // Modelo novo: naturalidadeEstrangeiro. Registros antigos: naturalidadePais != 'BR' (e a "UF" era texto país/região).
+    const _legado = f.naturalidadeEstrangeiro == null;
+    const _estr = _legado ? (!!f.naturalidadePais && f.naturalidadePais !== 'BR') : f.naturalidadeEstrangeiro === true;
+    document.getElementById('natEstrangeiro').checked = _estr;
+    document.getElementById('natUF').value = _estr ? '' : (f.naturalidadeUF||'');
+    document.getElementById('natCidade').value = (_estr && _legado)
+      ? [f.naturalidadeCidade, f.naturalidadeUF].filter(Boolean).join(' - ')
+      : (f.naturalidadeCidade||'');
+    window._natSync();
   }
   function _setFuncionais(f){
     const opts = Array.from(document.getElementById('funcao').options).map(o=>o.value);
@@ -2351,7 +2330,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
     // Dados que mudam de um ano para o outro (função, carga, vínculo, turnos, apoio): false = ficam em branco.
     const CARREGAR_FUNCIONAIS = false;
-    const CAMPOS_AUTOPREENCH = ['nome','nasc','mae','pai','sexo','corRaca','natPais','natUF','natUFText','natCidade'];
+    const CAMPOS_AUTOPREENCH = ['nome','nasc','mae','pai','sexo','corRaca','natEstrangeiro','natUF','natCidade'];
 
     const ID = { pronto:false, pessoa:null, dup:null, novo:false, preenchido:false, verificando:false };
     let _tick = 0;
@@ -2365,7 +2344,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         const el = $(id); if(!el) return;
         const field = el.closest('.field') || el.parentElement;
         if(!locked){ field.classList.remove('field-locked'); if(el.tagName === 'INPUT') el.readOnly = false; return; }
-        if(String(el.value || '').trim() !== ''){   // campo vazio continua editável
+        const preenchido = el.type === 'checkbox' ? el.checked : String(el.value || '').trim() !== '';
+        if(preenchido){   // campo vazio continua editável
           field.classList.add('field-locked');
           if(el.tagName === 'INPUT') el.readOnly = true;
         }
@@ -2531,7 +2511,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     return _cidadeCache;
   }
 
-  function makeAutoComplete({ inputId, ghostId, dropdownId, ufSelectId }){
+  function makeAutoComplete({ inputId, ghostId, dropdownId, ufSelectId, suspender, exigirUF }){
     const inp = document.getElementById(inputId);
     const ghost = document.getElementById(ghostId);
     const dropdown = document.getElementById(dropdownId);
@@ -2548,6 +2528,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     }
     function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     async function openDropdown(val){
+      if(suspender && suspender()){ closeDropdown(); return; }   // modo estrangeiro: texto livre, sem sugestões
       const opts = await getSugestoes(val);
       if(!opts.length){ closeDropdown(); return; }
       activeIdx = -1;
@@ -2583,10 +2564,16 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       e.preventDefault(); applyCity(opt.dataset.cidade, opt.dataset.uf);
     });
     document.addEventListener('click', (e)=>{ if(!inp.contains(e.target)&&!dropdown.contains(e.target)) closeDropdown(); });
-    if(selUF) selUF.addEventListener('change', ()=>closeDropdown());
+    if(selUF) selUF.addEventListener('change', async ()=>{
+      closeDropdown();
+      if(!exigirUF || !inp.value) return;
+      const db = await getCidadeDB(), uf = getUF();
+      if(uf && db.length && !db.some(o => o.uf === uf && o.cidade === inp.value.trim().toUpperCase())) inp.value = '';   // cidade de outra UF
+    });
   }
 
-  makeAutoComplete({ inputId:'natCidade', ghostId:'natCidadeGhost', dropdownId:'natCidadeDropdown', ufSelectId:'natUF' });
+  makeAutoComplete({ inputId:'natCidade', ghostId:'natCidadeGhost', dropdownId:'natCidadeDropdown', ufSelectId:'natUF',
+                    suspender: () => document.getElementById('natEstrangeiro').checked, exigirUF: true });
   makeAutoComplete({ inputId:'endCidade', ghostId:'endCidadeGhost', dropdownId:'endCidadeDropdown', ufSelectId:'endUF' });
 
   /* ════════════════════════════════════════
@@ -2611,6 +2598,15 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       }
       await carregarAnoAtivo();
       await carregarDB();
+
+      try{   // pós-salvar (hard refresh): mantém o ano letivo usado e mostra o resultado
+        const ret = JSON.parse(sessionStorage.getItem('funcionario:retomar') || 'null');
+        sessionStorage.removeItem('funcionario:retomar');
+        if(ret){
+          if(ret.ano){ anoLetivoInput.value = ret.ano; anoAtivo = parseInt(ret.ano, 10) || anoAtivoReal; }
+          if(ret.msg) setMsg(ret.msg, ret.kind || 'ok');
+        }
+      }catch(e){ console.warn('retomada pós-salvar:', e); }
 
       // ── MODO EDIÇÃO — ?editar=ID da MATRÍCULA (FMAT|ano|funcId) ──
       const editId = new URLSearchParams(window.location.search).get('editar');
