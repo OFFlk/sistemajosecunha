@@ -221,9 +221,15 @@ function _bloquearPagina(textoAviso, idAviso, textoBalao) {
   if (typeof initTooltipCards === 'function') initTooltipCards();
 }
 
-document.addEventListener('auth:ready', function () {
+// Aplica as guardas uma única vez. Chamada pelo auth:ready e também pelo boot (init),
+// para o bloqueio e o aviso já estarem na tela quando o overlay de loading sair.
+var _guardasAplicadas = false;
+function _aplicarGuardas() {
+  if (_guardasAplicadas) return;
   var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
-  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+  if (!session) return;                       // Auth ainda não pronto: tenta de novo no próximo gatilho
+  _guardasAplicadas = true;
+  var role = String(session.role || '').trim().toLowerCase();
 
   // Não-admin: só leitura
   if (role !== 'admin') {
@@ -235,7 +241,8 @@ document.addEventListener('auth:ready', function () {
   if (_semEscola()) {
     _bloquearPagina('⚠️ Escolha uma escola no topo da página para cadastrar os dados da escola.', 'avisoSemEscola', 'Escolha uma escola');
   }
-});
+}
+document.addEventListener('auth:ready', _aplicarGuardas);
 </script>
 
 <!-- Lightbox do escudo -->
@@ -428,10 +435,18 @@ function _authPronto(){
   });
 }
 
+// Espera fontes + 2 quadros para a página já estar montada quando o overlay sair (teto de 1,5 s)
+function _aguardarPintura(){
+  const fontes = (document.fonts && document.fonts.ready) ? document.fonts.ready.catch(() => {}) : Promise.resolve();
+  const teto = new Promise((r) => setTimeout(r, 1500));
+  return Promise.race([fontes, teto]).then(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
 // Boot: tenta carregar do Firestore; cache do localStorage para UX rápida
 async function init() {
   try {
     await _authPronto();
+    _aplicarGuardas();   // bloqueio + aviso já na tela antes de o overlay sair
 
     // Sem escola ativa (admin em "Todas as escolas"): não carrega nada, o formulário fica vazio.
     // Sem toast de falha nem "nenhuma escola cadastrada": seriam enganosos (guia 18.3).
@@ -455,7 +470,9 @@ async function init() {
       console.warn('Erro ao carregar dados da escola do Firestore:', e);
     }
   } finally {
-    // esconde o overlay mesmo se algo falhar (sem isso: loading infinito)
+    // esconde o overlay mesmo se algo falhar (sem isso: loading infinito).
+    // Antes, espera fontes e 2 quadros: sem escola o boot não lê banco e terminaria cedo demais.
+    try{ await _aguardarPintura(); }catch(_){}
     try{ Loading.esconder(); }catch(_){}
   }
 }
