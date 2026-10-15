@@ -22,15 +22,19 @@
 <!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-<!-- CSS globais -->
+<!-- CSS globais (ordem fixa: base → header → components) -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
+<!-- Esta página é única: mantém o cascade original (hub.css + escola_form.css) para o visual do formulário -->
 <link rel="stylesheet" href="/css/hub.css">
-<!-- CSS específico desta página -->
 <link rel="stylesheet" href="/css/escola_form.css">
 
 <title>Informações da Escola</title>
 <style>
+/* ── Esta página é única no sistema: o visual do formulário (campos, título, botão) é dela,
+   vindo do escola_form.css. Aqui ficam só os ajustes próprios da página. ── */
+
 /* cursor default em todo o card de formulário */
 main .card,
 main .card input,
@@ -42,68 +46,53 @@ main .card .campo,
 main .card .acoes {
   cursor: default;
 }
-/* cursor bloqueado nos botões de ação desabilitados (sobrescreve o default acima) */
+/* cursor bloqueado nos controles desabilitados; mantém o hover para o balão "Sem acesso" */
 input[type="file"]:disabled,
 button:disabled {
   cursor: not-allowed !important;
-  pointer-events: auto !important; /* mantém hover para o tooltip funcionar */
+  pointer-events: auto !important;
 }
 /* imagem do escudo: pointer para indicar que é clicável */
-#escudoPreview {
-  cursor: pointer;
-}
-/* tooltip nos elementos com data-tooltip — position:fixed no JS evita herdar opacity */
-[data-tooltip] {
-  position: relative;
-}
+#escudoPreview{ cursor:pointer; }
 
-/* botão Salvar: texto calculado pelo contraste da marca (--brand-fg, theme-colors.js).
-   O estilo base do botão mora em escola_form.css (carrega antes deste <style>);
-   seletor mais forte + variantes de hover/dark garantem que o valor não seja desfeito. */
+/* botão Salvar: texto pelo contraste da marca (o estilo base mora no escola_form.css) */
 main .card .acoes button.primary,
 main .card .acoes button.primary:hover,
 html[data-theme="dark"] main .card .acoes button.primary,
 html[data-theme="dark"] main .card .acoes button.primary:hover {
-  color: var(--brand-fg, #fff);
+  color: var(--ui-brand-fg);
 }
 
-/* animação de entrada do toast (guia-toasts) */
-@keyframes toastSubir {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
+/* aviso de bloqueio: primeiro item da página, isolado do card (padrão das outras páginas) */
+.aviso-topo{ width:100%; flex:0 0 100%; grid-column:1 / -1; box-sizing:border-box; margin-bottom:16px; }
 
-/* ===== Ícone de dica (ⓘ) — tooltip por toque/clique, funciona igual em
-   desktop e mobile (sem depender de hover). ===== */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-  text-transform:none; letter-spacing:normal;
+/* card bloqueado (sem permissão ou sem escola ativa): todos os controles desabilitados */
+main .card.bloqueado{ opacity:.55; }
+main .card.bloqueado .info-tip,
+main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
+
+/* balão "Sem acesso" nos controles desabilitados (criado por JS; posição dinâmica via style.left/top) */
+.sem-acesso-bubble{
+  position:fixed; z-index:9999; pointer-events:none;
+  opacity:0; transition:opacity .15s ease;
+  transform:translateX(-50%) translateY(-100%);
+  padding:5px 12px; border-radius:6px;
+  font-size:12px; font-weight:700; font-family:inherit;
+  letter-spacing:.04em; text-transform:uppercase; white-space:nowrap;
+  background:var(--ui-brand); color:var(--ui-brand-fg);
 }
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-/* tokens do balão: esta página não define --card/--border/--text, então usa
-   --card-bg/--card-border de base.css (se existirem) com fallback por tema */
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card-bg, #ffffff); border:1.5px solid var(--card-border, #cbd5e1); color:#1e293b;
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal;
-  font-family:inherit; line-height:1.4; text-align:left; text-transform:none; letter-spacing:normal;
-  white-space:normal; cursor:default;
+.sem-acesso-bubble.show{ opacity:1; }
+
+/* lightbox do escudo */
+.lightbox{
+  position:fixed; inset:0; z-index:9998;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,.82); cursor:zoom-out;
 }
-html[data-theme="dark"] .info-tip-bubble{
-  background:var(--card-bg, #0f172a); border-color:var(--card-border, #334155); color:#e5e7eb;
+.lightbox img{
+  max-width:90vw; max-height:90vh; border-radius:10px;
+  box-shadow:0 8px 40px rgba(0,0,0,.6); user-select:none;
 }
-.info-tip.open .info-tip-bubble{ display:block; }
-/* link dentro do balão (fundo neutro → --brand-text, nunca --brand puro).
-   As linhas html[data-theme="dark"] vencem o "a { color: var(--brand-d) }" do base.css. */
-.info-tip-bubble a{ color:var(--brand-text, #6d28d9); font-weight:700; text-decoration:underline; cursor:pointer; }
-.info-tip-bubble a:hover{ color:var(--brand-text, #6d28d9); }
-html[data-theme="dark"] .info-tip-bubble a,
-html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b5fd); }
 </style>
 </head>
 <body>
@@ -118,17 +107,17 @@ html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b
     <div class="form">
 
       <div class="campo">
-        <label>Nome da escola *
+        <label for="nomeEscola">Nome da escola *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Informe o nome completo da escola. Esse nome será exibido nas exportações de listas, documentos, fichas e demais exportações em todo o sistema.</span>
+            <span class="info-tip-bubble wide">Informe o nome completo da escola. Esse nome será exibido nas exportações de listas, documentos, fichas e demais exportações em todo o sistema.</span>
           </span>
         </label>
         <input type="text" id="nomeEscola" required>
       </div>
 
       <div class="campo">
-        <label>Endereço *
+        <label for="enderecoEscola">Endereço *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Especifique rua, povoado, bairro, número etc. O que informar aqui fica a critério do gestor.</span>
@@ -138,14 +127,14 @@ html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b
       </div>
 
       <div class="campo">
-        <label>Município/Cidade</label>
+        <label for="cidadeEscola">Município/Cidade</label>
         <input type="text" id="cidadeEscola" placeholder="Ex.: Valente" required>
       </div>
 
       <div class="campo">
-        <label>UF</label>
+        <label for="ufEscola">UF</label>
         <select id="ufEscola" required>
-          <option value="">Selecione</option>
+          <option value=""></option>
           <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option>
           <option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option>
           <option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option>
@@ -157,7 +146,7 @@ html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b
       </div>
 
       <div class="campo">
-        <label>Código INEP
+        <label for="inepEscola">Código INEP
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
             <span class="info-tip-bubble">Código de identificação da escola, gerado pelo INEP. Se você não souber o INEP da sua escola, consulte no <a href="https://www.gov.br/inep/pt-br/acesso-a-informacao/dados-abertos/inep-data/catalogo-de-escolas" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">site oficial do INEP</a>.</span>
@@ -167,15 +156,15 @@ html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b
       </div>
 
       <div class="campo">
-        <label>Escudo da escola
+        <label for="escudoArquivo">Escudo da escola
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Prefira imagens PNG sem fundo (transparente). Mesmo que os documentos exportados tenham fundo branco, outras páginas do sistema usam tons mais escuros, e um escudo com fundo visível pode destoar dessa identidade visual.</span>
+            <span class="info-tip-bubble wide">Prefira imagens PNG sem fundo (transparente). Mesmo que os documentos exportados tenham fundo branco, outras páginas do sistema usam tons mais escuros, e um escudo com fundo visível pode destoar dessa identidade visual.</span>
           </span>
         </label>
-        <input type="file" accept="image/*" onchange="previewEscudo(event)">
+        <input type="file" id="escudoArquivo" accept="image/*" onchange="previewEscudo(event)">
         <div class="preview">
-          <img id="escudoPreview" style="display:none" onclick="abrirLightbox()" title="Clique para ampliar">
+          <img id="escudoPreview" alt="Escudo da escola" hidden onclick="abrirLightbox()" title="Clique para ampliar">
         </div>
       </div>
 
@@ -191,54 +180,150 @@ html[data-theme="dark"] .info-tip-bubble a:hover{ color:var(--brand-text-d, #c4b
 <!-- header-logic: monta header, tema, chip e auth guard -->
 <script src="../header-logic.js"></script>
 
-<!-- Guarda de role: bloqueia edição para não-admin -->
+<!-- Guardas: (1) não-admin não edita; (2) admin sem escola ativa não cadastra nada -->
 <script>
-document.addEventListener('auth:ready', function () {
-  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
-  var role = session ? String(session.role || '').trim().toLowerCase() : '';
-  if (role === 'admin') return; // admin passa livre
+// Detecção única do guia (18.3): 'ADMIN' é só o marcador de "Todas as escolas", não uma escola
+function _semEscola(){
+  const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : '';
+  return !sid || String(sid).trim().toUpperCase() === 'ADMIN';
+}
 
+// Bloqueia campos e salvar (visual bloqueado); o aviso é informação necessária (.aviso-warn), não toast
+function _bloquearPagina(textoAviso, idAviso, textoBalao) {
   // 1. Desabilita todos os campos e o botão salvar
   document.querySelectorAll('input, select, button, textarea').forEach(function (el) {
     el.disabled = true;
   });
 
-  // 2. Tooltip nos dois botões de ação: input[type=file] e button salvar
+  // 2. Balão nos dois controles de ação: input[type=file] e botão salvar
   document.querySelectorAll('input[type="file"], button.primary').forEach(function (el) {
-    el.setAttribute('data-tooltip', 'Sem acesso');
+    el.setAttribute('data-tooltip', textoBalao);
   });
 
-  // 3. Aviso visual abaixo do título
-  var titulo = document.querySelector('main .card h2');
-  if (titulo) {
+  // 3. Visual bloqueado no card + aviso em destaque no topo da página, isolado do card
+  var card = document.querySelector('main .card');
+  if (card) card.classList.add('bloqueado');
+  var main = document.querySelector('main');
+  if (main && !(idAviso && document.getElementById(idAviso))) {
     var aviso = document.createElement('div');
-    aviso.style.cssText = [
-      'display:flex', 'align-items:center', 'gap:8px',
-      'background:var(--warn-bg,#fef9c3)', 'color:var(--warn-text,#854d0e)',
-      'border:1px solid var(--warn-border,#fde047)',
-      'border-radius:8px', 'padding:10px 14px',
-      'font-size:13px', 'font-weight:600',
-      'margin-bottom:16px'
-    ].join(';');
-    aviso.innerHTML = '<span style="font-size:16px">🔒</span> Somente administradores podem editar as informações da escola.';
-    titulo.insertAdjacentElement('afterend', aviso);
+    if (idAviso) aviso.id = idAviso;
+    aviso.className = 'aviso-warn aviso-topo';
+    aviso.textContent = textoAviso;
+    main.insertAdjacentElement('afterbegin', aviso);
   }
 
   // 4. Garante que salvarDados() não execute mesmo se chamado por outro meio
   window.salvarDados = function () {
-    console.warn('Acesso negado: role insuficiente para salvar dados da escola.');
+    console.warn('Acesso negado: página bloqueada (sem permissão ou sem escola ativa).');
   };
 
-  // 5. Inicializa tooltip após adicionar data-tooltip dinamicamente
+  // 5. Inicializa o balão após adicionar data-tooltip dinamicamente
   if (typeof initTooltipCards === 'function') initTooltipCards();
+}
+
+document.addEventListener('auth:ready', function () {
+  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+
+  // Não-admin: só leitura
+  if (role !== 'admin') {
+    _bloquearPagina('🔒 Somente administradores podem editar as informações da escola.', '', 'Sem acesso');
+    return;
+  }
+
+  // Admin global sem escola escolhida: nada de escola pode ser cadastrado aqui
+  if (_semEscola()) {
+    _bloquearPagina('⚠️ Escolha uma escola no topo da página para cadastrar os dados da escola.', 'avisoSemEscola', 'Escolha uma escola');
+  }
 });
+</script>
+
+<!-- Lightbox do escudo -->
+<div id="lightbox" class="lightbox" hidden onclick="fecharLightbox()">
+  <img id="lightboxImg" alt="Escudo da escola ampliado">
+</div>
+
+<script>
+// ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina
+};
+function _showToast(msg, tipo){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
+  const span = document.createElement('span');
+  span.className = 'toast-msg';
+  span.textContent = msg;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
+  document.body.appendChild(toast);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
+}
+// só remove o "carregando": nunca apaga um sucesso/erro/aviso que apareceu no meio do caminho
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) t.remove();
+}
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
+
+// Ponto de entrada único: setMsg(texto, kind) — ok | warn | loading | err
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else { console.warn('[toast] kind desconhecido:', JSON.stringify(kind)); _toastAviso(t); }
+}
+
+// Rede de segurança: promise sem catch com "carregando" aberto vira erro (não fica preso)
+window.addEventListener('unhandledrejection', () => {
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
+});
+
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
+document.addEventListener("click", function () {
+  document.querySelectorAll(".info-tip.open").forEach(function (el) { el.classList.remove("open"); });
+});
+
+// Lightbox do escudo
+function abrirLightbox() {
+  var src = document.getElementById('escudoPreview').src;
+  if (!src) return;
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').hidden = false;
+  document.addEventListener('keydown', _lbKey);
+}
+function fecharLightbox() {
+  document.getElementById('lightbox').hidden = true;
+  document.removeEventListener('keydown', _lbKey);
+}
+function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
 </script>
 
 <!-- Lógica específica desta página -->
 <script>
 let escudoBase64 = null;
 
-// schoolId e chave da escola agora gerenciados por Auth.getActiveSchoolId() via auth.firebase.js
+// schoolId e chave da escola gerenciados por Auth.getActiveSchoolId() via auth.firebase.js
 
 function previewEscudo(e) {
   const file = e.target.files && e.target.files[0];
@@ -250,13 +335,13 @@ function previewEscudo(e) {
     const img = document.getElementById('escudoPreview');
     if(img){
       img.src = escudoBase64;
-      img.style.display = 'block';
+      img.hidden = false;
     }
   };
   reader.readAsDataURL(file);
 }
 
-function salvarDados() {
+async function salvarDados() {
   const nomeEl = document.getElementById('nomeEscola');
   const endEl  = document.getElementById('enderecoEscola');
   if (!nomeEl?.value?.trim() || !endEl?.value?.trim()) {
@@ -287,23 +372,22 @@ function salvarDados() {
     escudo: escudoBase64
   };
 
-  // Salva no Firestore via DB.escola.save()
+  // Salva no Firestore via DB.escola.save(); o "carregando" é substituído em todos os caminhos
   setMsg('Salvando…', 'loading');
-  DB.escola.save(dadosEscola)
-    .then(() => {
-      // Mantém também no localStorage como cache local (usado por historico_auto)
-      try {
-        const key = Auth.getActiveSchoolId
-          ? `schools:${Auth.getActiveSchoolId()}:dadosEscola`
-          : 'dadosEscola';
-        localStorage.setItem(key, JSON.stringify(dadosEscola));
-      } catch {}
-      setMsg('Dados salvos com sucesso!', 'ok');
-    })
-    .catch(err => {
-      console.error('Erro ao salvar:', err);
-      setMsg('Erro ao salvar. Tente novamente.', 'err');
-    });
+  try {
+    await DB.escola.save(dadosEscola);
+    // Mantém também no localStorage como cache local (usado por historico_auto)
+    try {
+      const key = Auth.getActiveSchoolId
+        ? `schools:${Auth.getActiveSchoolId()}:dadosEscola`
+        : 'dadosEscola';
+      localStorage.setItem(key, JSON.stringify(dadosEscola));
+    } catch {}
+    setMsg('Dados salvos com sucesso!', 'ok');     // substitui o azul
+  } catch (err) {
+    console.error('salvarDados:', err);
+    setMsg('Erro ao salvar. Tente novamente.', 'err');   // substitui o azul
+  }
 }
 
 function preencherFormEscola(escola) {
@@ -322,7 +406,7 @@ function preencherFormEscola(escola) {
   if(escola.escudo) {
     escudoBase64 = escola.escudo;
     const img = document.getElementById('escudoPreview');
-    if(img){ img.src = escudoBase64; img.style.display = 'block'; }
+    if(img){ img.src = escudoBase64; img.hidden = false; }
   }
 
   // INEP: somente números, máx 8 dígitos
@@ -335,34 +419,47 @@ function preencherFormEscola(escola) {
   }
 }
 
-// Tenta carregar do Firestore; fallback para localStorage enquanto ainda offline
-(async function carregarSeExistir() {
-  // Aguarda Auth inicializar (garante que DB.escola.get() tem schoolId)
-  await new Promise(res => {
-    if (window.Auth && window.Auth.getSession && window.Auth.getSession()) { res(); return; }
-    document.addEventListener('auth:ready', res, { once: true });
+// Espera o Auth ficar pronto antes de ler o banco
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+    if(window.Auth && Auth.onReady) return Auth.onReady(resolve);
+    document.addEventListener('auth:ready', () => resolve(), { once: true });
   });
+}
 
-  // 1. Tenta carregar do cache localStorage imediatamente (UX rápida)
+// Boot: tenta carregar do Firestore; cache do localStorage para UX rápida
+async function init() {
   try {
-    const schoolId = window.Auth?.getActiveSchoolId?.() || '';
-    const key = schoolId ? `schools:${schoolId}:dadosEscola` : 'dadosEscola';
-    const cached = localStorage.getItem(key);
-    if (cached) preencherFormEscola(JSON.parse(cached));
-  } catch {}
+    await _authPronto();
 
-  // 2. Busca dados frescos do Firestore e atualiza o formulário
-  try {
-    const escola = await DB.escola.get();
-    if (escola && Object.keys(escola).length) {
-      preencherFormEscola(escola);
+    // Sem escola ativa (admin em "Todas as escolas"): não carrega nada, o formulário fica vazio.
+    // Sem toast de falha nem "nenhuma escola cadastrada": seriam enganosos (guia 18.3).
+    if (_semEscola()) return;
+
+    // 1. Cache do localStorage imediatamente
+    try {
+      const schoolId = window.Auth?.getActiveSchoolId?.() || '';
+      const key = schoolId ? `schools:${schoolId}:dadosEscola` : 'dadosEscola';
+      const cached = localStorage.getItem(key);
+      if (cached) preencherFormEscola(JSON.parse(cached));
+    } catch {}
+
+    // 2. Dados frescos do Firestore
+    try {
+      const escola = await DB.escola.get();
+      if (escola && Object.keys(escola).length) {
+        preencherFormEscola(escola);
+      }
+    } catch(e) {
+      console.warn('Erro ao carregar dados da escola do Firestore:', e);
     }
-  } catch(e) {
-    console.warn('Erro ao carregar dados da escola do Firestore:', e);
+  } finally {
+    // esconde o overlay mesmo se algo falhar (sem isso: loading infinito)
+    try{ Loading.esconder(); }catch(_){}
   }
-
-  Loading.esconder(); // ← linha adicionada
-})();
+}
+init().catch((e) => { console.error('init:', e); setMsg('Erro ao carregar a página.', 'err'); });
 
 // Garante INEP numérico mesmo quando ainda não existe dados salvos
 (function(){
@@ -374,77 +471,31 @@ function preencherFormEscola(escola) {
 })();
 </script>
 
+<!-- Balão "Sem acesso" (hover nos controles desabilitados) -->
 <script>
 (function () {
   var bubble = null;
 
-  function getBrandColor() {
-    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    var key     = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
-    var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
-                  || { '--brand': '#7c3aed', '--brand-d': '#7c3aed' };
-    var color = dark
-      ? (palette['--brand-d'] || '#7c3aed')
-      : (palette['--brand']   || '#7c3aed');
-    return { color: color, dark: dark };
-  }
-
-  function stylesBubble(b) {
-    var bc = getBrandColor();
-    b.style.background = bc.color;
-    var fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
-    b.style.color      = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
-  }
-
-  function initBubble(b) {
-    b.style.cssText = [
-      'position:fixed',
-      'z-index:9999',
-      'pointer-events:none',
-      'opacity:0',
-      'transition:opacity 0.15s ease, transform 0.15s ease',
-      'transform:translateX(-50%) translateY(4px)',
-      'font-size:12px',
-      'font-family:inherit',
-      'font-weight:700',
-      'letter-spacing:0.04em',
-      'text-transform:uppercase',
-      'white-space:nowrap',
-      'padding:5px 12px',
-      'border-radius:6px',
-    ].join(';');
-    stylesBubble(b);
-  }
-
   function ensureBubble() {
     if (bubble) return bubble;
     bubble = document.createElement('span');
-    initBubble(bubble);
+    bubble.className = 'sem-acesso-bubble';
     document.body.appendChild(bubble);
     return bubble;
-  }
-
-  function positionBubble(el) {
-    var rect = el.getBoundingClientRect();
-    bubble.style.left      = (rect.left + rect.width / 2) + 'px';
-    bubble.style.top       = (rect.top - 8) + 'px';
-    bubble.style.transform = 'translateX(-50%) translateY(-100%)';
   }
 
   function showTooltip(e) {
     var el = e.currentTarget;
     var b  = ensureBubble();
+    var rect = el.getBoundingClientRect();
     b.textContent = el.getAttribute('data-tooltip');
-    stylesBubble(b);
-    positionBubble(el);
-    requestAnimationFrame(function () {
-      b.style.opacity   = '1';
-      b.style.transform = 'translateX(-50%) translateY(-100%)';
-    });
+    b.style.left = (rect.left + rect.width / 2) + 'px';
+    b.style.top  = (rect.top - 8) + 'px';
+    b.classList.add('show');
   }
 
   function hideTooltip() {
-    if (bubble) bubble.style.opacity = '0';
+    if (bubble) bubble.classList.remove('show');
   }
 
   window.initTooltipCards = function () {
@@ -456,95 +507,12 @@ function preencherFormEscola(escola) {
     });
   };
 
-  function onThemeChange() {
-    if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
-  }
-
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', window.initTooltipCards);
   } else {
     window.initTooltipCards();
   }
-
-  new MutationObserver(onThemeChange)
-    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  document.addEventListener('colorchange', onThemeChange);
 })();
-</script>
-
-<!-- Lightbox do escudo -->
-<div id="lightbox" onclick="fecharLightbox()" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.82);cursor:zoom-out;align-items:center;justify-content:center;">
-  <img id="lightboxImg" style="max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.6);user-select:none;">
-</div>
-
-<script>
-// ── Toasts padronizados (ver guia-toasts.md) ──────────────────────────
-function _showToast(msg, bg, shadow, duration){
-  const existing = document.getElementById('_toastGlobal');
-  if(existing) existing.remove();
-  const toast = document.createElement('div');
-  toast.id = '_toastGlobal';
-  toast.style.cssText =
-    `position:fixed;bottom:28px;left:50%;transform:translateX(-50%);`+
-    `display:flex;align-items:center;gap:12px;`+
-    `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
-    `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
-    `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-    `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
-  const span = document.createElement('span');
-  span.textContent = msg;
-  span.style.cssText = 'flex:1;line-height:1.4;';
-  toast.appendChild(span);
-  const btnClose = document.createElement('button');
-  btnClose.type = 'button';
-  btnClose.textContent = '✕';
-  btnClose.setAttribute('aria-label','Fechar aviso');
-  btnClose.style.cssText =
-    'background:rgba(255,255,255,0.15);border:none;color:#fff;'+
-    'width:22px;height:22px;border-radius:6px;cursor:pointer;'+
-    'font-size:12px;font-weight:800;line-height:1;flex:0 0 auto;';
-  btnClose.onclick = () => toast.remove();
-  toast.appendChild(btnClose);
-  document.body.appendChild(toast);
-  setTimeout(() => { if(toast.isConnected) toast.remove(); }, duration || 2500);
-}
-function _toastSucesso(msg){ _showToast(msg, '#166534', 'rgba(22,163,74,0.95)', 2500); }
-function _toastErro(msg){ _showToast(msg, '#991b1b', 'rgba(185,28,28,0.95)', 4500); }
-function _toastAviso(msg){ _showToast(msg, '#92400e', 'rgba(217,119,6,0.95)', 4000); }
-function _toastCarregando(msg){ _showToast(msg, '#1e3a8a', 'rgba(37,99,235,0.95)', 8000); }
-
-// Ponto de entrada único: setMsg(texto, kind) — ok | warn | loading | err
-function setMsg(text, kind){
-  const t = (text||"").toString();
-  if(!t) return;
-  if(kind === "err") _toastErro('⚠️ ' + t);
-  else if(kind === "ok") _toastSucesso('✅ ' + t);
-  else if(kind === "warn") _toastAviso('⚠️ ' + t);
-  else if(kind === "loading") _toastCarregando('⏳ ' + t);
-  else {
-    console.warn('[toast] kind desconhecido:', JSON.stringify(kind), '— usando "aviso" (amarelo) como padrão seguro.');
-    _toastAviso(t);
-  }
-}
-
-// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
-document.addEventListener("click", function () {
-  document.querySelectorAll(".info-tip.open").forEach(function (el) { el.classList.remove("open"); });
-});
-
-function abrirLightbox() {
-  var src = document.getElementById('escudoPreview').src;
-  if (!src) return;
-  var lb  = document.getElementById('lightbox');
-  document.getElementById('lightboxImg').src = src;
-  lb.style.display = 'flex';
-  document.addEventListener('keydown', _lbKey);
-}
-function fecharLightbox() {
-  document.getElementById('lightbox').style.display = 'none';
-  document.removeEventListener('keydown', _lbKey);
-}
-function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
 </script>
 
 </body>
