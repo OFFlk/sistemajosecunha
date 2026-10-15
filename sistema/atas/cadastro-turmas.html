@@ -73,10 +73,11 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .id-badge-row .label-inline { font-size: 12px; color: var(--ui-muted); font-weight: 700; }
 .mono { font-family: ui-monospace, monospace; font-size: 12px; }
 
-/* ── Chip removível (série escolhida, com ×): não é .badge (5-A) ── */
+/* ── Chip removível (série escolhida, com ×): não é .badge (guia, seção 6).
+   Nível 2 (neutro): a listagem ao lado já usa a série em nível 1, então o formulário não compete com ela. ── */
 .chip {
-  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-chip-border);
-  background: var(--ui-chip-bg); color: var(--ui-chip-color); padding: 6px 10px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-chip-neutral-border);
+  background: var(--ui-chip-neutral-bg); color: var(--ui-chip-neutral-color); padding: 6px 10px; border-radius: 999px;
   font-size: 13px; font-weight: 700;
 }
 .chip button { border: 0; background: transparent; cursor: pointer; color: inherit; font-weight: 900; font-size: 14px; line-height: 1; padding: 0; }
@@ -120,8 +121,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 </script>
 <div id="header-placeholder"></div>
 <main class="wrap">
-  <div id="avisoAdminTodasEscolas" class="aviso-warn" hidden>
-    ⚠️ Os dados não podem ser exibidos enquanto <b>"Todas as escolas"</b> estiver selecionado no seletor do header. Por favor, selecione uma escola válida.
+  <div id="avisoSemEscola" class="aviso-warn" hidden>
+    ⚠️ Escolha uma escola no topo da página para cadastrar turmas.
   </div>
   <div class="split-grid">
 
@@ -132,7 +133,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         <div class="form-section-label">Dados da turma</div>
         <div class="form-row">
           <div class="field">
-            <label>Ano letivo</label>
+            <label for="anoSelect">Ano letivo</label>
             <input type="number" id="anoSelect" inputmode="numeric" step="1" min="2000" max="2100">
           </div>
           <div class="field">
@@ -152,7 +153,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         <label class="lbl">Adicionar série
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble wide">Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+            <span class="info-tip-bubble wide">O ano letivo e as séries fazem parte do ID da turma, por isso não podem ser alterados depois que ela é criada. Se algum deles foi cadastrado errado, o fluxo é: <b>Gestão de dados</b> → apague a turma → volte aqui e cadastre a turma com os dados corretos.</span>
           </span>
         </label>
         <div class="row serie-linha">
@@ -161,6 +162,9 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           <button class="btn secondary" id="btnClearSeries" type="button">Limpar séries</button>
         </div>
         <div id="chipsSeries" class="chips chips-series"></div>
+        <div id="avisoAnoSerieBloqueado" class="aviso-warn mt-12" hidden>
+          🔒 O ano letivo e as séries não podem ser alterados depois que a turma é criada (fazem parte do ID). Turno e nome continuam editáveis.
+        </div>
       </div>
 
       <div class="form-section">
@@ -172,7 +176,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           </span>
         </label>
         <select id="schemaSelect" class="input"></select>
-        <div id="avisoSchemaBloqueado" class="aviso-warn mt-12" style="display:none;">
+        <div id="avisoSchemaBloqueado" class="aviso-warn mt-12" hidden>
           🔒 O schema não pode ser alterado depois que a turma é criada. Ao salvar, a turma continua com o schema original.
         </div>
       </div>
@@ -193,12 +197,11 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           <span class="label-inline">ID da turma:
             <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
               i
-              <span class="info-tip-bubble wide">O ID da turma é gerado automaticamente usando os dados anteriores — não é possível editá-lo manualmente. Caso haja um ID idêntico, uma letra (A, B, C...) é adicionada ao final pra torná-lo único.<br><br>Por mais que seja possível editar a série de uma turma, não é aconselhável quando já há cadastro de alguma ata vinculada a ela. O fluxo pra essa alteração deve ser: <b>Gestão de dados</b> → apague a turma que deseja editar → volte aqui e cadastre a turma com a série correta.</span>
+              <span class="info-tip-bubble wide">O ID da turma é gerado automaticamente a partir do ano letivo e das séries — não é possível editá-lo manualmente, e ele nunca muda depois que a turma é criada. Caso já exista uma turma com o mesmo ano e série (por exemplo, de outro turno), uma letra (A, B, C...) é adicionada ao final pra torná-lo único.</span>
             </span>
           </span>
           <span class="badge gray mono" id="turmaIdBadge">—</span>
         </div>
-        <div id="avisoMudancaId" class="aviso-warn mt-12" style="display:none;"></div>
       </div>
 
       <div class="form-actions">
@@ -220,7 +223,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           </span>
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma salva no banco voltam para o formulário e você poderá alterar alguns dados. Em nenhuma circunstância altere o schema. Siga também as dicas em Séries e ID da turma.</span>
+            <span class="info-tip-bubble">Ao clicar em <b>Editar</b>, os dados da turma salva no banco voltam para o formulário. Nesse modo só o <b>turno</b> e o <b>nome</b> podem ser alterados: ano letivo, séries, schema e ID ficam bloqueados.</span>
           </span>
         </h2>
         <select id="filtroAnoLista" class="input filtro-ano"></select>
@@ -329,13 +332,12 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     });
   }
 
-  // Admin global com "Todas as escolas" no header (seção 19 do guia): o schoolId ativo é 'ADMIN'
-  // e as leituras por escola ficam travadas. O header recarrega a página ao trocar de escola.
-  function _adminSemEscolaSelecionada(){
-    try{
-      const sid = window.Auth && typeof Auth.getActiveSchoolId === 'function' ? Auth.getActiveSchoolId() : '';
-      return String(sid || '').toUpperCase() === 'ADMIN';
-    }catch(_){ return false; }
+  // Espera o Auth pronto antes de ler o banco (guia, 18.1): getSession() responde na hora, mas Auth.db ainda não existe.
+  function _authPronto(){
+    return new Promise((resolve) => {
+      if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+      if(window.Auth && Auth.onReady) Auth.onReady(resolve); else resolve();
+    });
   }
 
   /* ── Schemas do módulo de Atas — Firestore (DB.atasSchemas), sem
@@ -546,14 +548,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     return String(s||"").trim();
   }
 
-  function turnoAbbrev(turno){
-    const t = String(turno||"").toUpperCase();
-    if(t.startsWith("MAT")) return "MAT";
-    if(t.startsWith("VES")) return "VES";
-    if(t.startsWith("NOT")) return "NOT";
-    if(t.startsWith("INT")) return "INT";
-    return t.substring(0,3) || "TUR";
-  }
   function slugSerie(s){
     return String(s||"").trim().toUpperCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
@@ -562,16 +556,6 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       .replace(/[^A-Z0-9_]/g,"");
   }
 
-  function turmaIdBaseFromFull(id){
-    if(!id) return "";
-    const s = String(id);
-    const parts = s.split("|");
-    if(parts.length >= 5){
-      const last = parts[parts.length-1];
-      if(/^[A-Z]+$/.test(last)) return parts.slice(0,-1).join("|");
-    }
-    return s;
-  }
   function indexToLetters(n){
     let x = n, out = "";
     while(true){
@@ -590,9 +574,9 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   }
   function buildTurmaIdBase(){
     const ano = $("anoSelect")?.value || String(getAnoDefault());
-    const turno = turnoAbbrev($("turno")?.value);
     const seriesSlug = seriesSel.map(slugSerie).filter(Boolean).join("+") || "SEM_SERIE";
-    return `ATUR-ATAS|${ano}|${turno}|${seriesSlug}`;
+    // Turno NÃO entra no ID: é só um dado da turma. ID = ATUR-ATAS | ano letivo | série(s) [| letra se já existir igual]
+    return `ATUR-ATAS|${ano}|${seriesSlug}`;
   }
   function sameBase(base, id){
     if(!base || !id) return false;
@@ -619,16 +603,10 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     return base + "|" + indexToLetters(n);
   }
   function buildTurmaIdPreview(){
+    // Edição: o ID nunca muda (ano e série ficam bloqueados).
+    if(editingTurmaId) return editingTurmaId;
     const base = buildTurmaIdBase();
     const turmas = getTurmas();
-    if(editingTurmaId){
-      const baseEdit = turmaIdBaseFromFull(editingTurmaId);
-      if(baseEdit === base) return editingTurmaId;
-      const others = turmas.filter(t => t && t.turmaId !== editingTurmaId);
-      const same = others.filter(t => sameBase(base, t.turmaId));
-      if(!same.length) return base;
-      return pickNextIdForBase(base, ensureFirstGetsA(base, [...others]));
-    }
     const same = turmas.filter(t => sameBase(base, t.turmaId));
     if(!same.length) return base;
     return pickNextIdForBase(base, ensureFirstGetsA(base, [...turmas]));
@@ -644,37 +622,36 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     const box = $("chipsSeries");
     if(!box) return;
     box.innerHTML = "";
+    const travado = !!editingTurmaId;   // edição: série bloqueada, chip sem ×
     for(const s of seriesSel){
       const chip = document.createElement("span");
       chip.className = "chip";
-      chip.innerHTML = `${s} <button type="button" aria-label="remover">×</button>`;
-      chip.querySelector("button").addEventListener("click", ()=>{
-        seriesSel = seriesSel.filter(x=>x!==s);
-        syncDerived();
-        renderChips();
-      });
+      chip.append(document.createTextNode(s));
+      if(!travado){
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("aria-label", "remover");
+        btn.textContent = "×";
+        btn.addEventListener("click", ()=>{
+          seriesSel = seriesSel.filter(x=>x!==s);
+          syncDerived();
+          renderChips();
+        });
+        chip.append(btn);
+      }
       box.appendChild(chip);
     }
+  }
+  // Modo edição: ano letivo, séries e schema bloqueados (só turno e nome editáveis).
+  function aplicarModoEdicao(on){
+    ["anoSelect","serieSelect","btnAddSerie","btnClearSeries"].forEach(id => { const el = $(id); if(el) el.disabled = on; });
+    if($("avisoAnoSerieBloqueado")) $("avisoAnoSerieBloqueado").hidden = !on;
+    if($("avisoSchemaBloqueado")) $("avisoSchemaBloqueado").hidden = !on;
   }
   function syncDerived(){
     const previewId = buildTurmaIdPreview();
     if($("turmaIdBadge")) $("turmaIdBadge").textContent = previewId || "—";
     if(!nomeManual && $("nomeTurma")) $("nomeTurma").value = buildNomeAuto();
-
-    // Avisa se editar mudaria o ID de uma turma que já tem aluno lançado
-    const avisoEl = $("avisoMudancaId");
-    if(avisoEl){
-      if(editingTurmaId && previewId !== editingTurmaId){
-        const t = getTurmas().find(x => x.turmaId === editingTurmaId);
-        const temAlunos = Array.isArray(t?.alunos) && t.alunos.length > 0;
-        avisoEl.style.display = "block";
-        avisoEl.textContent = temAlunos
-          ? `⚠️ Mudar ano/turno/série muda o ID da turma (${editingTurmaId} → ${previewId}). Essa turma JÁ TEM ${t.alunos.length} aluno(s) lançado(s) — os dados de ata/matrícula antigos ficam órfãos, presos no ID velho. Evite mudar esses campos numa turma que já tem aluno.`
-          : `O ID muda de ${editingTurmaId} para ${previewId}. Como a turma ainda não tem aluno lançado, não tem risco.`;
-      } else {
-        avisoEl.style.display = "none";
-      }
-    }
   }
   function renderListaTurmas(){
     const list = $("listaTurmas");
@@ -778,14 +755,15 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     seriesSel = (Array.isArray(t.series) ? t.series : []).map(normalizeSerie).filter(Boolean);
 
     if($("nomeTurma")){
-      nomeManual = true;
-      $("nomeTurma").value = t.nome || buildNomeAuto();
-      nomeManual = false;
+      // Nome personalizado (diferente do automático) não pode ser sobrescrito ao trocar o turno.
+      const auto = buildNomeAuto();
+      $("nomeTurma").value = t.nome || auto;
+      nomeManual = !!(t.nome && t.nome !== auto);
     }
 
     // Edição: o schema é o do documento original e não pode ser trocado.
     mostrarSchemaDaTurma(t);
-    if($("avisoSchemaBloqueado")) $("avisoSchemaBloqueado").style.display = "block";
+    aplicarModoEdicao(true);
 
     renderChips();
     syncDerived();
@@ -804,8 +782,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     if($("nomeTurma")) $("nomeTurma").value = "";
     // Turma nova = schema padrão (doc "padrao" de atasSchemas).
     fillSchemaSelect(SCHEMA_PADRAO_ID);
-    if($("avisoSchemaBloqueado")) $("avisoSchemaBloqueado").style.display = "none";
-    if($("avisoMudancaId")) $("avisoMudancaId").style.display = "none";
+    aplicarModoEdicao(false);
 
     renderChips();
     syncDerived();
@@ -829,90 +806,64 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   }
 
   async function salvarTurma(){
-    const ano = parseInt($("anoSelect")?.value || String(getAnoDefault()), 10);
     const turno = $("turno")?.value || "MATUTINO";
     const nome = ($("nomeTurma")?.value || "").trim();
     const ehEdicao = !!editingTurmaId;
 
-    if(!seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
     if(!nome){ setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err"); return; }
 
-    // Schema: só existe escolha na CRIAÇÃO. Em edição o select está travado e
-    // esta função nunca lê nem regrava o schema (o payload copia o do documento
-    // original, mais abaixo).
-    let schemaId = "", schemaSnapshot = null;
-    if(!ehEdicao){
+    const now = new Date().toISOString();
+    let payload, ano = null;
+
+    if(ehEdicao){
+      // EDIÇÃO: o ID nunca muda. Só turno e nome são gravados; ano, séries, schema,
+      // origem e alunos ficam como estão no documento (save() é merge:true: o que
+      // não vai no payload é preservado, inclusive os alunos lançados em cadastro-atas.html).
+      const docOriginal = getTurmas().find(t => t && t.turmaId === editingTurmaId);
+      if(!docOriginal){ setMsg("Não foi possível localizar a turma original — recarregue a página.", "err"); return; }
+      payload = {
+        _id: editingTurmaId,
+        id: editingTurmaId,
+        turmaId: editingTurmaId,
+        nome,
+        turno,
+        atualizadoEm: now,
+      };
+    } else {
+      // CRIAÇÃO
+      if(!seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
+      ano = parseInt($("anoSelect")?.value || String(getAnoDefault()), 10);
+      if(isNaN(ano)){ setMsg("Informe um ano letivo válido.", "err"); return; }
+
       // Trava: sem schema padrão na coleção, não cadastra turma (nada de
       // cair num schema embutido que não existe no banco).
       if(!temSchemaPadrao()){ setMsg("Esta escola ainda não tem o schema padrão. Peça ao admin global para criá-lo em Gerenciar escolas (botão Schema padrão) e recarregue.", "err"); return; }
-      schemaId = $("schemaSelect")?.value || "";
+      const schemaId = $("schemaSelect")?.value || "";
       const schemaEscolhido = (schemaId ? getSchemaById(schemaId) : null) || getSchemaById(SCHEMA_PADRAO_ID);
-      schemaSnapshot = normalizeSchema(schemaEscolhido);
-    }
+      const schemaSnapshot = normalizeSchema(schemaEscolhido);
 
-    const base = buildTurmaIdBase();
-    let turmas = getTurmas().slice();
+      // ID = ATUR-ATAS | ano | série(s) [| letra]. Já existe um igual? Ganha a próxima letra.
+      const base = buildTurmaIdBase();
+      const turmas = getTurmas().slice();
+      let turmaId = base;
+      if(turmas.some(t => sameBase(base, t.turmaId))) turmaId = pickNextIdForBase(base, ensureFirstGetsA(base, turmas));
 
-    let oldId = null, criadoEmExistente = null, alunosExistentes = null, docOriginal = null;
-    if(editingTurmaId){
-      oldId = editingTurmaId;
-      const existente = turmas.find(t => t && t.turmaId === oldId);
-      docOriginal = existente || null;
-      if(existente?.criadoEm) criadoEmExistente = existente.criadoEm;
-      if(Array.isArray(existente?.alunos)) alunosExistentes = existente.alunos;
-      turmas = turmas.filter(t => t && t.turmaId !== oldId);
-    }
-
-    let turmaId;
-    const same = turmas.filter(t => sameBase(base, t.turmaId));
-    if(!same.length) turmaId = base;
-    else { turmas = ensureFirstGetsA(base, turmas); turmaId = pickNextIdForBase(base, turmas); }
-
-    if(oldId){
-      const baseEdit = turmaIdBaseFromFull(oldId);
-      if(baseEdit === base) turmaId = oldId;
-    }
-
-    // Confirmação extra se o ID vai mudar E a turma já tem aluno lançado
-    if(oldId && turmaId !== oldId && alunosExistentes && alunosExistentes.length){
-      const confirmou = await _confirmModal({
-        titulo: "⚠️ Isso vai trocar o ID de uma turma com alunos",
-        corpo: `Essa turma já tem ${alunosExistentes.length} aluno(s) lançado(s) em cadastro-atas.html.<br><br>Mudar ano/turno/série troca o ID de ${_escHtml(oldId)} para ${_escHtml(turmaId)} — os dados de ata/matrícula já lançados continuam presos no ID antigo (ficam órfãos).<br><br>Só continue se tiver certeza. Deseja continuar mesmo assim?`,
-        corDestaque: "danger",
-        textoConfirmar: "Sim, trocar o ID mesmo assim"
-      });
-      if(!confirmou) return;
-    }
-
-    const now = new Date().toISOString();
-    const payload = {
-      _id: turmaId,
-      id: turmaId,
-      turmaId,
-      nome,
-      anoLetivo: ano,
-      series: [...seriesSel],
-      turno,
-      criadoEm: criadoEmExistente || now,
-      atualizadoEm: now,
-    };
-    if(!oldId){
-      // Criação: schema escolhido + origem manual + array de alunos vazio.
-      payload.schemaId = schemaSnapshot.id || schemaId || "";
-      payload.schemaSnapshot = schemaSnapshot;
-      payload.origemArquivo = "MANUAL";
-      payload.aba = "MANUAL";
-      payload.alunos = [];
-    } else if(docOriginal){
-      // Edição: schema, origem e aba ficam EXATAMENTE como no documento original
-      // (nada de renormalizar nem de regravar "MANUAL" por cima de turma importada).
-      // Copia só o que existe — Firestore rejeita undefined. Se o ID mudou, o doc
-      // novo nasce com o schema do original em vez de ficar sem snapshot.
-      // NÃO manda `alunos`: save() é merge:true, então omitir preserva os alunos
-      // já lançados em cadastro-atas.html quando o ID não muda.
-      ["schemaId", "schemaSnapshot", "origemArquivo", "aba"].forEach(k => {
-        if(docOriginal[k] !== undefined) payload[k] = docOriginal[k];
-      });
+      payload = {
+        _id: turmaId,
+        id: turmaId,
+        turmaId,
+        nome,
+        anoLetivo: ano,
+        series: [...seriesSel],
+        turno,
+        criadoEm: now,
+        atualizadoEm: now,
+        schemaId: schemaSnapshot.id || schemaId || "",
+        schemaSnapshot,
+        origemArquivo: "MANUAL",
+        aba: "MANUAL",
+        alunos: [],
+      };
     }
 
     setMsg('Salvando…', 'loading');
@@ -924,29 +875,22 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       return;
     }
 
-    // Índice de anos (select da pesquisa de atas). Falha aqui NÃO desfaz a turma, mas avisa.
-    const idx = await registrarAnoNoIndice(ano);
-    const indiceOk = idx.ok;
-    const avisoIndice = `Turma salva, mas o índice de anos da pesquisa não pôde ser atualizado (${idx.motivo}).`;
-
     // EDIÇÃO: hard refresh. A página fica estática depois de salvar, então
     // recarrega do zero; a confirmação é guardada e exibida após o reload.
     if(ehEdicao){
-      const idMudou = oldId !== turmaId;
-      guardarMsgPosReload(
-        idMudou
-          ? `Turma salva. O ID mudou de ${oldId} para ${turmaId} — os alunos já lançados continuam no ID antigo.`
-          : (indiceOk ? "Turma salva!" : avisoIndice),
-        (idMudou || !indiceOk) ? "warn" : "ok"
-      );
+      guardarMsgPosReload("Turma salva!", "ok");
       window.location.reload();
       return;
     }
 
-    // CRIAÇÃO: sem reload — atualiza a lista local (sem isso, o item recém-salvo
-    // não aparece na lista à direita nem no preview de próximo ID) e reseta o
-    // formulário. Se essa releitura falhar, a turma FOI salva — o toast final
-    // precisa dizer isso, não "erro ao salvar".
+    // CRIAÇÃO: índice de anos (select da pesquisa de atas). Falha aqui NÃO desfaz a turma, mas avisa.
+    const idx = await registrarAnoNoIndice(ano);
+    const indiceOk = idx.ok;
+    const avisoIndice = `Turma salva, mas o índice de anos da pesquisa não pôde ser atualizado (${idx.motivo}).`;
+
+    // Sem reload — atualiza a lista local (sem isso, o item recém-salvo não aparece
+    // na lista à direita nem no preview de próximo ID) e reseta o formulário.
+    // Se essa releitura falhar, a turma FOI salva — o toast final precisa dizer isso.
     const okReload = await carregarTurmasCache();
     buildFiltroAnoOptions();
     if(!okReload){
@@ -961,6 +905,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 
   /* ── events ── */
   $("btnAddSerie")?.addEventListener("click", ()=>{
+    if(editingTurmaId) return;   // série bloqueada em edição
     const s = normalizeSerie($("serieSelect")?.value);
     if(!s) return;
     if(!seriesSel.includes(s)) seriesSel.push(s);
@@ -969,6 +914,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     renderChips();
   });
   $("btnClearSeries")?.addEventListener("click", ()=>{
+    if(editingTurmaId) return;   // série bloqueada em edição
     seriesSel = [];
     syncDerived();
     renderChips();
@@ -993,10 +939,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
   /* ── init ── */
   async function init(){
     try {
-      await new Promise(res=>{
-        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-        document.addEventListener('auth:ready', res, {once:true});
-      });
+      await _authPronto();
       const okTurmas = await carregarTurmasCache();
       const okSchemas = await carregarSchemasCache();
       fillSerieSelect();
@@ -1008,9 +951,9 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       }catch(e){ console.warn('ajustarContraste:', e); }
 
       // Admin global sem escola: aviso visível; os toasts de falha de leitura ficam de fora (o aviso já explica).
-      const semEscola = _adminSemEscolaSelecionada();
-      const avisoAdmin = $("avisoAdminTodasEscolas");
-      if(avisoAdmin) avisoAdmin.hidden = !semEscola;
+      const semEscola = !!(window.Auth && typeof Auth.semEscola === 'function' && Auth.semEscola());
+      const avisoSemEscola = $("avisoSemEscola");
+      if(avisoSemEscola) avisoSemEscola.hidden = !semEscola;
 
       // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
       document.addEventListener("click", ()=>{
