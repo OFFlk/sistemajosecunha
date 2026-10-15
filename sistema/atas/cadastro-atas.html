@@ -81,7 +81,9 @@ html[data-theme="dark"] tbody tr:hover td { background:var(--ui-chip-bg); }
 th.th-vertical { width:34px; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; padding:10px 4px; font-size:12px; line-height:1; }
 th.th-num { width:42px; }
 th.th-nome { width:220px; }
-td.col-nome { text-align:left; padding-left:8px; word-break:break-word; }
+/* tabela centralizada (class="center"); só a coluna Nome fica à esquerda, cabeçalho e conteúdo */
+.table-wrap th.th-nome, .table-wrap td.col-nome { text-align:left; padding-left:8px; }
+td.col-nome { word-break:break-word; }
 th.th-nota, td.col-nota { width:42px; font-size:11px; }
 
 /* ── Cabeçalho da ata (sobre o card de destaque) ── */
@@ -245,7 +247,7 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
       </div>
     </div>
 
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="center">
       <thead>
         <!-- ✅ Thead dinâmico -->
         <tr id="theadDinamico"></tr>
@@ -1231,34 +1233,63 @@ async function garantirIdsESistemaParaTurma(turmaObj){
 /* =========================
    Seleção de turma (ano → turma) — a turma já existe, criada em
    cadastro-turmas.html. Esta página só lê metadados dela e edita `alunos`.
+   Leitura sob demanda (guia 18.2): anos vêm do índice; turmas, só as do ano escolhido.
 ========================= */
 let turmaAtual = null;
 let turmaIdAtual = "";
-let TURMAS_CACHE_ATAS = [];
+let TURMAS_CACHE_ATAS = [];   // SÓ as turmas do ano escolhido (lidas por get, nunca a coleção inteira)
+let ANOS_INDICE = [];         // anos vindos do índice da escola (schools/{id}.atasIndice.anos)
 
 function getQueryParam(nome) {
   const url = new URL(window.location.href);
   return url.searchParams.get(nome) || "";
 }
 
-async function carregarTurmasCacheAtas() {
-  try { TURMAS_CACHE_ATAS = await window.DB.turmas.list(); }
-  catch(e) {
-    console.warn('[carregarTurmasCacheAtas]', e);
-    TURMAS_CACHE_ATAS = [];
-    if (!_semEscola) setMsg('Não foi possível carregar as turmas cadastradas.', 'err');
+/**
+ * Índice de anos: 1 leitura barata (documento da escola). É mantido por cadastro-turmas.html
+ * (acrescenta o ano ao salvar) e por Gestão de Atas → Reconstruir (cria/refaz).
+ * Devolve { ok, ausente }.
+ */
+async function carregarAnosIndice() {
+  ANOS_INDICE = [];
+  try {
+    const schoolId = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+    if (!window.Auth || !Auth.db || !schoolId || String(schoolId).toUpperCase() === 'ADMIN') return { ok: true, ausente: false };
+    const snap = await Auth.db.collection('schools').doc(schoolId).get();
+    const idx = snap.exists ? snap.data().atasIndice : null;
+    if (!idx || !idx.atualizadoEm) return { ok: true, ausente: true };
+    ANOS_INDICE = (Array.isArray(idx.anos) ? idx.anos : []).map(a => String(a).trim()).filter(Boolean);
+    return { ok: true, ausente: false };
+  } catch (e) {
+    console.warn('[carregarAnosIndice]', e);
+    if (!_semEscola) setMsg('Não foi possível carregar os anos letivos.', 'err');
+    return { ok: false, ausente: false };
+  }
+}
+
+/** Lê (get) só as turmas do ano escolhido. Troca o cache; falha deixa o cache vazio e avisa. */
+async function carregarTurmasDoAno(ano) {
+  TURMAS_CACHE_ATAS = [];
+  if (!ano) return true;
+  setMsg('Carregando turmas…', 'loading');
+  try {
+    TURMAS_CACHE_ATAS = await window.DB.turmas.whereEquals('anoLetivo', Number(ano));
+    return true;
+  } catch (e) {
+    console.warn('[carregarTurmasDoAno]', e);
+    if (!_semEscola) setMsg(`Não foi possível carregar as turmas de ${ano}.`, 'err');
+    return false;
+  } finally {
+    _toastLimpar();
   }
 }
 
 function carregarSelectAnoLetivo() {
   const sel = $("anoLetivoSelect");
   if (!sel) return;
-  const anos = Array.from(new Set(
-    TURMAS_CACHE_ATAS.map(t => String(t?.anoLetivo || "").trim()).filter(Boolean)
-  )).sort((a, b) => Number(b) - Number(a));
-
+  const anos = Array.from(new Set(ANOS_INDICE.map(String))).sort((a, b) => Number(b) - Number(a));
   sel.innerHTML = '<option value="">Selecione...</option>' +
-    anos.map(a => `<option value="${a}">${a}</option>`).join("");
+    anos.map(a => `<option value="${_escHtml(a)}">${_escHtml(a)}</option>`).join("");
 }
 
 function carregarSelectTurma(ano) {
@@ -1281,8 +1312,9 @@ function carregarSelectTurma(ano) {
 async function onAnoLetivoSelectChange() {
   const ano = $("anoLetivoSelect")?.value || "";
   if (!(await _liberarTrocaDeTurma())) { _restaurarSelectsDaTurmaAtual(); return; }
-  carregarSelectTurma(ano);
   selecionarTurma(""); // limpa a turma escolhida anteriormente
+  await carregarTurmasDoAno(ano);
+  carregarSelectTurma(ano);
 }
 
 async function onTurmaSelectChange() {
@@ -1368,10 +1400,18 @@ async function selecionarTurma(turmaId) {
 
 /** Pré-seleciona ano+turma a partir de um turmaId (deep-link, ex.: ?turma=ID). */
 async function selecionarTurmaPorId(turmaId, travarSelects = false) {
-  const turma = TURMAS_CACHE_ATAS.find(t => t.turmaId === turmaId);
-  if (!turma) { _toastErro("❌ Turma não encontrada no banco."); return; }
-  if ($("anoLetivoSelect")) $("anoLetivoSelect").value = String(turma.anoLetivo || "");
-  carregarSelectTurma(turma.anoLetivo);
+  // Deep-link: lê só esta turma (get) para descobrir o ano; depois carrega só as turmas desse ano.
+  let turma = null;
+  try { turma = await window.DB.turmas.get(turmaId); }
+  catch (e) { console.warn('[selecionarTurmaPorId]', e); }
+  if (!turma || turma.turmaId !== turmaId) { _toastErro("❌ Turma não encontrada no banco."); return; }
+
+  const ano = String(turma.anoLetivo || "");
+  await carregarTurmasDoAno(ano);
+  if (!TURMAS_CACHE_ATAS.some(t => t.turmaId === turmaId)) TURMAS_CACHE_ATAS.push(turma);
+  if (ano && !ANOS_INDICE.includes(ano)) { ANOS_INDICE.push(ano); carregarSelectAnoLetivo(); }   // ano fora do índice: ainda assim aparece
+  if ($("anoLetivoSelect")) $("anoLetivoSelect").value = ano;
+  carregarSelectTurma(ano);
   if ($("turmaSelect")) $("turmaSelect").value = turmaId;
   await selecionarTurma(turmaId);
 
@@ -1953,20 +1993,19 @@ function avaliarTrajetoria(ultimo, novo) {
 // em ordem). Por isso não basta olhar o "último" registro (maior
 // anoLetivo): é preciso olhar o vizinho imediatamente ANTES e o
 // imediatamente DEPOIS do ano sendo importado, e avaliar os dois lados.
-function _registrosVizinhosDoAluno(alunoId, turmasDB, anoNovo) {
+function _registrosVizinhosDoAluno(matriculasDoAluno, anoNovo) {
   let antes = null, depois = null;
   const anoNovoNum = Number(anoNovo);
-  for (const turma of (turmasDB||[])) {
-    for (const aluno of (turma.alunos||[])) {
-      if (aluno.alunoId !== alunoId) continue;
-      const ano = Number(turma.anoLetivo);
-      if (!Number.isFinite(ano) || ano === anoNovoNum) continue;
-      const registro = { anoLetivo: turma.anoLetivo, serieDisplay: aluno.serie, resultado: aluno.resultado };
-      if (ano < anoNovoNum) {
-        if (!antes || ano > Number(antes.anoLetivo)) antes = registro;
-      } else {
-        if (!depois || ano < Number(depois.anoLetivo)) depois = registro;
-      }
+  // Fonte: coleção `matriculas` (anoLetivo/serie/resultado já denormalizados), não as turmas
+  // de outros anos — a página só carrega as turmas do ano escolhido.
+  for (const m of (matriculasDoAluno||[])) {
+    const ano = Number(m.anoLetivo);
+    if (!Number.isFinite(ano) || ano === anoNovoNum) continue;
+    const registro = { anoLetivo: m.anoLetivo, serieDisplay: m.serie, resultado: m.resultado };
+    if (ano < anoNovoNum) {
+      if (!antes || ano > Number(antes.anoLetivo)) antes = registro;
+    } else {
+      if (!depois || ano < Number(depois.anoLetivo)) depois = registro;
     }
   }
   return { antes, depois };
@@ -2092,21 +2131,37 @@ function _importExtrairLinhas(matriz, rHead, colMap, schema) {
 // de lote (decisão do redesenho: aposenta o union-find de gestao-atas.html,
 // que só existia por causa do processamento multi-aba).
 async function _importAnalisarCatalogo(linhas, onProgresso) {
-  // Usa o cache de turmas que a página já carregou no boot (e que o save
-  // atualiza em memória) em vez de reler a coleção, que faria uma leitura
-  // COMPLETA da coleção de turmas a cada import — e devolvia [] em silêncio
-  // se falhasse (trajetória saía toda 🟢 sem comparar nada).
-  const turmasDB = TURMAS_CACHE_ATAS;
   const cachePrefixo = new Map();
+
+  // 1) candidatos do catálogo para cada linha
   let feitos = 0;
   for (const al of linhas) {
     feitos++;
     if (onProgresso) onProgresso(feitos, linhas.length);
-    const candidatos = await _candidatosCatalogo(al.nome, cachePrefixo);
+    al._cands = await _candidatosCatalogo(al.nome, cachePrefixo);
+  }
+
+  // 2) matrículas de TODOS os candidatos numa leva só (whereIn em lotes de 10). Se falhar, o erro
+  //    sobe e o import é abortado com aviso (sem isso a trajetória sairia toda 🟢 sem comparar nada).
+  const ids = new Set();
+  linhas.forEach(al => al._cands.forEach(c => ids.add(c.alunoId)));
+  const matriculasPorAluno = new Map();
+  if (ids.size) {
+    const mats = await window.DB.matriculas.whereIn('alunoId', [...ids]);
+    for (const m of mats) {
+      const id = String(m.alunoId || '').trim();
+      if (!matriculasPorAluno.has(id)) matriculasPorAluno.set(id, []);
+      matriculasPorAluno.get(id).push(m);
+    }
+  }
+
+  // 3) avalia a trajetória de cada candidato
+  for (const al of linhas) {
+    const candidatos = al._cands; delete al._cands;
     if (!candidatos.length) { al._indicador = 'novo'; continue; }
 
     for (const c of candidatos) {
-      const vizinhos = _registrosVizinhosDoAluno(c.alunoId, turmasDB, turmaAtual.anoLetivo);
+      const vizinhos = _registrosVizinhosDoAluno(matriculasPorAluno.get(String(c.alunoId).trim()), turmaAtual.anoLetivo);
       c.traj = avaliarTrajetoriaBidirecional(vizinhos, { anoLetivo: turmaAtual.anoLetivo, serieDisplay: al.serie, resultado: al.resultado });
     }
 
@@ -2391,9 +2446,12 @@ document.addEventListener("DOMContentLoaded", () => {
       // dados da escola (cabeçalho)
       await carregarDadosEscola();
 
-      // turmas já cadastradas (metadados vêm de cadastro-turmas.html)
-      await carregarTurmasCacheAtas();
+      // anos do índice (1 leitura barata); as turmas só são lidas quando um ano é escolhido
+      const idxAnos = await carregarAnosIndice();
       carregarSelectAnoLetivo();
+      if (idxAnos.ok && idxAnos.ausente && !_semEscola) {
+        setMsg('O índice de anos ainda não foi criado. Crie em Gestão de Atas → Reconstruir.', 'warn');
+      }
 
       // formulário/tabela nascem vazios — só habilitam depois de escolher a turma
       SCHEMA_ATIVO = null;
