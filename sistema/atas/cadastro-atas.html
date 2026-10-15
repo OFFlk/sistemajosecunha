@@ -145,7 +145,10 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 <div class="container">
 
   <div class="card card-destaque">
-    <div id="avisoEscola" class="aviso-warn" style="display:none">
+    <div id="avisoSemEscola" class="aviso-warn" hidden>
+      ⚠️ Escolha uma escola no topo da página para cadastrar atas.
+    </div>
+    <div id="avisoEscola" class="aviso-warn" hidden>
       ⚠️ Nenhuma escola cadastrada. Vá em <b>Editar escola</b> para configurar o cabeçalho.
     </div>
 
@@ -371,6 +374,7 @@ function renderFormularioDinamico() {
           <option>Não informado</option>
           <option>AP</option>
           <option>REP</option>
+          <option>CON</option>
           <option>DEST</option>
           <option>TRA</option>
           <option>FAL</option>
@@ -440,6 +444,7 @@ function renderTheadDinamico() {
 /* =========================
    Escola (cabeçalho)
 ========================= */
+let _semEscola = false;   // admin global com "Todas as escolas" (guia 18.3): leituras voltam vazias, sem erro
 async function carregarDadosEscola() {
   const aviso = $("avisoEscola");
   let escola = {};
@@ -449,16 +454,17 @@ async function carregarDadosEscola() {
     console.warn('[carregarDadosEscola]', e);
     // Falha de leitura ≠ escola inexistente: mostra erro e NÃO cai no aviso
     // "Nenhuma escola cadastrada" (enganoso nesse caso).
-    setMsg('Não foi possível carregar os dados da escola.', 'err');
+    if (!_semEscola) setMsg('Não foi possível carregar os dados da escola.', 'err');
     return;
   }
 
   if (!escola || !Object.keys(escola).length) {
-    if (aviso) aviso.style.display = "block";
+    // sem escola escolhida o aviso certo é o "Escolha uma escola"; "Nenhuma escola cadastrada" seria enganoso
+    if (aviso) aviso.hidden = _semEscola;   // (false quando há escola ativa sem dados)
     return;
   }
 
-  if (aviso) aviso.style.display = "none";
+  if (aviso) aviso.hidden = true;
 
   const elNome = $("nomeEscola");
   const elEnd  = $("enderecoEscola");
@@ -674,7 +680,7 @@ async function excluirAlunoEmEdicao() {
   const nome = _alunoEmEdicao.nome || "este aluno";
   const ok = await _confirmModal({
     titulo: "🗑️ Excluir aluno desta turma?",
-    corpo: `${escHtml(nome)} sai desta turma quando você clicar em "Salvar no banco" — até lá nada é apagado.\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado nesse momento. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida.`,
+    corpo: `${_escHtml(nome)} sai desta turma quando você clicar em "Salvar no banco" — até lá nada é apagado.\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado nesse momento. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida.`,
     corDestaque: "danger",
     textoConfirmar: "Sim, excluir",
   });
@@ -880,7 +886,7 @@ async function adicionarAluno() {
   if (alunos.some(a => _chaveNome(a.nome) === chaveNova)) {
     const okDup = await _confirmModal({
       titulo: "⚠️ Nome repetido",
-      corpo: `Já existe um aluno chamado ${escHtml(nomeEl.value.trim())} nesta turma (na tabela abaixo).\n\nAdicionar mesmo assim? (só faz sentido se forem homônimos)`,
+      corpo: `Já existe um aluno chamado ${_escHtml(nomeEl.value.trim())} nesta turma (na tabela abaixo).\n\nAdicionar mesmo assim? (só faz sentido se forem homônimos)`,
       textoConfirmar: "Sim, adicionar",
     });
     if (!okDup) return;
@@ -1059,7 +1065,7 @@ function statusFromResultado(res){
   if (r === "FAL") return "FALTOU";
   if (r === "AND") return "ANDAMENTO";
   if (!r || r === "NÃO INFORMADO" || r === "NAO INFORMADO") return "DESCONHECIDO";
-  // AP/REP/S/P/CSA/CPA/etc. -> concluiu (registro final)
+  // AP/REP/CON/S/P/CSA/CPA/etc. -> concluiu (registro final). CON (conservado) conta como REP.
   return "CONCLUIDO";
 }
 
@@ -1130,14 +1136,13 @@ async function garantirIdsESistemaParaTurma(turmaObj){
     }
 
     // Atualiza turma no Firebase com alunoIds preenchidos
-    await salvarTurmasDB({ ...turmaObj, _id: turmaObj._id || turmaObj.id });
+    await salvarTurmasDB({ ...turmaObj, _id: turmaObj.turmaId });
   }
 
   // 2) bancos auxiliares: ata + matrículas (salvo direto no Firebase)
-  const turmaId = String(turmaObj.id || turmaObj.turmaId || "").trim();
+  const turmaId = String(turmaObj.turmaId || "").trim();
   if (!turmaId) return;
 
-  turmaObj.turmaId = turmaId;
   const ataId = idAtaFromTurmaId(turmaId);
 
   // ata (upsert no Firebase)
@@ -1241,7 +1246,7 @@ async function carregarTurmasCacheAtas() {
   catch(e) {
     console.warn('[carregarTurmasCacheAtas]', e);
     TURMAS_CACHE_ATAS = [];
-    setMsg('Não foi possível carregar as turmas cadastradas.', 'err');
+    if (!_semEscola) setMsg('Não foi possível carregar as turmas cadastradas.', 'err');
   }
 }
 
@@ -1270,10 +1275,7 @@ function carregarSelectTurma(ano) {
 
   sel.disabled = false;
   sel.innerHTML = '<option value="">Selecione...</option>' +
-    turmas.map(t => {
-      const id = t.turmaId || t.id || t._id;
-      return `<option value="${id}">${t.nome || id}</option>`;
-    }).join("");
+    turmas.map(t => `<option value="${_escHtml(t.turmaId)}">${_escHtml(t.nome || t.turmaId)}</option>`).join("");
 }
 
 async function onAnoLetivoSelectChange() {
@@ -1338,7 +1340,7 @@ async function selecionarTurma(turmaId) {
     return;
   }
 
-  const turma = TURMAS_CACHE_ATAS.find(t => (t.turmaId || t.id || t._id) === turmaId);
+  const turma = TURMAS_CACHE_ATAS.find(t => t.turmaId === turmaId);
   if (!turma) { _toastErro("❌ Turma não encontrada no banco."); return; }
 
   turmaAtual = turma;
@@ -1366,7 +1368,7 @@ async function selecionarTurma(turmaId) {
 
 /** Pré-seleciona ano+turma a partir de um turmaId (deep-link, ex.: ?turma=ID). */
 async function selecionarTurmaPorId(turmaId, travarSelects = false) {
-  const turma = TURMAS_CACHE_ATAS.find(t => (t.turmaId || t.id || t._id) === turmaId);
+  const turma = TURMAS_CACHE_ATAS.find(t => t.turmaId === turmaId);
   if (!turma) { _toastErro("❌ Turma não encontrada no banco."); return; }
   if ($("anoLetivoSelect")) $("anoLetivoSelect").value = String(turma.anoLetivo || "");
   carregarSelectTurma(turma.anoLetivo);
@@ -1458,9 +1460,9 @@ function _modalDadosNaoSalvos() {
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
-    const fechar = (r) => { document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); };
-    const onKey = (ev) => { if (ev.key === 'Escape') fechar('cancelar'); };
-    document.addEventListener('keydown', onKey);
+    const fechar = (r) => { document.removeEventListener('keydown', onKey, true); backdrop.remove(); resolve(r); };
+    const onKey = (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); fechar('cancelar'); } };
+    document.addEventListener('keydown', onKey, true);
     backdrop.querySelector('#_nsVoltar').addEventListener('click', () => fechar('cancelar'));
     backdrop.querySelector('#_nsDescartar').addEventListener('click', () => fechar('descartar'));
     backdrop.querySelector('#_nsSalvar').addEventListener('click', () => fechar('salvar'));
@@ -1490,9 +1492,8 @@ function _restaurarSelectsDaTurmaAtual() {
    Salvar turma no banco
 ========================= */
 // ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
-// Divergência consciente do guia 8.2: o "carregando" NÃO expira sozinho (ms:0).
-// Nesta página ele cobre save, import e upload de scans (duração imprevisível):
-// fica até ser substituído por sucesso/erro/aviso ou fechado no ✕.
+// "Carregando" sem expirar (ms:0), padrão do guia (10.3): cobre save, import e upload de scans
+// (duração imprevisível) e fica até ser substituído por sucesso/erro/aviso ou fechado no ✕.
 const _TOAST = {
   ok:      { cls:'toast-ok',      ms:2500 },
   err:     { cls:'toast-err',     ms:4500 },
@@ -1531,7 +1532,7 @@ function _toastLimpar(){
   const t = document.getElementById('_toastGlobal');
   if (t && t.dataset.loading === '1') t.remove();
 }
-// Ponto de entrada padronizado (ver guia-toasts.md).
+// Ponto de entrada padronizado (guia, seção 10).
 function setMsg(text, kind){
   const t = (text||"").toString();
   if(!t) return;
@@ -1557,36 +1558,37 @@ window.addEventListener('unhandledrejection', (ev) => {
 
 // Modal de confirmação para decisões importantes (padrão do sistema).
 // Retorna uma Promise<boolean>: true = confirmou, false = cancelou/fechou fora.
-function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-// corDestaque: 'danger' = ação destrutiva (botão vermelho); qualquer outro = cor de marca.
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// corDestaque: 'danger' = ação destrutiva (título e botão vermelhos); 'ok' = contraponto positivo (verde);
+// qualquer outro = cor de marca.
 // digitar (opcional): exige digitar o texto para habilitar o botão (troca o prompt()).
 function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
   return new Promise((resolve) => {
     const perigo = corDestaque === 'danger';
+    const positivo = corDestaque === 'ok';
+    const variante = perigo ? ' perigo' : positivo ? ' ok' : '';
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div class="cm-box" role="dialog" aria-modal="true">`+
-        `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${escHtml(titulo || 'Confirmar ação')}</h3>`+
+      `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true">`+
+        `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
         `<p class="cm-corpo">${corpo || ''}</p>`+
-        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${escHtml(digitar)}">` : '')+
+        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
         `<div class="cm-acoes">`+
-          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${escHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${escHtml(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
     const ok = backdrop.querySelector('#_confirmModalOk');
     const cancelar = backdrop.querySelector('#_confirmModalCancelar');
     const input = backdrop.querySelector('#_confirmModalInput');
-
-    function fechar(resultado){
-      document.removeEventListener('keydown', onKey);
-      backdrop.remove();
-      resolve(resultado);
-    }
-    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
-    document.addEventListener('keydown', onKey);
+    function fechar(r){ document.removeEventListener('keydown', onKey, true); backdrop.remove(); resolve(r); }
+    // Esc em CAPTURA + stopPropagation: com um modal da página aberto por baixo, o Esc fecha só este
+    function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } }
+    document.addEventListener('keydown', onKey, true);
     ok.addEventListener('click', () => fechar(true));
     cancelar.addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
@@ -1674,12 +1676,12 @@ async function _salvarNoBancoInterno(recarregar) {
   }
 
   // Deriva seriesTurma/serieTexto (nomes usados por garantirIds/ata) a
-  // partir de turmaAtual.series (nome usado em cadastro-turmas.html).
-  const seriesLimpa = schema.serieAtiva ? dedupSeries(turmaAtual.series || turmaAtual.seriesTurma || []) : [];
+  // partir de turmaAtual.series (modelo atual, de cadastro-turmas.html).
+  const seriesLimpa = schema.serieAtiva ? dedupSeries(turmaAtual.series || []) : [];
 
   const turmaObj = {
     ...turmaAtual,
-    _id: turmaAtual._id || turmaIdAtual,
+    _id: turmaIdAtual,      // modelo atual: _id = id = turmaId
     id: turmaIdAtual,
     turmaId: turmaIdAtual,
     seriesTurma: seriesLimpa,
@@ -1734,7 +1736,7 @@ async function _salvarNoBancoInterno(recarregar) {
   if (window.uploadScansQueue) resultadoScans = await window.uploadScansQueue();
 
   turmaAtual = turmaObj; // reflete localmente sem precisar recarregar a página
-  const idx = TURMAS_CACHE_ATAS.findIndex(t => (t.turmaId||t.id||t._id) === turmaIdAtual);
+  const idx = TURMAS_CACHE_ATAS.findIndex(t => t.turmaId === turmaIdAtual);
   if (idx >= 0) TURMAS_CACHE_ATAS[idx] = turmaObj;
   atualizarInfoTurmaSelecionada();
 
@@ -1880,7 +1882,7 @@ async function _candidatosCatalogo(nome, cachePrefixo){
 
 function _categoriaResultado(resultado) {
   const AVANCA  = ['AP','S','P'];
-  const MANTEM  = ['REP','DEST','C','I','AND'];
+  const MANTEM  = ['REP','CON','DEST','C','I','AND'];   // CON (conservado) = reprovado: mantém a série
   const BLOQUEIA= ['FAL'];
   const r = String(resultado||'').trim().toUpperCase();
   if (BLOQUEIA.includes(r)) return 'BLOQUEIA';
@@ -2060,7 +2062,7 @@ function _importExtrairLinhas(matriz, rHead, colMap, schema) {
   const cNum = acha('num'), cNome = acha('nome'), cSerie = acha('serie'), cResultado = acha('resultado');
   const colsMateria = Object.entries(colMap).filter(([,v])=>v.tipo==='materia');
   const colunasSchema = getColunasAtivas(schema);
-  const validosResultado = ['AP','REP','DEST','TRA','FAL','AND'];
+  const validosResultado = ['AP','REP','CON','DEST','TRA','FAL','AND'];
 
   const linhas = [];
   for (let r = rHead+1; r < matriz.length; r++) {
@@ -2183,9 +2185,9 @@ function _importMontarModal(bodyHtml, largura, footHtml) {
 
 function _importAbrirModalEscolhaAba() {
   const abas = _importAtaWorkbook.SheetNames || [];
-  const opts = abas.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  const opts = abas.map(n => `<option value="${_escHtml(n)}">${_escHtml(n)}</option>`).join('');
   const body = `
-    <p class="import-txt">Qual aba da planilha corresponde à turma <b>${escHtml(turmaAtual.nome||turmaIdAtual)}</b>? O resto do arquivo é ignorado — nem chega a ser lido.</p>
+    <p class="import-txt">Qual aba da planilha corresponde à turma <b>${_escHtml(turmaAtual.nome||turmaIdAtual)}</b>? O resto do arquivo é ignorado — nem chega a ser lido.</p>
     <select id="_importSelectAba" class="input">
       <option value="">Selecione a aba...</option>
       ${opts}
@@ -2254,17 +2256,17 @@ async function _importConfirmarAba() {
 function _importRenderRevisao(materiasSemColuna, colunasNaoReconhecidas) {
   let avisosHtml = '';
   if (materiasSemColuna.length) {
-    avisosHtml += `<div class="aviso-warn">⚠️ Matéria(s) do schema sem coluna correspondente no import: <b>${materiasSemColuna.map(escHtml).join(', ')}</b></div>`;
+    avisosHtml += `<div class="aviso-warn">⚠️ Matéria(s) do schema sem coluna correspondente no import: <b>${materiasSemColuna.map(_escHtml).join(', ')}</b></div>`;
   }
   if (colunasNaoReconhecidas.length) {
-    avisosHtml += `<div class="aviso-warn">⚠️ Coluna(s) do cabeçalho do import não reconhecidas por nenhuma matéria do schema: <b>${colunasNaoReconhecidas.map(escHtml).join(', ')}</b></div>`;
+    avisosHtml += `<div class="aviso-warn">⚠️ Coluna(s) do cabeçalho do import não reconhecidas por nenhuma matéria do schema: <b>${colunasNaoReconhecidas.map(_escHtml).join(', ')}</b></div>`;
   }
 
   const linhasHtml = _importAtaAlunos.map((al, i) => _importRenderLinhaRevisao(al, i)).join('');
 
   const body = `
     ${avisosHtml}
-    <div class="import-txt curto">Aba <b>${escHtml(_importAtaAbaEscolhida)}</b> — ${_importAtaAlunos.length} aluno(s) encontrado(s). Nada é salvo ainda.</div>
+    <div class="import-txt curto">Aba <b>${_escHtml(_importAtaAbaEscolhida)}</b> — ${_importAtaAlunos.length} aluno(s) encontrado(s). Nada é salvo ainda.</div>
     <div class="import-lista">
       ${linhasHtml}
     </div>
@@ -2280,26 +2282,26 @@ function _importRenderLinhaRevisao(al, i) {
   let badge = '', extra = '';
 
   if (al._indicador === 'encontrado') {
-    badge = `🟢 Vincula a <b>${escHtml(al._candidato.nome)}</b> (${escHtml(al._candidato.alunoId)})`;
+    badge = `🟢 Vincula a <b>${_escHtml(al._candidato.nome)}</b> (${_escHtml(al._candidato.alunoId)})`;
   } else if (al._indicador === 'novo') {
     badge = `🔵 Aluno novo`;
   } else if (al._indicador === 'duplicidade') {
     const c = al._candidato;
-    badge = `🟡 Parecido com <b>${escHtml(c.nome)}</b> (${escHtml(c.alunoId)}, ${Math.round(c.score*100)}%) — é o mesmo aluno?`;
+    badge = `🟡 Parecido com <b>${_escHtml(c.nome)}</b> (${_escHtml(c.alunoId)}, ${Math.round(c.score*100)}%) — é o mesmo aluno?`;
     extra = `<select id="_impSel_${i}" class="input import-sel">
       <option value="novo" selected>Não, é aluno novo</option>
       <option value="vincular">Sim, é o mesmo — vincular</option>
     </select>`;
   } else if (al._indicador === 'avisoTrajetoria') {
     const c = al._candidato;
-    badge = `⚠️ Nome idêntico a <b>${escHtml(c.nome)}</b> (${escHtml(c.alunoId)}), mas ${escHtml(c.traj.motivo)}`;
+    badge = `⚠️ Nome idêntico a <b>${_escHtml(c.nome)}</b> (${_escHtml(c.alunoId)}), mas ${_escHtml(c.traj.motivo)}`;
     extra = `<select id="_impSel_${i}" class="input import-sel">
       <option value="vincular" selected>Sim, é o mesmo — vincular mesmo assim</option>
       <option value="novo">Não, é aluno novo</option>
     </select>`;
   } else if (al._indicador === 'multiplos') {
     badge = `🟡 Nome bate com ${al._candidatos.length} candidatos do catálogo ao mesmo tempo — qual é?`;
-    const opts = al._candidatos.map((c,ci) => `<option value="${ci}">${escHtml(c.nome)} (${escHtml(c.alunoId)}, ${Math.round(c.score*100)}%)</option>`).join('');
+    const opts = al._candidatos.map((c,ci) => `<option value="${ci}">${_escHtml(c.nome)} (${_escHtml(c.alunoId)}, ${Math.round(c.score*100)}%)</option>`).join('');
     extra = `<select id="_impSel_${i}" class="input import-sel">
       <option value="novo" selected>Nenhum, é aluno novo</option>
       ${opts}
@@ -2307,7 +2309,7 @@ function _importRenderLinhaRevisao(al, i) {
   }
 
   return `<div class="import-item">
-    <div class="import-item-nome">${escHtml(al.nome)}</div>
+    <div class="import-item-nome">${_escHtml(al.nome)}</div>
     <div class="import-item-info">${badge}</div>
     ${extra}
   </div>`;
@@ -2380,6 +2382,11 @@ document.addEventListener("DOMContentLoaded", () => {
       try{
         if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
       }catch(e){ console.warn('ajustarContraste:', e); }
+
+      // admin global sem escola: só avisa (guia 18.3); nenhum botão é desabilitado por isso
+      _semEscola = !!(window.Auth && typeof Auth.semEscola === 'function' && Auth.semEscola());
+      const avisoSemEscola = $("avisoSemEscola");
+      if (avisoSemEscola) avisoSemEscola.hidden = !_semEscola;
 
       // dados da escola (cabeçalho)
       await carregarDadosEscola();
@@ -2470,7 +2477,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return imagens;
   }
 
-  function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
   function fmtData(iso){ return iso ? new Date(iso).toLocaleDateString('pt-BR') : ''; }
 
@@ -2515,7 +2521,7 @@ document.addEventListener("DOMContentLoaded", () => {
       div.innerHTML =
         `<span class="scans-ico">${iconForMime(item.mimeType)}</span>`+
         '<div class="scans-item-info">'+
-          `<div class="scans-item-nome">${escHtml(item.fileName)}</div>`+
+          `<div class="scans-item-nome">${_escHtml(item.fileName)}</div>`+
           `<div class="scans-item-meta">Aguardando envio…${badge ? ' · '+badge : ''}</div>`+
         '</div>'+
         `<button type="button" class="btn quiet small" data-idx="${idx}" title="Remover">✕</button>`;
@@ -2701,13 +2707,13 @@ document.addEventListener("DOMContentLoaded", () => {
     div.innerHTML =
       `<span class="scans-ico">${iconForMime(f.mimeType)}</span>`+
       '<div class="scans-item-info">'+
-        `<div class="scans-item-nome">${escHtml(f.fileName)}</div>`+
+        `<div class="scans-item-nome">${_escHtml(f.fileName)}</div>`+
         `<div class="scans-item-meta">${fmtData(f.createdAt)}${badge ? ' · '+badge : ''}</div>`+
       '</div>'+
       '<div class="scans-item-actions">'+
         `<a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>`+
         btnPdf+
-        `<button class="btn danger small" data-fileid="${escHtml(f.fileId)}" data-restype="${escHtml(f.resourceType||'image')}" data-name="${escHtml(f.fileName)}" title="Excluir">🗑️ Excluir</button>`+
+        `<button class="btn danger small" data-fileid="${_escHtml(f.fileId)}" data-restype="${_escHtml(f.resourceType||'image')}" data-name="${_escHtml(f.fileName)}" title="Excluir">🗑️ Excluir</button>`+
       '</div>';
     // Excluir só MARCA o scan (riscado + "Desfazer"); o arquivo do Cloudinary e o
     // doc só somem em "Salvar no banco". Clicar de novo desfaz a marcação.
