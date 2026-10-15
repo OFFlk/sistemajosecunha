@@ -96,8 +96,8 @@
 ============================================================ -->
 <div class="wrap">
 
-  <div id="avisoAdminTodasEscolas" class="aviso-warn" hidden>
-    ⚠️ Os dados não podem ser exibidos enquanto <b>"Todas as escolas"</b> estiver selecionado no seletor do header. Por favor, selecione uma escola válida.
+  <div id="avisoSemEscola" class="aviso-warn" hidden>
+    ⚠️ Escolha uma escola no topo da página para pesquisar atas.
   </div>
 
   <!-- Filtros -->
@@ -119,6 +119,7 @@
           <option>MATUTINO</option>
           <option>VESPERTINO</option>
           <option>NOTURNO</option>
+          <option>INTEGRAL</option>
         </select>
       </div>
 
@@ -241,7 +242,7 @@
 <!-- SCRIPT 3 — DB por escola (Namespacing) + lógica principal da página -->
 <script>
 /* =========================
-   Toasts padronizados + modal de confirmação (ver guia-toasts.md)
+   Toasts padronizados (guia, seção 10)
 ========================= */
 // ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
 // "carregando" não expira: fecha pelo próximo toast ou por _toastLimpar() (só ele; nunca apaga sucesso/erro/aviso).
@@ -448,10 +449,11 @@ function serieChave(s) {
   return norm(s).replace(/[ºª°]/g, "").replace(/\s+/g, " ").trim();
 }
 function seriesDaTurma(t) {
-  const arr = (Array.isArray(t.seriesTurma) && t.seriesTurma.length) ? t.seriesTurma
-            : (Array.isArray(t.series) && t.series.length) ? t.series
-            : String(t.serieTexto || "").split(/\s*(?:,|;|\be\b)\s*/i);
-  return new Set(arr.map(serieChave).filter(Boolean));
+  return new Set((Array.isArray(t.series) ? t.series : []).map(serieChave).filter(Boolean));
+}
+// Série(s) em texto, a partir do campo `series` (modelo atual, gravado pelo cadastro-turmas).
+function serieTextoDaTurma(t) {
+  return formatarListaBonita(Array.isArray(t && t.series) ? t.series : []);
 }
 function preencherFiltroSerie() {
   const sel = document.getElementById("selSerieAdd");
@@ -551,7 +553,7 @@ async function _consultaTurmas({ ano, turno, series }) {
       snap = await montar(false).get();
     } else { throw e; }
   }
-  return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ _id: d.id, ...d.data() })).filter(t => t.turmaId);   // só modelo atual (com turmaId)
 }
 
 // Busca no Firestore SÓ o que os filtros pedem: ano, turno e série viram consulta. Sem nenhum dos três, lê tudo (pedido explícito).
@@ -573,7 +575,7 @@ async function buscarTurmasNoBanco() {
     r = [...porTexto, ...porNumero].filter(t => !vistos.has(t._id) && vistos.add(t._id));
   }
   else if (turno || series.length) r = await _consultaTurmas({ turno, series });
-  else               r = await DB.turmas.list();   // nenhum filtro: leitura completa, só porque você pediu
+  else               r = (await DB.turmas.list()).filter(t => t.turmaId);   // nenhum filtro: leitura completa, só porque você pediu
   r.forEach(t => _memoria.set(t._id, t));
   _buscasFeitas.push(q);
   return r;
@@ -601,8 +603,8 @@ function ordenarTurmas(lista) {
       : anoB.localeCompare(anoA, 'pt-BR');   // decrescente: mais recente primeiro
     if (cmpAno !== 0) return cmpAno;
     // desempata por número de série (sempre crescente)
-    const nA = numSerie(a.serieTexto || (a.seriesTurma && a.seriesTurma[0]) || '');
-    const nB = numSerie(b.serieTexto || (b.seriesTurma && b.seriesTurma[0]) || '');
+    const nA = numSerie(serieTextoDaTurma(a));
+    const nB = numSerie(serieTextoDaTurma(b));
     return nA - nB;
   });
 }
@@ -617,21 +619,19 @@ function renderListaTurmas(lista) {
   }
 
   lista.forEach(t => {
-    const tid = t.id || t._id || t.turmaId;
+    const tid = t.turmaId;
     const div = document.createElement("div");
     div.className = "list-item";
     div.dataset.turmaId = tid;
     div.addEventListener("click", () => selecionarTurma(tid));
 
-    const serieTxt = t.serieTexto || (t.seriesTurma && t.seriesTurma.length ? formatarListaBonita(t.seriesTurma) : "");
+    const serieTxt = serieTextoDaTurma(t);
     const anoTxt = t.anoLetivo ? String(t.anoLetivo) : "?";
     const turnoTxt = t.turno || "?";
     const alunosTxt = (t.alunos?.length ?? 0) + " aluno(s)";
 
-    const abaUpper = String(t.aba || "").trim().toUpperCase();
-    const titulo = (t.aba && !["MANUAL","CADASTRO"].includes(abaUpper))
-      ? t.aba
-      : `${serieTxt || "Turma"}${t.anoLetivo ? " " + t.anoLetivo : ""}`.trim();
+    // Título = nome da turma (campo `nome` do cadastro-turmas). `aba` é só a origem ("MANUAL"), não um nome.
+    const titulo = t.nome || `${serieTxt || "Turma"}${t.anoLetivo ? " " + t.anoLetivo : ""}`.trim();
 
     div.innerHTML = `
       <div class="left">
@@ -648,7 +648,7 @@ function renderListaTurmas(lista) {
         </div>
       </div>
       <div class="right" onclick="event.stopPropagation()">
-        <button class="btn primary small" type="button" onclick="selecionarTurma('${tid}')">Abrir</button>
+        <button class="btn primary small" type="button" onclick="selecionarTurma('${_escHtml(tid)}')">Abrir</button>
       </div>
     `;
 
@@ -661,10 +661,10 @@ function renderListaTurmas(lista) {
 ========================= */
 // Abre uma turma que pode não estar na lista atual (ex.: vinda da pesquisa por aluno): lê só ela (1 leitura).
 async function abrirTurmaPorId(id) {
-  if (!turmas.some(t => (t.id || t._id || t.turmaId) === id)) {
+  if (!turmas.some(t => t.turmaId === id)) {
     try {
       const t = await DB.turmas.get(id);
-      if (!t) { setMsg("Turma não encontrada.", "err"); return; }
+      if (!t || !t.turmaId) { setMsg("Turma não encontrada.", "err"); return; }
       turmasTodas.push(t);
       recomputarTurmasBase();
     } catch(e) {
@@ -677,20 +677,20 @@ async function abrirTurmaPorId(id) {
 window.abrirTurmaPorId = abrirTurmaPorId;
 
 function selecionarTurma(id) {
-  turmaSelecionada = turmas.find(t => (t.id || t._id || t.turmaId) === id) || null;
+  turmaSelecionada = turmas.find(t => t.turmaId === id) || null;
 
   document.getElementById("detalhesVazio").style.display = turmaSelecionada ? "none" : "block";
   document.getElementById("detalhesBox").style.display = turmaSelecionada ? "block" : "none";
 
   if (!turmaSelecionada) return;
 
-  const serieTxt = turmaSelecionada.serieTexto ||
-    (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "?");
+  const serieTxt = serieTextoDaTurma(turmaSelecionada) || "?";
+  const _origem = String(turmaSelecionada.origemArquivo || "").trim();
 
   document.getElementById("detalhesMeta").innerHTML =
-    `<b>${_escHtml(turmaSelecionada.aba || turmaSelecionada.nome || "Turma")}</b><br>` +
-    `ID: ${_escHtml(turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId || "?")}<br>` +
-    (turmaSelecionada.origemArquivo ? `Arquivo: ${_escHtml(turmaSelecionada.origemArquivo)}<br>` : '') +
+    `<b>${_escHtml(turmaSelecionada.nome || "Turma")}</b><br>` +
+    `ID: ${_escHtml(turmaSelecionada.turmaId || "?")}<br>` +
+    (_origem && _origem.toUpperCase() !== "MANUAL" ? `Arquivo: ${_escHtml(_origem)}<br>` : '') +
     `Ano: <b>${_escHtml(turmaSelecionada.anoLetivo || "?")}</b> · Turno: <b>${_escHtml(turmaSelecionada.turno || "?")}</b> · Série: <b>${_escHtml(serieTxt)}</b>`;
 
   const btnEditarTurma = document.getElementById('btnEditarTurma');
@@ -761,7 +761,7 @@ function editarTurmaSelecionada() {
     return;
   }
   
-  const turmaId = turmaSelecionada.id || turmaSelecionada._id || turmaSelecionada.turmaId;
+  const turmaId = turmaSelecionada.turmaId;
   if (!turmaId) {
     setMsg("ID da turma não encontrado.", "err");
     return;
@@ -813,8 +813,8 @@ function renderResumoTurma(t) {
   const cont = contarResultados(alunos);
 
   const linhas = [];
-  linhas.push(`Turma: ${t.aba || "?"}`);
-  linhas.push(`Ano: ${t.anoLetivo || "?"} | Turno: ${t.turno || "?"} | Série: ${t.serieTexto || "?"}`);
+  linhas.push(`Turma: ${t.nome || "?"}`);
+  linhas.push(`Ano: ${t.anoLetivo || "?"} | Turno: ${t.turno || "?"} | Série: ${serieTextoDaTurma(t) || "?"}`);
   linhas.push(`Alunos: ${alunos.length}`);
   linhas.push("");
   linhas.push("Resultados:");
@@ -842,9 +842,8 @@ function aplicarFiltros() {
   if (fBusca) {
     lista = lista.filter(t => {
       const base =
-        norm(t.aba || "") + " " +
-        norm(t.origemArquivo || "") + " " +
-        norm(t.serieTexto || "") + " " +
+        norm(t.nome || "") + " " +
+        norm(serieTextoDaTurma(t)) + " " +
         norm(t.turno || "") + " " +
         norm(t.anoLetivo || "");
       if (base.includes(fBusca)) return true;
@@ -859,15 +858,11 @@ function aplicarFiltros() {
    Exportar PDF
 ========================= */
 // Nome de arquivo compartilhado por PDF e CSV: pelo identificador da turma
-// (série + ano + turno), não por "aba" — em turmas criadas manualmente (não
-// importadas de planilha) esse campo guarda a ORIGEM do cadastro ("MANUAL"),
-// não um nome, e o arquivo saía "ata_MANUAL.pdf" pra qualquer turma cadastrada
-// assim. "aba" só entra como último recurso se os três campos vierem vazios.
+// (série + ano + turno). O nome da turma só entra como último recurso se os três vierem vazios.
 function _nomeArquivoAta(turma, extensao){
-  const serieTxt = turma.serieTexto ||
-    (turma.seriesTurma?.length ? formatarListaBonita(turma.seriesTurma) : "");
+  const serieTxt = serieTextoDaTurma(turma);
   const idPartes = [serieTxt, turma.anoLetivo || "", turma.turno || ""].filter(Boolean).join("_");
-  const safe = String(idPartes || turma.aba || "turma")
+  const safe = String(idPartes || turma.nome || "turma")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
     .replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, "_");
   return `ATA_${safe}.${extensao}`;
@@ -1059,8 +1054,7 @@ async function _exportarPDFDaTurmaInterno() {
 
   const escola = await carregarDadosEscola();
 
-  const serieTxt = turmaSelecionada.serieTexto ||
-    (turmaSelecionada.seriesTurma?.length ? formatarListaBonita(turmaSelecionada.seriesTurma) : "");
+  const serieTxt = serieTextoDaTurma(turmaSelecionada);
   const ano   = turmaSelecionada.anoLetivo || "";
   const turno = turmaSelecionada.turno || "";
 
@@ -1163,11 +1157,21 @@ function _exportarCSVDaTurmaInterno() {
 /* =========================
    Boot
 ========================= */
-async function carregar() {
-  await new Promise(res=>{
-    if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-    document.addEventListener('auth:ready', res, {once:true});
+// Espera o Auth pronto antes de ler o banco (guia, 18.1): getSession() responde na hora, mas Auth.db ainda não existe.
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+    if(window.Auth && Auth.onReady) Auth.onReady(resolve); else resolve();
   });
+}
+let _semEscola = false;   // admin global com "Todas as escolas" (guia 18.3)
+
+async function carregar() {
+  try {
+  await _authPronto();
+  _semEscola = !!(window.Auth && typeof Auth.semEscola === 'function' && Auth.semEscola());
+  const avisoSemEscola = document.getElementById("avisoSemEscola");
+  if(avisoSemEscola) avisoSemEscola.hidden = !_semEscola;
 
   recomputarTurmasBase();
 
@@ -1202,7 +1206,7 @@ async function carregar() {
     } catch(e) {
       console.warn("[pesquisa-ata] Falha ao buscar turmas:", e);
       box.innerHTML = `<div class="aviso-warn">Não foi possível buscar as turmas agora.</div>`;
-      setMsg("Não foi possível buscar as turmas. Tente novamente.", "err");
+      if (!_semEscola) setMsg("Não foi possível buscar as turmas. Tente novamente.", "err");
     } finally {
       btn.disabled = false;
     }
@@ -1232,19 +1236,17 @@ async function carregar() {
     if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
   }catch(e){ console.warn('ajustarContraste:', e); }
 
-  // Admin global com "Todas as escolas" (guia, seção 19): só avisa; o header recarrega a página ao trocar de escola.
-  try{
-    const sid = (window.Auth && typeof Auth.getActiveSchoolId === 'function') ? Auth.getActiveSchoolId() : '';
-    const avisoAdmin = document.getElementById("avisoAdminTodasEscolas");
-    if(avisoAdmin) avisoAdmin.hidden = String(sid || '').toUpperCase() !== 'ADMIN';
-  }catch(_){}
-
   // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
   document.addEventListener("click", ()=>{
     document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
   });
 
-  Loading.esconder();
+  } catch(e) {
+    console.error('[pesquisa-ata] carregar:', e);
+    setMsg('Erro ao carregar a página — recarregue e tente de novo.', 'err');
+  } finally {
+    Loading.esconder();
+  }
 }
 
 let _jaFoiPesquisado = false;
@@ -1266,15 +1268,6 @@ document.addEventListener("DOMContentLoaded", carregar);
       .toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/\s+/g, " ");
-  }
-
-  function escapeHtml(s){
-    return String(s||"")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
   }
 
   window.limparPesquisaAluno = function(){
@@ -1328,7 +1321,7 @@ document.addEventListener("DOMContentLoaded", carregar);
 
       if (!achados.length){
         out.innerHTML = `<div class="aviso-warn">
-          Nenhuma ocorrência encontrada para <b>${escapeHtml(qEl.value)}</b>.
+          Nenhuma ocorrência encontrada para <b>${_escHtml(qEl.value)}</b>.
         </div>`;
         return;
       }
@@ -1343,10 +1336,10 @@ document.addEventListener("DOMContentLoaded", carregar);
       out.innerHTML = achados.map(h => `
       <div class="aluno-result-row">
         <div class="aluno-result-info">
-          <div><b>${escapeHtml(h.ano || "?")}</b> — ${escapeHtml(h.serie || "?")} — <b>${escapeHtml(h.aluno)}</b>${h.resultado ? " — " + escapeHtml(h.resultado) : ""}</div>
+          <div><b>${_escHtml(h.ano || "?")}</b> — ${_escHtml(h.serie || "?")} — <b>${_escHtml(h.aluno)}</b>${h.resultado ? " — " + _escHtml(h.resultado) : ""}</div>
         </div>
         <div class="aluno-result-actions">
-          <button class="btn secondary small" type="button" onclick="abrirTurmaPorId('${escapeHtml(h.id)}')">Abrir</button>
+          <button class="btn secondary small" type="button" onclick="abrirTurmaPorId('${_escHtml(h.id)}')">Abrir</button>
         </div>
       </div>
     `).join("") + (temMais ? `<div class="aviso-warn">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
