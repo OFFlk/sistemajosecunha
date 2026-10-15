@@ -264,15 +264,16 @@ html[data-theme="dark"]{
   background:var(--ativo-bg); color:var(--ativo-color); border:1px solid var(--ativo-border);
 }
 
-/* ⚠️ TABELA — mantida como estava (seletores de elemento, valem pro sistema
-   todo). Divergência conhecida: aqui células centralizadas, borda em volta;
-   o cadastro usa alinhado à esquerda e só borda inferior. Decidir no guia. */
+/* TABELA — seletores de elemento, valem para o sistema todo. Alinhamento à esquerda (padrão).
+   Borda: grade completa. (Cadastro de alunos usa só borda inferior: decidir ao migrá-lo.) */
 table{ width:100%; border-collapse:collapse; font-size:13px; }
-th, td{ padding:8px 10px; text-align:center; border:1px solid var(--border); }
+th, td{ padding:8px 10px; text-align:left; border:1px solid var(--border); }
 th{ background:var(--tbtn-bg); font-weight:800; font-size:12px; color:var(--muted); }
 td{ color:var(--text); }
-/* alinhamento à esquerda: <table class="left">. Vai no th/td (via classe da
-   tabela), NUNCA no <tr> (text-align no tr não vence o th/td global). */
+/* alinhamento: ESQUERDA é o padrão. Para centralizar: <table class="center">.
+   Vai no th/td (via classe da tabela), NUNCA no <tr> (text-align no tr não vence o th/td global).
+   table.left = nome antigo, continua aceito (não faz nada além do padrão). */
+table.center :is(th, td){ text-align:center; }
 table.left :is(th, td){ text-align:left; }
 
 
@@ -505,6 +506,33 @@ html[data-theme="dark"] .config-card.card-destaque{
 }
 .dest-tit{ display:flex; align-items:center; font-size:14px; font-weight:800; margin-bottom:10px; }
 .card-destaque .dest-tit{ color:var(--dest-fg); }
+
+/* ── CARD RECOLHÍVEL (cabeçalho + seta + corpo). Comportamento: guia, seção 4.3.
+   Só a seta recolhe; recolhido, o cabeçalho inteiro abre (.fechada = cabeçalho de card recolhido, por JS).
+   A seta é um <button class="sec-toggle"> (também funciona com <span>). Padding da seta compensado com
+   margem negativa: a área clicável cresce e o layout não muda. ── */
+.sec-header{ display:flex; align-items:center; justify-content:space-between; cursor:default; user-select:none; }
+.sec-header.fechada{ cursor:pointer; }
+.card:not(.card-destaque) .sec-header.fechada:hover :is(h2, h3, h4){ color:var(--ui-brand-text); }
+.sec-toggle{
+  background:transparent; border:0; color:inherit; font:inherit; font-size:16px; line-height:1;
+  display:inline-block; cursor:pointer; padding:4px 8px; margin:-4px -8px;
+  transition:transform .2s;
+}
+.sec-toggle.collapsed{ transform:rotate(-90deg); }
+.sec-body.collapsed{ display:none; }
+.card-destaque .sec-toggle{ color:var(--dest-fg); }
+
+/* ── CAIXA DE NÚMERO (.stat-box): número grande + rótulo. A linha que as agrupa (.stats-row) é layout da página. ── */
+.stat-box{
+  flex:1; min-width:120px; background:var(--ui-brand-faded);
+  border:1px solid var(--ui-border); border-radius:10px; padding:12px 16px; text-align:center;
+}
+.stat-num{ font-size:26px; font-weight:800; color:var(--ui-brand-text); line-height:1; }
+.stat-lbl{ font-size:12px; color:var(--ui-muted); margin-top:4px; }
+/* sobre o destaque: fundo liso (como o painel) */
+.card-destaque .stat-box{ background:var(--ui-cell-bg); border-color:transparent; }
+.card-destaque.contraste-claro .stat-box{ border-color:var(--ui-border); }
 
 /* tabela dentro do destaque: célula neutra, cabeçalho com o véu do card */
 .card-destaque td{ background:var(--ui-table-cell-bg); }
