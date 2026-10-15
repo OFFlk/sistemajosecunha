@@ -32,8 +32,6 @@
 .ch-card{ --card-gap:14px; }                 /* todos os cards são filhos diretos de .wrap, com a mesma largura */
 .ch-card > .section-title{ margin:0 0 10px; }
 .ch-aviso{ margin-bottom:14px; }
-.ch-nota{ margin-top:8px; }
-.ch-sub-tit{ font-weight:700; margin-bottom:8px; }
 .ch-regras{ margin-top:8px; }
 .toolbar{ display:flex; gap:8px; flex-wrap:wrap; }
 
@@ -76,13 +74,9 @@
 .simnao-panel{ display:none; margin-top:10px; }
 .simnao-panel.open{ display:block; }
 
-/* chips removíveis (com ×) sobre o card de destaque: fundo liso (guia 6) */
+/* chips removíveis (com ×) sobre o card de destaque: nível neutral (único nível de chip da página) */
 .ch-chips{ display:flex; flex-wrap:wrap; gap:6px; }
-.ch-chip{
-  display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px;
-  font-size:11px; font-weight:700;
-  background:var(--ui-cell-bg); color:var(--ui-text); border:1px solid var(--ui-border);
-}
+.ch-chip{ display:inline-flex; align-items:center; gap:6px; margin-left:0; }   /* cor/nível vêm do .badge.neutral */
 .ch-chip-x{ border:none; background:transparent; color:inherit; cursor:pointer; font-weight:700; font-family:inherit; font-size:inherit; line-height:1; padding:0 2px; }
 
 /* tabela de regras: só layout (larguras por coluna, rolagem horizontal) */
@@ -115,13 +109,12 @@
   </div>
 
   <div class="card ch-card">
-    <h3 class="section-title">Carga horária por disciplina (todas na mesma regra) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Cada matéria deverá ter uma carga horária. Consulte o documento oficial de carga horária do sistema da sua escola.</span></span></h3>
+    <h3 class="section-title">Carga horária por disciplina (todas na mesma regra) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cada matéria deverá ter uma carga horária. Consulte o documento oficial de carga horária do sistema da sua escola. Preencha as disciplinas necessárias; campos em branco ficam sem CH nesta regra.</span></span></h3>
     <div id="chCargasGrid" class="ch-cargas-grid"></div>
-    <div class="subnote ch-nota">Preencha as disciplinas necessárias. Campos em branco ficam sem CH nesta regra.</div>
   </div>
 
   <div class="card ch-card">
-    <h3 class="section-title">Turno 2</h3>
+    <h3 class="section-title">Turno 2 <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Só é usado nos anos letivos em que o histórico exige a seção "TURNO 02". Campos em branco ficam sem CH nesta regra.</span></span></h3>
     <div class="simnao-header">
       <div class="simnao-label">Este schema tem Turno 2 (Complementação Escolar / modelo integral)?</div>
       <div class="simnao-toggle">
@@ -131,9 +124,7 @@
     </div>
     <input type="hidden" id="chTemTurno2" value="0">
     <div id="chCargasGridT2Wrap" class="simnao-panel">
-      <div class="ch-sub-tit">Carga horária das atividades complementares (Turno 2)</div>
       <div id="chCargasGridT2" class="ch-cargas-grid"></div>
-      <div class="subnote ch-nota">Só é usado nos anos letivos em que o histórico exige a seção "TURNO 02". Campos em branco ficam sem CH nesta regra.</div>
     </div>
   </div>
 
@@ -164,7 +155,7 @@
       <div class="ch-aplic-col">
         <div class="row">
           <div class="field ch-f-serie">
-            <label for="chSerieSelect">Série(s) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Você poderá adicionar múltiplas séries para um schema. Elas filtram qual schema o aluno recebe na exportação da página de histórico, juntamente com os anos cadastrados ao lado.</span></span></label>
+            <label for="chSerieSelect">Série(s) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Você poderá adicionar múltiplas séries para um schema. Elas filtram qual schema o aluno recebe na exportação da página de histórico, juntamente com os anos cadastrados ao lado. Sem nenhuma série adicionada, a regra vale para todas as séries do ano letivo.</span></span></label>
             <select id="chSerieSelect">
               <option value="" disabled hidden selected>Escolha a série…</option>
               <option value="ALFABETIZAÇÃO">Alfabetização</option>
@@ -193,7 +184,7 @@
           <button type="button" class="btn outline field-h" onclick="chAddSerieSelecionada()">Adicionar</button>
           <button type="button" class="btn outline field-h" onclick="chLimparSeries()">Limpar séries</button>
         </div>
-        <div id="chSeriesSelecionadas" class="ch-chips"><span class="subnote">Nenhuma série adicionada (regra vale pra todas as séries do ano letivo).</span></div>
+        <div id="chSeriesSelecionadas" class="ch-chips"><span class="subnote">Nenhuma série adicionada.</span></div>
       </div>
     </div>
 
@@ -376,8 +367,8 @@ function chColetaAnosDetectados(){
 function chRenderSeriesSelecionadas(){
   const box=document.getElementById('chSeriesSelecionadas'); if(!box) return;
   const series=chState.editor.series||[];
-  if(!series.length){ box.innerHTML='<span class="subnote">Nenhuma série adicionada (regra vale pra todas as séries do ano letivo).</span>'; return; }
-  box.innerHTML = series.map(s=>`<span class="ch-chip">${esc(s)}<button type="button" class="ch-chip-x" data-del-serie="${esc(s)}" aria-label="Remover ${esc(s)}">×</button></span>`).join('');
+  if(!series.length){ box.innerHTML='<span class="subnote">Nenhuma série adicionada.</span>'; return; }
+  box.innerHTML = series.map(s=>`<span class="badge small neutral ch-chip">${esc(s)}<button type="button" class="ch-chip-x" data-del-serie="${esc(s)}" aria-label="Remover ${esc(s)}">×</button></span>`).join('');
   box.querySelectorAll('[data-del-serie]').forEach(b=>b.addEventListener('click',()=>{ chState.editor.series=(chState.editor.series||[]).filter(x=>x!==b.getAttribute('data-del-serie')); chRenderSeriesSelecionadas(); }));
 }
 function chAddSerieSelecionada(){
@@ -394,7 +385,7 @@ function chRenderAnosSelecionados(){
   const box=document.getElementById('chAnosSelecionados'); if(!box) return;
   const anos=[...(chState.editor.anos||[])].sort(chAnoSort);
   if(!anos.length){ box.innerHTML='<span class="subnote">Nenhum ano adicionado.</span>'; return; }
-  box.innerHTML = anos.map(a=>`<span class="ch-chip">${esc(a)}<button type="button" class="ch-chip-x" data-del-ano="${esc(a)}" aria-label="Remover ${esc(a)}">×</button></span>`).join('');
+  box.innerHTML = anos.map(a=>`<span class="badge small neutral ch-chip">${esc(a)}<button type="button" class="ch-chip-x" data-del-ano="${esc(a)}" aria-label="Remover ${esc(a)}">×</button></span>`).join('');
   box.querySelectorAll('[data-del-ano]').forEach(b=>b.addEventListener('click',()=>{ chState.editor.anos=(chState.editor.anos||[]).filter(x=>x!==b.getAttribute('data-del-ano')); chRenderAnosSelecionados(); chRenderAnoSelect(); }));
 }
 function chRenderAnoSelect(){
