@@ -325,6 +325,16 @@
       return activeSchoolId(this.getSession());
     },
 
+    /**
+     * true quando NÃO há escola definida: sem sessão, ou admin global em
+     * "Todas as escolas" (getActiveSchoolId() devolve o marcador 'ADMIN',
+     * que não é uma escola). Usado pelas páginas para o aviso de admin sem escola.
+     */
+    semEscola() {
+      const sid = activeSchoolId(this.getSession());
+      return !sid || String(sid).trim().toUpperCase() === 'ADMIN';
+    },
+
     /** Recarrega o perfil do usuário autenticado e atualiza a sessão. */
     async refreshSession() {
       const user = _auth && _auth.currentUser;
