@@ -34,11 +34,17 @@
 
 /* ── Tabelas (aparência é global; aqui só rolagem, larguras e alinhamento) ── */
 .tbl-wrap { overflow-x: auto; }
-.col-nome { min-width: 130px; }
+/* tabela de escolas: nome grande, mas sem tomar a tabela inteira; id pode quebrar linha (sem scroll lateral) */
+.col-nome { width: 36%; min-width: 130px; }
+.col-disp { width: 22%; }
+.col-id   { overflow-wrap: anywhere; }
+.col-txt  { min-width: 130px; }
 .col-fit  { width: 1%; white-space: nowrap; }
 /* coluna de ações: encolhe ao tamanho dos botões e fica centralizada (exceção ao alinhamento à esquerda) */
 .col-acoes { width: 1%; white-space: nowrap; text-align: center; padding-left: 14px; padding-right: 14px; }
-.row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.row-actions { display: flex; gap: 6px; justify-content: center; }
+/* admin global: Editar | Excluir na primeira linha, Schema padrão ocupando a linha de baixo */
+.row-actions.grade { display: grid; grid-template-columns: repeat(2, max-content); }
 .row-actions .full { grid-column: 1 / -1; }
 </style>
 </head>
@@ -80,15 +86,14 @@
     <div class="card" id="cardList">
       <div class="card-head">
         <div class="section-title">Escolas cadastradas</div>
-        <span class="badge gray" id="count">—</span>
       </div>
       <div class="tbl-wrap" id="wrapEscolas" hidden>
         <table>
           <thead>
             <tr>
               <th class="col-nome">Nome</th>
-              <th class="col-fit">Nome de exibição</th>
-              <th class="col-fit">schoolId</th>
+              <th class="col-disp">Nome de exibição</th>
+              <th class="col-id">schoolId</th>
               <th class="col-acoes">Ações</th>
             </tr>
           </thead>
@@ -98,19 +103,36 @@
       <div class="aviso-warn" id="avisoEscolas">ℹ️ Carregando…</div>
     </div>
 
+    <!-- Card: solicitações pendentes da própria escola (gestor). Só aparece enquanto há pendência. -->
+    <div class="card" id="cardMinhasReq" hidden>
+      <div class="card-head">
+        <div class="section-title">Solicitações pendentes</div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-txt">Solicitado por</th>
+              <th class="col-txt">Alterações</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyMinhasReq"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Card: solicitações de alteração -->
     <div class="card" id="cardApprovals" style="display:none;">
       <div class="card-head">
         <div class="section-title">Solicitações de alteração <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">As solicitações de alteração feitas por gestores de escola aparecem aqui, aguardando sua aprovação ou reprovação.</span></span></div>
-        <span class="badge gray" id="reqCount">—</span>
       </div>
       <div class="tbl-wrap" id="wrapReq" hidden>
         <table>
           <thead>
             <tr>
               <th class="col-fit">Escola</th>
-              <th class="col-nome">Solicitado por</th>
-              <th class="col-nome">Alterações</th>
+              <th class="col-txt">Solicitado por</th>
+              <th class="col-txt">Alterações</th>
               <th class="col-acoes">Ações</th>
             </tr>
           </thead>
@@ -233,19 +255,35 @@
     catch(e){ console.warn('[admin_escolas] ajustarContraste falhou:', e); }
   }
 
-  // ── Estado de lista / contagem ──
+  // Reset completo após uma ação: o toast é guardado e mostrado depois do reload (senão se perderia).
+  const TOAST_POS_RELOAD = 'admin_escolas_toast_v1';
+  function recarregarComToast(msg){
+    try{
+      sessionStorage.setItem(TOAST_POS_RELOAD, msg);
+      location.reload();
+    }catch(_){
+      setMsg(msg, 'ok');
+      setTimeout(() => location.reload(), 1500);
+    }
+  }
+  function mostrarToastPendente(){
+    try{
+      const m = sessionStorage.getItem(TOAST_POS_RELOAD);
+      if(m){ sessionStorage.removeItem(TOAST_POS_RELOAD); setMsg(m, 'ok'); }
+    }catch(_){}
+  }
+
+  // "campo: valor | campo: valor" — mesmo formato nas tabelas do admin e do gestor
+  function fmtAlteracoes(ch){
+    return Object.entries(ch||{}).map(([k,v]) => k+': '+v).join(' | ') || '—';
+  }
+
+  // ── Estado de lista ──
   // Com itens → mostra a tabela; sem itens (vazio, carregando, falha) → só o aviso, como irmão da tabela.
   function setEstadoLista(wrapId, avisoId, temItens, texto){
     const wrap = document.getElementById(wrapId), av = document.getElementById(avisoId);
     if(wrap) wrap.hidden = !temItens;
     if(av){ av.hidden = temItens; if(!temItens) av.textContent = texto || ''; }
-  }
-  // Contagem: neutro quando > 0, cinza quando 0 (guia, seção 6).
-  function setContagem(id, n, rotulo){
-    const e = document.getElementById(id);
-    if(!e) return;
-    e.textContent = (n + ' ' + (rotulo||'')).trim();
-    e.className = 'badge ' + (n > 0 ? 'neutral' : 'gray');
   }
 
   function slugifySchoolId(name){
@@ -264,6 +302,8 @@
   const $tbody       = document.getElementById('tbody');
   const $cardApprovals = document.getElementById('cardApprovals');
   const $tbodyReq    = document.getElementById('tbodyReq');
+  const $cardMinhasReq  = document.getElementById('cardMinhasReq');
+  const $tbodyMinhasReq = document.getElementById('tbodyMinhasReq');
 
   let idDirty   = false;
   let editingId = null;
@@ -370,8 +410,7 @@
           status: 'pending', changes
         };
         await Auth.db.collection('schools').doc(sid).collection('changeRequests').add(payload);
-        setMsg('Solicitação enviada! Aguarde aprovação do ADMIN.', 'ok');
-        btn.textContent = '✅ Enviado';
+        recarregarComToast('Solicitação enviada! Aguarde a aprovação do ADMIN.');
       }catch(e){
         // Diagnóstico: mostra código do erro + exatamente o que foi enviado,
         // pra comparar com o que as Rules de changeRequests aceitam.
@@ -401,8 +440,6 @@
         schools = schools.filter(s => String(s.schoolId||'').trim() === active);
       }
 
-      setContagem('count', schools.length, 'escola(s)');
-
       if(!schools.length){
         $tbody.innerHTML = '';
         setEstadoLista('wrapEscolas', 'avisoEscolas', false, 'ℹ️ Nenhuma escola cadastrada.');
@@ -418,15 +455,15 @@
         const tr   = document.createElement('tr');
         tr.innerHTML = `
           <td class="col-nome">${escapeHtml(nm||'—')}</td>
-          <td class="col-fit">${disp ? `<span class="badge">${escapeHtml(disp)}</span>` : '—'}</td>
-          <td class="col-fit"><span class="badge gray">${escapeHtml(sid)}</span></td>
+          <td class="col-disp">${disp ? `<span class="badge">${escapeHtml(disp)}</span>` : '—'}</td>
+          <td class="col-id"><span class="badge gray">${escapeHtml(sid)}</span></td>
           <td class="col-acoes">
-            <div class="row-actions">
+            <div class="row-actions${isMaster ? ' grade' : ''}">
               ${isMaster ? `
                 <button class="btn primary small" type="button" data-edit="${escapeHtml(sid)}" data-name="${escapeHtml(nm)}" data-display="${escapeHtml(disp)}">Editar</button>
                 <button class="btn danger-soft small" type="button" data-del="${escapeHtml(sid)}">Excluir</button>
-                <button class="btn secondary small full" type="button" data-schema-padrao="${escapeHtml(sid)}" title="Cria o schema padrão de Atas se a escola não tiver">Schema padrão</button>
-              ` : `<button class="btn primary small full" type="button" data-req-edit="${escapeHtml(sid)}" data-req-name="${escapeHtml(nm)}" data-req-display="${escapeHtml(disp)}">✏️ Solicitar edição</button>`}
+                <button class="btn outline small full" type="button" data-schema-padrao="${escapeHtml(sid)}" title="Cria o schema padrão de Atas se a escola não tiver">Schema padrão</button>
+              ` : `<button class="btn primary small" type="button" data-req-edit="${escapeHtml(sid)}" data-req-name="${escapeHtml(nm)}" data-req-display="${escapeHtml(disp)}">✏️ Solicitar edição</button>`}
             </div>
           </td>
         `;
@@ -623,7 +660,6 @@
       return;
     }
 
-    setContagem('reqCount', pending.length, '');
     // "Solicitado por" agora é um uid; tenta resolver nome/e-mail (admin global pode
     // listar usuários). Pedidos antigos guardaram o e-mail direto — caem no fallback.
     const byUid = {};
@@ -643,8 +679,8 @@
     $tbodyReq.innerHTML = pending.map(r => `
       <tr>
         <td class="col-fit"><span class="badge">${escapeHtml(escolaNome(r.schoolId))}</span></td>
-        <td class="col-nome">${escapeHtml(quem(r))}</td>
-        <td class="col-nome">${escapeHtml(Object.entries(r.changes||{}).map(([k,v])=>k+': '+v).join(' | ')||'—')}</td>
+        <td class="col-txt">${escapeHtml(quem(r))}</td>
+        <td class="col-txt">${escapeHtml(fmtAlteracoes(r.changes))}</td>
         <td class="col-acoes">
           <div class="row-actions">
             <button class="btn success-soft small" type="button" data-approve="${escapeHtml(r.id)}">Aprovar</button>
@@ -716,6 +752,49 @@
     });
   }
 
+  // Gestor: pendências da própria escola, só leitura. Lê só os documentos 'pending' desta escola
+  // (subcoleção, sem índice extra). Quando o admin decide, o status deixa de ser 'pending' e o
+  // card some: aprovado muda a tabela; reprovado não muda nada — sem leitura nem gravação a mais.
+  async function refreshMinhasSolicitacoes(){
+    const session  = Auth.getSession();
+    const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
+    if(isMaster || !$cardMinhasReq) return;
+    const sid = String(session?.schoolId||'').trim();
+    if(!sid) return;
+    try{
+      const snap = await Auth.db.collection('schools').doc(sid).collection('changeRequests')
+        .where('status', '==', 'pending')
+        .get();
+      const pend = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => r.type !== 'delete_user');   // exclusões de usuário têm fluxo próprio (cadastro_admin)
+      if(!pend.length){ $tbodyMinhasReq.innerHTML = ''; $cardMinhasReq.hidden = true; return; }
+
+      // "Solicitado por": o próprio gestor aparece como "Você"; só lê a lista de usuários se houver outro solicitante.
+      const byUid = {};
+      if(pend.some(r => r.requestedBy && r.requestedBy !== session.uid) && typeof Auth.listUsers === 'function'){
+        try{ (await Auth.listUsers(sid) || []).forEach(u => { if(u && u.uid) byUid[u.uid] = u; }); }
+        catch(e){ console.warn('[admin_escolas] listUsers p/ "solicitado por":', e); }
+      }
+      const quem = r => {
+        if(r.requestedBy === session.uid) return 'Você';
+        const u = byUid[r.requestedBy];
+        return u ? (u.name || u.email || r.requestedBy) : (r.requestedBy || '—');
+      };
+      $tbodyMinhasReq.innerHTML = pend.map(r => `
+        <tr>
+          <td class="col-txt">${escapeHtml(quem(r))}</td>
+          <td class="col-txt">${escapeHtml(fmtAlteracoes(r.changes))}</td>
+        </tr>
+      `).join('');
+      $cardMinhasReq.hidden = false;
+    }catch(e){
+      console.error('[admin_escolas] refreshMinhasSolicitacoes:', e);
+      $cardMinhasReq.hidden = true;
+      setMsg('Erro ao carregar suas solicitações pendentes: '+(e.message||e), 'err');
+    }
+  }
+
   document.addEventListener('auth:ready', async () => {
     const session  = Auth.getSession();
     const isMaster = session && String(session.schoolId||'').toUpperCase() === 'ADMIN';
@@ -726,9 +805,11 @@
     try{
       await renderSchoolRows();
       await refreshApprovals();
+      await refreshMinhasSolicitacoes();
     } finally {
       ajustarDestaque();
       try{ Loading.esconder(); }catch(_){}
+      mostrarToastPendente();
     }
   }, { once: true });
 
