@@ -867,11 +867,11 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
     <section class="card zona-perigo" id="zonaPerigo" style="display:none;">
       <h3>⚠️ Zona de perigo</h3>
       <p>
-        Excluir este funcionário remove o cadastro do banco de dados e todos os
-        documentos anexados no Cloudinary. Essa ação é permanente e não pode ser desfeita.
+        Excluir remove a matrícula deste ano. Se for o único ano cadastrado, o funcionário, a foto e os
+        documentos anexados no Cloudinary também são removidos. Essa ação é permanente e não pode ser desfeita.
       </p>
       <button type="button" id="btnExcluirFuncionario" class="btn danger">
-        🗑️ Excluir funcionário permanentemente
+        🗑️ Excluir matrícula
       </button>
     </section>
 
@@ -1044,18 +1044,31 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
   function normUpper(s){ return (s||'').toString().trim().replace(/\s+/g,' ').toUpperCase(); }
 
-  function gerarFuncId(){
-    return 'FUNC-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+  // ID do funcionário: contador atômico em system/contadores (campo funcionarioId), igual ao alunoId.
+  // Só chame na hora de gravar: consome o número e nunca reaproveita.
+  async function proximoFuncId(){
+    if(!window.Auth || !window.Auth.db) throw new Error('Auth.db indisponível para gerar o ID do funcionário.');
+    const ref = window.Auth.db.collection('system').doc('contadores');
+    const novo = await window.Auth.db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const atual = (snap.exists && typeof snap.data()?.funcionarioId === 'number') ? snap.data().funcionarioId : 0;
+      tx.set(ref, { funcionarioId: atual + 1, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return atual + 1;
+    });
+    return 'FUN-' + String(novo).padStart(6, '0');
   }
+  // A matrícula (vínculo pessoa × ano) tem ID determinístico: por isso o "já cadastrado neste ano" é uma leitura de 1 doc.
+  const matriculaIdDe = (ano, funcId) => `FMAT|${ano}|${funcId}`;
 
   function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 
   /* ════════════════════════════════════════
      Estado
   ════════════════════════════════════════ */
-  let funcionarios = [];
   let _funcoesExtras = [];
-  let _editandoId = null;
+  let _dadosEscola = null;        // doc da escola (1 leitura, reaproveitada pelo ano ativo e pelas funções extras)
+  let _editandoId = null;         // ID da MATRÍCULA em edição (FMAT|ano|funcId)
+  let _editandoFuncId = null;     // funcId da pessoa dona da matrícula em edição
   let _editandoViaURL = false; // true quando a edição veio de ?editar=ID na URL
 
   // Página de pesquisa pra onde volta ao cancelar/concluir edição via URL.
@@ -1083,8 +1096,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
   async function carregarAnoAtivo(){
     try{
-      const dados = await window.DB.loadAll();
-      const ano = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+      _dadosEscola = await window.DB.escola.get();   // 1 leitura (antes: DB.loadAll() lia turmas, atas, matrículas… só para achar o ano)
+      const ano = (_dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
       anoAtivoReal = ano && !isNaN(Number(ano)) ? parseInt(ano, 10) : new Date().getFullYear();
     } catch(e){
       console.warn('carregarAnoAtivo:', e);
@@ -1107,29 +1120,17 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
      Firestore
   ════════════════════════════════════════ */
   async function carregarDB(){
-    console.log('[DEBUG] carregarDB iniciou');
+    // Não existe mais leitura da coleção de funcionários aqui: o CPF é buscado pontualmente
+    // (whereEquals('cpfNum')) e a edição lê 1 matrícula. Só as funções extras vêm do doc da escola.
     try{
-      funcionarios = await window.DB.funcionarios.list();
-      console.log('[DEBUG] funcionarios carregados da coleção dedicada:', funcionarios.length);
-      const dadosEscola = await window.DB.escola.get();
+      const dadosEscola = _dadosEscola || await window.DB.escola.get();
       if(Array.isArray(dadosEscola?.funcoesCadastradas)){
         _funcoesExtras = dadosEscola.funcoesCadastradas;
       }
     } catch(e){
-      console.warn('carregarDB funcionarios:', e);
-      funcionarios = [];
+      console.warn('carregarDB funcoes:', e);
     }
-    console.log('[DEBUG] funcionarios carregados:', funcionarios.length, '| anoAtivo:', anoAtivo);
     popularFuncaoSelect();
-  }
-
-  // Salva UM funcionário — merge parcial no doc dele (coleção `funcionarios`),
-  // não mexe em mais nada. Substitui o antigo salvarDB(), que reescrevia o
-  // array funcionariosDB inteiro a cada mudança (era a raiz do bug de foto:
-  // qualquer save de qualquer funcionário podia clobar o que outra aba/save
-  // tivesse acabado de gravar).
-  async function salvarFuncionarioDoc(obj){
-    await window.DB.funcionarios.save({ _id: obj.funcId, ...obj });
   }
 
   /* ════════════════════════════════════════
@@ -1138,13 +1139,14 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
      em mais nada nem no doc de mais ninguém (era o problema do modelo
      antigo com o array único).
   ════════════════════════════════════════ */
-  window._getFuncionarioAtual = function(funcId){
-    return funcionarios.find(f => f.funcId === funcId) || null;
-  };
+  // A foto é da PESSOA: grava no doc do funcionário e copia para TODAS as matrículas dele
+  // (a pesquisa lê só as matrículas). Chamada pelo widget de foto, direto, em edição e após o salvar de um novo.
   window._setFotoFuncionario = async function(funcId, fotoUrl, fotoFileId){
-    const idx = funcionarios.findIndex(f => f.funcId === funcId);
-    if(idx >= 0) funcionarios[idx] = { ...funcionarios[idx], fotoUrl, fotoFileId };
-    await window.DB.funcionarios.save({ _id: funcId, fotoUrl, fotoFileId });
+    const foto = { fotoUrl: fotoUrl || null, fotoFileId: fotoFileId || null };
+    const mats = await window.DB.funcionariosMatriculas.whereEquals('funcId', funcId);
+    const ops = [{ col:'funcionarios', op:'set', id:funcId, data:foto }]
+      .concat(mats.map(m => ({ col:'funcionariosMatriculas', op:'set', id:m._id, data:foto })));
+    await window.DB.batchWrite(ops);
   };
 
   async function salvarFuncoesExtras(){
@@ -1862,9 +1864,13 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     document.getElementById('formComp').style.display='none';
 
     _editandoId = null;
+    _editandoFuncId = null;
     _editandoViaURL = false;
+    anoLetivoInput.readOnly = false;                                   // o ano só fica travado em edição
+    anoLetivoInput.closest('.field')?.classList.remove('field-locked');
 
     if(window.limparFotoFuncionario) window.limparFotoFuncionario();
+    if(window.limparDocsFuncionario) window.limparDocsFuncionario();
     if(window._identFunc) window._identFunc.limpar();   // volta a travar o formulário até o CPF ser informado
   }
 
@@ -1876,13 +1882,15 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
   document.getElementById('btnExcluirFuncionario').addEventListener('click', async function(){
     if(!_editandoId) return;
-    const funcId = _editandoId;
+    const matId  = _editandoId;
+    const funcId = _editandoFuncId;
+    const ano    = anoLetivoInput.value;
     const nome   = document.getElementById('nome').value.trim() || 'este funcionário';
     const btn = this;
 
     const confirmou = await _confirmModal({
-      titulo: 'Excluir funcionário?',
-      corpo: `Isso vai excluir <strong>${_escHtml(nome)}</strong> e todos os documentos anexados, permanentemente.\nDigite EXCLUIR (em maiúsculas) para confirmar.`,
+      titulo: 'Excluir matrícula?',
+      corpo: `Isso vai excluir a matrícula de <strong>${_escHtml(nome)}</strong> em <strong>${_escHtml(ano)}</strong>.\nSe for o único ano cadastrado, o funcionário, a foto e os documentos anexados também serão excluídos, permanentemente.\nDigite EXCLUIR (em maiúsculas) para confirmar.`,
       corDestaque: 'danger',
       textoConfirmar: 'Excluir',
       digitar: 'EXCLUIR'
@@ -1892,54 +1900,92 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     btn.disabled = true;
     btn.textContent = '⏳ Excluindo...';
     let avisoCloud = '';
+    let funcionarioRemovido = false;
 
     try{
-      // 1) Apaga a pasta de documentos no Cloudinary (melhor esforço —
-      //    se falhar, avisa mas continua removendo o cadastro do DB)
-      try{
-        const resp = await fetch(`/api/drive-delete-pasta-funcionario?funcionarioId=${encodeURIComponent(funcId)}`, { method:'DELETE' });
-        const data = await resp.json();
-        if(!resp.ok) throw new Error(data.error || 'Falha ao apagar documentos');
-      }catch(errCloud){
-        console.warn('Falha ao apagar documentos no Cloudinary:', errCloud.message);
-        avisoCloud = errCloud.message;   // vira aviso no toast final (um toast só substitui o outro)
-      }
+      // Quantas matrículas a pessoa tem? (só as dela: query pontual)
+      const mats = await window.DB.funcionariosMatriculas.whereEquals('funcId', funcId);
+      const outras = mats.filter(m => m._id !== matId);
 
-      // 2) Apaga a foto de perfil no Cloudinary, se houver (pasta separada
-      //    dos documentos — avatares/funcionarios/{funcId} — por isso
-      //    precisa de uma chamada à parte da exclusão de pasta acima)
-      const _alvoAtual = funcionarios.find(f => f.funcId === funcId);
-      if(_alvoAtual?.fotoFileId){
+      if(!outras.length){
+        // Último ano: a pessoa some junto. Primeiro a mídia no Cloudinary (melhor esforço: se falhar, avisa mas segue).
+        const pessoa = await window.DB.funcionarios.get(funcId);
         try{
-          await fetch('/api/drive-delete-funcionario', {
-            method: 'DELETE', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ fileId: _alvoAtual.fotoFileId, resourceType: 'image' }),
-          });
-        }catch(errFoto){ console.warn('Falha ao apagar foto de perfil no Cloudinary:', errFoto.message); }
+          const resp = await fetch(`/api/drive-delete-pasta-funcionario?funcionarioId=${encodeURIComponent(funcId)}`, { method:'DELETE' });
+          const data = await resp.json();
+          if(!resp.ok) throw new Error(data.error || 'Falha ao apagar documentos');
+        }catch(errCloud){
+          console.warn('Falha ao apagar documentos no Cloudinary:', errCloud.message);
+          avisoCloud = errCloud.message;   // vira aviso no toast final (um toast só substitui o outro)
+        }
+        // Foto de perfil: pasta separada (avatares/funcionarios/{funcId}), chamada à parte
+        if(pessoa?.fotoFileId){
+          try{
+            await fetch('/api/drive-delete-funcionario', {
+              method: 'DELETE', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ fileId: pessoa.fotoFileId, resourceType: 'image' }),
+            });
+          }catch(errFoto){ console.warn('Falha ao apagar foto de perfil no Cloudinary:', errFoto.message); }
+        }
+        await window.DB.batchWrite([
+          { col:'funcionariosMatriculas', op:'delete', id:matId },
+          { col:'funcionarios',           op:'delete', id:funcId },
+        ]);
+        funcionarioRemovido = true;
+      } else {
+        // A pessoa continua cadastrada em outros anos: só a matrícula sai (foto e documentos ficam)
+        await window.DB.batchWrite([{ col:'funcionariosMatriculas', op:'delete', id:matId }]);
       }
 
-      // 3) Remove o doc do funcionário (coleção dedicada, um por funcionário)
-      const idx = funcionarios.findIndex(f => f.funcId === funcId);
-      if(idx === -1) throw new Error('Funcionário não encontrado na lista local.');
-      funcionarios.splice(idx, 1);
-      await window.DB.funcionarios.remove(funcId);
-
-      // 4) Feedback e redireciona pra pesquisa
+      const oque = funcionarioRemovido ? 'Funcionário excluído' : `Matrícula de ${ano} excluída (o funcionário continua cadastrado em outros anos)`;
       if(avisoCloud){
-        setMsg('Funcionário excluído, mas não foi possível confirmar a exclusão dos documentos no Cloudinary (' + avisoCloud + '). Verifique a pasta manualmente. Redirecionando…', 'warn');
+        setMsg(oque + ', mas não foi possível confirmar a exclusão dos documentos no Cloudinary (' + avisoCloud + '). Verifique a pasta manualmente. Redirecionando…', 'warn');
         setTimeout(() => { location.href = PAGINA_PESQUISA; }, 4500);
       } else {
-        setMsg('Funcionário excluído. Redirecionando…', 'ok');
+        setMsg(oque + '. Redirecionando…', 'ok');
         setTimeout(() => { location.href = PAGINA_PESQUISA; }, 1500);
       }
 
     }catch(err){
-      console.error('Erro ao excluir funcionário:', err);
+      console.error('Erro ao excluir:', err);
       setMsg('Erro ao excluir: ' + err.message, 'err');
       btn.disabled = false;
-      btn.textContent = '🗑️ Excluir funcionário permanentemente';
+      btn.textContent = '🗑️ Excluir matrícula';
     }
   });
+
+  /* ════════════════════════════════════════
+     Plano de gravação (função pura: não lê nem escreve — só monta as operações do batch).
+     Regras do modelo pessoa × ano:
+       • doc da pessoa  = identidade + perfil MAIS RECENTE (editar um ano antigo não sobrescreve o perfil);
+       • matrícula      = cópia de TUDO (identidade + perfil do ano + dados do ano): a pesquisa lê só ela;
+       • outras matrículas da pessoa recebem a identidade nova SÓ se algo mudou (poupa gravações);
+       • doc do ano     = criado só se o ano ainda não existe.
+  ════════════════════════════════════════ */
+  function montarOpsGravacao({ funcId, matId, ano, novaPessoa, emEdicao, identidade, perfil, doAno, mats, anoExiste, fotoAtual, agora }){
+    const anoMaisRecente = Math.max(ano, ...mats.map(m => Number(m.anoLetivo) || 0));
+    const pessoa = { funcId, ...identidade };
+    if(novaPessoa) pessoa.criadoEm = agora;
+    if(novaPessoa || ano >= anoMaisRecente) Object.assign(pessoa, perfil);
+
+    const mat = { matriculaId: matId, funcId, anoLetivo: ano, ...identidade, ...perfil, ...doAno };
+    if(!emEdicao){
+      mat.criadoEm = agora;
+      if(fotoAtual){ mat.fotoUrl = fotoAtual.fotoUrl; mat.fotoFileId = fotoAtual.fotoFileId; }   // a foto atual da pessoa acompanha a matrícula nova
+    }
+
+    const ops = [
+      { col:'funcionarios',           op:'set', id:funcId, data:pessoa },
+      { col:'funcionariosMatriculas', op:'set', id:matId,  data:mat },
+    ];
+    if(!anoExiste) ops.push({ col:'funcionariosAnos', op:'set', id:String(ano), data:{ anoLetivo:ano, criadoEm:agora } });
+    const chaves = Object.keys(identidade);
+    mats.filter(m => m._id !== matId).forEach(m => {
+      const mudou = chaves.some(k => JSON.stringify(m[k] ?? null) !== JSON.stringify(identidade[k] ?? null));
+      if(mudou) ops.push({ col:'funcionariosMatriculas', op:'set', id:m._id, data:{ ...identidade } });
+    });
+    return ops;
+  }
 
   /* ════════════════════════════════════════
      Salvar funcionário (etapa 2)
@@ -2023,30 +2069,20 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     if(document.getElementById('chkVespertino').checked) turnos.push('VES');
     if(document.getElementById('chkNoturno').checked) turnos.push('NOT');
 
-    const funcId = _editandoId || gerarFuncId();
-
-    // Verifica duplicata de CPF no mesmo ano
-    if(!_editandoId){
-      const jaExiste = funcionarios.some(f => stripNum(f.cpf||'')===cpf && String(f.anoLetivo||f.ano)===String(anoAtivo));
-      if(jaExiste){
-        mostrarErroSalvar('CPF já cadastrado neste ano.');
-        voltarEtapa1();
-        return;
-      }
-    } else {
-      const outro = funcionarios.find(f => f.funcId!==funcId && stripNum(f.cpf||'')===cpf && String(f.anoLetivo||f.ano)===String(anoAtivo));
-      if(outro){
-        mostrarErroSalvar('CPF já em uso por outro funcionário neste ano.');
-        voltarEtapa1();
-        return;
-      }
+    // ── Dados em 3 grupos (ver DB.migrate / db_firebase.js): identidade (copiada p/ todas as matrículas),
+    //    perfil (retrato do ano; o doc da pessoa guarda o mais recente) e dados do ano (só na matrícula).
+    const ano = Number(anoLetivoInput.value);
+    if(!Number.isInteger(ano) || ano < 2000 || ano > 2100){
+      _toastErro('⚠️ Informe um ano letivo válido.'); return;
     }
+    if((window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) === 'ADMIN'){
+      _toastErro('⚠️ Selecione uma escola no topo da página antes de salvar.'); return;
+    }
+    if(window._salvandoFunc) return;
 
-    const obj = {
-      funcId,
-      anoLetivo: String(anoAtivo),
-      // Etapa 1
+    const identidade = {
       cpf: formatCPF(cpf),
+      cpfNum: cpf,
       rgCnh: document.getElementById('rgCnh').value.trim(),
       nome: normUpper(document.getElementById('nome').value),
       dataNascimento: document.getElementById('nasc').value,
@@ -2059,12 +2095,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         ? document.getElementById('natUF').value
         : document.getElementById('natUFText').value.trim(),
       naturalidadeCidade: normUpper(document.getElementById('natCidade').value),
-      funcao,
-      profissionalApoio: document.getElementById('profissionalApoio').checked,
-      cargaHoraria: document.getElementById('cargaHoraria').value ? parseInt(document.getElementById('cargaHoraria').value, 10) : null,
-      status: document.getElementById('status').value,
-      turnos,
-      // NEE
+    };
+    const perfil = {
       deficiencia: {
         possui: WIZ.def === true,
         tea: WIZ.tea, altasHabilidades: WIZ.altas,
@@ -2072,7 +2104,6 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         defVisual: WIZ.visual, defVisualSub: WIZ.visualSub,
         defAuditiva: WIZ.auditiva, defAuditivaSub: WIZ.auditivaSub,
       },
-      // Etapa 2
       cep: document.getElementById('cep').value,
       endUF: document.getElementById('endUF').value,
       endCidade: normUpper(document.getElementById('endCidade').value),
@@ -2084,67 +2115,92 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       complementacoes: WIZ.complementacoes,
       outrosCursos: WIZ.outrosCursos,
     };
+    const doAno = {
+      funcao,
+      profissionalApoio: document.getElementById('profissionalApoio').checked,
+      cargaHoraria: document.getElementById('cargaHoraria').value ? parseInt(document.getElementById('cargaHoraria').value, 10) : null,
+      status: document.getElementById('status').value,
+      turnos,
+    };
 
     const btnSalvar = document.getElementById('btnSalvar');
+    const _falha = m => Object.assign(new Error(m), { amigavel: true });
+    window._salvandoFunc = true;
     btnSalvar.disabled = true; btnSalvar.textContent = '⏳ Salvando…';
 
     try{
-      const isNovo = !_editandoId;
-      if(!isNovo){
-        const idx = funcionarios.findIndex(f=>f.funcId===funcId);
-        // Merge local (não replace): preserva fotoUrl/fotoFileId e qualquer
-        // outro campo que o widget de foto (ou algo futuro) já tenha
-        // atualizado neste registro, mesmo que "obj" não os inclua.
-        if(idx>=0) funcionarios[idx] = { ...funcionarios[idx], ...obj };
-        else funcionarios.push(obj);
-      } else {
-        funcionarios.push(obj);
-      }
-      await salvarFuncionarioDoc(obj);
-      if(isNovo){
-        // Trava o ID só depois do save confirmar: sem isso, um segundo
-        // clique em "Salvar" (ex.: o usuário ajusta algo e salva de novo,
-        // sem passar por "Novo funcionário") geraria outro funcId e
-        // duplicaria o registro.
-        _editandoId = funcId;
-      }
-      if(typeof window._natCacheInvalidate === 'function') window._natCacheInvalidate();
+      const agora = new Date().toISOString();
+      const emEdicao = !!_editandoId;
+      const pessoaIdent = window._identFunc ? window._identFunc.estado().pessoa : null;   // achada pelo CPF (outro ano)
+      let funcId, matId, novaPessoa = false, fotoAtual = null, mats = [];
 
-      // Envia a foto que ficou esperando o funcId ser confirmado (cadastro
-      // novo) — não faz nada se não houver foto pendente.
+      if(emEdicao){
+        funcId = _editandoFuncId; matId = _editandoId;
+      } else if(pessoaIdent){
+        funcId = pessoaIdent.funcId; matId = matriculaIdDe(ano, funcId);
+        const fresca = await window.DB.funcionarios.get(funcId);          // dado fresco (1 leitura)
+        if(!fresca) throw _falha('O cadastro deste funcionário não existe mais. Use "Refazer identificação".');
+        fotoAtual = { fotoUrl: fresca.fotoUrl ?? null, fotoFileId: fresca.fotoFileId ?? null };
+      } else {
+        // Guarda final: o CPF pode ter sido cadastrado por outra pessoa depois da identificação
+        const ja = await window.DB.funcionarios.whereEquals('cpfNum', cpf, { limit: 1 });
+        if(ja.length) throw _falha(`O CPF ${identidade.cpf} já pertence a ${ja[0].nome || ja[0]._id}. Use "Refazer identificação".`);
+        funcId = await proximoFuncId();                                    // só aqui: consome o contador
+        matId = matriculaIdDe(ano, funcId);
+        novaPessoa = true;
+      }
+
+      if(!novaPessoa) mats = await window.DB.funcionariosMatriculas.whereEquals('funcId', funcId);   // só as desta pessoa
+
+      if(!emEdicao && mats.some(m => m._id === matId)) throw _falha(`Este funcionário já está cadastrado em ${ano}.`);
+      if(emEdicao){
+        const original = mats.find(m => m._id === matId);
+        if(!original) throw _falha('A matrícula em edição não existe mais.');
+        if(stripNum(original.cpfNum || original.cpf || '') !== cpf){        // CPF alterado: precisa continuar único
+          const outro = (await window.DB.funcionarios.whereEquals('cpfNum', cpf, { limit: 1 })).filter(p => p._id !== funcId);
+          if(outro.length) throw _falha(`O CPF ${identidade.cpf} já pertence a ${outro[0].nome || outro[0]._id}.`);
+        }
+      }
+
+      const anoExiste = !!(await window.DB.funcionariosAnos.get(String(ano)));   // 1 leitura: o doc do ano só é criado se ainda não existe
+      const ops = montarOpsGravacao({ funcId, matId, ano, novaPessoa, emEdicao, identidade, perfil, doAno, mats, anoExiste, fotoAtual, agora });
+      await window.DB.batchWrite(ops);                                       // pessoa + matrícula (+ ano, + cópias) — tudo ou nada
+
+      // Trava os IDs só depois do save confirmar: um segundo clique em "Salvar" vira edição desta matrícula
+      // (sem isso geraria outro funcId e duplicaria o cadastro).
+      _editandoId = matId; _editandoFuncId = funcId;
+
+      // Envia a foto que ficou esperando o funcId (cadastro novo) — não faz nada se não houver foto pendente.
       if(window.enviarFotoPendenteFuncionario) await window.enviarFotoPendenteFuncionario(funcId);
 
       // Envia a fila de documentos pendentes (upload junto ao salvar)
       if(window.initDocsFuncionario)        window.initDocsFuncionario(funcId);
       if(window.uploadDocsQueueFuncionario) await window.uploadDocsQueueFuncionario();
 
-      // Edição via URL (?editar=ID): já vai redirecionar de qualquer jeito,
-      // então só o toast de confirmação basta — sem exibir o card de
-      // resumo, igual ao padrão do cadastro-aluno.
+      // Edição via URL (?editar=ID): já vai redirecionar de qualquer jeito, então só o toast basta.
       if(_editandoViaURL){
         _toastSucesso('✅ Funcionário atualizado com sucesso! Redirecionando…');
         setTimeout(() => { location.href = PAGINA_PESQUISA; }, 1800);
         return;
       }
 
-      // Cadastro novo (ou edição direto nesta página, sem vir da pesquisa):
-      // mostra o resumo pra continuar cadastrando mais funcionários em
-      // seguida, como já funcionava.
+      // Cadastro novo (ou edição direto nesta página): mostra o resumo pra continuar cadastrando.
       const escOpts = document.getElementById('escolaridade').options;
       const escLabel = escOpts[escOpts.selectedIndex]?.text || '—';
       document.getElementById('resumoGrid').innerHTML =
-        `<div class="resumo-item"><strong>Nome</strong>${obj.nome}</div>` +
-        `<div class="resumo-item"><strong>CPF</strong>${obj.cpf}</div>` +
-        `<div class="resumo-item"><strong>Nascimento</strong>${obj.dataNascimento}</div>` +
-        `<div class="resumo-item"><strong>Escolaridade</strong>${escLabel}</div>`;
+        `<div class="resumo-item"><strong>Nome</strong>${_escHtml(identidade.nome)}</div>` +
+        `<div class="resumo-item"><strong>CPF</strong>${_escHtml(identidade.cpf)}</div>` +
+        `<div class="resumo-item"><strong>Nascimento</strong>${_escHtml(identidade.dataNascimento)}</div>` +
+        `<div class="resumo-item"><strong>Ano letivo</strong>${ano}</div>` +
+        `<div class="resumo-item"><strong>Escolaridade</strong>${_escHtml(escLabel)}</div>`;
       document.getElementById('resumoFinal').classList.add('show');
       window.scrollTo({top:0,behavior:'smooth'});
     } catch(e){
-      console.error(e);
-      mostrarErroSalvar('❌ Erro ao salvar: ' + (e.message||e));
-      // Desfaz push em caso de erro
-      if(!_editandoId) funcionarios.pop();
+      console.error('[salvar funcionário]', e);
+      if(e && e.amigavel){ _toastErro('⚠️ ' + e.message); voltarEtapa1(); }
+      else mostrarErroSalvar('❌ Erro ao salvar: ' + (e.message||e));
     } finally {
+      window._salvandoFunc = false;
       btnSalvar.disabled = false; btnSalvar.textContent = '💾 Salvar funcionário';
     }
   });
@@ -2235,7 +2291,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
   function iniciarEdicao(f, viaURL){
     limparFormulario();
-    _editandoId = f.funcId;
+    _editandoId = f.matriculaId || f._id;       // `f` é a MATRÍCULA (traz todos os dados da pessoa)
+    _editandoFuncId = f.funcId;
     _editandoViaURL = !!viaURL;
 
     if(window.initFotoFuncionario) window.initFotoFuncionario(f.funcId, f.fotoUrl || '', f.fotoFileId || '');
@@ -2244,6 +2301,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const anoDoRegistro = parseInt(f.anoLetivo, 10);
     anoAtivo = !isNaN(anoDoRegistro) ? anoDoRegistro : anoAtivoReal;
     anoLetivoInput.value = anoAtivo;
+    anoLetivoInput.readOnly = true;             // mudar o ano seria outra matrícula (outro ID): fica travado em edição
+    anoLetivoInput.closest('.field')?.classList.add('field-locked');
 
     // Etapa 1
     document.getElementById('cpf').value = f.cpf||''; document.getElementById('cpf').dispatchEvent(new Event('input'));
@@ -2279,10 +2338,10 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   /* ════════════════════════════════════════
      Identificação por CPF — mesmo fluxo do cadastro de aluno
      • sem CPF válido o resto do formulário fica travado;
-     • CPF já cadastrado em OUTRO ano: carrega os dados e cria um cadastro novo no ano escolhido;
-     • CPF já cadastrado NO ano escolhido: bloqueia (duas fichas do mesmo funcionário no ano);
+     • CPF já cadastrado (em qualquer ano): carrega a pessoa, a foto e os documentos; a matrícula do ano escolhido é nova;
+     • CPF já cadastrado COM matrícula no ano escolhido: bloqueia;
      • CPF novo: libera o formulário em branco.
-     A busca é em memória (`funcionarios` já foi lida em carregarDB): não há leitura extra no banco.
+     Leituras: 1 query por CPF (funcionarios.cpfNum) + 1 doc por ano (a matrícula tem ID determinístico).
   ════════════════════════════════════════ */
   (function(){
     const $ = id => document.getElementById(id);
@@ -2290,15 +2349,15 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const cpfEl = $('cpf'), banner = $('bannerFuncEncontrado'), etapa1 = $('etapa1');
     if(!cpfEl || !banner || !etapa1) return;
 
-    // Dados que costumam mudar de um ano para o outro (função, carga, vínculo, turnos, apoio).
-    // false = ficam em branco para serem preenchidos; true = vêm do cadastro do ano anterior.
+    // Dados que mudam de um ano para o outro (função, carga, vínculo, turnos, apoio): false = ficam em branco.
     const CARREGAR_FUNCIONAIS = false;
     const CAMPOS_AUTOPREENCH = ['nome','nasc','mae','pai','sexo','corRaca','natPais','natUF','natUFText','natCidade'];
 
-    const ID = { pronto:false, regs:null, base:null, dup:null, novo:false, preenchido:false };
+    const ID = { pronto:false, pessoa:null, dup:null, novo:false, preenchido:false, verificando:false };
+    let _tick = 0;
+    const _cacheCpf = new Map(), _cacheMat = new Map();
     const emEdicao = () => !!_editandoId;
     const anoSel = () => String(anoLetivoInput.value || '');
-    const anoDe = r => String(r.anoLetivo || r.ano || '');
 
     /* ── Travas ── */
     function setLocked(locked){
@@ -2313,7 +2372,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       });
     }
     function aplicarTrava(){
-      const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup);
+      const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup || ID.verificando);
       const fieldCpf = $('fieldCpf');
       const alvos = Array.from(etapa1.querySelectorAll('.form-grid > .field, .foto-box, .nee-block, .actions .btn'));
       alvos.push($('step2'));
@@ -2324,7 +2383,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         if(bloquear) el.setAttribute('inert', ''); else el.removeAttribute('inert');
       });
       // identificado: o CPF só muda com "Refazer identificação"
-      const travaCpf = ID.pronto && !emEdicao();
+      const travaCpf = (ID.pronto || ID.verificando) && !emEdicao();
       cpfEl.readOnly = travaCpf;
       fieldCpf.classList.toggle('field-locked', travaCpf);
     }
@@ -2338,58 +2397,103 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       banner.classList.add('visible');
     }
     function limparEstado(){
-      ID.pronto = false; ID.regs = null; ID.base = null; ID.dup = null; ID.novo = false; ID.preenchido = false;
+      _tick++;
+      ID.pronto = false; ID.pessoa = null; ID.dup = null; ID.novo = false; ID.preenchido = false; ID.verificando = false;
+      _cacheCpf.clear(); _cacheMat.clear();            // um cadastro novo pode ter acabado de entrar
       banner.classList.remove('visible', 'dup');
       setLocked(false);
       aplicarTrava();
     }
 
-    /* ── Carrega um cadastro anterior no formulário ── */
-    function preencher(f){
-      _setPessoais(f);
-      _setNEE(f);
-      _setEtapa2(f);
-      if(CARREGAR_FUNCIONAIS) _setFuncionais(f);
-      // a foto e os documentos NÃO acompanham: ficam no cadastro do ano de origem
+    /* ── Leituras pontuais (com cache durante a identificação) ── */
+    async function lookupCpf(d){
+      if(_cacheCpf.has(d)) return _cacheCpf.get(d);
+      const r = await window.DB.funcionarios.whereEquals('cpfNum', d, { limit: 1 });
+      const p = r[0] || null;
+      _cacheCpf.set(d, p);
+      return p;
     }
-    const maisRecente = regs => regs.slice().sort((a, b) => (parseInt(anoDe(b), 10) || 0) - (parseInt(anoDe(a), 10) || 0))[0];
+    async function matriculaDoAno(pessoa, ano){
+      const k = pessoa.funcId + '|' + ano;
+      if(_cacheMat.has(k)) return _cacheMat.get(k);
+      const m = await window.DB.funcionariosMatriculas.get(matriculaIdDe(ano, pessoa.funcId));
+      _cacheMat.set(k, m);
+      return m;
+    }
+
+    /* ── Carrega a pessoa já cadastrada no formulário ── */
+    function preencher(p){
+      _setPessoais(p);
+      _setNEE(p);
+      _setEtapa2(p);
+      if(CARREGAR_FUNCIONAIS) _setFuncionais(p);
+      // foto e documentos são da PESSOA: aparecem aqui; trocar a foto vale para todos os anos dela
+      if(window.initFotoFuncionario) window.initFotoFuncionario(p.funcId, p.fotoUrl || '', p.fotoFileId || '');
+      if(window.initDocsFuncionario) window.initDocsFuncionario(p.funcId);
+    }
 
     /* ── Avalia o resultado (roda na busca e quando o ano letivo muda) ── */
-    function avaliar(avisar){
+    async function avaliar(avisar){
+      const tk = ++_tick;
       const ano = anoSel();
-      const regs = ID.regs || [];
-      const dup = regs.find(r => anoDe(r) === ano) || null;
-      const mudouDup = !!dup !== !!ID.dup;
-      ID.dup = dup;
-      if(!regs.length){
-        ID.novo = true; ID.base = null;
+      if(!ID.pessoa){
+        ID.novo = true; ID.dup = null; ID.verificando = false;
         mostrar('🆕', 'Novo funcionário', `CPF ${formatCPF(dig(cpfEl.value))} não encontrado. Preencha os dados do funcionário.`);
-      } else if(dup){
-        ID.novo = false;
+        ID.pronto = true; aplicarTrava(); return;
+      }
+      ID.novo = false;
+      ID.verificando = true; aplicarTrava();      // bloqueado até saber se já existe matrícula neste ano
+      let m = null;
+      try{ m = await matriculaDoAno(ID.pessoa, ano); }
+      catch(e){
+        console.error('[identificação] falha ao verificar a matrícula do ano:', e);
+        if(tk !== _tick) return;
+        ID.verificando = false; ID.pronto = false; aplicarTrava();
+        setCpfMsg('err', 'Falha ao verificar o ano');
+        _toastErro('❌ Não foi possível verificar a matrícula do ano: ' + (e && e.message ? e.message : e));
+        return;
+      }
+      if(tk !== _tick) return;                    // a identificação mudou durante a consulta
+      const mudouDup = !!m !== !!ID.dup;
+      ID.verificando = false;
+      ID.dup = m;
+      const p = ID.pessoa;
+      if(m){
         const orient = 'Para corrigir dados, abra a edição do funcionário na pesquisa.';
-        mostrar('⛔', dup.nome || dup.funcId, `Este funcionário já está cadastrado em ${ano}. ${orient}`, true);
+        mostrar('⛔', p.nome || p.funcId, `Este funcionário já está cadastrado em ${ano}. ${orient}`, true);
         if(mudouDup || avisar) _toastAviso('⚠️ Funcionário já cadastrado em ' + ano + '. ' + orient);
       } else {
-        ID.novo = false;
-        const base = maisRecente(regs);
-        ID.base = base;
-        if(!ID.preenchido){ preencher(base); ID.preenchido = true; setLocked(true); }
-        mostrar('✅', base.nome || base.funcId, `Funcionário já cadastrado em ${anoDe(base)} (ID ${base.funcId}). Um novo cadastro será criado em ${ano} com os dados carregados.`);
+        if(!ID.preenchido){ preencher(p); ID.preenchido = true; setLocked(true); }
+        mostrar('✅', p.nome || p.funcId, `Funcionário já cadastrado (ID ${p.funcId}). Uma nova matrícula será criada em ${ano} com os dados carregados.`);
       }
       ID.pronto = true;
       aplicarTrava();
     }
 
     /* ── Eventos ── */
-    cpfEl.addEventListener('input', () => {
+    cpfEl.addEventListener('input', async () => {
       if(emEdicao()) return;
       const d = dig(cpfEl.value);
-      if(d.length !== 11 || !isValidCPF(d) || ID.pronto) return;
-      ID.regs = funcionarios.filter(f => dig(f.cpf) === d);
-      avaliar(true);
+      if(d.length !== 11 || !isValidCPF(d) || ID.pronto || ID.verificando) return;
+      const tk = ++_tick;
+      ID.verificando = true; aplicarTrava();
+      setCpfMsg('ok', 'Buscando…');
+      try{
+        const p = await lookupCpf(d);
+        if(tk !== _tick) return;
+        ID.pessoa = p;
+        await avaliar(true);
+        if(tk === _tick || ID.pronto) setCpfMsg('ok', 'CPF válido');
+      }catch(e){
+        console.error('[identificação] falha ao buscar CPF:', e);
+        if(tk !== _tick) return;
+        ID.verificando = false; aplicarTrava();
+        setCpfMsg('err', 'Falha ao buscar o CPF.');
+        setMsg('Não foi possível buscar o CPF: ' + (e && e.message ? e.message : e), 'err');
+      }
     });
     ['input', 'change'].forEach(ev => anoLetivoInput.addEventListener(ev, () => {
-      if(ID.pronto && ID.regs && !emEdicao()) avaliar(false);
+      if(ID.pronto && !emEdicao()) avaliar(false);
     }));
     $('btnLimparAutoFill').addEventListener('click', async () => {
       const ok = await _confirmModal({ titulo:'Refazer a identificação?', corpo:'O formulário será limpo para recomeçar a identificação.', textoConfirmar:'Sim, limpar' });
@@ -2399,7 +2503,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     window._identFunc = {
       limpar: limparEstado,
       refresh(){ if(emEdicao()) banner.classList.remove('visible', 'dup'); aplicarTrava(); },
-      pronta: () => emEdicao() || (ID.pronto && !ID.dup),
+      pronta: () => emEdicao() || (ID.pronto && !ID.dup && !ID.verificando),
+      estado: () => ID,
     };
     aplicarTrava();
   })();
@@ -2409,31 +2514,22 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   ════════════════════════════════════════ */
   let _cidadeCache = null;
 
+  // Base de municípios estática (/municipios.json, a mesma do cadastro de aluno): zero leituras no Firestore.
   async function getCidadeDB(){
     if(_cidadeCache) return _cidadeCache;
     try{
-      let docs = [];
-      if(window.DB && typeof window.DB.funcionarios?.list === 'function'){
-        docs = await window.DB.funcionarios.list();
-      }
-      const map = new Map();
-      docs.forEach(d => {
-        const nc = (d.naturalidadeCidade||'').trim().toUpperCase();
-        const nu = (d.naturalidadeUF||'').trim().toUpperCase();
-        if(nc && nu) map.set('NAT_'+nc+'_'+nu, { cidade: nc, uf: nu });
-        const ec = (d.endCidade||'').trim().toUpperCase();
-        const eu = (d.endUF||'').trim().toUpperCase();
-        if(ec && eu) map.set('END_'+ec+'_'+eu, { cidade: ec, uf: eu });
-      });
-      _cidadeCache = Array.from(map.values()).sort((a,b)=>a.cidade.localeCompare(b.cidade,'pt-BR'));
+      const r = await fetch('/municipios.json');
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const arr = await r.json();
+      _cidadeCache = arr.map(([cidade, uf]) => ({ cidade: String(cidade).toUpperCase(), uf: String(uf).toUpperCase() }))
+                        .sort((a, b) => a.cidade.localeCompare(b.cidade, 'pt-BR'));
     } catch(e){
       console.warn('Autocomplete cidades:', e);
+      setMsg('Lista de municípios indisponível: o autocomplete de cidade não vai sugerir nomes.', 'warn');
       _cidadeCache = [];
     }
     return _cidadeCache;
   }
-
-  window._natCacheInvalidate = function(){ _cidadeCache = null; };
 
   function makeAutoComplete({ inputId, ghostId, dropdownId, ufSelectId }){
     const inp = document.getElementById(inputId);
@@ -2509,17 +2605,21 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
         document.addEventListener('auth:ready', res, { once: true });
       });
+      if(!window.DB || !window.DB.funcionariosMatriculas || !window.DB.funcionariosAnos){
+        _toastErro('❌ db_firebase.js desatualizado: faltam as coleções funcionariosAnos / funcionariosMatriculas.');
+        return;
+      }
       await carregarAnoAtivo();
       await carregarDB();
 
-      // ── MODO EDIÇÃO — detecta ?editar=ID na URL ──
+      // ── MODO EDIÇÃO — ?editar=ID da MATRÍCULA (FMAT|ano|funcId) ──
       const editId = new URLSearchParams(window.location.search).get('editar');
       if(editId){
-        const alvo = funcionarios.find(f => f.funcId === editId);
+        const alvo = await window.DB.funcionariosMatriculas.get(editId);   // 1 leitura: a matrícula já traz todos os dados
         if(alvo){
           iniciarEdicao(alvo, true);
         } else {
-          _toastErro('⚠️ Funcionário não encontrado ou sem permissão de acesso.');
+          _toastErro('⚠️ Matrícula não encontrada ou sem permissão de acesso.');
         }
       }
     } finally {
@@ -2531,10 +2631,9 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 </script>
 
 <!-- ══ Foto do funcionário — upload/preview/remoção via /api/avatar-upload ══
-     Script isolado (própria IIFE), igual ao padrão do aluno. Cada
-     funcionário tem seu próprio doc na coleção `funcionarios` (mesmo
-     padrão do aluno) — window._setFotoFuncionario faz um merge parcial
-     (só fotoUrl/fotoFileId) direto no doc, sem tocar em mais nada. -->
+     Script isolado (própria IIFE), igual ao padrão do aluno. A foto é
+     da PESSOA (doc em `funcionarios`) e é copiada para as matrículas dela —
+     window._setFotoFuncionario grava os dois lados (ver ponte no script principal). -->
 <script id="foto-funcionario-js">
 (function(){
   const inpFoto      = document.getElementById('inpFotoFuncionario');
@@ -2866,6 +2965,13 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     document.getElementById('docsFilaLista')?.querySelectorAll('.docs-fila-pendente').forEach(el=>el.remove());
     if(erros.length){ setStatus('err', `⚠️ ${erros.length} arquivo(s) falharam: ${erros.join(' | ')}`); }
     else { setStatus('ok', '✅ Todos os documentos enviados!'); }
+  };
+
+  window.limparDocsFuncionario = function(){
+    _fila = []; _funcionarioId = null;
+    const lista = document.getElementById('docsFilaLista');
+    if(lista) lista.innerHTML = '';
+    renderFila();
   };
 
   window.initDocsFuncionario = function(funcionarioId){
