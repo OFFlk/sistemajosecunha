@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="icon" href="../icon.png" type="image/png"/>
+<link rel="icon" href="/icon.png" type="image/png"/>
 
 <!-- Tema antecipado (evita flash de tema errado) -->
 <script>
@@ -14,21 +14,29 @@
 })();
 </script>
 
+<!-- Loading: antes dos scripts globais (seção 18.1 do guia) -->
+<script src="/loading-overlay.js"></script>
+
 <!-- Scripts globais -->
-<script src="../auth.firebase.js"></script>
-<script src="../db.firebase.js"></script>
-<script src="../theme-colors.js"></script>
+<script src="/auth.firebase.js"></script>
+<script src="/db.firebase.js"></script>
+<script src="/theme-colors.js"></script>
 
 <!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-<!-- CSS globais -->
+<!-- CSS globais (ordem fixa; hub.css entra por último) -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/hub.css">
 
 <title>Funcionários • Menu</title>
-
+<style>
+/* Card com bloqueio por papel: o balão "Sem acesso" (position:fixed, via JS) parte daqui.
+   O visual do estado bloqueado (.disabled) é do hub.css: nada de CSS novo aqui. */
+.card[data-restrito] { position: relative; }
+</style>
 </head>
 <body>
 
@@ -39,9 +47,16 @@
     <div class="l-slabel">// módulos</div>
     <div class="l-sline"></div>
   </div>
+
+  <!--
+    Os cards deste módulo são restritos (dados pessoais de funcionários) e já nascem
+    BLOQUEADOS, sem link. O script libera o link (data-href) só para os papéis
+    listados em data-role-allowed. Isso é só interface: a barreira de verdade fica
+    nas regras do servidor e nas próprias páginas de destino.
+  -->
   <div class="grid grid-config">
 
-    <a class="card" id="cardCadastroFunc" href="cadastro-funcionario.html">
+    <a class="card disabled" data-restrito data-href="cadastro-funcionario.html" data-role-allowed="admin,gestor" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">📋</div>
       <div class="card-title">Cadastro de funcionários</div>
@@ -50,7 +65,7 @@
       </div>
     </a>
 
-    <a class="card" id="cardPesquisaFunc" href="pesquisa-funcionario.html">
+    <a class="card disabled" data-restrito data-href="pesquisa-funcionario.html" data-role-allowed="admin,gestor" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🔎</div>
       <div class="card-title">Pesquisa / Lista</div>
@@ -62,35 +77,65 @@
   </div>
 </div>
 
-
-
 <!-- header-logic: monta header, tema, chip e auth guard -->
-<script src="../header-logic.js"></script>
+<script src="/header-logic.js"></script>
+
+<!-- SCRIPT — Acesso por papel e boot do hub -->
 <script>
-document.addEventListener('auth:ready', function () {
-  var session = window.Auth && typeof Auth.getSession === 'function'
-    ? Auth.getSession()
-    : null;
-  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+(function(){
+  // Espera o Auth terminar de iniciar, para decidir o acesso com o papel já confirmado.
+  // O limite de tempo evita loading infinito; se estourar, os cards seguem bloqueados.
+  function _authPronto(ms){
+    return new Promise((resolve, reject) => {
+      if(!window.Auth || !Auth.onReady) return reject(new Error('Auth indisponível.'));
+      const t = setTimeout(() => reject(new Error('Tempo esgotado ao iniciar a sessão.')), ms || 15000);
+      Auth.onReady(() => { clearTimeout(t); resolve(); });
+    });
+  }
 
-  // Admin e gestor acessam; só o usuário comum fica de fora.
-  var ROLES_PERMITIDOS = ['admin', 'gestor'];
+  // Libera ou bloqueia cada card restrito conforme o papel da sessão.
+  // Funciona nos dois sentidos: um papel que perdeu o acesso volta a ficar bloqueado.
+  function aplicarAcesso(){
+    const s = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+    const role = s ? String(s.role || '').trim().toLowerCase() : '';
+    document.querySelectorAll('.card[data-restrito]').forEach(function(card){
+      const permitidos = (card.getAttribute('data-role-allowed') || '')
+        .split(',').map(function(r){ return r.trim().toLowerCase(); }).filter(Boolean);
+      const liberado = !!role && permitidos.indexOf(role) !== -1;
+      if (liberado) {
+        card.setAttribute('href', card.dataset.href);
+        card.classList.remove('disabled');
+        card.removeAttribute('aria-disabled');
+        card.removeAttribute('data-tooltip');
+        card.removeAttribute('title');
+      } else {
+        card.removeAttribute('href');
+        card.classList.add('disabled');
+        card.setAttribute('aria-disabled', 'true');
+        card.setAttribute('data-tooltip', 'Sem acesso');
+        card.title = 'Acesso restrito a administradores e gestores';
+      }
+    });
+  }
 
-  ['cardCadastroFunc', 'cardPesquisaFunc'].forEach(function (id) {
-    var card = document.getElementById(id);
-    if (!card) return;
-    if (ROLES_PERMITIDOS.indexOf(role) === -1) {
-      card.removeAttribute('href');
-      card.classList.add('disabled');
-      card.setAttribute('data-tooltip', 'Sem acesso');
-      card.title = 'Acesso restrito a administradores e gestores';
+  document.addEventListener('auth:sessionChanged', aplicarAcesso);
+
+  // Boot (seção 18.1): o finally esconde o overlay mesmo se algo falhar
+  async function init(){
+    try {
+      await _authPronto();
+      aplicarAcesso();
+    } finally {
+      try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+      catch (e) { console.warn('ajustarContraste:', e); }
+      try { Loading.esconder(); } catch (_) {}
     }
-  });
-
-  if (typeof initTooltipCards === 'function') initTooltipCards();
-});
+  }
+  init().catch(function(e){ console.error('init:', e); });
+})();
 </script>
 
+<!-- SCRIPT — Balão "Sem acesso" nos cards bloqueados -->
 <script>
 (function () {
   var bubble = null;
@@ -150,8 +195,10 @@ document.addEventListener('auth:ready', function () {
 
   function showTooltip(e) {
     var card = e.currentTarget;
-    var b    = ensureBubble();
-    b.textContent = card.getAttribute('data-tooltip');
+    var texto = card.getAttribute('data-tooltip');
+    if (!texto) return;                       // card já liberado: sem balão
+    var b = ensureBubble();
+    b.textContent = texto;
     stylesBubble(b);
     positionBubble(card);
     requestAnimationFrame(function () {
@@ -164,23 +211,24 @@ document.addEventListener('auth:ready', function () {
     if (bubble) bubble.style.opacity = '0';
   }
 
-  window.initTooltipCards = function () {
-    document.querySelectorAll('.card[data-tooltip]').forEach(function (card) {
+  // Liga nos cards restritos (o atributo data-tooltip entra e sai conforme o papel)
+  function initTooltipCards() {
+    document.querySelectorAll('.card[data-restrito]').forEach(function (card) {
       if (card._tooltipBound) return;
       card._tooltipBound = true;
       card.addEventListener('mouseenter', showTooltip);
       card.addEventListener('mouseleave', hideTooltip);
     });
-  };
+  }
 
   function onThemeChange() {
     if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initTooltipCards);
+    document.addEventListener('DOMContentLoaded', initTooltipCards);
   } else {
-    window.initTooltipCards();
+    initTooltipCards();
   }
 
   new MutationObserver(onThemeChange)
