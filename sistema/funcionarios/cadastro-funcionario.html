@@ -71,7 +71,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .step.active .step-num{background:var(--ui-brand);border-color:var(--ui-brand);color:var(--ui-brand-fg);}
 .step.done .step-num{background:var(--dest-btn-bg);border-color:var(--dest-fg);color:var(--dest-fg);}
 /* Etapa 1 incompleta: ⚠️ + borda tracejada (sem amarelo sobre a cor de marca). :not(.active) porque a classe .aviso continua no número ao voltar. */
-.step:not(.active) .step-num.aviso{background:var(--dest-btn-bg);border:2px dashed var(--dest-fg);color:var(--dest-fg);}
+.step:not(.active) .step-num.aviso{border-style:dashed;}   /* etapa incompleta: tracejado + ⚠️, nunca amarelo */
 .step-label{font-size:11px;font-weight:700;color:var(--dest-fg);opacity:.75;text-transform:uppercase;letter-spacing:.05em;}
 .step-title{font-size:14px;font-weight:800;color:var(--dest-fg);}
 .step.active .step-label{color:var(--ui-muted);opacity:1;}
@@ -87,6 +87,8 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .foto-info{flex:1;min-width:0;}
 .foto-tit{font-weight:700;font-size:13px;margin-bottom:10px;}
 .foto-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.foto-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.foto-status:empty{display:none;}
 
 /* ── "É profissional de apoio?" alinhado ao select de Função (rótulo-espaçador invisível ocupa a altura do rótulo ao lado) ── */
 .apoio-spacer{visibility:hidden;}
@@ -158,21 +160,6 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .nee-radio-item input[type="radio"]{width:15px;height:15px;flex-shrink:0;cursor:pointer;margin:0;}
 .nee-radio-item.selected input[type="radio"]{accent-color:var(--ui-brand-fg);}
 
-/* ── CEP: mensagem de status de ação (D3: local, com --ui-st-*) ── */
-.cep-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin-top:5px;padding:3px 10px;border-radius:999px;}
-.cep-status.loading{background:var(--ui-st-info-bg);color:var(--ui-st-info-fg);border:1px solid var(--ui-st-info-bd);}
-.cep-status.ok{background:var(--ui-st-ok-bg);color:var(--ui-st-ok-fg);border:1px solid var(--ui-st-ok-bd);}
-.cep-status.err{background:var(--ui-st-bad-bg);color:var(--ui-st-bad-fg);border:1px solid var(--ui-st-bad-bd);}
-
-/* ── Seção colapsável (D33: CSS ainda local) ── */
-.secao-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;background:var(--ui-chip-bg);border:1px solid var(--ui-border);border-radius:10px;margin-bottom:8px;user-select:none;transition:background .15s;}
-.secao-toggle:hover{background:var(--ui-brand-faded);border-color:var(--ui-brand);}
-.secao-toggle-label{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;}
-.secao-toggle-arrow{font-size:12px;color:var(--ui-muted);transition:transform .2s;}
-.secao-toggle.open .secao-toggle-arrow{transform:rotate(180deg);}
-.secao-body{display:none;padding:14px 0 4px;}
-.secao-body.open{display:block;animation:fadeSlide .18s ease;}
-
 /* ── Listas de cursos ── */
 .lista-itens{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
 .lista-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--ui-chip-bg);border:1px solid var(--ui-brand);border-radius:10px;font-size:13px;}
@@ -211,6 +198,11 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .docs-fila-lista{display:flex;flex-direction:column;gap:6px;}
 .docs-fila-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;border:1px solid var(--ui-border);background:var(--ui-surface);}
 .docs-fila-item.docs-existente{opacity:.85;}
+.docs-fila-item .btn{flex-shrink:0;white-space:nowrap;}
+.docs-fila-item.docs-existente.docs-marcado{opacity:.6;}
+.docs-marcado .docs-fila-nome{text-decoration:line-through;}
+.docs-marca{display:none;margin-top:4px;}
+.docs-marcado .docs-marca{display:inline-flex;}
 .docs-fila-thumb{width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;}
 .docs-fila-icon{font-size:18px;flex-shrink:0;}
 .docs-fila-info{flex:1;min-width:0;}
@@ -221,12 +213,6 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .docs-fila-rm{background:none;border:none;cursor:pointer;font-size:15px;color:var(--ui-muted);padding:0 2px;line-height:1;transition:color .15s;}
 .docs-fila-rm:hover{color:var(--ui-st-bad-fg);}
 .docs-sep-tit{font-size:11px;font-weight:800;color:var(--ui-muted);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;margin-bottom:6px;}
-/* Status de ação do upload (D3: local, com --ui-st-*) */
-.docs-status{display:none;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;margin-top:8px;}
-.docs-status.show{display:block;}
-.docs-status.ok{background:var(--ui-st-ok-bg);color:var(--ui-st-ok-fg);border:1px solid var(--ui-st-ok-bd);}
-.docs-status.err{background:var(--ui-st-bad-bg);color:var(--ui-st-bad-fg);border:1px solid var(--ui-st-bad-bd);}
-.docs-status.loading{background:var(--ui-st-info-bg);color:var(--ui-st-info-fg);border:1px solid var(--ui-st-info-bd);}
 .docs-prog-wrap{height:3px;border-radius:999px;background:var(--ui-border);margin-top:4px;overflow:hidden;display:none;}
 .docs-prog-wrap.show{display:block;}
 .docs-prog-bar{height:100%;border-radius:999px;background:var(--ui-brand);width:0%;transition:width .3s;}
@@ -242,6 +228,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 <div id="header-placeholder"></div>
 
 <main class="wrap">
+  <div class="aviso-warn" id="avisoSemEscola" hidden>🔒 Escolha uma escola no topo da página para cadastrar funcionários.</div>
 
   <!-- Card de destaque do topo: ano letivo (editável, permite cadastrar em anos passados/futuros) + etapas do cadastro -->
   <section class="card card-destaque topo-destaque">
@@ -286,17 +273,17 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       <!-- Foto do funcionário -->
       <div id="fotoFuncionarioBox" class="foto-box">
         <div id="fotoFuncionarioPreviewWrap" class="foto-preview">
-          <img id="fotoFuncionarioPreview" class="foto-img" src="" alt="Foto do funcionário" style="display:none;">
+          <img id="fotoFuncionarioPreview" class="foto-img" src="" alt="Foto do funcionário" hidden>
           <span id="fotoFuncionarioPlaceholder" class="foto-ph">🧑</span>
         </div>
         <div class="foto-info">
           <div class="foto-tit">Foto do funcionário (opcional) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">A foto deverá representar o funcionário. Ela será utilizada na exibição no sistema e na exportação da ficha individual!</span></span></div>
-          <input type="file" id="inpFotoFuncionario" accept="image/*" style="display:none;">
+          <input type="file" id="inpFotoFuncionario" accept="image/*" hidden>
           <div class="foto-btns">
             <button type="button" class="btn small" id="btnEscolherFotoFuncionario" onclick="document.getElementById('inpFotoFuncionario').click()">📷 Escolher foto</button>
-            <button type="button" class="btn danger small" id="btnRemoverFotoFuncionario" style="display:none;">🗑️ Remover</button>
+            <button type="button" class="btn small" id="btnRemoverFotoFuncionario" hidden>🗑️ Remover</button>
           </div>
-          <div id="fotoFuncionarioStatus" class="help"></div>
+          <div id="fotoFuncionarioStatus" class="foto-status"></div>
         </div>
       </div>
 
@@ -341,7 +328,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="sexo">Sexo <span class="req">*</span></label>
           <select id="sexo">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="F">Feminino</option>
             <option value="M">Masculino</option>
           </select>
@@ -349,7 +336,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="corRaca">Cor / Raça <span class="req">*</span></label>
           <select id="corRaca">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="NAO_DECLARADA">Não declarada</option>
             <option value="BRANCA">Branca</option>
             <option value="PRETA">Preta</option>
@@ -369,12 +356,12 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
           <div class="inline-2">
             <div class="nat-wrap">
               <div class="nat-ghost-layer" id="natCidadeGhost" aria-hidden="true"></div>
-              <input id="natCidade" class="nat-input-real" placeholder="Selecione a UF primeiro"
+              <input id="natCidade" class="nat-input-real"
                      autocomplete="off" autocorrect="off" spellcheck="false" disabled/>
               <div class="nat-dropdown" id="natCidadeDropdown" role="listbox"></div>
             </div>
             <select id="natUF">
-              <option value="">--</option>
+              <option value=""></option>
               <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
               <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
               <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
@@ -397,7 +384,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="funcao">Função <span class="req">*</span></label>
           <select id="funcao">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="PROFESSOR">Professor(a)</option>
             <option value="DIRETOR">Diretor(a)</option>
             <option value="VICE-DIRETOR">Vice-Diretor(a)</option>
@@ -437,7 +424,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="status">Status / Vínculo <span class="req">*</span></label>
           <select id="status">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="CE">Contrato Emergencial (CE)</option>
             <option value="PS">Processo Seletivo (PS)</option>
             <option value="EF">Concursado / Efetivo (EF)</option>
@@ -491,7 +478,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="nee-cat-header" id="catVisualHeader">
               <input type="checkbox" class="nee-check" id="chkVisual"/>
               <span class="nee-cat-name">👁️ Deficiência visual</span>
-              <span class="badge small nee-cat-badge" id="badgeVisual"></span>
+              <span class="badge small gray nee-cat-badge" id="badgeVisual"></span>
             </div>
             <div class="nee-sub" id="subVisual">
               <label class="nee-radio-item" id="rVisual0"><input type="radio" name="rVisual" value="BAIXA_VISAO"/>Baixa visão</label>
@@ -503,7 +490,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="nee-cat-header" id="catAuditivaHeader">
               <input type="checkbox" class="nee-check" id="chkAuditiva"/>
               <span class="nee-cat-name">👂 Deficiência auditiva / surdez</span>
-              <span class="badge small nee-cat-badge" id="badgeAuditiva"></span>
+              <span class="badge small gray nee-cat-badge" id="badgeAuditiva"></span>
             </div>
             <div class="nee-sub" id="subAuditiva">
               <label class="nee-radio-item" id="rAuditiva0"><input type="radio" name="rAuditiva" value="DEF_AUDITIVA"/>Deficiência auditiva</label>
@@ -540,12 +527,12 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="cep">CEP</label>
           <input id="cep" placeholder="00000-000" inputmode="numeric" maxlength="9"/>
-          <div id="cepStatus"></div>
+          <span class="badge small" id="cepStatus" hidden aria-live="polite"></span>
         </div>
         <div class="field">
           <label for="zona">Zona de residência</label>
           <select id="zona">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="URBANA">Urbana</option>
             <option value="RURAL">Rural</option>
           </select>
@@ -562,7 +549,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="endUF">UF</label>
           <select id="endUF">
-            <option value="">--</option>
+            <option value=""></option>
             <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
             <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
             <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
@@ -584,7 +571,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="escolaridade">Nível de escolaridade <span class="req">*</span></label>
           <select id="escolaridade">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="SEM_ESCOLARIDADE">Sem escolaridade</option>
             <option value="FUND_INCOMPLETO">Ensino fundamental incompleto</option>
             <option value="FUND_COMPLETO">Ensino fundamental completo</option>
@@ -597,7 +584,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="tipoEnsino">Tipo de ensino cursado</label>
           <select id="tipoEnsino">
-            <option value="">— selecione —</option>
+            <option value=""></option>
             <option value="FORMACAO_GERAL">Formação geral</option>
             <option value="MAGISTERIO">Magistério / Normal</option>
             <option value="PROFISSIONALIZANTE">Profissionalizante</option>
@@ -617,11 +604,11 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       </div>
 
       <!-- Graduações -->
-      <div class="secao-toggle open" id="togGrad">
-        <div class="secao-toggle-label">🎓 Graduações / licenciaturas</div>
-        <span class="secao-toggle-arrow">▼</span>
+      <div class="sec-header" onclick="secHeaderClick('secGrad', event)">
+        <h3>🎓 Graduações / licenciaturas</h3>
+        <button type="button" class="sec-toggle" id="togSecGrad" aria-expanded="true" aria-controls="secGrad" aria-label="Recolher">▼</button>
       </div>
-      <div class="secao-body open" id="bodyGrad">
+      <div class="sec-body" id="secGrad">
         <div class="lista-itens" id="listaGrad"></div>
         <p class="lista-vazia" id="vaziaGrad">Nenhum curso adicionado.</p>
         <button type="button" class="btn secondary" id="btnAbrirFormGrad">+ Adicionar graduação</button>
@@ -631,7 +618,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="field">
               <label for="gNivel">Nível <span class="req">*</span></label>
               <select id="gNivel">
-                <option value="">— selecione —</option>
+                <option value=""></option>
                 <option value="BACHARELADO">Bacharelado</option>
                 <option value="LICENCIATURA">Licenciatura</option>
                 <option value="TECNOLOGICO">Tecnológico</option>
@@ -646,7 +633,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="field col-full">
               <label for="gCurso">Curso <span class="req">*</span></label>
               <select id="gCurso">
-                <option value="">— selecione —</option>
+                <option value=""></option>
                 <option>Pedagogia</option><option>Letras / Português</option>
                 <option>Letras / Inglês</option><option>Matemática</option>
                 <option>História</option><option>Geografia</option>
@@ -664,7 +651,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="field">
               <label for="gTipoInst">Tipo de instituição <span class="req">*</span></label>
               <select id="gTipoInst">
-                <option value="">— selecione —</option>
+                <option value=""></option>
                 <option value="PUBLICA_FEDERAL">Pública federal</option>
                 <option value="PUBLICA_ESTADUAL">Pública estadual</option>
                 <option value="PUBLICA_MUNICIPAL">Pública municipal</option>
@@ -678,7 +665,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="field">
               <label for="gInstUF">UF da instituição <span class="req">*</span></label>
               <select id="gInstUF">
-                <option value="">--</option>
+                <option value=""></option>
                 <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
                 <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
                 <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
@@ -698,7 +685,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             </div>
           </div>
           <div class="form-add-actions">
-            <button type="button" class="btn secondary" id="btnFecharFormGrad">Cancelar</button>
+            <button type="button" class="btn cancel" id="btnFecharFormGrad">Cancelar</button>
             <button type="button" class="btn primary" id="btnSalvarGrad">✓ Adicionar</button>
           </div>
         </div>
@@ -707,11 +694,11 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       <div class="divider"></div>
 
       <!-- Complementação -->
-      <div class="secao-toggle" id="togComp">
-        <div class="secao-toggle-label">📚 Complementação</div>
-        <span class="secao-toggle-arrow">▼</span>
+      <div class="sec-header fechada" onclick="secHeaderClick('secComp', event)">
+        <h3>📚 Complementação</h3>
+        <button type="button" class="sec-toggle collapsed" id="togSecComp" aria-expanded="false" aria-controls="secComp" aria-label="Expandir">▼</button>
       </div>
-      <div class="secao-body" id="bodyComp">
+      <div class="sec-body collapsed" id="secComp">
         <div class="lista-itens" id="listaComp"></div>
         <p class="lista-vazia" id="vaziaComp">Nenhuma complementação adicionada.</p>
         <button type="button" class="btn secondary" id="btnAbrirFormComp">+ Adicionar complementação</button>
@@ -732,7 +719,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             </div>
           </div>
           <div class="form-add-actions">
-            <button type="button" class="btn secondary" id="btnFecharFormComp">Cancelar</button>
+            <button type="button" class="btn cancel" id="btnFecharFormComp">Cancelar</button>
             <button type="button" class="btn primary" id="btnSalvarComp">✓ Adicionar</button>
           </div>
         </div>
@@ -741,11 +728,11 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
       <div class="divider"></div>
 
       <!-- Pós-graduação -->
-      <div class="secao-toggle" id="togPos">
-        <div class="secao-toggle-label">🏅 Pós-graduação</div>
-        <span class="secao-toggle-arrow">▼</span>
+      <div class="sec-header fechada" onclick="secHeaderClick('secPos', event)">
+        <h3>🏅 Pós-graduação</h3>
+        <button type="button" class="sec-toggle collapsed" id="togSecPos" aria-expanded="false" aria-controls="secPos" aria-label="Expandir">▼</button>
       </div>
-      <div class="secao-body" id="bodyPos">
+      <div class="sec-body collapsed" id="secPos">
         <div class="lista-itens" id="listaPos"></div>
         <p class="lista-vazia" id="vaziaPos">Nenhuma pós-graduação adicionada.</p>
         <button type="button" class="btn secondary" id="btnAbrirFormPos">+ Adicionar pós-graduação</button>
@@ -755,7 +742,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             <div class="field">
               <label for="pNivel">Nível <span class="req">*</span></label>
               <select id="pNivel">
-                <option value="">— selecione —</option>
+                <option value=""></option>
                 <option value="ESPECIALIZACAO">Especialização</option>
                 <option value="MESTRADO">Mestrado</option>
                 <option value="DOUTORADO">Doutorado</option>
@@ -773,7 +760,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
             </div>
           </div>
           <div class="form-add-actions">
-            <button type="button" class="btn secondary" id="btnFecharFormPos">Cancelar</button>
+            <button type="button" class="btn cancel" id="btnFecharFormPos">Cancelar</button>
             <button type="button" class="btn primary" id="btnSalvarPos">✓ Adicionar</button>
           </div>
         </div>
@@ -789,7 +776,7 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="field">
           <label for="outrosCursoSelect">Área do curso</label>
           <select id="outrosCursoSelect">
-            <option value="">— selecione —</option>
+            <option value="" disabled hidden selected>Escolha o curso…</option>
             <option>Creche (0 a 3 anos)</option>
             <option>Pré-escola (4 e 5 anos)</option>
             <option>Alfabetização</option>
@@ -835,14 +822,13 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
         <div class="help">Imagens (JPG, PNG, WEBP) ou PDF — PDFs são convertidos em imagens — máx. 10 MB · PDFs máx. 12 páginas</div>
       </div>
 
-      <div class="docs-fila-sep-fixo" id="docsFilaSepFixo" style="display:none;">
+      <div class="docs-fila-sep-fixo" id="docsFilaSepFixo" hidden>
         Arquivos selecionados serão enviados ao salvar
       </div>
-      <div id="docsFilaWrap" style="display:none;">
+      <div id="docsFilaWrap" hidden>
         <div id="docsFilaLista" class="docs-fila-lista"></div>
       </div>
 
-      <div class="docs-status" id="docsStatus"></div>
     </section>
 
     <!-- Zona de perigo — só aparece em modo edição (?editar=ID) -->
@@ -927,6 +913,39 @@ window.addEventListener('unhandledrejection', () => {
   const t = document.getElementById('_toastGlobal');
   if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
 });
+
+// Auth pronto antes de ler o banco (sessão em cache ou evento de pronto)
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();
+    if(window.Auth && typeof Auth.onReady === 'function') return Auth.onReady(resolve);
+    document.addEventListener('auth:ready', () => resolve(), { once: true });
+  });
+}
+// Admin global sem escola escolhida ("Todas as escolas"): Auth.semEscola() (marcador 'ADMIN' não é escola)
+function _semEscola(){
+  try{
+    if(window.Auth && typeof Auth.semEscola === 'function') return !!Auth.semEscola();
+    return !!(window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId() === 'ADMIN');
+  }catch(_){ return false; }
+}
+
+// Card recolhível (guia 4.3): só a seta recolhe; recolhido, o cabeçalho inteiro abre
+function toggleSec(id){
+  const body = document.getElementById(id);
+  const tog  = document.getElementById('tog' + id.charAt(0).toUpperCase() + id.slice(1));
+  if(!body) return;
+  const col = body.classList.toggle('collapsed');
+  if(tog){ tog.classList.toggle('collapsed', col); tog.setAttribute('aria-expanded', String(!col)); tog.setAttribute('aria-label', col ? 'Expandir' : 'Recolher'); }
+  const hdr = body.previousElementSibling;
+  if(hdr) hdr.classList.toggle('fechada', col);
+}
+function secHeaderClick(id, ev){
+  const body = document.getElementById(id);
+  if(!body) return;
+  const fechado = body.classList.contains('collapsed');
+  if(fechado || (ev && ev.target && ev.target.closest && ev.target.closest('.sec-toggle'))) toggleSec(id);
+}
 
 function _escHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1206,7 +1225,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   function popularFuncaoSelect(){
     const val = document.getElementById('funcao').value;
     document.getElementById('funcao').innerHTML = `
-      <option value="">— selecione —</option>
+      <option value=""></option>
       <option value="PROFESSOR">Professor(a)</option>
       <option value="DIRETOR">Diretor(a)</option>
       <option value="VICE-DIRETOR">Vice-Diretor(a)</option>
@@ -1319,11 +1338,11 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       sc.placeholder = 'Cidade / país de nascimento (exterior)';
       return;
     }
-    su.disabled = false;
+    su.disabled = document.getElementById('natEstrangeiro').closest('.field').classList.contains('field-locked');   // travada pela identificação
     const sem = !su.value;
     sc.disabled = sem;
     if(sem) sc.value = '';
-    sc.placeholder = sem ? 'Selecione a UF primeiro' : 'Município de nascimento';
+    sc.placeholder = sem ? '' : 'Município de nascimento';
   };
   document.getElementById('natEstrangeiro').addEventListener('change', function(){
     document.getElementById('natCidade').value = '';   // o que havia (município da lista ou texto livre) não vale no outro modo
@@ -1454,26 +1473,15 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   });
 
   /* ════════════════════════════════════════
-     Seções colapsáveis
-  ════════════════════════════════════════ */
-  ['Grad','Comp','Pos'].forEach(id => {
-    document.getElementById('tog'+id).addEventListener('click', function(){
-      const body = document.getElementById('body'+id);
-      const open = body.classList.contains('open');
-      body.classList.toggle('open', !open);
-      this.classList.toggle('open', !open);
-    });
-  });
-
-  /* ════════════════════════════════════════
      CEP
   ════════════════════════════════════════ */
   let _cepTimeout = null;
   function maskCEP(v){ const d=v.replace(/\D/g,'').slice(0,8); return d.length>5?d.slice(0,5)+'-'+d.slice(5):d; }
-  function setCepStatus(kind, text){
-    const el = document.getElementById('cepStatus'); el.innerHTML = '';
-    if(!text) return;
-    const s = document.createElement('span'); s.className='cep-status '+kind; s.textContent=text; el.appendChild(s);
+  function setCepStatus(estado, texto){        // estado: 'buscando' | 'ok' | 'erro' | ''
+    const el = document.getElementById('cepStatus');
+    el.hidden = !estado;
+    el.className = 'badge small' + (estado === 'ok' ? ' ok' : estado === 'erro' ? ' bad' : '');
+    el.textContent = estado ? texto : '';
   }
   function lockEnd(locked){
     ['endUF','endCidade'].forEach(id => {
@@ -1483,7 +1491,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     });
   }
   async function buscarCEP(cep){
-    setCepStatus('loading','⏳ Buscando…');
+    setCepStatus('buscando','Buscando CEP…');
     try{
       const r = await fetch('https://viacep.com.br/ws/'+cep+'/json/');
       if(!r.ok) throw new Error('http');
@@ -1491,10 +1499,10 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       if(d.erro) throw new Error('nf');
       document.getElementById('endUF').value = d.uf||'';
       document.getElementById('endCidade').value = (d.localidade||'').toUpperCase();
-      lockEnd(true); setCepStatus('ok','✅ CEP encontrado');
+      lockEnd(true); setCepStatus('ok','CEP encontrado');
     } catch(e){
       lockEnd(false);
-      setCepStatus('err', e.message==='nf'?'❌ CEP não encontrado — preencha manualmente':'⚠️ Falha na busca — preencha manualmente');
+      setCepStatus('erro', e.message==='nf' ? 'CEP não encontrado' : 'Falha na busca do CEP');
     }
   }
   document.getElementById('cep').addEventListener('input', function(){
@@ -2065,8 +2073,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     if(!Number.isInteger(ano) || ano < 2000 || ano > 2100){
       _toastErro('⚠️ Informe um ano letivo válido.'); return;
     }
-    if((window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) === 'ADMIN'){
-      _toastErro('⚠️ Selecione uma escola no topo da página antes de salvar.'); return;
+    if(_semEscola()){     // checagem ANTES de consumir o contador de ID (a escrita já seria barrada pelo banco)
+      _toastErro('⚠️ Escolha uma escola no topo da página para cadastrar funcionários.'); return;
     }
     if(window._salvandoFunc) return;
 
@@ -2117,6 +2125,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     window._salvandoFunc = true;
     btnSalvar.disabled = true; btnSalvar.textContent = '⏳ Salvando…';
 
+    setMsg('Salvando…', 'loading');
     try{
       const agora = new Date().toISOString();
       const emEdicao = !!_editandoId;
@@ -2159,12 +2168,17 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       // (sem isso geraria outro funcId e duplicaria o cadastro).
       _editandoId = matId; _editandoFuncId = funcId;
 
-      // Envia a foto que ficou esperando o funcId (cadastro novo) — não faz nada se não houver foto pendente.
-      if(window.enviarFotoPendenteFuncionario) await window.enviarFotoPendenteFuncionario(funcId);
-
-      // Envia a fila de documentos pendentes (upload junto ao salvar)
-      if(window.initDocsFuncionario)        window.initDocsFuncionario(funcId);
-      if(window.uploadDocsQueueFuncionario) await window.uploadDocsQueueFuncionario();
+      // Foto e documentos só mudam no banco de imagens agora, junto com o salvamento (cancelar não altera nada)
+      if(window.aplicarFotoFuncionario) await window.aplicarFotoFuncionario(funcId);
+      if(window.aplicarRemocoesDocsFuncionario){
+        const errosRemocao = await window.aplicarRemocoesDocsFuncionario();
+        if(errosRemocao.length) throw new Error('os dados foram salvos, mas ' + errosRemocao.length + ' documento(s) não puderam ser apagados: ' + errosRemocao.join(' | '));
+      }
+      if(window.initDocsFuncionario) window.initDocsFuncionario(funcId);
+      if(window.uploadDocsQueueFuncionario){
+        const errosUpload = await window.uploadDocsQueueFuncionario();
+        if(errosUpload.length) throw new Error('os dados foram salvos, mas ' + errosUpload.length + ' documento(s) não puderam ser enviados: ' + errosUpload.join(' | '));
+      }
 
       // Edição via URL (?editar=ID): já vai redirecionar de qualquer jeito, então só o toast basta.
       if(_editandoViaURL){
@@ -2186,6 +2200,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       else mostrarErroSalvar('❌ Erro ao salvar: ' + (e.message||e));
     } finally {
       if(!recarregando){       // recarregando: o botão fica travado até a página reiniciar (evita duplo clique)
+        _toastLimpar();        // só fecha o "carregando"; um erro/sucesso que já o substituiu fica
         window._salvandoFunc = false;
         btnSalvar.disabled = false; btnSalvar.textContent = '💾 Salvar funcionário';
       }
@@ -2343,13 +2358,25 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       CAMPOS_AUTOPREENCH.forEach(id => {
         const el = $(id); if(!el) return;
         const field = el.closest('.field') || el.parentElement;
-        if(!locked){ field.classList.remove('field-locked'); if(el.tagName === 'INPUT') el.readOnly = false; return; }
+        if(!locked){
+          field.classList.remove('field-locked');
+          if(el.tagName === 'INPUT') el.readOnly = false;
+          if(el.type === 'checkbox' || el.tagName === 'SELECT') el.disabled = false;
+          return;
+        }
         const preenchido = el.type === 'checkbox' ? el.checked : String(el.value || '').trim() !== '';
         if(preenchido){   // campo vazio continua editável
           field.classList.add('field-locked');
           if(el.tagName === 'INPUT') el.readOnly = true;
+          // pointer-events:none não basta: o clique no TEXTO do <label> ainda marca o checkbox, e o teclado ainda muda o select
+          if(el.type === 'checkbox' || el.tagName === 'SELECT') el.disabled = true;
         }
       });
+      // O checkbox "Estrangeiro" faz parte do bloco Naturalidade: se UF ou cidade vieram preenchidas (e o campo foi travado),
+      // ele também trava, senão marcá-lo apagaria o que foi carregado (vale para brasileiro, não só para estrangeiro)
+      const _est = $('natEstrangeiro');
+      if(locked && _est && _est.closest('.field').classList.contains('field-locked')) _est.disabled = true;
+      if(!locked && window._natSync) window._natSync();   // devolve a UF ao estado certo (desabilitada em "Estrangeiro")
     }
     function aplicarTrava(){
       const bloquear = !emEdicao() && (!ID.pronto || !!ID.dup || ID.verificando);
@@ -2588,10 +2615,8 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
       // Aguarda auth UMA única vez — o evento dispara uma única vez e seria consumido
       // pela primeira função, deixando carregarDB travado para sempre
-      await new Promise(res => {
-        if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-        document.addEventListener('auth:ready', res, { once: true });
-      });
+      await _authPronto();
+      document.getElementById('avisoSemEscola').hidden = !_semEscola();
       if(!window.DB || !window.DB.funcionariosMatriculas || !window.DB.funcionariosAnos){
         _toastErro('❌ db_firebase.js desatualizado: faltam as coleções funcionariosAnos / funcionariosMatriculas.');
         return;
@@ -2633,31 +2658,52 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 <script id="foto-funcionario-js">
 (function(){
   const inpFoto      = document.getElementById('inpFotoFuncionario');
-  const previewImg    = document.getElementById('fotoFuncionarioPreview');
-  const placeholder   = document.getElementById('fotoFuncionarioPlaceholder');
-  const btnRemover    = document.getElementById('btnRemoverFotoFuncionario');
-  const statusEl      = document.getElementById('fotoFuncionarioStatus');
+  const previewImg   = document.getElementById('fotoFuncionarioPreview');
+  const placeholder  = document.getElementById('fotoFuncionarioPlaceholder');
+  const btnRemover   = document.getElementById('btnRemoverFotoFuncionario');
+  const statusEl     = document.getElementById('fotoFuncionarioStatus');
   if(!inpFoto) return;
 
-  let _fotoPendente = null;    // { base64, mimeType } — cadastro novo, aguardando funcId confirmado
-  let _fotoFuncId   = null;    // conhecido de cara em modo edição
-  let _fotoFileIdAtual = null; // fotoFileId da foto atualmente salva (pra poder apagar no Cloudinary ao remover)
+  // NADA vai para o banco de imagens antes do "Salvar": escolher, trocar ou remover só mexe no widget;
+  // cancelar/recarregar descarta tudo. Quem aplica é window.aplicarFotoFuncionario (chamada pelo salvar).
+  let _fotoPendente    = null;   // { base64, mimeType } — foto escolhida, aguardando o salvamento
+  let _fotoFuncId      = null;   // funcId da pessoa quando ela já existe (edição ou CPF já cadastrado)
+  let _fotoFileIdAtual = null;   // fotoFileId da foto salva (para apagar no Cloudinary)
+  let _fotoTinhaSalva  = false;  // já existe foto salva para esta pessoa
+  let _fotoRemover     = false;  // remoção pedida, só aplicada ao salvar
+  const LEGENDA_PENDENTE = 'Aguardando o salvamento do funcionário para aplicar a foto…';
 
-  function _setStatus(txt, kind){   // kind: 'ok' | 'err' | omitido (neutro)
-    statusEl.textContent = txt || '';
-    statusEl.className = kind ? 'help ' + kind : 'help';
+  // Status da foto: chips ok/bad curtos (com legenda quando algo aguarda o salvamento).
+  // Carregamento e erros vão para o toast geral (setMsg), não para o status.
+  function _limparStatus(){ statusEl.textContent = ''; }
+  function _chip(tipo, texto, legenda){
+    _limparStatus();
+    const b = document.createElement('span');
+    b.className = 'badge small ' + tipo; b.textContent = texto;
+    statusEl.appendChild(b);
+    if(legenda){
+      const l = document.createElement('div');
+      l.className = 'help'; l.textContent = legenda;
+      statusEl.appendChild(l);
+    }
+  }
+  const _msg = (t, k) => { if(window.setMsg) window.setMsg(t, k); };
+
+  function _mostrarFoto(url){
+    if(url){ previewImg.src = url; previewImg.hidden = false; placeholder.hidden = true; btnRemover.hidden = false; }
+    else   { previewImg.hidden = true; previewImg.src = ''; placeholder.hidden = false; btnRemover.hidden = true; }
   }
 
-  // Chamado no modo edição, com a foto já existente (se houver)
+  // Edição ou CPF já cadastrado: carrega a foto existente (se houver) no widget. Não grava nada.
   window.initFotoFuncionario = function(funcId, fotoUrlExistente, fotoFileIdExistente){
-    _fotoFuncId = funcId ? String(funcId) : null;
+    _fotoFuncId      = funcId ? String(funcId) : null;
     _fotoFileIdAtual = fotoFileIdExistente || null;
-    if(fotoUrlExistente){
-      previewImg.src = fotoUrlExistente;
-      previewImg.style.display = 'block';
-      placeholder.style.display = 'none';
-      btnRemover.style.display = '';
-    }
+    _fotoTinhaSalva  = !!fotoUrlExistente;
+    _fotoRemover     = false;
+    _fotoPendente    = null;
+    inpFoto.value = '';
+    _limparStatus();
+    _mostrarFoto(fotoUrlExistente || '');
   };
 
   // Redimensiona no canvas (máx. 480px no maior lado) e reexporta em JPEG
@@ -2687,7 +2733,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   }
 
   async function _enviarFoto(funcId, base64, mimeType){
-    _setStatus('Enviando foto...');
+    _limparStatus();
     try{
       const resp = await fetch('/api/avatar-upload', {
         method: 'POST', headers: {'Content-Type':'application/json'},
@@ -2696,14 +2742,14 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       const data = await resp.json();
       if(!resp.ok) throw new Error(data.error || 'erro desconhecido');
       if(!data.fotoUrl) throw new Error('upload OK mas sem fotoUrl na resposta — veja o console');
-      // Atualiza o registro em memória + persiste o array inteiro (é assim
-      // que este módulo salva — ver comentário no topo do bloco).
+      // A foto é da PESSOA: grava no doc do funcionário e copia para todas as matrículas dele
       if(window._setFotoFuncionario) await window._setFotoFuncionario(funcId, data.fotoUrl, data.fotoFileId);
       _fotoFileIdAtual = data.fotoFileId;
-      _setStatus('✅ Foto salva.', 'ok');
+      return true;
     }catch(e){
       console.error('[foto-funcionario] falha ao enviar/salvar foto:', e);
-      _setStatus('❌ Falha ao enviar foto: ' + e.message, 'err');
+      _msg('Falha ao enviar foto: ' + e.message, 'err');
+      return false;
     }
   }
 
@@ -2711,73 +2757,69 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const file = inpFoto.files[0];
     if(!file) return;
     if(!file.type.startsWith('image/')){
-      _setStatus('⚠️ Selecione um arquivo de imagem.', 'err');
+      _msg('Selecione um arquivo de imagem.', 'warn');
       return;
     }
-    _setStatus('Comprimindo...');
     try{
       const { base64, mimeType, preview } = await _comprimir(file);
-      previewImg.src = preview;
-      previewImg.style.display = 'block';
-      placeholder.style.display = 'none';
-      btnRemover.style.display = '';
-
-      if(_fotoFuncId){
-        await _enviarFoto(_fotoFuncId, base64, mimeType);
-      } else {
-        _fotoPendente = { base64, mimeType };
-        _setStatus('Foto pronta — será enviada ao salvar o funcionário.', 'ok');
-      }
+      _mostrarFoto(preview);
+      _fotoPendente = { base64, mimeType };
+      _fotoRemover  = false;
+      _chip('ok', _fotoTinhaSalva ? 'Foto trocada' : 'Foto adicionada', LEGENDA_PENDENTE);
     }catch(e){
-      _setStatus('❌ Falha ao processar a foto: ' + e.message, 'err');
+      _msg('Falha ao processar a foto: ' + e.message, 'err');
     }
   });
 
-  btnRemover.addEventListener('click', async () => {
-    const fileIdAntigo = _fotoFileIdAtual;
-    previewImg.style.display = 'none';
-    previewImg.src = '';
-    placeholder.style.display = '';
-    btnRemover.style.display = 'none';
+  btnRemover.addEventListener('click', () => {
+    _mostrarFoto('');
     inpFoto.value = '';
     _fotoPendente = null;
-    _fotoFileIdAtual = null;
-    _setStatus('');
-    if(_fotoFuncId && window._setFotoFuncionario){
-      try{ await window._setFotoFuncionario(_fotoFuncId, null, null); }
-      catch(e){ console.warn('Erro ao limpar foto no Firestore:', e); }
-    }
-    if(fileIdAntigo){
-      try{
-        await fetch('/api/drive-delete-funcionario', {
-          method: 'DELETE', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
-        });
-      }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+    if(_fotoFuncId && _fotoTinhaSalva){
+      // Pessoa com foto salva: a remoção só é aplicada (Firestore + Cloudinary) ao salvar o formulário.
+      _fotoRemover = true;
+      _chip('bad', 'Foto apagada', LEGENDA_PENDENTE);
+    } else {
+      // Nada existe no servidor: só reseta o widget.
+      _fotoRemover = false;
+      _chip('bad', 'Foto removida');
     }
   });
+
+  // Chamado pelo salvar (cadastro novo, nova matrícula ou edição) DEPOIS dos dados gravados.
+  // Aplica a foto nova ou a remoção no Cloudinary/Firestore; lança erro se falhar.
+  window.aplicarFotoFuncionario = async function(funcId){
+    const id = String(funcId || _fotoFuncId || '');
+    if(!id) return;
+    if(_fotoPendente){
+      const { base64, mimeType } = _fotoPendente;
+      const ok = await _enviarFoto(id, base64, mimeType);
+      if(!ok) throw new Error('os dados foram salvos, mas a foto não pôde ser enviada');
+      _fotoPendente = null; _fotoRemover = false; _fotoTinhaSalva = true; _fotoFuncId = id;
+      return;
+    }
+    if(_fotoRemover){
+      const fileIdAntigo = _fotoFileIdAtual;
+      if(window._setFotoFuncionario) await window._setFotoFuncionario(id, null, null);
+      if(fileIdAntigo){
+        try{
+          await fetch('/api/drive-delete-funcionario', {
+            method: 'DELETE', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+          });
+        }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+      }
+      _fotoFileIdAtual = null; _fotoRemover = false; _fotoTinhaSalva = false;
+    }
+  };
 
   // Reseta o widget de foto pro estado vazio — chamado por limparFormulario()
   window.limparFotoFuncionario = function(){
-    _fotoPendente = null;
-    _fotoFuncId   = null;
-    _fotoFileIdAtual = null;
+    _fotoPendente = null; _fotoFuncId = null; _fotoFileIdAtual = null;
+    _fotoTinhaSalva = false; _fotoRemover = false;
     inpFoto.value = '';
-    previewImg.style.display = 'none';
-    previewImg.src = '';
-    placeholder.style.display = '';
-    btnRemover.style.display = 'none';
-    _setStatus('');
-  };
-
-  // Chamado logo depois que o funcId de um cadastro NOVO é confirmado —
-  // envia a foto que ficou esperando.
-  window.enviarFotoPendenteFuncionario = async function(funcId){
-    if(!_fotoPendente) return;
-    _fotoFuncId = String(funcId);
-    const { base64, mimeType } = _fotoPendente;
-    _fotoPendente = null;
-    await _enviarFoto(funcId, base64, mimeType);
+    _mostrarFoto('');
+    _limparStatus();
   };
 })();
 </script>
@@ -2796,6 +2838,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 
   let _fila        = [];
   let _funcionarioId = null;
+  const _remocoes = new Map();   // documentos marcados para apagar: só aplicados ao salvar o formulário
 
   function iconForMime(m){ return (m||'').startsWith('image/') ? '🖼️' : '📄'; }
   function fmtSize(b){
@@ -2805,12 +2848,24 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   }
   function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+  // Mensagens do widget vão para o toast geral (cor = tipo, nunca hex). O toast "carregando" da conversão de PDF
+  // é fechado pelo próximo toast (ok/err) ou, se nada vier depois, por _toastLimpar().
   function setStatus(kind, text){
-    const el = document.getElementById('docsStatus');
-    if(!el) return;
-    el.className = 'docs-status'+(text?' show '+kind:'');
-    el.textContent = text;
-    if(kind==='ok'&&text) setTimeout(()=>{ el.className='docs-status'; el.textContent=''; }, 4000);
+    if(!text){ if(window._toastLimpar) window._toastLimpar(); return; }
+    const limpo = String(text).replace(/^(⏳|✅|❌|⚠️)\s*/, '');
+    if(window.setMsg) window.setMsg(limpo, kind);
+  }
+
+  // Pré-visualização de um arquivo ainda na fila (antes de salvar), em nova aba, via blob
+  function _abrirPreview(item){
+    try{
+      const bin = atob(item.base64 || '');
+      const bytes = new Uint8Array(bin.length);
+      for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: item.mimeType || 'image/jpeg' }));
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }catch(e){ console.warn('[docs-funcionario] falha ao abrir pré-visualização:', e); }
   }
 
   function renderFila(){
@@ -2821,12 +2876,12 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     lista.querySelectorAll('.docs-fila-pendente').forEach(el => el.remove());
     const temExistente = lista.querySelector('.docs-existente');
     if(!_fila.length){
-      wrap.style.display  = temExistente ? '' : 'none';
-      if(sep) sep.style.display = 'none';
+      wrap.hidden = !temExistente;
+      if(sep) sep.hidden = true;
       return;
     }
-    wrap.style.display = '';
-    if(sep) sep.style.display = '';
+    wrap.hidden = false;
+    if(sep) sep.hidden = false;
 
     _fila.forEach((item, idx) => {
       const div = document.createElement('div');
@@ -2843,12 +2898,19 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
           `<div class="docs-prog-wrap" id="docsProgItem${idx}"><div class="docs-prog-bar"></div></div>`+
         '</div>'+
         `<span class="docs-fila-size">${fmtSize(item._size||item.file.size)}</span>`+
+        `<button type="button" class="btn secondary small docs-ver" data-idx="${idx}">👁️ Ver</button>`+
         `<button class="docs-fila-rm docs-fila-pendente" data-idx="${idx}" title="Remover">✕</button>`;
       lista.insertBefore(div, lista.querySelector('.docs-existente')||null);
     });
 
     lista.querySelectorAll('.docs-fila-label').forEach(inp => {
       inp.addEventListener('input', e => { _fila[parseInt(e.target.dataset.idx)].label = e.target.value; });
+    });
+    lista.querySelectorAll('button.docs-ver').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const it = _fila[parseInt(e.currentTarget.dataset.idx)];
+        if(it) _abrirPreview(it);
+      });
     });
     lista.querySelectorAll('button.docs-fila-rm.docs-fila-pendente').forEach(btn => {
       btn.addEventListener('click', e => {
@@ -2949,22 +3011,39 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     }
   }
 
+  // Envia a fila ao salvar. Devolve a lista de erros; os arquivos que falharam continuam na fila (dá para tentar de novo).
   window.uploadDocsQueueFuncionario = async function(){
-    if(!_fila.length || !_funcionarioId) return;
-    setStatus('loading', `⏳ Enviando ${_fila.length} imagem(ns)…`);
+    if(!_fila.length || !_funcionarioId) return [];
     const erros = [];
+    const falhou = [];
     for(let i=0; i<_fila.length; i++){
       const res = await uploadItem(_fila[i], i);
-      if(!res.ok) erros.push(res.name+': '+res.error);
+      if(!res.ok){ erros.push(res.name+': '+res.error); falhou.push(_fila[i]); }
     }
-    _fila = [];
-    document.getElementById('docsFilaLista')?.querySelectorAll('.docs-fila-pendente').forEach(el=>el.remove());
-    if(erros.length){ setStatus('err', `⚠️ ${erros.length} arquivo(s) falharam: ${erros.join(' | ')}`); }
-    else { setStatus('ok', '✅ Todos os documentos enviados!'); }
+    _fila = falhou;
+    renderFila();
+    return erros;     // o salvar transforma a lista em um único toast de erro
+  };
+
+  // Chamado pelo salvar: apaga no Cloudinary os documentos marcados. Devolve a lista de erros.
+  window.aplicarRemocoesDocsFuncionario = async function(){
+    const erros = [];
+    for(const r of Array.from(_remocoes.values())){
+      try{
+        const resp = await fetch(API_DELETE, {
+          method: 'DELETE', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ fileId: r.fileId, resourceType: r.resourceType }),
+        });
+        const d = await resp.json().catch(() => ({}));
+        if(!resp.ok) throw new Error(d.error || 'erro no servidor');
+        _remocoes.delete(r.fileId);
+      }catch(e){ erros.push(r.name + ': ' + e.message); }
+    }
+    return erros;
   };
 
   window.limparDocsFuncionario = function(){
-    _fila = []; _funcionarioId = null;
+    _fila = []; _funcionarioId = null; _remocoes.clear();
     const lista = document.getElementById('docsFilaLista');
     if(lista) lista.innerHTML = '';
     renderFila();
@@ -2982,13 +3061,14 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const lista = document.getElementById('docsFilaLista');
     if(!lista) return;
     lista.querySelectorAll('.docs-existente').forEach(el => el.remove());
+    _remocoes.clear();
     try{
       const resp = await fetch(`${API_LIST}?funcionarioId=${encodeURIComponent(_funcionarioId)}`);
       const data = await resp.json();
       if(!resp.ok) throw new Error(data.error);
       const files = data.files || [];
       if(!files.length) return;
-      wrap && (wrap.style.display = '');
+      if(wrap) wrap.hidden = false;
       const sep = document.createElement('div');
       sep.className = 'docs-existente docs-sep-tit';
       sep.textContent = 'Documentos já anexados';
@@ -3003,28 +3083,24 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
           '<div class="docs-fila-info">'+
             `<div class="docs-fila-nome">${escHtml(f.label||f.fileName)}</div>`+
             `<div class="docs-fila-meta">${escHtml(f.fileName)}${data_fmt?' · '+data_fmt:''}</div>`+
+            '<span class="badge small bad docs-marca">Será apagado ao salvar</span>'+
           '</div>'+
           `<a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>`+
-          `<button class="docs-fila-rm" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Remover">🗑️</button>`;
+          `<button type="button" class="btn danger-soft small docs-rm-existente" data-fileid="${escHtml(f.fileId)}" data-name="${escHtml(f.label||f.fileName)}" data-restype="${escHtml(f.resourceType||'image')}" title="Apagar documento">🗑️ Apagar</button>`;
         lista.appendChild(item);
       });
-      lista.querySelectorAll('.docs-existente .docs-fila-rm').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const okRemover = await _confirmModal({
-            titulo: 'Remover documento?',
-            corpo: `Remover <strong>${escHtml(btn.dataset.name)}</strong>?\nEssa ação não pode ser desfeita.`,
-            corDestaque: 'danger',
-            textoConfirmar: 'Remover'
-          });
-          if(!okRemover) return;
-          setStatus('loading','⏳ Removendo…');
-          try{
-            const r = await fetch(API_DELETE,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileId:btn.dataset.fileid,resourceType:btn.dataset.restype||'image'})});
-            const d = await r.json();
-            if(!r.ok) throw new Error(d.error);
-            btn.closest('.docs-existente').remove();
-            setStatus('ok','✅ Documento removido.');
-          }catch(e){ setStatus('err','❌ Erro ao remover: '+e.message); }
+      // Apagar só MARCA o documento (reversível com "Desfazer"); a remoção real acontece ao salvar o formulário
+      lista.querySelectorAll('.docs-existente .docs-rm-existente').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item   = btn.closest('.docs-existente');
+          const id     = btn.dataset.fileid;
+          const marcar = !item.classList.contains('docs-marcado');
+          item.classList.toggle('docs-marcado', marcar);
+          btn.textContent = marcar ? '↩ Desfazer' : '🗑️ Apagar';
+          btn.classList.toggle('danger-soft', !marcar);
+          btn.classList.toggle('secondary', marcar);
+          if(marcar) _remocoes.set(id, { fileId: id, resourceType: btn.dataset.restype || 'image', name: btn.dataset.name });
+          else _remocoes.delete(id);
         });
       });
     }catch(err){ console.warn('[docs-funcionario] Erro ao carregar:', err.message); }

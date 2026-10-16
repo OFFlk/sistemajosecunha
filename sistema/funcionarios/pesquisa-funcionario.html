@@ -191,6 +191,12 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
 .modal-head     { position: sticky; top: 0; background: var(--card-bg, var(--card)); display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border, var(--border)); }
 .modal-head h3  { margin: 0; font-size: 16px; font-weight: 800; }
 .modal-body     { padding: 14px; }
+
+/* ── Ficha (modal): blocos de formação e NEE ── */
+.ficha-sub{font-size:11px;font-weight:800;color:var(--ui-muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;}
+.ficha-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.ficha-linha{font-size:13px;}
+.ficha-vazio{font-size:13px;color:var(--ui-muted);}
 </style>
 
 <!-- ══ Bibliotecas de Exportação (PDF / DOCX) ══ -->
@@ -954,36 +960,36 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     if(d.defVisual)        itens.push('👁️ Deficiência visual' + (d.defVisualSub ? ` (${escapeHtml(d.defVisualSub)})` : ''));
     if(d.defAuditiva)      itens.push('👂 Deficiência auditiva / surdez' + (d.defAuditivaSub ? ` (${escapeHtml(d.defAuditivaSub)})` : ''));
     if(!itens.length){
-      return `<div style="font-size:13px;color:var(--muted);">Nenhuma</div>`;
+      return `<div class="ficha-vazio">Nenhuma</div>`;
     }
-    return `<div style="display:flex;flex-wrap:wrap;gap:6px;">` +
-      itens.map(t => `<span class="badge">${t}</span>`).join('') +
+    return `<div class="ficha-chips">` +
+      itens.map(t => `<span class="badge gray">${t}</span>`).join('') +
       `</div>`;
   }
 
   function montarFormacao(f){
     const blocos = [];
     if(Array.isArray(f.graduacoes) && f.graduacoes.length){
-      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Graduações</div>` +
-        f.graduacoes.map(g => `<div style="font-size:13px;">• ${escapeHtml(g.curso||g.nome||'—')}${g.ano?' · '+escapeHtml(String(g.ano)):''}</div>`).join(''));
+      blocos.push(`<div class="ficha-sub">Graduações</div>` +
+        `<div class="ficha-chips">` + f.graduacoes.map(g => `<span class="badge">${escapeHtml(g.curso||g.nome||'—')}${g.ano?' · '+escapeHtml(String(g.ano)):''}</span>`).join('') + `</div>`);
     }
     if(Array.isArray(f.posGraduacoes) && f.posGraduacoes.length){
-      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Pós-graduações</div>` +
-        f.posGraduacoes.map(p => `<div style="font-size:13px;">• ${escapeHtml(p.area||'—')}${p.ano?' · '+escapeHtml(String(p.ano)):''}</div>`).join(''));
+      blocos.push(`<div class="ficha-sub">Pós-graduações</div>` +
+        `<div class="ficha-chips">` + f.posGraduacoes.map(x => `<span class="badge neutral">${escapeHtml(x.area||'—')}${x.ano?' · '+escapeHtml(String(x.ano)):''}</span>`).join('') + `</div>`);
     }
     // Complementações — array novo OU o campo único legado (registros mais antigos)
     const complementacoes = Array.isArray(f.complementacoes) && f.complementacoes.length
       ? f.complementacoes
       : (f.complementacaoPedagogica && f.complementacaoNome ? [{ nome: f.complementacaoNome }] : []);
     if(complementacoes.length){
-      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Complementações</div>` +
-        complementacoes.map(c => `<div style="font-size:13px;">• ${escapeHtml(c.nome||'—')}${c.ano?' · '+escapeHtml(String(c.ano)):''}</div>`).join(''));
+      blocos.push(`<div class="ficha-sub">Complementações</div>` +
+        complementacoes.map(c => `<div class="ficha-linha">• ${escapeHtml(c.nome||'—')}${c.ano?' · '+escapeHtml(String(c.ano)):''}</div>`).join(''));
     }
     if(Array.isArray(f.outrosCursos) && f.outrosCursos.length){
-      blocos.push(`<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;">Outros cursos</div>` +
-        f.outrosCursos.map(o => `<div style="font-size:13px;">• ${escapeHtml(typeof o === 'string' ? o : (o.nome||o.curso||'—'))}</div>`).join(''));
+      blocos.push(`<div class="ficha-sub">Outros cursos</div>` +
+        f.outrosCursos.map(o => `<div class="ficha-linha">• ${escapeHtml(typeof o === 'string' ? o : (o.nome||o.curso||'—'))}</div>`).join(''));
     }
-    return blocos.length ? blocos.join('') : `<div style="font-size:13px;color:var(--muted);">Nenhuma formação adicional registrada.</div>`;
+    return blocos.length ? blocos.join('') : `<div class="ficha-vazio">Nenhuma formação adicional registrada.</div>`;
   }
 
   function abrirFichaFuncionario(matId){
