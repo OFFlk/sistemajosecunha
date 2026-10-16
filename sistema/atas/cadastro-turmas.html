@@ -80,15 +80,10 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .chips-series { margin-top: 10px; }
 
-/* ── Lista de turmas: sub-card (D19, definição local) ── */
+/* ── Lista de turmas: cada turma é um .subcard (aparência global); aqui só o layout ── */
 .list { display: flex; flex-direction: column; gap: 10px; }
-.item {
-  border: 1px solid var(--ui-border); border-radius: 10px; padding: 12px 14px;
-  background: var(--ui-surface); color: var(--ui-text);
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
+.item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .item:hover { border-color: var(--ui-brand); }
-.item.editing { border-color: var(--ui-brand); box-shadow: 0 0 0 3px var(--ui-brand-faded); }
 .item-main { flex: 1; min-width: 0; }
 .item-titulo { margin: 0 0 6px; }
 .row.item-linha-badges { gap: 6px; margin-top: 2px; }
@@ -154,7 +149,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         </label>
         <div class="row serie-linha">
           <select id="serieSelect" class="input"></select>
-          <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
+          <button class="btn outline field-h" id="btnAddSerie" type="button">Adicionar</button>
           <button class="btn secondary" id="btnClearSeries" type="button">Limpar séries</button>
         </div>
         <div id="chipsSeries" class="chips chips-series"></div>
@@ -673,7 +668,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     list.innerHTML = "";
     turmas.forEach((t, idx) => {
       const div = document.createElement("div");
-      div.className = "item" + (editingTurmaId === t.turmaId ? " editing" : "");
+      div.className = "item subcard" + (editingTurmaId === t.turmaId ? " selected" : "");
 
       const left = document.createElement("div");
       left.className = "item-main";

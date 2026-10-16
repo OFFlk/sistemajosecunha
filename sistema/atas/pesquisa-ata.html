@@ -75,12 +75,6 @@
 
 /* ── Detalhes: filtro de aluno em linha cheia + menu "Exportar" ── */
 .detalhe-actions .input { width:100%; }
-.drop-wrap { position:relative; display:inline-block; }
-.drop-menu {
-  position:absolute; left:0; top:calc(100% + 6px); z-index:200; min-width:180px; padding:6px 0; flex-direction:column;
-  background:var(--ui-surface); border:1.5px solid var(--ui-border); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.18);
-}
-.drop-menu .btn { width:100%; justify-content:flex-start; padding:10px 16px; }
 </style>
 
 <title>Pesquisa de Atas</title>
@@ -127,7 +121,7 @@
         <label for="selSerieAdd">Filtrar por série</label>
         <div class="serie-add-row">
           <select id="selSerieAdd"><option value="" disabled hidden selected>Selecione a série…</option></select>
-          <button class="btn primary" id="btnAddSerie" type="button">+ Adicionar</button>
+          <button class="btn primary field-h" id="btnAddSerie" type="button">+ Adicionar</button>
         </div>
         <div class="chips" id="chipsSeries"></div>
       </div>
@@ -195,11 +189,11 @@
 
         <div class="detalhe-actions">
           <input id="fAluno" class="input" type="text" placeholder="Filtrar aluno por nome...">
-          <div class="drop-wrap">
-            <button class="btn primary" type="button" id="btnAtaExportar">Exportar ▾</button>
-            <div id="dropExportAta" class="drop-menu" style="display:none;">
-              <button class="btn quiet" id="btnExportAtaPdf" type="button">📄 Exportar PDF</button>
-              <button class="btn quiet" id="btnExportAtaCsv" type="button">📊 Exportar CSV</button>
+          <div class="rel-inline">
+            <button class="btn primary" type="button" id="btnAtaExportar" data-dropdown="dropExportAta" aria-haspopup="menu" aria-expanded="false">Exportar ▾</button>
+            <div id="dropExportAta" class="popover menu" hidden>
+              <button class="btn quiet menu-item" id="btnExportAtaPdf" type="button">📄 Exportar PDF</button>
+              <button class="btn quiet menu-item" id="btnExportAtaCsv" type="button">📊 Exportar CSV</button>
             </div>
           </div>
           <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
@@ -894,30 +888,36 @@ async function carregarDadosEscola() {
   return padrao;
 }
 
-// Dropdown "Exportar" (mesmo padrão de abrir/fechar do pesquisa-ano-ativo.html).
-// PDF e CSV são ligados no IIFE abaixo.
-(function(){
-  const btn  = document.getElementById("btnAtaExportar");
-  const drop = document.getElementById("dropExportAta");
-  if (!btn || !drop) return;
+// Dropdown (guia, seção 8): JS padrão por delegação, uma vez por página. O botão aponta para o menu
+// por data-dropdown; estado por atributo hidden. O abrir/fechar (inclusive ao clicar num item) é daqui.
+function _fecharDropdowns(exceto){
+  document.querySelectorAll('[data-dropdown]').forEach(b => {
+    const m = document.getElementById(b.dataset.dropdown);
+    if(m && m !== exceto){ m.hidden = true; b.setAttribute('aria-expanded', 'false'); }
+  });
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-dropdown]');
+  if(btn){
+    const menu = document.getElementById(btn.dataset.dropdown);
+    if(!menu) return;
+    const abrir = menu.hidden;
+    _fecharDropdowns(menu);
+    menu.hidden = !abrir;
+    btn.setAttribute('aria-expanded', String(abrir));
+    return;
+  }
+  if(e.target.closest('.popover')){                         // clique dentro do popover
+    if(e.target.closest('.menu-item')) _fecharDropdowns();  // item de lista fecha
+    return;
+  }
+  _fecharDropdowns();                                       // clique fora
+});
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDropdowns(); });
 
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const aberto = drop.style.display !== "none";
-    drop.style.display = aberto ? "none" : "flex";
-  });
-  document.addEventListener("click", () => { drop.style.display = "none"; });
-  drop.addEventListener("click", (e) => { e.stopPropagation(); });
-
-  document.getElementById("btnExportAtaPdf").addEventListener("click", () => {
-    drop.style.display = "none";
-    exportarPDFDaTurma();
-  });
-  document.getElementById("btnExportAtaCsv").addEventListener("click", () => {
-    drop.style.display = "none";
-    exportarCSVDaTurma();
-  });
-})();
+// PDF e CSV da turma aberta
+document.getElementById("btnExportAtaPdf").addEventListener("click", () => exportarPDFDaTurma());
+document.getElementById("btnExportAtaCsv").addEventListener("click", () => exportarCSVDaTurma());
 
 async function exportarPDFDaTurma() {
   if (!turmaSelecionada) return;

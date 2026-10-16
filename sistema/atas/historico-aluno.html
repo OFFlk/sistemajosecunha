@@ -42,7 +42,6 @@
 /* ===== Layout desta página ===== */
 .container{ max-width:1100px; margin:22px auto 48px; padding:0 18px; }
 .container .card{ --card-pad:20px; }
-.top-actions{ display:flex; gap:10px; justify-content:flex-end; margin-bottom:14px; flex-wrap:wrap; }
 
 /* espaçamentos (substituem style="margin-top:..." inline) */
 .mt-4{ margin-top:4px; }
@@ -52,37 +51,19 @@
 .mt-16{ margin-top:16px; }
 
 /* card "Buscar aluno" */
-.dest-topo{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
-.dest-topo h2{ margin:0; }
 .busca-linha{ display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin-top:10px; }
 .busca-campo{ flex:1; min-width:200px; }
 .busca-acoes{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding-bottom:2px; }
 
-/* ===== Formulário (sem uso neste arquivo; confirmar nos .js externos antes de apagar) ===== */
-.row{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
-@media(max-width:900px){ .row{grid-template-columns:1fr 1fr;} }
-@media(max-width:540px){ .row{grid-template-columns:1fr;} }
-.campo{ display:flex; flex-direction:column; min-width:0; }
-.form-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
-.actions{ display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
-
-/* ===== Tabela (D1 em aberto: mantida como estava; só tokens da tabela 2.2 trocados) ===== */
-.table-wrap{ overflow-x:auto; padding-bottom:6px; border:1px solid var(--line); border-radius:14px; margin-top:14px; }
+/* ===== Tabela da turma aberta (D1 em aberto: mantida como estava) ===== */
 table{ width:max-content; min-width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
-th, td{ border:1px solid var(--line); padding:6px; text-align:center; vertical-align:middle; }
-th{ background:var(--chip-bg); font-weight:700; text-align:left; color:var(--muted); }
+th, td{ border:1px solid var(--ui-border); padding:6px; text-align:center; vertical-align:middle; }
+th{ background:var(--ui-chip-bg); font-weight:700; text-align:left; color:var(--ui-muted); }
 html[data-theme="dark"] table{ color:var(--ui-text); }
-html[data-theme="dark"] th{ background:var(--chip-bg); color:var(--muted); border-color:var(--ui-border); }
+html[data-theme="dark"] th{ background:var(--ui-chip-bg); color:var(--ui-muted); border-color:var(--ui-border); }
 html[data-theme="dark"] td{ background:var(--field-bg); color:var(--ui-text); border-color:var(--ui-border); }
-html[data-theme="dark"] tbody tr:hover td{ background:var(--chip-bg); }
-th.th-vertical{ width:34px; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; padding:10px 4px; font-size:12px; line-height:1; }
-th.th-num{ width:42px; }
-th.th-nome{ width:220px; }
-td.col-nome{ text-align:left; padding-left:8px; word-break:break-word; }
-th.th-nota, td.col-nota{ width:42px; font-size:11px; }
+html[data-theme="dark"] tbody tr:hover td{ background:var(--ui-chip-bg); }
 tr.linha-alvo{ font-weight:800; }
-
-.hidden{ display:none !important; }
 
 /* ===== Complementos específicos: Histórico por Aluno ===== */
 .split{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; align-items:stretch;}
@@ -91,18 +72,15 @@ tr.linha-alvo{ font-weight:800; }
 .muted{color:var(--ui-muted); font-size:13px;}
 .aluno-nome{font-size:18px; font-weight:900;}
 
-/* lista de resultados (sub-card local, D19) */
-.list{border:1px solid var(--ui-border); border-radius:14px; overflow:hidden; background:var(--ui-surface);}
-.item{display:grid; grid-template-columns: 1fr 220px; gap:10px; align-items:center; padding:12px; border-top:1px solid var(--ui-border);}
-.item:first-child{border-top:none;}
+/* lista de resultados: cada aluno encontrado é um .subcard (aparência global); aqui só o layout */
+.resultados{display:flex; flex-direction:column; gap:10px;}
+.item{display:grid; grid-template-columns: 1fr 220px; gap:10px; align-items:center; cursor:pointer;}
 .item .title{font-weight:800; min-width:0; font-size:14px;}
 .item .sub{color:var(--ui-muted); font-size:13px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .item .right{display:flex; gap:8px; justify-content:flex-end; flex-wrap:nowrap; align-items:center;}
 .w-90{width:90px; justify-content:center;}
 
 /* timeline do histórico */
-.details-title{display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
-.details-title h3{margin:0;}
 .timeline{margin-top:10px; border-top:1px solid var(--ui-border);}
 .trow{display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--ui-border); align-items:center;}
 .tleft{min-width:0;}
@@ -121,7 +99,7 @@ tr.linha-alvo{ font-weight:800; }
 
 <div class="container">
   <div class="card card-destaque">
-    <div class="dest-topo">
+    <div class="card-head">
       <h2>Buscar aluno</h2>
       <a class="btn" href="pesquisa-ata.html">🔎 Pesquisar por turma</a>
     </div>
@@ -140,13 +118,13 @@ tr.linha-alvo{ font-weight:800; }
         <button class="btn secondary" type="button" onclick="limpar()">Limpar</button>
       </div>
     </div>
-    <!-- Seção 19 do guia: admin global sem escola só recebe aviso (visível só nesse caso) -->
-    <div class="aviso-warn mt-10" id="avisoSemEscola" hidden>⚠️ Você está vendo todas as escolas. Escolha uma escola no topo da página para pesquisar alunos.</div>
+    <!-- Guia 18.3: admin global sem escola só recebe aviso (visível só nesse caso) -->
+    <div class="aviso-warn mt-10" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no topo da página para pesquisar alunos.</div>
   </div>
 
   <div class="split">
     <div class="card">
-      <div class="details-title">
+      <div class="card-head">
         <h3>Resultados
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -161,7 +139,7 @@ tr.linha-alvo{ font-weight:800; }
     </div>
 
     <div class="card">
-      <div class="details-title">
+      <div class="card-head">
         <h3>Detalhes do aluno
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -169,7 +147,7 @@ tr.linha-alvo{ font-weight:800; }
           </span>
         </h3>
         <div class="rel-inline" id="wrapExportHistorico">
-          <button class="btn primary" type="button" id="btnExportarSel" disabled>Exportar ▾</button>
+          <button class="btn primary" type="button" id="btnExportarSel" data-dropdown="dropExportHistorico" aria-haspopup="menu" aria-expanded="false" disabled>Exportar ▾</button>
           <div class="popover menu align-right" id="dropExportHistorico" hidden>
             <button class="btn quiet menu-item" type="button" id="btnExportarPdfSel">📄 Exportar PDF</button>
             <button class="btn quiet menu-item" type="button" id="btnExportarCsvSel">📊 Exportar CSV</button>
@@ -189,7 +167,7 @@ tr.linha-alvo{ font-weight:800; }
        página não tem permissão de edição de turma (ver pendência de
        RBAC no handoff — cadastro-atas.html é gestor/admin-only). -->
   <div id="cardTurmaAberta" class="card mt-16" hidden>
-    <div class="details-title">
+    <div class="card-head">
       <h3 id="turmaAbertaTitulo">Turma</h3>
       <button class="btn secondary" type="button" onclick="fecharTurmaAberta()">✕ Fechar</button>
     </div>
@@ -283,36 +261,6 @@ window.addEventListener('unhandledrejection', () => {
   if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
 });
 
-/* =========================
-   Escola ativa (sem cache de dados — só a sessão em si)
-========================= */
-const DB = (() => {
-  function getSession(){
-    try{
-      if (window.Auth && typeof window.Auth.getSession === "function"){
-        return window.Auth.getSession();
-      }
-    }catch{}
-    return null;
-  }
-  function getActiveSchoolId(){
-    const sess = getSession() || {};
-    const sid = String(sess.schoolId || "").trim() || "SEM_ESCOLA";
-    if (sid === "ADMIN"){
-      // admin_active_school_v1 é preferência de UI do header (qual escola o
-      // admin está "olhando"), não dado do módulo de atas — não é cache
-      // de dados do Firestore, então não conflita com "sem localStorage".
-      const active = String(localStorage.getItem("admin_active_school_v1") || "").trim();
-      return active || "ADMIN";
-    }
-    return sid;
-  }
-  // Seção 19: admin global em "Todas as escolas" (sem escola definida). Usuário de escola nunca fica nesse estado.
-  function adminSemEscola(){ return getActiveSchoolId() === "ADMIN"; }
-  return { getActiveSchoolId, adminSemEscola };
-})();
-
-
 // Card de destaque: decide texto claro/escuro pela luminância real da cor
 // escolhida em perfil.html. Cálculo e o reajuste automático em troca de cor
 // (evento "colorchange") agora vivem centralizados em theme-colors.js —
@@ -327,13 +275,8 @@ function normNome(s){
     .replace(/\s+/g, " ");
 }
 
-function escapeHtml(s){
-  return String(s||"")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+function _escHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // Dados da escola (nome/endereço/escudo p/ cabeçalho do PDF) — carregados
@@ -368,20 +311,22 @@ function tituloTurma(t){
 
 
 
-// Situação do aluno → badge global (ok / bad / neutral / gray)
+// Resultado do aluno → badge global. Mapa do guia (seção 6): AP/AND verde, REP/CON vermelho, FAL/DEST cinza, TRA neutro.
+// Valor fora do mapa cai no variável (sem classe de cor) — é um caso a relatar.
 const RESULT_META = {
   "AP":   { icon:"✅", label:"AP",   cls:"ok" },        // aprovado
+  "AND":  { icon:"⏳", label:"AND",  cls:"ok" },        // em andamento
   "REP":  { icon:"❌", label:"REP",  cls:"bad" },       // reprovado
-  "TRA":  { icon:"🔁", label:"TRA",  cls:"neutral" },   // transferido
-  "DEST": { icon:"",   label:"DEST", cls:"gray" },      // desistente
+  "CON":  { icon:"❌", label:"CON",  cls:"bad" },       // conservado (= reprovado)
   "FAL":  { icon:"",   label:"FAL",  cls:"gray" },      // falecido
-  "AND":  { icon:"⏳", label:"AND",  cls:"neutral" },   // (a confirmar: não definido nas regras)
+  "DEST": { icon:"",   label:"DEST", cls:"gray" },      // desistente
+  "TRA":  { icon:"🔁", label:"TRA",  cls:"neutral" },   // transferido
   "Não informado": { icon:"•", label:"NI", cls:"gray" }
 };
 
 function badgeResultado(res){
-  const meta = RESULT_META[String(res||"Não informado")] || { icon:"•", label:String(res||"NI"), cls:"gray" };
-  return `<span class="badge ${meta.cls}">${meta.icon ? meta.icon + " " : ""}${escapeHtml(meta.label)}</span>`;
+  const meta = RESULT_META[String(res||"Não informado")] || { icon:"•", label:String(res||"NI"), cls:"" };
+  return `<span class="badge ${meta.cls}">${meta.icon ? meta.icon + " " : ""}${_escHtml(meta.label)}</span>`;
 }
 
 // Nome da turma: campo do cadastro; se não houver, cai no "série + ano"
@@ -393,7 +338,7 @@ function nomeTurma(t){
 function renderAusencia(de, ate){
   return `<div class="trow">
     <div class="tleft">
-      <b>— Ausente ${escapeHtml(String(de))}–${escapeHtml(String(ate))} —</b>
+      <b>— Ausente ${_escHtml(String(de))}–${_escHtml(String(ate))} —</b>
       <div class="muted">Sem registros encontrados nesse intervalo</div>
     </div>
     <div class="tright"></div>
@@ -524,28 +469,28 @@ async function buscar(){
   }catch(e){
     console.error('historico-aluno: falha na busca', e);
     $("lista").innerHTML = `<div class="aviso-warn">⚠️ Erro ao buscar. Tente de novo.</div>`;
-    if (!DB.adminSemEscola()) setMsg("Erro ao buscar aluno.", "err");   // seção 19: leitura bloqueada por desenho, sem toast
+    if (!Auth.semEscola()) setMsg("Erro ao buscar aluno.", "err");   // 18.3: sem escola a leitura é bloqueada por desenho, sem toast
     return;
   }
 
   $("count").textContent = `${candidatos.length} resultado(s)`;
 
   if (!candidatos.length){
-    $("lista").innerHTML = `<div class="aviso-warn">Nenhum aluno encontrado para <b>${escapeHtml(termoRaw)}</b>.<br/>
+    $("lista").innerHTML = `<div class="aviso-warn">Nenhum aluno encontrado para <b>${_escHtml(termoRaw)}</b>.<br/>
       A busca por nome procura só pelo <b>começo</b> do nome (ex.: "maria" acha "Maria Silva", mas não acha por "silva" sozinho).</div>`;
     return;
   }
 
-  $("lista").innerHTML = `<div class="list">` + candidatos.map(a => {
-    const idBadge = a.alunoId ? `<span class="badge small gray">${escapeHtml(a.alunoId)}</span>` : ``;
+  $("lista").innerHTML = `<div class="resultados">` + candidatos.map(a => {
+    const idBadge = a.alunoId ? `<span class="badge small gray">${_escHtml(a.alunoId)}</span>` : ``;
     return `
-      <div class="item" onclick="selecionarAluno('${escapeHtml(a.alunoId)}')">
+      <div class="item subcard" onclick="selecionarAluno('${_escHtml(a.alunoId)}')">
         <div>
-          <div class="title">${escapeHtml(a.nome)} ${idBadge}</div>
+          <div class="title">${_escHtml(a.nome)} ${idBadge}</div>
           <div class="sub">Clique para abrir o histórico</div>
         </div>
         <div class="right">
-          <button class="btn secondary small w-90" type="button" onclick="event.stopPropagation(); selecionarAluno('${escapeHtml(a.alunoId)}')">Abrir</button>
+          <button class="btn secondary small w-90" type="button" onclick="event.stopPropagation(); selecionarAluno('${_escHtml(a.alunoId)}')">Abrir</button>
         </div>
       </div>
     `;
@@ -574,7 +519,7 @@ async function selecionarAluno(alunoId){
   }catch(e){
     console.error('historico-aluno: falha ao montar histórico do aluno', e);
     $("detalhes").innerHTML = `<div class="aviso-warn">⚠️ Erro ao carregar o histórico. Tente de novo.</div>`;
-    if (!DB.adminSemEscola()) setMsg("Erro ao carregar histórico do aluno.", "err");   // seção 19
+    if (!Auth.semEscola()) setMsg("Erro ao carregar histórico do aluno.", "err");   // 18.3
     return;
   }
 
@@ -583,7 +528,7 @@ async function selecionarAluno(alunoId){
 
   if (!aluno.ocorrencias.length){
     $("detalhes").innerHTML = `
-      <div class="aluno-nome">${escapeHtml(aluno.display)}</div>
+      <div class="aluno-nome">${_escHtml(aluno.display)}</div>
       <div class="aviso-warn mt-8">Nenhuma ocorrência em turmas de ata encontrada pra esse aluno.</div>
     `;
     return;
@@ -637,7 +582,7 @@ async function selecionarAluno(alunoId){
 
   $("detalhes").innerHTML = `
     <div>
-      <div class="aluno-nome">${escapeHtml(aluno.display)}</div>
+      <div class="aluno-nome">${_escHtml(aluno.display)}</div>
       <div class="muted">Período: <b>${faixa}</b> • Registros: <b>${aluno.qtd}</b></div>
       <div class="timeline">
         ${rows.map(r => {
@@ -645,23 +590,23 @@ async function selecionarAluno(alunoId){
           const o = r.o;
           const t = o.turma;
           const encontrado = (o.nomeRaw && normNome(o.nomeRaw) !== normNome(aluno.display))
-            ? `<span class="badge small gray">encontrado: ${escapeHtml(o.nomeRaw)}</span>`
+            ? `<span class="badge small gray">encontrado: ${_escHtml(o.nomeRaw)}</span>`
             : ``;
 
           return `
             <div class="trow">
               <div class="tleft">
-                <b>${escapeHtml(nomeTurma(t))}</b>
+                <b>${_escHtml(nomeTurma(t))}</b>
                 <div class="badges-linha">
-                  <span class="badge">${escapeHtml(o.ano || "?")}</span>
-                  <span class="badge">${escapeHtml(o.serie || "?")}</span>
+                  <span class="badge">${_escHtml(o.ano || "?")}</span>
+                  <span class="badge">${_escHtml(o.serie || "?")}</span>
                   ${badgeResultado(o.resultado)}
                   ${encontrado}
                 </div>
               </div>
               <div class="tright">
-                <button class="btn secondary small" type="button" onclick="abrirTurmaTabela('${escapeHtml(t.id)}')">Ver turma</button>
-                <button class="btn primary small" type="button" onclick="exportarOcorrencia('${escapeHtml(t.id)}','${escapeHtml(aluno.alunoId)}')">Exportar ano</button>
+                <button class="btn secondary small" type="button" onclick="abrirTurmaTabela('${_escHtml(t.id)}')">Ver turma</button>
+                <button class="btn primary small" type="button" onclick="exportarOcorrencia('${_escHtml(t.id)}','${_escHtml(aluno.alunoId)}')">Exportar ano</button>
               </div>
             </div>
           `;
@@ -708,13 +653,13 @@ function abrirTurmaTabela(turmaId){
   const tt = tituloTurma(t);
   $("turmaAbertaTitulo").textContent = tt.base + (tt.extras ? " — " + tt.extras : "");
   $("turmaAbertaMeta").innerHTML =
-    `ID: ${escapeHtml(t.id || turmaId)}` +
-    (t.origemArquivo ? ` • Arquivo: ${escapeHtml(t.origemArquivo)}` : "") +
+    `ID: ${_escHtml(t.id || turmaId)}` +
+    (t.origemArquivo ? ` • Arquivo: ${_escHtml(t.origemArquivo)}` : "") +
     ` • ${alunos.length} aluno(s)`;
 
   let headHtml = `<th>Nº</th><th>Nome</th>`;
   if (serieAtiva) headHtml += `<th>Série</th>`;
-  cols.forEach(c => { headHtml += `<th>${escapeHtml(c.label || c.key)}</th>`; });
+  cols.forEach(c => { headHtml += `<th>${_escHtml(c.label || c.key)}</th>`; });
   if (resultadoAtivo) headHtml += `<th>Resultado</th>`;
   $("theadTurmaAberta").innerHTML = headHtml;
 
@@ -729,10 +674,10 @@ function abrirTurmaTabela(turmaId){
       || (keyNome && normNome(a?.nome) === keyNome);
     const tr = document.createElement("tr");
     if (isAlvo) tr.classList.add("linha-alvo");
-    let html = `<td>${idx+1}</td><td>${escapeHtml(a?.nome || "")}</td>`;
-    if (serieAtiva) html += `<td>${escapeHtml(a?.serie || "")}</td>`;
-    cols.forEach(c => { html += `<td>${escapeHtml(a?.[c.key] ?? "--")}</td>`; });
-    if (resultadoAtivo) html += `<td>${escapeHtml(a?.resultado ?? "Não informado")}</td>`;
+    let html = `<td>${idx+1}</td><td>${_escHtml(a?.nome || "")}</td>`;
+    if (serieAtiva) html += `<td>${_escHtml(a?.serie || "")}</td>`;
+    cols.forEach(c => { html += `<td>${_escHtml(a?.[c.key] ?? "--")}</td>`; });
+    if (resultadoAtivo) html += `<td>${_escHtml(a?.resultado ?? "Não informado")}</td>`;
     tr.innerHTML = html;
     tbody.appendChild(tr);
   });
@@ -1013,27 +958,45 @@ function exportarHistoricoCSV(aluno, somenteOcc=null){
 
 
 /* =========================
-   Dropdown / popover (padrão global 6-A)
+   Dropdown / popover (guia, seção 8): JS padrão por delegação, uma vez por página.
+   O botão aponta para o menu por data-dropdown; estado por atributo hidden.
 ========================= */
-function initDropdown(btn, menu){
-  const fechar = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
-  btn.setAttribute('aria-haspopup', 'menu');
-  btn.setAttribute('aria-expanded', 'false');
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
+function _fecharDropdowns(exceto){
+  document.querySelectorAll('[data-dropdown]').forEach(b => {
+    const m = document.getElementById(b.dataset.dropdown);
+    if(m && m !== exceto){ m.hidden = true; b.setAttribute('aria-expanded', 'false'); }
+  });
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-dropdown]');
+  if(btn){
+    const menu = document.getElementById(btn.dataset.dropdown);
+    if(!menu) return;
     const abrir = menu.hidden;
-    document.querySelectorAll('.popover:not([hidden])').forEach(p => { p.hidden = true; });  // um aberto por vez
+    _fecharDropdowns(menu);
     menu.hidden = !abrir;
     btn.setAttribute('aria-expanded', String(abrir));
-  });
-  menu.addEventListener('click', (e) => { e.stopPropagation(); if(e.target.closest('.menu-item')) fechar(); });
-  document.addEventListener('click', fechar);
-  document.addEventListener('keydown', (e) => { if(e.key === 'Escape') fechar(); });
-}
+    return;
+  }
+  if(e.target.closest('.popover')){                         // clique dentro do popover
+    if(e.target.closest('.menu-item')) _fecharDropdowns();  // item de lista fecha
+    return;
+  }
+  _fecharDropdowns();                                       // clique fora
+});
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDropdowns(); });
 
 /* =========================
    Boot
 ========================= */
+// Espera o Auth pronto antes de ler o banco (guia, 18.1): getSession() responde na hora, mas Auth.db ainda não existe.
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+    if(window.Auth && Auth.onReady) Auth.onReady(resolve); else resolve();
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   // Sem pré-carga: nada de ler coleções inteiras nem gravar em localStorage
   // no boot. Busca e histórico são 100% sob demanda (ver buscar() e
@@ -1041,19 +1004,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   // de loading presa pra sempre — por isso o finally com Loading.esconder(),
   // mesmo padrão já usado no boot de cadastro-turmas.html.
   try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
+    await _authPronto();
 
     // Dados da escola (nome/endereço/escudo pro cabeçalho do PDF) — 1
     // leitura pontual, feita uma vez, guardada só em memória.
     try{ _escolaCache = (await window.DB.escola.get()) || {}; }
     catch(e){ console.warn('historico-aluno: falha ao carregar dados da escola', e); _escolaCache = {}; }
 
-    // Seção 19: admin global sem escola só recebe o aviso (sem bloquear nada)
-    const semEscola = DB.adminSemEscola();
-    $("avisoSemEscola").hidden = !semEscola;
+    // 18.3: admin global sem escola só recebe o aviso (sem bloquear nada)
+    $("avisoSemEscola").hidden = !Auth.semEscola();
 
     try{
       if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
@@ -1065,13 +1024,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     // Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora.
-    // Mesmo padrão do dropdown "Exportar ▾" logo abaixo.
     document.addEventListener("click", ()=>{
       document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
     });
 
-    // Dropdown "Exportar ▾" (PDF / CSV) — padrão global 6-A (.rel-inline + .popover.menu)
-    initDropdown($("btnExportarSel"), $("dropExportHistorico"));
+    // Itens do dropdown "Exportar ▾" (o abrir/fechar é do JS padrão acima)
     $("btnExportarPdfSel").addEventListener("click", exportarHistoricoSelecionadoPDF);
     $("btnExportarCsvSel").addEventListener("click", exportarHistoricoSelecionadoCSV);
   }catch(e){
