@@ -300,17 +300,15 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
       <div class="panel-actions">
         <label class="check-all"><input type="checkbox" id="chkAllFuncionarios"> Todos</label>
         <span class="count count-selecionados" id="countSelecionados" style="display:none;">0 selecionado(s)</span>
-        <div style="position:relative;display:inline-block;" id="wrapExportFuncionarios">
+        <div class="rel-inline" id="wrapExportFuncionarios">
           <button class="btn primary" id="btnExportarFuncionarios" type="button">Exportar ▾</button>
-          <div id="dropExportFuncionarios" style="display:none;position:absolute;right:0;top:calc(100% + 6px);
-            background:var(--card-bg);border:1.5px solid var(--card-border);border-radius:12px;
-            box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:200;min-width:230px;padding:6px 0;
-            flex-direction:column;">
-            <button class="btn" id="btnExportFichaGeral" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📋 Ficha geral (PDF)</button>
-            <button class="btn" id="btnExportDocx" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📄 Tabela completa (Word)</button>
-            <button class="btn" id="btnExportCsv" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">📊 CSV completo (todos os dados)</button>
-            <div style="height:1px;background:var(--card-border);margin:6px 0;"></div>
-            <button class="btn" id="btnExportFichaIndividual" type="button" style="width:100%;border-radius:0;border:none;justify-content:flex-start;padding:10px 16px;">🧾 Ficha individual (PDF)</button>
+          <!-- Dropdown no padrão global (.popover.menu). Abre/fecha pelo script de exportação (legado: style.display) -->
+          <div class="popover menu align-right" id="dropExportFuncionarios" style="display:none;">
+            <button class="btn quiet menu-item" id="btnExportFichaGeral" type="button">📋 Ficha geral (PDF)</button>
+            <button class="btn quiet menu-item" id="btnExportDocx" type="button">📄 Tabela completa (Word)</button>
+            <button class="btn quiet menu-item" id="btnExportCsv" type="button">📊 CSV completo (todos os dados)</button>
+            <div class="pop-div"></div>
+            <button class="btn quiet menu-item" id="btnExportFichaIndividual" type="button">🧾 Ficha individual (PDF)</button>
           </div>
         </div>
       </div>
@@ -826,7 +824,7 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
         </div>
         <div class="right">
           <a class="btn small secondary" href="cadastro-funcionario.html?editar=${encodeURIComponent(matId)}">✏️ Editar</a>
-          <button type="button" class="btn small neutral" data-view-mat="${escapeHtml(matId)}">👁️ Visualizar</button>
+          <button type="button" class="btn small outline" data-view-mat="${escapeHtml(matId)}">👁️ Visualizar</button>
           <label class="check">
             <input type="checkbox" class="chkFuncionario" data-func="${escapeHtml(f.funcId)}" data-mat="${escapeHtml(matId)}" />
             <span>Selecionar</span>

@@ -104,6 +104,12 @@ h2{margin:0 0 4px;font-size:18px;font-weight:800;}
 .turnos-group .turno-check.checked{border-color:var(--ui-brand);background:var(--ui-chip-bg);color:var(--ui-chip-color);}
 
 /* ── Identificação por CPF (mesmo visual do cadastro de aluno) ── */
+/* Campo de CPF ativo e vazio: borda acesa + brilho suave pulsando + placeholder em negrito. Some assim que há texto
+   (volta ao padrão). A classe é posta pelo JS (aplicarTrava) só fora do modo edição e antes de identificar. */
+.ident-aguardando input:placeholder-shown{border-color:var(--ui-brand);box-shadow:0 0 0 3px var(--ui-brand-faded);animation:cadPulso 2.4s ease-in-out infinite;}
+.ident-aguardando input:placeholder-shown::placeholder{font-weight:800;color:var(--ui-brand-text);opacity:.9;}
+@keyframes cadPulso{0%,100%{box-shadow:0 0 0 2px var(--ui-brand-faded);}50%{box-shadow:0 0 0 5px var(--ui-brand-faded);}}
+@media (prefers-reduced-motion:reduce){.ident-aguardando input:placeholder-shown{animation:none;}}
 .ident-trava{opacity:.5;filter:grayscale(.35);pointer-events:none;user-select:none;}
 .field-locked input,.field-locked select,.field-locked .nat-input-real{background:var(--ui-chip-bg) !important;color:var(--ui-muted) !important;cursor:default !important;pointer-events:none;}
 .field-locked label::after{content:" 🔒";font-size:11px;opacity:.6;}
@@ -2393,6 +2399,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       const travaCpf = (ID.pronto || ID.verificando) && !emEdicao();
       cpfEl.readOnly = travaCpf;
       fieldCpf.classList.toggle('field-locked', travaCpf);
+      fieldCpf.classList.toggle('ident-aguardando', !emEdicao() && !ID.pronto);   // destaque do campo que libera o resto
     }
 
     /* ── Banner ── */
