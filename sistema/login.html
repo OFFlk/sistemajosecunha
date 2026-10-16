@@ -214,8 +214,6 @@ function setMsg(text, kind){
     avisoUrl.textContent = AVISOS_URL[erroUrl];
     avisoUrl.hidden = false;
   }
-  // Quem foi barrado por falta de permissão não deve ser mandado de volta automaticamente
-  const semRedirecionar = erroUrl === 'acesso-negado';
 
   // Espera o Auth terminar de iniciar (Firebase carregado e usuário restaurado).
   // Aqui NÃO basta getSession(): ele responde do cache antes de o Firebase estar pronto.
@@ -315,7 +313,7 @@ function setMsg(text, kind){
     try{
       await _authPronto();
       const s = Auth.getSession();
-      if (s && s.role !== 'pending' && !semRedirecionar) {
+      if (s && s.role !== 'pending') {
         redirecionando = true;                    // mantém o overlay até a navegação terminar
         window.location.replace(getRedirect());
       }
