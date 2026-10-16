@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="icon" href="../icon.png" type="image/png"/>
+<link rel="icon" href="/icon.png" type="image/png"/>
 
-<!-- Tema antecipado (evita flash) -->
+<!-- Tema antecipado (evita flash de tema errado) -->
 <script>
 (function(){
   var saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
@@ -13,30 +13,28 @@
 })();
 </script>
 
+<!-- Loading: antes dos scripts globais (seção 18.1 do guia) -->
+<script src="/loading-overlay.js"></script>
+
 <!-- Scripts globais -->
-<script src="../auth.firebase.js"></script>
-<script src="../db.firebase.js"></script>
-<script src="../theme-colors.js"></script>
+<script src="/auth.firebase.js"></script>
+<script src="/db.firebase.js"></script>
+<script src="/theme-colors.js"></script>
 
 <!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-<!-- CSS globais -->
+<!-- CSS globais (ordem fixa; hub.css entra por último) -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/hub.css">
 
 <title>Atas finais</title>
 <style>
-/* tooltip para cards bloqueados — necessário para o JS de position:fixed funcionar */
-.card[data-tooltip] {
-  position: relative;
-}
-/* Nada de CSS novo aqui: reaproveitamos a classe .disabled já definida em
-   hub.css (mesma usada antes, e já compatível com o hover do tooltip —
-   uma classe com pointer-events:none quebraria o mouseenter/mouseleave).
-   A diferença agora é só ONDE ela é aplicada: direto no HTML abaixo,
-   como estado padrão, em vez de só depois do JS rodar. */
+/* Card com bloqueio por papel: o balão "Sem acesso" (position:fixed, via JS) parte daqui.
+   O visual do estado bloqueado (.disabled) é do hub.css: nada de CSS novo aqui. */
+.card[data-restrito] { position: relative; }
 </style>
 </head>
 <body>
@@ -49,92 +47,112 @@
     <div class="l-sline"></div>
   </div>
 
-  <div class="grid-atas">
+  <!--
+    Os quatro cards deste módulo são restritos (as atas são sigilosas) e já nascem
+    BLOQUEADOS, sem link. O script libera o link (data-href) só para os papéis
+    listados em data-role-allowed. Isso é só interface: a barreira de verdade fica
+    nas regras do servidor e nas próprias páginas de destino.
+  -->
+  <div class="grid grid-atas">
 
-    <a class="card disabled" id="cardCadastroTurma" data-href="cadastro-atas.html" data-role-allowed="admin,gestor">
+    <a class="card disabled" data-restrito data-href="cadastro-atas.html" data-role-allowed="admin,gestor" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">📘</div>
       <div class="card-title">Cadastro de atas</div>
       <div class="card-footer">
-        <div class="card-desc">Crie uma nova ata final, selecione a turma e preencha resultados/observações.</div>
+        <div class="card-desc">Registre uma nova ata final: escolha a turma e preencha os resultados e as observações.</div>
       </div>
     </a>
 
-    <a class="card" href="pesquisa-ata.html">
+    <a class="card disabled" data-restrito data-href="pesquisa-ata.html" data-role-allowed="admin,gestor" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🔍</div>
-      <div class="card-title">Pesquisa de turma/ata</div>
+      <div class="card-title">Pesquisa de turmas e atas</div>
       <div class="card-footer">
-        <div class="card-desc">Encontre atas já criadas, edite informações e exporte o documento quando necessário.</div>
+        <div class="card-desc">Encontre as atas já registradas, corrija as informações e gere o documento da ata quando precisar.</div>
       </div>
     </a>
 
-    <a class="card disabled" id="cardCadastroTurmas" data-href="cadastro-turmas.html" data-role-allowed="admin,gestor">
+    <a class="card disabled" data-restrito data-href="cadastro-turmas.html" data-role-allowed="admin,gestor" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🪑</div>
-      <div class="card-title">cadastro de turmas</div>
+      <div class="card-title">Cadastro de turmas</div>
       <div class="card-footer">
-        <div class="card-desc">Crie as turmas que serão utilizadas para cadastrar as atas finais.</div>
+        <div class="card-desc">Cadastre as turmas da escola. Elas serão usadas para registrar as atas finais.</div>
       </div>
     </a>
 
-    <a class="card disabled" id="cardGestao" data-href="gestao-atas.html" data-role-allowed="admin,gestor">
+    <a class="card disabled" data-restrito data-href="gestao-atas.html" data-role-allowed="admin,gestor" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🗄️</div>
       <div class="card-title">Gestão de dados</div>
       <div class="card-footer">
-        <div class="card-desc">Importe, exporte, e gerencie os dados do módulo de atas finais.</div>
+        <div class="card-desc">Importe planilhas, baixe uma cópia dos dados e organize as informações das atas finais.</div>
       </div>
     </a>
 
   </div>
 </div>
 
-
 <!-- header-logic.js cuida de: tema, chip de usuário, auth guard e montagem do header -->
-<script src="../header-logic.js"></script>
+<script src="/header-logic.js"></script>
 
+<!-- SCRIPT — Acesso por papel e boot do hub -->
 <script>
-function _applyCardGuards() {
-  var session = window.Auth && typeof Auth.getSession === 'function'
-    ? Auth.getSession()
-    : null;
-  // getSession() é síncrono (usa cache do localStorage antes do Firebase
-  // confirmar) — por isso dá pra chamar essa função ANTES do auth:ready.
-  var role  = session ? String(session.role || '').trim().toLowerCase() : '';
-  var known = !!session; // já temos alguma info de sessão (cache ou real)?
+(function(){
+  // Espera o Auth terminar de iniciar, para decidir o acesso com o papel já confirmado.
+  // O limite de tempo evita loading infinito; se estourar, os cards seguem bloqueados.
+  function _authPronto(ms){
+    return new Promise((resolve, reject) => {
+      if(!window.Auth || !Auth.onReady) return reject(new Error('Auth indisponível.'));
+      const t = setTimeout(() => reject(new Error('Tempo esgotado ao iniciar a sessão.')), ms || 15000);
+      Auth.onReady(() => { clearTimeout(t); resolve(); });
+    });
+  }
 
-  document.querySelectorAll('.card.disabled').forEach(function (card) {
-    var allowed = (card.getAttribute('data-role-allowed') || '')
-      .split(',').map(function (s) { return s.trim(); });
-    var isAllowed = allowed.indexOf(role) !== -1;
+  // Libera ou bloqueia cada card restrito conforme o papel da sessão.
+  // Funciona nos dois sentidos: um papel que perdeu o acesso volta a ficar bloqueado.
+  function aplicarAcesso(){
+    const s = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+    const role = s ? String(s.role || '').trim().toLowerCase() : '';
+    document.querySelectorAll('.card[data-restrito]').forEach(function(card){
+      const permitidos = (card.getAttribute('data-role-allowed') || '')
+        .split(',').map(function(r){ return r.trim().toLowerCase(); }).filter(Boolean);
+      const liberado = !!role && permitidos.indexOf(role) !== -1;
+      if (liberado) {
+        card.setAttribute('href', card.dataset.href);
+        card.classList.remove('disabled');
+        card.removeAttribute('aria-disabled');
+        card.removeAttribute('data-tooltip');
+        card.removeAttribute('title');
+      } else {
+        card.removeAttribute('href');
+        card.classList.add('disabled');
+        card.setAttribute('aria-disabled', 'true');
+        card.setAttribute('data-tooltip', 'Sem acesso');
+        card.title = 'Acesso restrito a administradores e gestores';
+      }
+    });
+  }
 
-    if (isAllowed) {
-      card.setAttribute('href', card.getAttribute('data-href'));
-      card.classList.remove('disabled');
-      card.removeAttribute('data-tooltip');
-      card.title = '';
-    } else if (known) {
-      // Sessão já resolvida (cache ou confirmada) e não autorizado: trava
-      // de vez e mostra o motivo. Se ainda não sabemos (known=false), o
-      // card fica travado "neutro" — nem liberado nem com aviso de negado —
-      // até auth:ready confirmar, em vez de ficar clicável por precaução.
-      card.removeAttribute('href');
-      card.classList.add('disabled');
-      card.setAttribute('data-tooltip', 'Sem acesso');
-      card.title = 'Acesso restrito';
+  document.addEventListener('auth:sessionChanged', aplicarAcesso);
+
+  // Boot (seção 18.1): o finally esconde o overlay mesmo se algo falhar
+  async function init(){
+    try {
+      await _authPronto();
+      aplicarAcesso();
+    } finally {
+      try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+      catch (e) { console.warn('ajustarContraste:', e); }
+      try { Loading.esconder(); } catch (_) {}
     }
-  });
-
-  if (typeof initTooltipCards === 'function') initTooltipCards();
-}
-
-// 1) Roda já, com o cache síncrono — evita a janela clicável antes da checagem.
-_applyCardGuards();
-// 2) Roda de novo quando o Firebase confirmar a sessão real (cobre cache
-//    desatualizado, sessão revogada, ou primeiro login neste navegador).
-document.addEventListener('auth:ready', _applyCardGuards);
+  }
+  init().catch(function(e){ console.error('init:', e); });
+})();
 </script>
 
+<!-- SCRIPT — Balão "Sem acesso" nos cards bloqueados -->
 <script>
 (function () {
   var bubble = null;
@@ -153,7 +171,8 @@ document.addEventListener('auth:ready', _applyCardGuards);
   function stylesBubble(b) {
     var bc = getBrandColor();
     b.style.background = bc.color;
-    b.style.color      = bc.dark ? '#f0f0f8' : '#ffffff';
+    var fg = getComputedStyle(document.documentElement).getPropertyValue('--brand-fg').trim();
+    b.style.color      = fg || (bc.dark ? '#f0f0f8' : '#ffffff');
   }
 
   function initBubble(b) {
@@ -193,8 +212,10 @@ document.addEventListener('auth:ready', _applyCardGuards);
 
   function showTooltip(e) {
     var card = e.currentTarget;
-    var b    = ensureBubble();
-    b.textContent = card.getAttribute('data-tooltip');
+    var texto = card.getAttribute('data-tooltip');
+    if (!texto) return;                       // card já liberado: sem balão
+    var b = ensureBubble();
+    b.textContent = texto;
     stylesBubble(b);
     positionBubble(card);
     requestAnimationFrame(function () {
@@ -207,23 +228,24 @@ document.addEventListener('auth:ready', _applyCardGuards);
     if (bubble) bubble.style.opacity = '0';
   }
 
-  window.initTooltipCards = function () {
-    document.querySelectorAll('.card[data-tooltip]').forEach(function (card) {
+  // Liga nos cards restritos (o atributo data-tooltip entra e sai conforme o papel)
+  function initTooltipCards() {
+    document.querySelectorAll('.card[data-restrito]').forEach(function (card) {
       if (card._tooltipBound) return;
       card._tooltipBound = true;
       card.addEventListener('mouseenter', showTooltip);
       card.addEventListener('mouseleave', hideTooltip);
     });
-  };
+  }
 
   function onThemeChange() {
     if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initTooltipCards);
+    document.addEventListener('DOMContentLoaded', initTooltipCards);
   } else {
-    window.initTooltipCards();
+    initTooltipCards();
   }
 
   new MutationObserver(onThemeChange)
