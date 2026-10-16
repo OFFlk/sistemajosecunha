@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<link rel="icon" href="../icon.png" type="image/png"/>
-<script src="auth.firebase.js"></script>
-<script src="db.firebase.js"></script>
+<link rel="icon" href="/icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
 <script>
 (function(){
   const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
@@ -13,26 +13,31 @@
   document.documentElement.setAttribute('data-theme', theme);
 })();
 </script>
-<script src="theme-colors.js"></script>
 
-<!-- ── ARQUIVOS CSS ORGANIZADOS ── -->
+<!-- Loading: antes dos scripts globais (seção 18.1 do guia) -->
+<script src="/loading-overlay.js"></script>
+
+<!-- Scripts globais -->
+<script src="/auth.firebase.js"></script>
+<script src="/db.firebase.js"></script>
+<script src="/theme-colors.js"></script>
+
+<!-- CSS globais (ordem fixa; hub.css entra por último) -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
 <link rel="stylesheet" href="/css/hub.css">
 
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <title>Sistema Escolar • Menu</title>
 <style>
-/* tooltip para cards bloqueados — necessário para o JS de position:fixed funcionar */
-.card[data-tooltip] {
-  position: relative;
-}
+/* Card com bloqueio por papel: o balão "Sem acesso" (position:fixed, via JS) parte daqui */
+.card[data-restrito] { position: relative; }
 </style>
 </head>
 <body>
 
 <div id="header-placeholder"></div>
-
 
 <div class="container">
   <div class="l-section">
@@ -41,11 +46,19 @@
   </div>
   <div class="grid">
 
-    <a class="card" href="atas/atas.html">
+    <!--
+      Cards com data-restrito já nascem BLOQUEADOS (sem link). O script libera
+      o link (data-href) só para quem tem papel de administrador/gestor.
+      Isso é só interface: a barreira de verdade fica nas regras do servidor
+      e nas próprias páginas de destino.
+    -->
+
+    <a class="card disabled" data-restrito data-href="atas/atas.html" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">📜</div>
       <div class="card-title">Atas finais</div>
       <div class="card-footer">
-        <div class="card-desc">Cadastro de turmas, pesquisa/edição de atas, importação XLSX e histórico de aluno.</div>
+        <div class="card-desc">Cadastre as turmas, importe planilhas do Excel, consulte e corrija as atas finais e veja o histórico de cada aluno.</div>
       </div>
     </a>
 
@@ -53,16 +66,16 @@
       <div class="card-icon">📅</div>
       <div class="card-title">Ano ativo</div>
       <div class="card-footer">
-        <div class="card-desc">Área para gerenciar turmas e alunos do ano letivo atual.</div>
+        <div class="card-desc">Cuide das turmas e dos alunos do ano letivo em andamento.</div>
       </div>
     </a>
 
-    <a class="card" id="cardAdmin" href="admin/admin.html">
+    <a class="card disabled" data-restrito data-href="admin/admin.html" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🛠️</div>
       <div class="card-title">Admin & Config</div>
       <div class="card-footer">
-        <div class="card-desc">Ferramentas de administração, configuração de schemas, IDs e backup/restauração.</div>
+        <div class="card-desc">Gerencie usuários e escolas, ajuste as configurações do sistema e faça cópias de segurança dos dados.</div>
       </div>
     </a>
 
@@ -70,52 +83,86 @@
       <div class="card-icon">🏫</div>
       <div class="card-title">Informações da escola</div>
       <div class="card-footer">
-        <div class="card-desc">Dados institucionais usados nos documentos (nome, município, brasão, etc.).</div>
+        <div class="card-desc">Mantenha atualizados o nome, o município, o brasão e outros dados que aparecem nos documentos da escola.</div>
       </div>
     </a>
 
-    <a class="card" href="paginas/documentos.html">
+    <a class="card disabled" data-restrito data-href="paginas/documentos.html" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
+      <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">🗂️</div>
       <div class="card-title">Documentos</div>
       <div class="card-footer">
-        <div class="card-desc">Central de documentos do sistema.</div>
+        <div class="card-desc">Acesse os documentos da escola em um só lugar.</div>
       </div>
     </a>
 
-    <a class="card" id="cardFuncionarios" href="funcionarios/funcionarios.html">
+    <a class="card disabled" data-restrito data-href="funcionarios/funcionarios.html" data-tooltip="Sem acesso" aria-disabled="true" title="Acesso restrito a administradores e gestores">
       <span class="card-badge">Admin/Gestor</span>
       <div class="card-icon">👨‍🏫</div>
       <div class="card-title">Funcionários</div>
       <div class="card-footer">
-        <div class="card-desc">Cadastre e gerencie os dados pessoais dos funcionários da escola.</div>
+        <div class="card-desc">Cadastre e mantenha atualizados os dados pessoais dos funcionários da escola.</div>
       </div>
     </a>
 
   </div>
 </div>
 
+<script src="/header-logic.js"></script>
 
-<script src="header-logic.js"></script>
+<!-- SCRIPT — Acesso por papel e boot do hub -->
 <script>
-document.addEventListener('auth:ready', function() {
-  var session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
-  var role = session ? String(session.role || '').trim().toLowerCase() : '';
+(function(){
+  // Espera o Auth terminar de iniciar, para decidir o acesso com o papel já confirmado.
+  // O limite de tempo evita loading infinito; se estourar, os cards restritos seguem bloqueados.
+  function _authPronto(ms){
+    return new Promise((resolve, reject) => {
+      if(!window.Auth || !Auth.onReady) return reject(new Error('Auth indisponível.'));
+      const t = setTimeout(() => reject(new Error('Tempo esgotado ao iniciar a sessão.')), ms || 15000);
+      Auth.onReady(() => { clearTimeout(t); resolve(); });
+    });
+  }
 
-  ['cardAdmin', 'cardFuncionarios'].forEach(function(id) {
-    var card = document.getElementById(id);
-    if (!card) return;
-    if (role !== 'admin') {
-      card.removeAttribute('href');
-      card.classList.add('disabled');
-      card.setAttribute('data-tooltip', 'Sem acesso');
-      card.title = 'Acesso restrito a administradores';
+  // Libera ou bloqueia os cards restritos conforme o papel da sessão.
+  // Funciona nos dois sentidos, então também reage a uma troca de sessão.
+  function aplicarAcesso(){
+    const s = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
+    const liberado = !!s && String(s.role || '').trim().toLowerCase() === 'admin';
+    document.querySelectorAll('.card[data-restrito]').forEach(function(card){
+      if (liberado) {
+        card.setAttribute('href', card.dataset.href);
+        card.classList.remove('disabled');
+        card.removeAttribute('aria-disabled');
+        card.removeAttribute('data-tooltip');
+        card.removeAttribute('title');
+      } else {
+        card.removeAttribute('href');
+        card.classList.add('disabled');
+        card.setAttribute('aria-disabled', 'true');
+        card.setAttribute('data-tooltip', 'Sem acesso');
+        card.title = 'Acesso restrito a administradores e gestores';
+      }
+    });
+  }
+
+  document.addEventListener('auth:sessionChanged', aplicarAcesso);
+
+  // Boot (seção 18.1): o finally esconde o overlay mesmo se algo falhar
+  async function init(){
+    try {
+      await _authPronto();
+      aplicarAcesso();
+    } finally {
+      try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+      catch (e) { console.warn('ajustarContraste:', e); }
+      try { Loading.esconder(); } catch (_) {}
     }
-  });
-
-  if (typeof initTooltipCards === 'function') initTooltipCards();
-});
+  }
+  init().catch(function(e){ console.error('init:', e); });
+})();
 </script>
 
+<!-- SCRIPT — Balão "Sem acesso" nos cards bloqueados -->
 <script>
 (function () {
   var bubble = null;
@@ -175,8 +222,10 @@ document.addEventListener('auth:ready', function() {
 
   function showTooltip(e) {
     var card = e.currentTarget;
-    var b    = ensureBubble();
-    b.textContent = card.getAttribute('data-tooltip');
+    var texto = card.getAttribute('data-tooltip');
+    if (!texto) return;                       // card já liberado: sem balão
+    var b = ensureBubble();
+    b.textContent = texto;
     stylesBubble(b);
     positionBubble(card);
     requestAnimationFrame(function () {
@@ -189,23 +238,24 @@ document.addEventListener('auth:ready', function() {
     if (bubble) bubble.style.opacity = '0';
   }
 
-  window.initTooltipCards = function () {
-    document.querySelectorAll('.card[data-tooltip]').forEach(function (card) {
+  // Liga nos cards restritos (o atributo data-tooltip entra e sai conforme o papel)
+  function initTooltipCards() {
+    document.querySelectorAll('.card[data-restrito]').forEach(function (card) {
       if (card._tooltipBound) return;
       card._tooltipBound = true;
       card.addEventListener('mouseenter', showTooltip);
       card.addEventListener('mouseleave', hideTooltip);
     });
-  };
+  }
 
   function onThemeChange() {
     if (bubble && bubble.style.opacity === '1') stylesBubble(bubble);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', window.initTooltipCards);
+    document.addEventListener('DOMContentLoaded', initTooltipCards);
   } else {
-    window.initTooltipCards();
+    initTooltipCards();
   }
 
   new MutationObserver(onThemeChange)
