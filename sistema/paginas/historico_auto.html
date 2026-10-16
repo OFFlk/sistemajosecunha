@@ -383,14 +383,14 @@ async function carregarDB(){
 }
 
 // ===== Pesquisa por consulta direcionada (sem carregar a base inteira) =====
-// state.index = resultados da ÚLTIMA pesquisa: [{key, alunoId, nome, oc, anosArr, seriesArr, matriculas}]
+// state.index = resultados da ÚLTIMA pesquisa: [{key, alunoId, nome, ultimoAno}]  (matrículas só são lidas do aluno clicado)
 let _pesqSeq = 0, _selSeq = 0;
 
 // ===== Cache em memória: some quando a página fecha (padrão das outras páginas de pesquisa) =====
 // Repetir a mesma pesquisa ou selecionar de novo o mesmo aluno não relê o servidor. Guarda a PROMISE:
 // duas chamadas iguais ao mesmo tempo (duplo clique) compartilham uma única leitura. Falha não fica em cache.
-const _cachePesq = new Map();    // consulta normalizada → { p: Promise<{alunos, temMais, mats}> }
-const _cacheAluno = new Map();   // alunoId → { p: Promise<[turmas, pessoal]> }
+const _cachePesq = new Map();    // consulta normalizada → { p: Promise<{ alunos, temMais }> }
+const _cacheAluno = new Map();   // alunoId → { p: Promise<{ mats, turmas, pessoal }> }
 function _cacheGet(map, key){ const c = map.get(key); return c ? c.p : null; }
 function _cacheSet(map, key, p){
   map.set(key, { p });
@@ -399,7 +399,9 @@ function _cacheSet(map, key, p){
 }
 function _cacheLimpar(){ _cachePesq.clear(); _cacheAluno.clear(); }
 
-// As ÚNICAS leituras de uma pesquisa: alunos (pelo ID ou pelo início do nome) + matrículas deles.
+// As ÚNICAS leituras de uma pesquisa: só os alunos (pelo ID = 1 leitura; pelo início do nome = até LIMITE+1 leituras).
+// As matrículas NÃO são lidas aqui: só as do aluno que for clicado (ver _lerAluno). Antes, cada pesquisa lia
+// as matrículas de TODOS os candidatos (até 5 alunos × todos os anos), que era a maior parte do custo.
 async function _lerPesquisa(q, mId, limite){
   let alunos = [], temMais = false;
   if(mId){
@@ -409,8 +411,7 @@ async function _lerPesquisa(q, mId, limite){
     const r = await Identidade.buscarAtasPorNome(q, limite + 1);
     temMais = r.length > limite; alunos = r.slice(0, limite);
   }
-  const mats = alunos.length ? await DB.matriculas.whereIn('alunoId', alunos.map(a=>a.alunoId)) : [];
-  return { alunos, temMais, mats };
+  return { alunos, temMais };
 }
 async function pesquisar(){
   const raw=document.getElementById('qAluno').value, out=document.getElementById('resultados');
@@ -419,7 +420,7 @@ async function pesquisar(){
   // Regra: só números (ou "ALU" + números) → busca pelo ID (completado a 6 dígitos); qualquer texto → busca pelo NOME (início do nome).
   const mId = q.match(/^(?:alu[-\s]*)?(\d+)$/);
   if(!mId && q.length < 3){ setMsg('Digite pelo menos 3 caracteres do nome (ou o ID do aluno).', 'warn'); return; }
-  if(!(window.Identidade && Identidade.buscarAtasPorNome && Identidade.buscarAtasPorId && window.DB && DB.matriculas && DB.matriculas.whereIn)){
+  if(!(window.Identidade && Identidade.buscarAtasPorNome && Identidade.buscarAtasPorId && window.DB && DB.matriculas && DB.matriculas.whereEquals)){
     out.innerHTML=avisoHtml('Módulo de busca indisponível.','⚠️'); setMsg('Erro ao iniciar a busca.', 'err'); return;
   }
   const seq = ++_pesqSeq;
@@ -429,18 +430,12 @@ async function pesquisar(){
   try{
     let p = _cacheGet(_cachePesq, chave);
     if(!p) p = _cacheSet(_cachePesq, chave, _lerPesquisa(q, mId, LIMITE));
-    const { alunos, temMais, mats } = await p;
+    const { alunos, temMais } = await p;
     if(seq !== _pesqSeq) return;   // chegou uma pesquisa mais nova: descarta esta
-    const porAluno = new Map();
-    mats.forEach(m=>{ const id=String(m?.alunoId||'').trim(); if(!porAluno.has(id)) porAluno.set(id,[]); porAluno.get(id).push(m); });
-    state.index = alunos.map(a=>{
-      const ms = porAluno.get(a.alunoId) || [];
-      const anosArr = [...new Set(ms.map(m=>String(m?.anoLetivo||'')).filter(Boolean))].sort((x,y)=>(+x||0)-(+y||0));
-      const seriesArr = [...new Set(ms.map(m=>String(m?.serie||'')).filter(Boolean))];
-      return { key:a.alunoId, alunoId:a.alunoId, nome:a.nome, oc:ms.length, anosArr, seriesArr, matriculas:ms };
-    });
+    // "último ano registrado" já vem no próprio doc do aluno (0 leituras extras) e ajuda a distinguir homônimos
+    state.index = alunos.map(a=>({ key:a.alunoId, alunoId:a.alunoId, nome:a.nome, ultimoAno:a.ultimoAnoRegistro }));
     if(!state.index.length){ out.innerHTML=avisoHtml('Nenhum resultado.' + (mId ? '' : ' A busca por nome considera o início do nome.')); return; }
-    out.innerHTML = state.index.map(x=>`<div class="item subcard" data-k="${esc(x.key)}"><div><b>${esc(x.nome||'(sem nome)')}</b> ${x.alunoId?`<span class="badge small">${esc(x.alunoId)}</span>`:''}</div><div class="subnote">ocorrências: ${x.oc} • anos: ${esc(x.anosArr.join(', ')||'—')} • séries: ${esc(x.seriesArr.join(', ')||'—')}</div></div>`).join('')
+    out.innerHTML = state.index.map(x=>`<div class="item subcard" data-k="${esc(x.key)}"><div><b>${esc(x.nome||'(sem nome)')}</b> ${x.alunoId?`<span class="badge small">${esc(x.alunoId)}</span>`:''}</div>${x.ultimoAno!=null?`<div class="subnote">último ano registrado: ${esc(x.ultimoAno)}</div>`:''}</div>`).join('')
       + (temMais ? avisoHtml('Há mais resultados — digite mais do nome para refinar.') : '');
     out.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('click',()=>selecionarAluno(el.getAttribute('data-k'))));
   }catch(e){
@@ -449,6 +444,13 @@ async function pesquisar(){
     out.innerHTML=avisoHtml('Não foi possível pesquisar agora. Tente novamente.','⚠️');
     setMsg('Erro ao pesquisar o aluno.', 'err');
   }
+}
+// Leituras de UM aluno (só quando ele é clicado): matrículas dele → turmas dessas matrículas; dados pessoais em paralelo.
+async function _lerAluno(item){
+  const pPessoal = carregarPessoalDoAluno(item);   // trata os próprios erros (devolve { erro:true })
+  const mats = await DB.matriculas.whereEquals('alunoId', item.alunoId);
+  const turmas = await carregarTurmasDoAluno({ ...item, matriculas: mats });
+  return { mats, turmas, pessoal: await pPessoal };
 }
 // Turmas SÓ do aluno: ids vêm das matrículas dele (doc da turma = turmaId; se não achar, tenta o campo turmaId).
 async function carregarTurmasDoAluno(item){
@@ -626,12 +628,12 @@ async function selecionarAluno(key){
   const item=state.index.find(x=>x.key===key); if(!item) return;
   const seq = ++_selSeq;
   setMsg('Carregando histórico do aluno…', 'loading');
-  let turmas, pessoal;
+  let mats, turmas, pessoal;
   const chaveAluno = item.alunoId || item.key;
   try{
     let p = _cacheGet(_cacheAluno, chaveAluno);
-    if(!p) p = _cacheSet(_cacheAluno, chaveAluno, Promise.all([carregarTurmasDoAluno(item), carregarPessoalDoAluno(item)]));
-    [turmas, pessoal] = await p;
+    if(!p) p = _cacheSet(_cacheAluno, chaveAluno, _lerAluno(item));
+    ({ mats, turmas, pessoal } = await p);
     if(pessoal && pessoal.erro) _cacheAluno.delete(chaveAluno);   // leitura que falhou (tratada dentro da função) não fica em cache
   }catch(e){
     if(seq !== _selSeq) return;
@@ -643,7 +645,7 @@ async function selecionarAluno(key){
   // dados lidos só deste aluno — as funções abaixo (getTurmaAlunoRowsFor/enrichAluno) continuam lendo de state.db
   state.db.turmasDB = turmas;
   state.db.alunosDB = _normalizarAlunosDB([{ alunoId:item.alunoId, nome:item.nome }]);
-  state.db.matriculasDB = item.matriculas || [];
+  state.db.matriculasDB = mats || [];
   const enrich = enrichAluno(item);
   // sobrepõe com os dados pessoais da fonte correta (só campos preenchidos)
   Object.keys(pessoal.dados||{}).forEach(k=>{ if(pessoal.dados[k]) enrich[k]=pessoal.dados[k]; });
@@ -1020,10 +1022,12 @@ const chState = { rules: [] };
 (async function initCHRulesHist(){
   try{
     await _authPronto();
-    chState.rules = (await DB.schemas.listRules()) || [];
-    _chRegrasAtualizadas();
-    // Atualiza em tempo real quando o Schema CH salva/exclui
-    DB.schemas.onSnapshot(docs=>{ chState.rules = docs || []; _chRegrasAtualizadas(); });
+    // UMA leitura só: o onSnapshot já entrega o estado inicial e depois atualiza em tempo real quando o
+    // Schema CH salva/exclui. (Antes: listRules() + onSnapshot liam a coleção inteira duas vezes ao abrir.)
+    let recebeu = false;
+    DB.schemas.onSnapshot(docs=>{ recebeu = true; chState.rules = docs || []; _chRegrasAtualizadas(); });
+    // o onSnapshot do db.firebase.js não tem callback de erro: se nada chegar, avisa em vez de falhar em silêncio
+    setTimeout(()=>{ if(!recebeu && !_semEscola()) setMsg('Não foi possível carregar as regras de carga horária — a CH sairá em branco. Recarregue a página.', 'err'); }, 10000);
   }catch(e){
     console.error('initCHRulesHist:', e);
     if(!_semEscola()) setMsg('Não foi possível carregar as regras de carga horária — a CH sairá em branco. Recarregue a página.', 'err');
