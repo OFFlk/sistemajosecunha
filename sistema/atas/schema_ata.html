@@ -47,6 +47,7 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
 .col-full { grid-column: 1 / -1; }
 .col-acao { display: flex; align-items: flex-end; }
 .w-100 { width: 100%; }
+.col-acao .btn { height: 43px; }   /* acompanha a altura dos campos ao lado */
 .acoes { display: flex; gap: 10px; flex-wrap: wrap; }
 .acoes-barra { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .acoes-linha { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
@@ -55,6 +56,10 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
 
 /* campos dentro da tabela (fora de .field): aparência vem do .input global; largura é da página */
 td .input { width: 100%; }
+/* matéria marcada para remoção: esmaecida e riscada; só some ao salvar (botão "Desfazer" na última coluna) */
+.col-removendo td { opacity: .6; }
+.col-removendo td:last-child { opacity: 1; }
+.col-removendo .input { text-decoration: line-through; }
 .tag-fora { display: block; margin-top: 4px; font-size: 11px; color: var(--ui-muted); }
 
 /* ── Tabela (D1 em aberto: mantida como estava; só tokens trocados) ──
@@ -76,6 +81,10 @@ tr:last-child td { border-bottom: none; }
 <div id="header-placeholder"></div>
 
 <div class="container">
+  <div id="avisoSemEscola" class="aviso-warn" hidden>
+    ⚠️ Escolha uma escola no topo da página para editar os schemas de atas.
+  </div>
+
   <div class="card">
     <div class="aviso-warn">⚠️ <b>Importante:</b> Alterações aqui <b>não</b> alteram turmas já salvas no banco.
       Elas só valem para <b>novas turmas</b>.</div>
@@ -209,7 +218,7 @@ tr:last-child td { border-bottom: none; }
         </select>
       </div>
       <div class="col-acao">
-        <button class="btn primary w-100" id="btnAddMateria" type="button" style="height:43px" onclick="adicionarColuna()">+ Adicionar matéria</button>
+        <button class="btn primary w-100" id="btnAddMateria" type="button" onclick="adicionarColuna()">+ Adicionar matéria</button>
       </div>
     </div>
     <div id="avisoNovaMateria" class="aviso-warn mt-12" hidden></div>
@@ -224,7 +233,7 @@ tr:last-child td { border-bottom: none; }
           <th>Ações
             <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble wide align-right">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" exclui a matéria da tabela do schema. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
+            <span class="info-tip-bubble wide align-right">↓ envia a matéria uma linha para baixo. ↑ envia a matéria uma linha para cima. "Remover" marca a matéria para exclusão (ela fica riscada) e só sai de fato ao clicar em "Salvar configuração"; "Desfazer" cancela a marcação. "+ Adicionar matéria" adiciona uma matéria na última linha da tabela.</span>
           </span>
           </th>
         </tr>
@@ -287,9 +296,8 @@ function uid() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-// Sem catch de propósito: se a leitura falhar, o loading infinito é o sinal
-// (ver handoff). Engolir o erro aqui devolvendo [] faria o boot achar que o
-// padrão não existe e recriá-lo por cima do que o gestor já editou.
+// Sem catch de propósito: o erro sobe para o boot, que mostra o aviso de falha. Engolir o erro
+// aqui devolvendo [] faria o boot achar que o padrão não existe.
 function loadSchemas() {
   return window.DB.atasSchemas.list()
     .then(arr => Array.isArray(arr) ? arr.map(normalizeConfig) : []);
@@ -345,6 +353,7 @@ function normalizeConfig(cfg) {
 let SCHEMAS = [];
 let CONFIG = null;
 let SAVED = {};   // id → cópia do último estado salvo (para detectar/descartar alterações não salvas)
+const REMOVER = new Set();   // chaves das matérias marcadas para remoção (só saem ao "Salvar configuração")
 
 const _clone = (o) => JSON.parse(JSON.stringify(o));
 function marcarSalvo(cfg) { SAVED[cfg.id] = _clone(cfg); }
@@ -356,13 +365,14 @@ function _estadoTela() {
     serieAtiva: document.getElementById("flagSerie")?.value === "1",
     resultadoAtivo: document.getElementById("flagResultado")?.value === "1",
     ordenarPor: document.getElementById("ordenacao")?.value === "numero" ? "numero" : "nome",
-    colunas: CONFIG.colunas
+    colunas: CONFIG.colunas,
+    remover: [...REMOVER].sort()
   });
 }
 function temAlteracaoNaoSalva() {
   if (!CONFIG || bloqueado() || !SAVED[CONFIG.id]) return false;
   const s = SAVED[CONFIG.id];
-  return _estadoTela() !== JSON.stringify({ nome: s.nome, serieAtiva: s.serieAtiva, resultadoAtivo: s.resultadoAtivo, ordenarPor: s.ordenarPor, colunas: s.colunas });
+  return _estadoTela() !== JSON.stringify({ nome: s.nome, serieAtiva: s.serieAtiva, resultadoAtivo: s.resultadoAtivo, ordenarPor: s.ordenarPor, colunas: s.colunas, remover: [] });
 }
 
 // O padrão é imutável: só leitura nesta tela (para variações, Duplicar e editar a cópia).
@@ -387,7 +397,7 @@ function avisarMateriaFora() {
   if (!el) return;
   const key = (document.getElementById("novaKey")?.value || "").trim().toLowerCase();
   if (!key || CODIGOS_CATALOGO.has(key) || bloqueado()) { el.hidden = true; el.innerHTML = ""; return; }
-  el.innerHTML = `ℹ️ <b>${escapeHtml(key)}</b> não é um código do catálogo do histórico (${[...CODIGOS_CATALOGO].join(", ")}). `
+  el.innerHTML = `ℹ️ <b>${_escHtml(key)}</b> não é um código do catálogo do histórico (${[...CODIGOS_CATALOGO].join(", ")}). `
     + `A matéria funciona normalmente na ata, mas <b>não entra no Histórico Escolar</b>. Para entrar, use um desses códigos.`;
   el.hidden = false;
 }
@@ -407,7 +417,7 @@ function renderSchemaSelect() {
   sel.innerHTML = ordenados.map(s => {
     const isPadrao = s.id === PADRAO_ID;
     const label = isPadrao ? `${s.nome} (padrão)` : s.nome;
-    return `<option value="${escapeAttr(s.id)}" ${s.id === CONFIG.id ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    return `<option value="${_escHtml(s.id)}" ${s.id === CONFIG.id ? "selected" : ""}>${_escHtml(label)}</option>`;
   }).join("");
 
   sel.onchange = () => onSelectSchema(sel.value);
@@ -428,6 +438,7 @@ function onSelectSchema(id) {
   // Só troca o que está sendo visualizado/editado nesta tela — não mexe em
   // qual é o schema padrão (isso é fixo, ver PADRAO_ID).
   CONFIG = found;
+  REMOVER.clear();
 
   renderSchemaSelect();
   render();
@@ -450,28 +461,31 @@ function render() {
   const b = bloqueado();
   const dis = b ? "disabled" : "";
   CONFIG.colunas.forEach((c, idx) => {
+    const marcado = REMOVER.has(c.key);
+    const rowDis = (b || marcado) ? "disabled" : "";   // linha marcada: só o "Desfazer" fica ativo
     const noCatalogo = CODIGOS_CATALOGO.has(c.key);
-    const keyDis = (b || noCatalogo) ? "disabled" : "";
+    const keyDis = (b || noCatalogo || marcado) ? "disabled" : "";
     const keyTitle = noCatalogo ? ' title="Código do catálogo do histórico — não pode ser alterado"' : "";
     const tag = (!b && !noCatalogo) ? '<span class="tag-fora">fora do histórico</span>' : "";
     const tr = document.createElement("tr");
+    if (marcado) tr.className = "col-removendo";
     tr.innerHTML = `
       <td>
-        <input type="checkbox" ${c.enabled ? "checked" : ""} ${dis} onchange="toggleEnabled(${idx}, this.checked)" />
+        <input type="checkbox" ${c.enabled ? "checked" : ""} ${rowDis} onchange="toggleEnabled(${idx}, this.checked)" />
       </td>
-      <td><input class="input" value="${escapeAttr(c.key)}" ${keyDis}${keyTitle} onchange="editKey(${idx}, this.value)" />${tag}</td>
-      <td><input class="input" value="${escapeAttr(c.label)}" ${dis} onchange="editLabel(${idx}, this.value)" /></td>
+      <td><input class="input" value="${_escHtml(c.key)}" ${keyDis}${keyTitle} onchange="editKey(${idx}, this.value)" />${tag}</td>
+      <td><input class="input" value="${_escHtml(c.label)}" ${rowDis} onchange="editLabel(${idx}, this.value)" /></td>
       <td>
-        <select class="input" ${(b || noCatalogo) ? "disabled" : ""} onchange="editType(${idx}, this.value)">
+        <select class="input" ${(b || noCatalogo || marcado) ? "disabled" : ""} onchange="editType(${idx}, this.value)">
           <option value="nota" ${c.type==="nota"?"selected":""}>Nota</option>
           <option value="texto" ${c.type==="texto"?"selected":""}>Texto</option>
         </select>
       </td>
       <td>
         <div class="acoes-linha">
-          <button class="btn secondary small" type="button" ${dis} onclick="moveUp(${idx})">&#8593;</button>
-          <button class="btn secondary small" type="button" ${dis} onclick="moveDown(${idx})">&#8595;</button>
-          <button class="btn danger small" type="button" ${dis} onclick="removeCol(${idx})">Remover</button>
+          <button class="btn secondary small" type="button" ${rowDis} onclick="moveUp(${idx})">&#8593;</button>
+          <button class="btn secondary small" type="button" ${rowDis} onclick="moveDown(${idx})">&#8595;</button>
+          <button class="btn ${marcado ? "secondary" : "danger"} small" type="button" ${dis} onclick="removeCol(${idx})">${marcado ? "Desfazer" : "Remover"}</button>
         </div>
       </td>
     `;
@@ -564,7 +578,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div class="cm-box" role="dialog" aria-modal="true">`+
+      `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true">`+
         `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
         `<p class="cm-corpo">${corpo || ''}</p>`+
         (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
@@ -577,9 +591,10 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const ok = backdrop.querySelector('#_confirmModalOk');
     const cancelar = backdrop.querySelector('#_confirmModalCancelar');
     const input = backdrop.querySelector('#_confirmModalInput');
-    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
-    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
-    document.addEventListener('keydown', onKey);
+    function fechar(r){ document.removeEventListener('keydown', onKey, true); backdrop.remove(); resolve(r); }
+    // Esc em CAPTURA + stopPropagation: com um modal da página aberto por baixo, o Esc fecha só este
+    function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } }
+    document.addEventListener('keydown', onKey, true);
     ok.addEventListener('click', () => fechar(true));
     cancelar.addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
@@ -588,31 +603,35 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   });
 }
 
-// pede um texto → string (não vazia) | null. (O guia não traz este modelo: mesmas classes .cm-* do _confirmModal.)
-function _promptModal({ titulo, rotulo, valor, textoConfirmar }){
+// Pede um texto → string (já com trim) | null se cancelar (guia, 10.5). Enter confirma, Esc cancela;
+// o botão fica desabilitado enquanto o campo está vazio. `corpo` é HTML: escape o que for dinâmico.
+function _promptModal({ titulo, corpo, valorInicial, placeholder, textoConfirmar, textoCancelar }){
   return new Promise((resolve) => {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
       `<div class="cm-box" role="dialog" aria-modal="true">`+
-        `<h3 class="cm-titulo">${_escHtml(titulo || 'Informar')}</h3>`+
-        `<p class="cm-corpo">${_escHtml(rotulo || '')}</p>`+
-        `<input type="text" class="cm-input" id="_modalInput" autocomplete="off" value="${_escHtml(valor || '')}">`+
+        `<h3 class="cm-titulo">${_escHtml(titulo || 'Informe')}</h3>`+
+        (corpo ? `<p class="cm-corpo">${corpo}</p>` : '')+
+        `<input type="text" class="cm-input" id="_promptModalInput" autocomplete="off" value="${_escHtml(valorInicial || '')}" placeholder="${_escHtml(placeholder || '')}">`+
         `<div class="cm-acoes">`+
-          `<button type="button" class="btn secondary" id="_modalCancelar">Cancelar</button>`+
-          `<button type="button" class="cm-ok" id="_modalOk">${_escHtml(textoConfirmar || 'Salvar')}</button>`+
+          `<button type="button" class="btn secondary" id="_promptModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="cm-ok" id="_promptModalOk">${_escHtml(textoConfirmar || 'Confirmar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
-    const input = backdrop.querySelector('#_modalInput');
-    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
-    function onKey(ev){
-      if(ev.key === 'Escape') fechar(null);
-      else if(ev.key === 'Enter') backdrop.querySelector('#_modalOk').click();
-    }
-    document.addEventListener('keydown', onKey);
-    backdrop.querySelector('#_modalOk').addEventListener('click', () => fechar((input.value || '').trim() || null));
-    backdrop.querySelector('#_modalCancelar').addEventListener('click', () => fechar(null));
+    const input = backdrop.querySelector('#_promptModalInput');
+    const ok = backdrop.querySelector('#_promptModalOk');
+    const cancelar = backdrop.querySelector('#_promptModalCancelar');
+    function fechar(r){ document.removeEventListener('keydown', onKey, true); backdrop.remove(); resolve(r); }
+    function confirmar(){ const v = input.value.trim(); if(v) fechar(v); }
+    function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(null); } }
+    document.addEventListener('keydown', onKey, true);
+    ok.disabled = !input.value.trim();
+    input.addEventListener('input', () => { ok.disabled = !input.value.trim(); });
+    input.addEventListener('keydown', (ev) => { if(ev.key === 'Enter'){ ev.preventDefault(); confirmar(); } });
+    ok.addEventListener('click', confirmar);
+    cancelar.addEventListener('click', () => fechar(null));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(null); });
     input.focus(); input.select();
   });
@@ -633,11 +652,14 @@ async function salvarConfig() {
   CONFIG.resultadoAtivo = document.getElementById("flagResultado").value === "1";
   CONFIG.ordenarPor = document.getElementById("ordenacao").value === "numero" ? "numero" : "nome";
 
-  if (!CONFIG.colunas.length) { setMsg("O schema precisa ter ao menos uma matéria.", "err"); return; }
+  // As matérias marcadas para remoção saem agora, no salvamento.
+  const colunasFinais = CONFIG.colunas.filter(c => !REMOVER.has(c.key));
+  if (!colunasFinais.length) { setMsg("O schema precisa ter ao menos uma matéria.", "err"); return; }
 
   try {
-    CONFIG = await saveSchema(CONFIG);
+    CONFIG = await saveSchema({ ...CONFIG, colunas: colunasFinais });
   } catch (e) { return falhaGravar(e, "salvar o schema"); }
+  REMOVER.clear();
 
   const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
   if (idx >= 0) SCHEMAS[idx] = CONFIG;
@@ -650,7 +672,7 @@ async function salvarConfig() {
 }
 
 async function novoSchema() {
-  const nome = await _promptModal({ titulo: "Novo schema", rotulo: "Nome do novo schema:", valor: "Novo schema", textoConfirmar: "Criar" });
+  const nome = await _promptModal({ titulo: "Novo schema", corpo: "Nome do novo schema:", valorInicial: "Novo schema", textoConfirmar: "Criar" });
   if (!nome) return;
   if (nomeEmUso(nome)) { setMsg(`Já existe um schema chamado “${nome}”. Escolha outro nome.`, "err"); return; }
 
@@ -662,6 +684,7 @@ async function novoSchema() {
   try { salvo = await saveSchema(def); } catch (e) { return falhaGravar(e, "criar o schema"); }
   SCHEMAS.push(salvo); marcarSalvo(salvo);
   CONFIG = salvo; // só passa a exibir/editar o novo — não vira o padrão
+  REMOVER.clear();
 
   renderSchemaSelect();
   render();
@@ -669,15 +692,16 @@ async function novoSchema() {
 }
 
 async function duplicarSchema() {
-  const nome = await _promptModal({ titulo: "Duplicar schema", rotulo: "Nome do schema duplicado:", valor: (CONFIG.nome || "Cópia") + " (cópia)", textoConfirmar: "Duplicar" });
+  const nome = await _promptModal({ titulo: "Duplicar schema", corpo: "Nome do schema duplicado:", valorInicial: (CONFIG.nome || "Cópia") + " (cópia)", textoConfirmar: "Duplicar" });
   if (!nome) return;
   if (nomeEmUso(nome)) { setMsg(`Já existe um schema chamado “${nome}”. Escolha outro nome.`, "err"); return; }
 
-  const copy = { ...CONFIG, id: uid(), nome: nome.trim() };
+  const copy = { ...CONFIG, id: uid(), nome: nome.trim(), colunas: CONFIG.colunas.filter(c => !REMOVER.has(c.key)) };   // a cópia não leva as matérias marcadas
   let salvo;
   try { salvo = await saveSchema(copy); } catch (e) { return falhaGravar(e, "duplicar o schema"); }
   SCHEMAS.push(salvo); marcarSalvo(salvo);
   CONFIG = salvo; // só passa a exibir/editar a cópia — não vira o padrão
+  REMOVER.clear();
 
   renderSchemaSelect();
   render();
@@ -696,6 +720,7 @@ async function excluirSchema() {
 
   // Volta a visualização pro schema padrão (não muda quem é o padrão em si)
   CONFIG = SCHEMAS.find(s => s.id === PADRAO_ID) || SCHEMAS[0];
+  REMOVER.clear();
 
   renderSchemaSelect();
   render();
@@ -743,10 +768,17 @@ function editKey(i, val) {
 function editLabel(i, val) { if (bloqueado()) return; val = String(val||"").trim(); if (!val) return; CONFIG.colunas[i].label = val; render(); }
 function editType(i, val)  { if (bloqueado()) return; if (CODIGOS_CATALOGO.has(CONFIG.colunas[i].key)) { setMsg("Matéria do catálogo do histórico precisa ser do tipo Nota.", "warn"); render(); return; } CONFIG.colunas[i].type = (val==="texto") ? "texto" : "nota"; render(); }
 
-async function removeCol(i) {
+// Remoção reversível (guia, 10.4): só MARCA a matéria (esmaecida, com "Desfazer"); ela sai de fato em "Salvar configuração".
+function removeCol(i) {
   if (bloqueado()) return;
-  if (!(await _confirmModal({ titulo: "Remover matéria", corpo: "Remover essa coluna do schema?\n\nNão afeta turmas já salvas.", textoConfirmar: "Remover" }))) return;
-  CONFIG.colunas.splice(i, 1);
+  const c = CONFIG.colunas[i];
+  if (!c) return;
+  if (REMOVER.has(c.key)) {
+    REMOVER.delete(c.key);
+  } else {
+    REMOVER.add(c.key);
+    setMsg("Matéria marcada para remoção — ela sai ao clicar em “Salvar configuração”.", "warn");
+  }
   render();
 }
 
@@ -765,58 +797,59 @@ function moveDown(i) {
 }
 
 /* =========================
-   Escape helpers
-========================= */
-function escapeHtml(s) {
-  return String(s??"")
-    .replaceAll("&","&amp;").replaceAll("<","&lt;")
-    .replaceAll(">","&gt;").replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-function escapeAttr(s) { return escapeHtml(s).replaceAll('"',"&quot;"); }
-
-/* =========================
    Boot
 ========================= */
-document.addEventListener("DOMContentLoaded", async () => {
-  await new Promise(res => {
-    if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-    document.addEventListener('auth:ready', res, { once: true });
+// Espera o Auth pronto antes de ler o banco (guia, 18.1): getSession() responde na hora, mas Auth.db ainda não existe.
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+    if(window.Auth && Auth.onReady) Auth.onReady(resolve); else resolve();
   });
+}
 
-  SCHEMAS = await loadSchemas();
-  SCHEMAS.forEach(marcarSalvo);
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    await _authPronto();
 
-  // Trava: o "padrao" é criado com a escola (ou pelo botão "Schema padrão" em
-  // admin_escolas). Sem ele a tela não tem o que editar — só avisa.
-  if (!SCHEMAS.some(s => s.id === PADRAO_ID)) {
+    // Admin global com "Todas as escolas" (guia, 18.3): schemas são por escola; sem escola não há o que editar.
+    if (window.Auth && typeof Auth.semEscola === 'function' && Auth.semEscola()) {
+      document.getElementById("avisoSemEscola").hidden = false;
+      document.querySelectorAll(".container > .card").forEach(c => { c.hidden = true; });
+      return;
+    }
+
+    SCHEMAS = await loadSchemas();
+    SCHEMAS.forEach(marcarSalvo);
+
+    // Trava: o "padrao" é criado com a escola (ou pelo botão "Schema padrão" em
+    // admin_escolas). Sem ele a tela não tem o que editar — só avisa.
+    if (!SCHEMAS.some(s => s.id === PADRAO_ID)) {
+      document.querySelector(".container").innerHTML =
+        '<div class="card"><div class="aviso-warn">⚠️ <b>Esta escola ainda não tem o schema padrão.</b> ' +
+        'Peça ao admin global para criá-lo em Gerenciar escolas (botão "Schema padrão") e recarregue esta página.</div></div>';
+      return;
+    }
+
+    CONFIG = SCHEMAS.find(s => s.id === PADRAO_ID) || SCHEMAS[0];
+
+    renderSchemaSelect();
+    render();
+
+    // Contraste dos dois cards de destaque ("Configuração atual" e "Colunas de notas"), guia 4.2.
+    try{
+      if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+    }catch(e){ console.warn('ajustarContraste:', e); }
+  } catch (e) {
+    console.error('[schema_ata] boot:', e);
     document.querySelector(".container").innerHTML =
-      '<div class="card"><div class="aviso-warn">⚠️ <b>Esta escola ainda não tem o schema padrão.</b> ' +
-      'Peça ao admin global para criá-lo em Gerenciar escolas (botão "Schema padrão") e recarregue esta página.</div></div>';
+      '<div class="card"><div class="aviso-warn">⚠️ <b>Não foi possível carregar os schemas.</b> Recarregue a página e tente de novo.</div></div>';
+    setMsg('Não foi possível carregar os schemas.', 'err');
+  } finally {
     Loading.esconder();
-    return;
   }
-
-  CONFIG = SCHEMAS.find(s => s.id === PADRAO_ID) || SCHEMAS[0];
-
-  renderSchemaSelect();
-  render();
-
-  // Contraste dos cards de destaque é centralizado em theme-colors.js (ver
-  // guia-migracao-contraste-theme-colors.md, Parte 1). Sem argumento,
-  // ThemeColors.ajustarContraste() já cobre os dois `.card-destaque` desta
-  // página ("Configuração atual" e "Colunas de notas") de uma vez —
-  // theme-colors.js reage sozinho ao 'colorchange' depois disso.
-  try{
-    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
-  }catch(e){ console.warn('ajustarContraste:', e); }
-
-  Loading.esconder();
 });
 
-// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora (ver
-// guia-migracao-contraste-theme-colors.md, Parte 2.3). Um só listener pra
-// página inteira, mesmo com vários ícones.
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora. Um só listener pra página inteira.
 document.addEventListener("click", ()=>{
   document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
 });
