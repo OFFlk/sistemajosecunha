@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<link rel="icon" href="../icon.png" type="image/png"/>
+<link rel="icon" href="/icon.png" type="image/png"/>
+
+<!-- Tema antecipado (evita flash de tema errado) -->
 <script>
 (function(){
   const saved = (localStorage.getItem('ui_theme_v1') || '').toLowerCase();
@@ -12,132 +14,71 @@
 })();
 </script>
 
-<!-- Scripts globais -->
-<script src="auth.firebase.js"></script>
+<!-- Loading: antes dos scripts globais (seção 18.1 do guia) -->
+<script src="/loading-overlay.js"></script>
+
+<!-- Scripts globais (esta página não carrega theme-colors.js: ninguém logado) -->
+<script src="/auth.firebase.js"></script>
 
 <!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-<!-- CSS globais (header/tema/reset já vêm daqui — não duplicar) -->
+<!-- CSS globais (ordem fixa) -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/components.css">
 
 <title>Criar conta • Sistema Escolar</title>
 <style>
-/* ── Variáveis que esta página sobrescreve ── */
-:root {
-  --bg:           #f4f3ff;
-  --card:         #ffffff;
-  --danger:       #b91c1c;
-  --field-bg:     #ffffff;
-  --field-border: #ddd6fe;
-  --shadow:       0 4px 20px rgba(0,0,0,0.06);
+/* Sigla desta página: cu (nenhuma variável própria é necessária). */
 
-  /* header.css usa estas var. de marca — como esta página não carrega
-     theme-colors.js (ninguém logado ainda pra ter cor personalizada),
-     definimos aqui o roxo padrão, claro e escuro (-d) ao mesmo tempo. */
+/* ── EXCEÇÃO: cor de marca padrão ──
+   Como esta página não carrega theme-colors.js (ninguém logado ainda pra ter
+   cor personalizada), o roxo padrão é definido aqui, claro e escuro (-d) ao
+   mesmo tempo. É a única coisa que esta página declara no :root. */
+:root {
   --brand:          #7c3aed;
   --brand-hover:    #6d28d9;
   --brand-faded:    #f5f3ff;
   --brand-border:   #ddd6fe;
   --brand-text:     #6d28d9;
+  --brand-fg:       #ffffff;
   --brand-d:        #7c3aed;
   --brand-hover-d:  #6d28d9;
   --brand-faded-d:  rgba(124,58,237,0.20);
   --brand-border-d: #7c3aed;
   --brand-text-d:   #c4b5fd;
-}
-html[data-theme="dark"] {
-  --bg:           #0a0e1a;
-  --card:         #131c2e;
-  --danger:       #fca5a5;
-  --field-bg:     #0a1426;
-  --field-border: #1e2540;
-  --shadow:       0 4px 24px rgba(0,0,0,0.4);
-}
-
-html[data-theme="dark"] body {
-  background:
-    radial-gradient(900px 500px at 20% 10%, rgba(124,58,237,0.12), transparent 60%),
-    radial-gradient(700px 400px at 70% 60%, rgba(59,130,246,0.07), transparent 60%),
-    var(--bg);
+  --brand-fg-d:     #ffffff;
 }
 
 /* ── Layout ── */
 .container { max-width: 560px; margin: 44px auto 60px; padding: 0 20px; }
+.container > .card { --card-pad-y: 22px; --card-pad-x: 28px; --card-gap: 0; }
 
-/* ── Card ── */
-.card {
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: 14px; box-shadow: var(--shadow); overflow: hidden;
-  transition: background 0.3s, border-color 0.3s;
-}
-.card-head { padding: 22px 28px 18px; border-bottom: 1px solid var(--line); }
-.card-head h2 { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; color: var(--ink); }
-.card-head p  { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
-.card-body    { padding: 22px 28px; display: flex; flex-direction: column; gap: 14px; }
+.form { display: flex; flex-direction: column; gap: 14px; }
+.form > .section-title { margin: 0 0 6px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+#btnSubmit { width: 100%; justify-content: center; }
 
-/* ── Campos ── */
-.field label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
-.field input,
-.field select {
-  width: 100%; padding: 11px 14px;
-  border: 1px solid var(--field-border); border-radius: 10px;
-  background: var(--field-bg); color: var(--ink);
-  font-size: 14px; font-family: inherit; outline: none; appearance: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.field input:focus,
-.field select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(124,58,237,0.10); }
-.field select:disabled { opacity: 0.55; cursor: not-allowed; }
+.note { text-align: center; margin: 0; }
+.note a { color: var(--ui-brand); font-weight: 800; text-decoration: none; }
 
-/* ── Botão primário ── */
-.btn-primary {
-  width: 100%; padding: 13px; border-radius: 10px; border: none;
-  background: var(--brand); color: #fff;
-  font-weight: 800; font-size: 15px; font-family: inherit;
-  cursor: pointer; transition: background 0.15s;
-}
-.btn-primary:hover    { background: var(--brand-hover); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-
-/* ── Spinner ── */
-.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+/* ── Spinner do botão (segue a cor do texto do botão) ── */
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: -3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Alertas ── */
-.alert { padding: 12px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; line-height: 1.4; display: none; }
-.alert.show  { display: block; }
-.alert.error   { background: rgba(185,28,28,0.10); border: 1px solid rgba(185,28,28,0.25); color: var(--danger); }
-.alert.success { background: rgba(22,163,74,0.10); border: 1px solid rgba(22,163,74,0.25); color: #16a34a; }
-html[data-theme="dark"] .alert.success { color: #4ade80; }
-
-/* ── Nota ── */
-.note { font-size: 13px; color: var(--muted); text-align: center; }
-.note a { color: var(--brand); font-weight: 800; text-decoration: none; }
-
-/* ── Tela de pendência ── */
-.pending-screen { display: none; flex-direction: column; align-items: center; text-align: center; padding: 40px 28px; gap: 14px; }
+/* ── Tela de pendência (troca o formulário depois do envio) ── */
+.pending-screen { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 18px 0; }
 .pending-screen .icon { font-size: 48px; }
-.pending-screen h3 { font-size: 18px; font-weight: 800; color: var(--ink); }
-.pending-screen p  { font-size: 14px; color: var(--muted); line-height: 1.5; max-width: 340px; }
-.pending-screen .btn-voltar {
-  display: inline-flex; align-items: stretch; border-radius: 8px; overflow: hidden;
-  border: 1px solid var(--brand-border); text-decoration: none; font-family: inherit;
-  margin-top: 8px; transition: border-color 0.18s;
-}
-.pending-screen .btn-voltar .b-icon { padding: 10px 12px; background: var(--brand-faded); color: var(--brand-text); font-size: 14px; border-right: 1px solid var(--brand-border); display: flex; align-items: center; }
-.pending-screen .btn-voltar .b-label { padding: 10px 16px; color: var(--brand-text); font-size: 14px; font-weight: 800; display: flex; align-items: center; }
-
-/* ── Footer ── */
-footer { text-align: center; padding: 14px 0 28px; font-size: 12px; color: var(--muted); }
+.pending-screen .section-title { font-size: 18px; margin: 0; }
+.pending-screen p { font-size: 14px; color: var(--ui-muted); line-height: 1.5; max-width: 340px; margin: 0; }
 </style>
 </head>
 <body>
 
 <div class="l-bar"></div>
 
+<!-- Header próprio: esta página não carrega o header-logic (sem login), então ele é estático -->
 <header class="app-header">
   <div class="app-header-inner">
     <div class="brand">
@@ -158,67 +99,117 @@ footer { text-align: center; padding: 14px 0 28px; font-size: 12px; color: var(-
 <div class="container">
   <div class="card">
 
-    <div id="formSection">
-      <div class="card-head">
-        <h2>📋 Solicitar acesso</h2>
-        <p>Preencha os dados abaixo. Após o envio, um administrador irá aprovar sua conta.</p>
+    <div class="form" id="formSection">
+      <h2 class="section-title">📋 Solicitar acesso
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          i
+          <span class="info-tip-bubble">Preencha os dados abaixo. Após o envio, um administrador irá aprovar sua conta.</span>
+        </span>
+      </h2>
+
+      <div class="field">
+        <label for="inputName">Nome completo</label>
+        <input id="inputName" type="text" placeholder="Ex: João da Silva" autocomplete="name"/>
       </div>
-      <div class="card-body">
-        <div class="alert" id="alertMsg"></div>
-
-        <div class="field">
-          <label for="inputName">Nome completo</label>
-          <input id="inputName" type="text" placeholder="Ex: João da Silva" autocomplete="name"/>
-        </div>
-        <div class="field">
-          <label for="inputEmail">E-mail</label>
-          <input id="inputEmail" type="email" placeholder="joao@escola.com" autocomplete="email"/>
-        </div>
-        <div class="field">
-          <label for="inputPass">Senha</label>
-          <input id="inputPass" type="password" placeholder="mínimo 6 caracteres" autocomplete="new-password"/>
-        </div>
-        <div class="field">
-          <label for="inputSchool">Escola</label>
-          <select id="inputSchool">
-            <option value="">Carregando escolas...</option>
-          </select>
-        </div>
-
-        <button class="btn-primary" id="btnSubmit">📨 Enviar solicitação</button>
-
-        <p class="note">Já tem conta? <a href="login.html">Fazer login</a></p>
+      <div class="field">
+        <label for="inputEmail">E-mail</label>
+        <input id="inputEmail" type="email" placeholder="joao@escola.com" autocomplete="email"/>
       </div>
+      <div class="field">
+        <label for="inputPass">Senha</label>
+        <input id="inputPass" type="password" placeholder="mínimo 6 caracteres" autocomplete="new-password"/>
+      </div>
+      <div class="field">
+        <label for="inputSchool">Escola</label>
+        <select id="inputSchool" disabled>
+          <option value="">Carregando escolas...</option>
+        </select>
+      </div>
+
+      <button class="btn primary" id="btnSubmit" type="button">📨 Enviar solicitação</button>
+
+      <p class="help note">Já tem conta? <a href="login.html">Fazer login</a></p>
     </div>
 
-    <div class="pending-screen" id="pendingSection">
+    <div class="pending-screen" id="pendingSection" hidden>
       <div class="icon">⏳</div>
-      <h3>Solicitação enviada!</h3>
+      <h2 class="section-title">Solicitação enviada!</h2>
       <p>Sua conta foi criada e está aguardando aprovação de um administrador. Você receberá acesso assim que for aprovado.</p>
-      <a class="btn-voltar" href="login.html">
-        <span class="b-icon">🔒</span><span class="b-label">Voltar ao login</span>
-      </a>
+      <a class="btn primary" href="login.html">🔒 Voltar ao login</a>
     </div>
 
   </div>
 </div>
 
-<footer>sistema interno de gestão escolar · desenvolvido sob medida</footer>
+<!-- SCRIPT — Helpers padrão do sistema (toast e tooltip ⓘ) -->
+<script>
+// ── Toasts (visual em components.css: .toast .toast-ok|err|warn|loading) ──
+const _TOAST = {
+  ok:      { cls:'toast-ok',      ms:2500 },
+  err:     { cls:'toast-err',     ms:4500 },
+  warn:    { cls:'toast-warn',    ms:4000 },
+  loading: { cls:'toast-loading', ms:0 },
+};
+function _showToast(msg, tipo){
+  const existing = document.getElementById('_toastGlobal');
+  if(existing) existing.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
+  const toast = document.createElement('div');
+  toast.id = '_toastGlobal';
+  toast.className = 'toast ' + cfg.cls;
+  toast.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
+  const span = document.createElement('span');
+  span.className = 'toast-msg';
+  span.textContent = msg;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-close';
+  btn.textContent = '✕';
+  btn.setAttribute('aria-label','Fechar aviso');
+  btn.onclick = () => toast.remove();
+  toast.append(span, btn);
+  document.body.appendChild(toast);
+  if(cfg.ms) setTimeout(() => { if(toast.isConnected) toast.remove(); }, cfg.ms);
+}
+function _toastLimpar(){
+  const t = document.getElementById('_toastGlobal');
+  if(t && t.classList.contains('toast-loading')) t.remove();
+}
+function _toastSucesso(m){ _showToast(m,'ok'); }
+function _toastErro(m){ _showToast(m,'err'); }
+function _toastAviso(m){ _showToast(m,'warn'); }
+function _toastCarregando(m){ _showToast(m,'loading'); }
 
+function setMsg(text, kind){
+  const t = (text||"").toString();
+  if(!t) return;
+  if(kind === "err") _toastErro('⚠️ ' + t);
+  else if(kind === "ok") _toastSucesso('✅ ' + t);
+  else if(kind === "warn") _toastAviso('⚠️ ' + t);
+  else if(kind === "loading") _toastCarregando('⏳ ' + t);
+  else { console.warn('[toast] kind desconhecido:', JSON.stringify(kind)); _toastAviso(t); }
+}
+
+// ── Tooltip ⓘ: clique fora fecha ──
+document.addEventListener("click", ()=>{
+  document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
+});
+</script>
+
+<!-- SCRIPT — Lógica do cadastro (exclusiva desta página) -->
 <script>
 (function(){
-  /* ── Tema ── */
+  /* ── Tema (exceção: sem header-logic nesta página) ── */
   function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
-    localStorage.setItem('ui_theme_v1', t);
+    try { localStorage.setItem('ui_theme_v1', t); } catch {}
     const icon = document.getElementById('themeIcon');
     const text = document.getElementById('themeText');
     if (icon) icon.textContent = t === 'dark' ? '☀️' : '🌙';
     if (text) text.textContent = t === 'dark' ? 'Claro' : 'Escuro';
   }
-  const themeBtn = document.getElementById('themeToggle');
-  applyTheme(localStorage.getItem('ui_theme_v1') || 'light');
-  themeBtn.addEventListener('click', () => {
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+  document.getElementById('themeToggle').addEventListener('click', () => {
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
   });
 
@@ -228,130 +219,150 @@ footer { text-align: center; padding: 14px 0 28px; font-size: 12px; color: var(-
   const inputPass      = document.getElementById('inputPass');
   const inputSchool    = document.getElementById('inputSchool');
   const btnSubmit      = document.getElementById('btnSubmit');
-  const alertMsg       = document.getElementById('alertMsg');
   const formSection    = document.getElementById('formSection');
   const pendingSection = document.getElementById('pendingSection');
 
-  function showAlert(msg, type = 'error') { alertMsg.textContent = msg; alertMsg.className = 'alert show ' + type; }
-  function clearAlert() { alertMsg.className = 'alert'; }
+  // Espera o Auth terminar de iniciar (Firebase carregado e usuário restaurado).
+  // Aqui NÃO basta getSession(): ele responde do cache antes de Auth.db existir.
+  // O limite de tempo evita loading infinito se o Firebase não carregar.
+  function _authPronto(ms){
+    return new Promise((resolve, reject) => {
+      if(!window.Auth || !Auth.onReady) return reject(new Error('Auth indisponível.'));
+      const t = setTimeout(() => reject(new Error('Tempo esgotado ao conectar. Recarregue a página.')), ms || 15000);
+      Auth.onReady(() => { clearTimeout(t); resolve(); });
+    });
+  }
+
   function setLoading(on) {
     btnSubmit.disabled = on;
     btnSubmit.innerHTML = on ? '<span class="spinner"></span> Enviando...' : '📨 Enviar solicitação';
   }
 
-  /* ── Carrega escolas ── */
-  function populateSchools(schools) {
+  function erroSelect(msg){
     inputSchool.innerHTML = '';
-    if (!schools || !schools.length) {
-      inputSchool.innerHTML = '<option value="">Nenhuma escola cadastrada</option>';
-      inputSchool.disabled = true; return;
-    }
-    inputSchool.disabled = false;
-    const opt0 = document.createElement('option');
-    opt0.value = ''; opt0.textContent = 'Selecione a escola...';
-    inputSchool.appendChild(opt0);
-    schools
+    const o = document.createElement('option');
+    o.value = ''; o.textContent = msg;
+    inputSchool.appendChild(o);
+    inputSchool.disabled = true;
+  }
+
+  /* ── Escolas ── */
+  function populateSchools(schools) {
+    const lista = (schools || [])
       .map(sc => ({
         schoolId: String(sc.schoolId || sc.id || '').trim(),
         name: String(sc.displayName || sc.name || sc.nome || '').trim(),
       }))
       // ADMIN é o ID especial do administrador global, não uma escola de verdade
       .filter(sc => sc.schoolId && sc.schoolId.toUpperCase() !== 'ADMIN')
-      .sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'))
-      .forEach(sc => {
-        const opt = document.createElement('option');
-        opt.value = sc.schoolId;
-        opt.textContent = sc.name || sc.schoolId;
-        inputSchool.appendChild(opt);
-      });
-    if (!inputSchool.options.length || inputSchool.options.length === 1) {
-      inputSchool.innerHTML = '<option value="">Nenhuma escola cadastrada</option>';
-      inputSchool.disabled = true;
-    }
+      .sort((a,b) => (a.name || a.schoolId).localeCompare(b.name || b.schoolId, 'pt-BR'));
+
+    if (!lista.length) { erroSelect('Nenhuma escola cadastrada'); return; }
+
+    inputSchool.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = ''; opt0.textContent = 'Selecione a escola...';
+    inputSchool.appendChild(opt0);
+    lista.forEach(sc => {
+      const opt = document.createElement('option');
+      opt.value = sc.schoolId;
+      opt.textContent = sc.name || sc.schoolId;
+      inputSchool.appendChild(opt);
+    });
+    inputSchool.disabled = false;
   }
 
-  function loadSchools() {
-    inputSchool.innerHTML = '<option value="">Carregando...</option>';
-    inputSchool.disabled = true;
-    function tryLoad() {
-      if (window.Auth && typeof Auth.listSchools === 'function') {
-        const cached = Auth.listSchools();
-        if (cached && cached.length) { populateSchools(cached); return; }
-      }
-      if (window.Auth && window.Auth.db) {
-        Auth.db.collection('schools').get()
-          .then(snap => populateSchools(snap.docs.map(d => ({ schoolId:d.id, id:d.id, ...d.data() }))))
-          .catch(() => { inputSchool.innerHTML = '<option value="">Erro ao carregar escolas</option>'; inputSchool.disabled = true; });
-        return;
-      }
-      if (window.firebase && firebase.apps && firebase.apps.length) {
-        firebase.firestore().collection('schools').get()
-          .then(snap => populateSchools(snap.docs.map(d => ({ schoolId:d.id, id:d.id, ...d.data() }))))
-          .catch(() => { inputSchool.innerHTML = '<option value="">Erro ao carregar escolas</option>'; inputSchool.disabled = true; });
-        return;
-      }
-      document.addEventListener('auth:ready', tryLoad, { once: true });
+  // Lê a lista atual no Firestore; se falhar (regras, rede), cai no cache local
+  async function loadSchools() {
+    try {
+      const snap = await Auth.db.collection('schools').get();
+      populateSchools(snap.docs.map(d => ({ schoolId: d.id, id: d.id, ...d.data() })));
+    } catch (e) {
+      console.warn('cadastro: erro ao carregar escolas', e);
+      const cached = Auth.listSchools();
+      if (cached && cached.length) populateSchools(cached);
+      else erroSelect('Erro ao carregar escolas');
     }
-    tryLoad();
   }
-
-  document.addEventListener('auth:ready', () => {
-    const s = window.Auth && Auth.getSession();
-    if (s && s.role !== 'pending') window.location.replace('/index.html');
-  }, { once: true });
-
-  loadSchools();
 
   /* ── Submit ── */
-  btnSubmit.addEventListener('click', async () => {
-    clearAlert();
+  async function enviar() {
     const name     = inputName.value.trim();
     const email    = inputEmail.value.trim().toLowerCase();
     const password = inputPass.value;
     const schoolId = inputSchool.value;
 
-    if (!name)     return showAlert('Informe seu nome completo.');
-    if (!email)    return showAlert('Informe um e-mail.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showAlert('E-mail inválido. Use o formato: nome@dominio.com');
-    if (password.length < 6) return showAlert('A senha deve ter pelo menos 6 caracteres.');
-    if (!schoolId) return showAlert('Selecione a escola.');
+    if (!name)     return setMsg('Informe seu nome completo.', 'err');
+    if (!email)    return setMsg('Informe um e-mail.', 'err');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMsg('E-mail inválido. Use o formato: nome@dominio.com', 'err');
+    if (password.length < 6) return setMsg('A senha deve ter pelo menos 6 caracteres.', 'err');
+    if (!schoolId) return setMsg('Selecione a escola.', 'err');
 
     setLoading(true);
     try {
-      await new Promise(res => {
-        if (window.Auth && window.Auth.auth) { res(); return; }
-        document.addEventListener('auth:ready', res, { once: true });
-      });
+      await _authPronto();
 
-      const firebase = window.Auth.firebase;
-      const db       = window.Auth.db;
-      const auth     = window.Auth.auth;
+      const db   = Auth.db;
+      const auth = Auth.auth;
 
       let cred;
       try {
         cred = await auth.createUserWithEmailAndPassword(email, password);
       } catch(e) {
-        if (e.code === 'auth/email-already-in-use') throw new Error('Esse e-mail já está cadastrado. Faça login ou use outro e-mail.');
-        if (e.code === 'auth/invalid-email')        throw new Error('E-mail inválido.');
-        if (e.code === 'auth/weak-password')        throw new Error('Senha fraca. Use pelo menos 6 caracteres.');
+        if (e.code === 'auth/email-already-in-use')   throw new Error('Esse e-mail já está cadastrado. Faça login ou use outro e-mail.');
+        if (e.code === 'auth/invalid-email')          throw new Error('E-mail inválido.');
+        if (e.code === 'auth/weak-password')          throw new Error('Senha fraca. Use pelo menos 6 caracteres.');
+        if (e.code === 'auth/network-request-failed') throw new Error('Sem conexão. Verifique a internet e tente de novo.');
+        if (e.code === 'auth/too-many-requests')      throw new Error('Muitas tentativas. Aguarde um pouco e tente de novo.');
         throw e;
       }
 
-      await db.collection('users').doc(cred.user.uid).set({
-        name, email, role: 'pending', schoolId,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      });
+      try {
+        await db.collection('users').doc(cred.user.uid).set({
+          name, email, role: 'pending', schoolId,
+          createdAt: Auth.firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch(e) {
+        // Sem o documento a conta ficaria órfã (e-mail "já cadastrado" sem poder entrar): desfaz para permitir nova tentativa
+        console.error('cadastro: falha ao gravar o perfil', e);
+        try { await cred.user.delete(); } catch (e2) { console.warn('cadastro: não foi possível desfazer a conta', e2); }
+        throw new Error('Não foi possível concluir o cadastro. Tente novamente.');
+      }
 
       await auth.signOut();
-      formSection.style.display = 'none';
-      pendingSection.style.display = 'flex';
+      formSection.hidden = true;
+      pendingSection.hidden = false;
 
     } catch(e) {
-      showAlert(e.message || 'Erro ao enviar solicitação. Tente novamente.');
+      console.error('cadastro: envio', e);
+      setMsg(e.message || 'Erro ao enviar solicitação. Tente novamente.', 'err');
       setLoading(false);
     }
+  }
+
+  btnSubmit.addEventListener('click', enviar);
+  [inputName, inputEmail, inputPass].forEach(el => {
+    el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !btnSubmit.disabled) enviar(); });
+  });
+
+  /* ── Boot (seção 18.1): o finally esconde o overlay mesmo se algo falhar ── */
+  async function init(){
+    try{
+      await _authPronto();
+      const s = Auth.getSession();
+      if (s && s.role !== 'pending') { window.location.replace('/index.html'); return; }
+      await loadSchools();
+    } finally {
+      try{ Loading.esconder(); }catch(_){}
+    }
+  }
+  init().catch((e) => {
+    console.error('init:', e);
+    erroSelect('Erro ao carregar escolas');
+    setMsg((e && e.message) || 'Erro ao carregar a página.', 'err');
   });
 })();
 </script>
+
 </body>
 </html>
