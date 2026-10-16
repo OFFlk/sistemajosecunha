@@ -57,19 +57,10 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .stat-num { font-size:26px; font-weight:800; color:var(--ui-brand-text); line-height:1; }
 .stat-lbl { font-size:12px; color:var(--ui-muted); margin-top:4px; }
 
-/* ── Seção colapsável ── */
-.sec-header { display:flex; align-items:center; justify-content:space-between; user-select:none; }
-/* Recolher só pela seta (evita clique errado no título). Recolhido: o cabeçalho inteiro expande.
-   Hover do título só recolhido e fora do destaque (no destaque o hover = cor do fundo e o título sumiria). */
-.sec-header.collapsed { cursor:pointer; }
-.card:not(.card-destaque) .sec-header.collapsed:hover h3 { color:var(--ui-brand-text); }
-.sec-toggle { font-size:16px; line-height:1; transition:transform .2s; display:inline-block;
-              background:none; border:0; padding:4px 8px; margin:-4px -8px; color:inherit; font-family:inherit; cursor:pointer; }
-.sec-toggle.collapsed { transform:rotate(-90deg); }
-.sec-body.collapsed { display:none; }
+/* ── Seção recolhível: .sec-header/.sec-toggle/.sec-body são do global (guia 4.3) ── */
 
-/* ── Checkbox na cor do sistema (candidato a global) ── */
-input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); cursor:pointer; }
+/* ── Checkbox: só o tamanho; a cor da paleta já vem do base.css ── */
+input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 
 /* ── Índice de anos: chips são .badge (5-A); aqui só o container ── */
 .chips-anos { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
@@ -147,14 +138,14 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 
   <!-- ── ÍNDICE DE ANOS ── -->
   <div class="card">
-    <div class="sec-header" onclick="expandirSec('secIndice')">
+    <div class="sec-header" onclick="secHeaderClick('secIndice', event)">
       <h3>📅 Índice de anos
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
           <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
         </span>
       </h3>
-      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-label="Recolher ou expandir" onclick="event.stopPropagation(); toggleSec('secIndice')">▼</button>
+      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-controls="secIndice" aria-label="Recolher ou expandir">▼</button>
     </div>
     <div class="sec-body" id="secIndice">
       <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
@@ -167,9 +158,9 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 
   <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
   <div class="card card-destaque">
-    <div class="sec-header" onclick="expandirSec('secBackup')">
+    <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
       <h3>💾 Backup do módulo de atas</h3>
-      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-label="Recolher ou expandir" onclick="event.stopPropagation(); toggleSec('secBackup')">▼</button>
+      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-controls="secBackup" aria-label="Recolher ou expandir">▼</button>
     </div>
     <div class="sec-body" id="secBackup">
       <div class="bk-grid">
@@ -208,14 +199,14 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 
   <!-- ── APAGAR TURMAS ── -->
   <div class="card">
-    <div class="sec-header" onclick="expandirSec('secApagar')">
+    <div class="sec-header" onclick="secHeaderClick('secApagar', event)">
       <h3>🗑️ Apagar turmas
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
           <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
         </span>
       </h3>
-      <button type="button" class="sec-toggle" id="togSecApagar" aria-expanded="true" aria-label="Recolher ou expandir" onclick="event.stopPropagation(); toggleSec('secApagar')">▼</button>
+      <button type="button" class="sec-toggle" id="togSecApagar" aria-expanded="true" aria-controls="secApagar" aria-label="Recolher ou expandir">▼</button>
     </div>
     <div class="sec-body" id="secApagar">
       <div class="row-btns mt-0">
@@ -265,14 +256,21 @@ input[type="checkbox"] { width:15px; height:15px; accent-color:var(--ui-brand); 
 ============================================= */
 let IS_ADMIN = false;
 
-// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora
-// (ver guia-migracao-contraste-theme-colors.md, Parte 2.3). Um só listener
-// pro página inteira, mesmo com vários ícones.
+// Ícone(s) de dica (ⓘ) — fecha qualquer um aberto ao clicar fora. Um só listener pra página inteira.
 document.addEventListener("click", ()=>{
   document.querySelectorAll(".info-tip.open").forEach(el => el.classList.remove("open"));
 });
 
-document.addEventListener('auth:ready', function () {
+// Espera o Auth pronto antes de ler o banco (guia, 18.1): getSession() responde na hora, mas Auth.db ainda não existe.
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();   // sessão em cache
+    if(window.Auth && Auth.onReady) Auth.onReady(resolve); else resolve();
+  });
+}
+
+(async function bootGestao () {
+  await _authPronto();
   const session = window.Auth && typeof Auth.getSession === 'function' ? Auth.getSession() : null;
   const role = session ? String(session.role || '').trim().toLowerCase() : '';
   IS_ADMIN = (role === 'admin');
@@ -286,7 +284,7 @@ document.addEventListener('auth:ready', function () {
   // Revela a página só para admins
   document.body.style.visibility = 'visible';
   inicializar();
-});
+})();
 
 /* =============================================
    DB HELPERS
@@ -439,6 +437,7 @@ function ehTurmaDeAtas(t) {
 }
 
 async function inicializar() {
+  try {
   // identidade-aluno.js v2 não tem catálogo em memória nem promise de
   // "pronto" — cada chamada (buscarAtasPorNome, criarAtasBatch, etc.) já é
   // pontual e aguarda Auth sozinha.
@@ -447,16 +446,19 @@ async function inicializar() {
   // "Carregar dados", "Carregar turmas" ou usa uma função que precisa delas
   // (exportar, importar, reconstruir índice) — ver _garantirTurmas().
   carregarIndiceAnos();   // 1 leitura do doc da escola (não bloqueia)
-  // Contraste do card de destaque agora é centralizado em theme-colors.js
-  // (ver guia-migracao-contraste-theme-colors.md, Parte 1). O próprio
-  // theme-colors.js já reage sozinho ao evento 'colorchange'; esta chamada
-  // aqui é só a inicialização única, depois que o card já existe no DOM.
+  // Contraste do card de destaque (guia 4.2): o theme-colors.js já reage sozinho ao 'colorchange';
+  // esta chamada é só a inicialização única, depois que o card já existe no DOM.
   try{
     if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
   }catch(e){ console.warn('ajustarContraste:', e); }
-  // Esconde a tela de loading: a página já está utilizável (os números e as
-  // turmas só carregam sob demanda).
-  Loading.esconder();
+  } catch (e) {
+    console.error('[gestao-atas] inicializar:', e);
+    setMsg('Erro ao carregar a página — recarregue e tente de novo.', 'err');
+  } finally {
+    // Esconde a tela de loading mesmo se algo falhar: a página já está utilizável
+    // (os números e as turmas só carregam sob demanda).
+    Loading.esconder();
+  }
 }
 
 let _turmasCarregadas = false;   // false = as turmas ainda não foram lidas nesta sessão
@@ -466,10 +468,7 @@ let _turmasCarregadas = false;   // false = as turmas ainda não foram lidas nes
 async function _garantirTurmas(forcar) {
   if (_turmasCarregadas && !forcar) return true;
   try {
-    await new Promise(res => {
-      if (window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, { once: true });
-    });
+    await _authPronto();
     if (!window.DB || !window.DB.turmas) { _cargaTurmasFalhou = true; return false; }
     _mem[dbKey('turmasDB')] = await window.DB.turmas.list();   // todas as turmas (suspeitas ficam selecionáveis)
     _cargaTurmasFalhou = false;
@@ -637,21 +636,19 @@ async function reconstruirIndiceAnos() {
 ============================================= */
 function toggleSec(id) {
   const body = document.getElementById(id);
-  const tog  = document.getElementById('togSec' + id.replace('sec','').replace(/^./,c=>c.toUpperCase()));
+  const tog  = document.getElementById('tog' + id.charAt(0).toUpperCase() + id.slice(1));   // 'secIndice' → 'togSecIndice'
   if (!body) return;
   const col = body.classList.toggle('collapsed');
   if (tog) { tog.classList.toggle('collapsed', col); tog.setAttribute('aria-expanded', String(!col)); }
-  const head = body.previousElementSibling;
-  if (head && head.classList.contains('sec-header')) head.classList.toggle('collapsed', col);
+  const hdr = body.previousElementSibling;
+  if (hdr) hdr.classList.toggle('fechada', col);
 }
-// Clique no cabeçalho só EXPANDE (recolher é só pela seta, para não fechar por clique errado no título)
-function expandirSec(id) {
+// Aberto: só a seta recolhe. Fechado: o cabeçalho inteiro abre.
+function secHeaderClick(id, ev) {
   const body = document.getElementById(id);
-  if (body && body.classList.contains('collapsed')) toggleSec(id);
-}
-
-function esc(s) {
-  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (!body) return;
+  const fechado = body.classList.contains('collapsed');
+  if (fechado || (ev && ev.target && ev.target.closest && ev.target.closest('.sec-toggle'))) toggleSec(id);
 }
 
 /* =============================================
@@ -661,7 +658,7 @@ const _TOAST = {
   ok:      { cls:'toast-ok',      ms:2500 },
   err:     { cls:'toast-err',     ms:4500 },
   warn:    { cls:'toast-warn',    ms:4000 },
-  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina (8.2-A)
+  loading: { cls:'toast-loading', ms:0 },       // 0 = sem expirar: fecha quando a operação termina (guia 10.3)
 };
 function _showToast(msg, tipo){
   const existing = document.getElementById('_toastGlobal');
@@ -710,7 +707,7 @@ window.addEventListener('unhandledrejection', () => {
   if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
 });
 
-/* ── Modal de confirmação (CSS global: .modal-backdrop .cm-*). `corpo` é HTML: escape o dinâmico com esc().
+/* ── Modal de confirmação (CSS global: .modal-backdrop .cm-*). `corpo` é HTML: escape o dinâmico com _escHtml().
       corDestaque:'danger' = ação destrutiva; 'ok' = contraponto positivo (verde). Esc cancela; foco inicial em Cancelar.
       (captura + stopPropagation no Esc mantidos da versão anterior: evitam fechar outro modal por baixo.) ── */
 function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
@@ -721,13 +718,13 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div class="cm-box" role="alertdialog" aria-modal="true">`+
-        `<h3 class="cm-titulo${variante}">${esc(titulo || 'Confirmar ação')}</h3>`+
+      `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true">`+
+        `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
         `<p class="cm-corpo">${corpo || ''}</p>`+
-        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${esc(digitar)}">` : '')+
+        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
         `<div class="cm-acoes">`+
-          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${esc(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${esc(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
+          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
@@ -781,12 +778,12 @@ function renderTabelaTurmas() {
     return `
       <tr>
         <td class="c"><input type="checkbox" class="chk-turma" data-idx="${i}" onchange="onCheckTurma()"></td>
-        <td><b>${esc(t.aba||t.id||t._id||t.turmaId||'—')}</b> ${badgeLegado} ${badgeSemId}</td>
-        <td>${esc(t.anoLetivo||'—')}</td>
-        <td>${esc(t.turno||'—')}</td>
-        <td>${esc(t.serieTexto||'—')}</td>
+        <td><b>${_escHtml(t.aba||t.id||t._id||t.turmaId||'—')}</b> ${badgeLegado} ${badgeSemId}</td>
+        <td>${_escHtml(t.anoLetivo||'—')}</td>
+        <td>${_escHtml(t.turno||'—')}</td>
+        <td>${_escHtml(t.serieTexto||'—')}</td>
         <td class="c">${alunos}</td>
-        <td class="muted origem" title="${esc(t.origemArquivo||'')}">${esc(origem)}</td>
+        <td class="muted origem" title="${_escHtml(t.origemArquivo||'')}">${_escHtml(origem)}</td>
       </tr>`;
   }).join('');
   onCheckTurma();
@@ -1252,7 +1249,7 @@ function _renderMergePreview() {
 
   for (const t of novas) {
     const div=document.createElement('div'); div.className='merge-item nova';
-    div.innerHTML=`<span class="badge neutral">NOVA</span> <b>${esc(t.aba||t.id)}</b> — ${esc(t.anoLetivo||'?')} · ${esc(t.turno||'?')} · ${esc(t.serieTexto||'?')} <span class="muted">(${(t.alunos||[]).length} alunos)</span>`;
+    div.innerHTML=`<span class="badge neutral">NOVA</span> <b>${_escHtml(t.aba||t.id)}</b> — ${_escHtml(t.anoLetivo||'?')} · ${_escHtml(t.turno||'?')} · ${_escHtml(t.serieTexto||'?')} <span class="muted">(${(t.alunos||[]).length} alunos)</span>`;
     lista.appendChild(div);
   }
 
@@ -1263,15 +1260,15 @@ function _renderMergePreview() {
       <input type="checkbox" id="chkSus${i}" class="chk" checked>
       <div>
         <span class="badge">SUSPEITA</span>
-        <b class="ml-6">${esc(nova.aba||nova.id)}</b> — ${esc(nova.anoLetivo||'?')} · ${esc(nova.serieTexto||'?')}
+        <b class="ml-6">${_escHtml(nova.aba||nova.id)}</b> — ${_escHtml(nova.anoLetivo||'?')} · ${_escHtml(nova.serieTexto||'?')}
         <span class="muted">(${(nova.alunos||[]).length} alunos)</span><br>
-        <span class="muted peq">⚠️ Parecida com: ${parecidaCom.map(x=>esc(x.aba||x.id)).join(', ')}</span>
+        <span class="muted peq">⚠️ Parecida com: ${parecidaCom.map(x=>_escHtml(x.aba||x.id)).join(', ')}</span>
       </div>`;
     lista.appendChild(div);
   }
 
   const _nomes = (arr, max=6) => {
-    const n = arr.map(a => esc(a?.nome || a?.alunoId || '?'));
+    const n = arr.map(a => _escHtml(a?.nome || a?.alunoId || '?'));
     return n.slice(0,max).join(', ') + (n.length>max ? ` … (+${n.length-max})` : '');
   };
   for (let i=0; i<divergentes.length; i++) {
@@ -1286,7 +1283,7 @@ function _renderMergePreview() {
     div.innerHTML=`
       <div class="corpo">
         <span class="badge">DIVERGENTE</span>
-        <b class="ml-6">${esc(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${esc(entrada.anoLetivo||'?')} · ${esc(entrada.serieTexto||'?')}<br>
+        <b class="ml-6">${_escHtml(entrada.aba||entrada.id||entrada.turmaId)}</b> — ${_escHtml(entrada.anoLetivo||'?')} · ${_escHtml(entrada.serieTexto||'?')}<br>
         <span class="muted peq">${linhas.join('<br>')}</span><br>
         <select id="selDiv${i}" class="input">
           <option value="">Não importar (manter o banco)</option>
@@ -1299,7 +1296,7 @@ function _renderMergePreview() {
 
   for (const t of iguais) {
     const div=document.createElement('div'); div.className='merge-item igual';
-    div.innerHTML=`<span class="badge gray">IDÊNTICA</span> <b>${esc(t.aba||t.id)}</b> — será ignorada`;
+    div.innerHTML=`<span class="badge gray">IDÊNTICA</span> <b>${_escHtml(t.aba||t.id)}</b> — será ignorada`;
     lista.appendChild(div);
   }
 
@@ -1310,7 +1307,7 @@ function _renderMergePreview() {
   for (const s of schemasNovos) {
     const id=s._id||s.id, nome=s.nome||s.titulo||id;
     const div=document.createElement('div'); div.className='merge-item nova';
-    div.innerHTML=`<span class="badge neutral">NOVO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span>`;
+    div.innerHTML=`<span class="badge neutral">NOVO</span> <b>${_escHtml(nome)}</b> <span class="muted">(id: ${_escHtml(id)})</span>`;
     listaSchemas.appendChild(div);
   }
 
@@ -1323,7 +1320,7 @@ function _renderMergePreview() {
       <input type="checkbox" id="chkSchemaConf${i}" class="chk">
       <div>
         <span class="badge">CONFLITO${ehPadrao?' · PADRÃO':''}</span>
-        <b class="ml-6">${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span><br>
+        <b class="ml-6">${_escHtml(nome)}</b> <span class="muted">(id: ${_escHtml(id)})</span><br>
         <span class="muted peq">⚠️ Já existe um schema com este ID e conteúdo diferente${ehPadrao?' — este é o schema padrão da escola, confirme com atenção':''}. Desmarcado por padrão: marque só se quiser <b>sobrescrever</b> o schema atual pelo do backup.</span>
       </div>`;
     listaSchemas.appendChild(div);
@@ -1332,7 +1329,7 @@ function _renderMergePreview() {
   for (const s of schemasIguais) {
     const id=s._id||s.id, nome=s.nome||s.titulo||id;
     const div=document.createElement('div'); div.className='merge-item igual';
-    div.innerHTML=`<span class="badge gray">IDÊNTICO</span> <b>${esc(nome)}</b> <span class="muted">(id: ${esc(id)})</span> — será ignorado`;
+    div.innerHTML=`<span class="badge gray">IDÊNTICO</span> <b>${_escHtml(nome)}</b> <span class="muted">(id: ${_escHtml(id)})</span> — será ignorado`;
     listaSchemas.appendChild(div);
   }
 }
