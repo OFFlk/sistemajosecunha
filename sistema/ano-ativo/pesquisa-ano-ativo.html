@@ -266,6 +266,24 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
             </label>
           </div>
 
+          <div class="pop-div"></div>
+
+          <div>
+            <label class="lbl" for="selSexoAv">👤 Sexo</label>
+            <select class="input w-100" id="selSexoAv">
+              <option value="">Todos</option>
+              <option value="F">Feminino</option>
+              <option value="M">Masculino</option>
+              <option value="O">Outro</option>
+            </select>
+            <div class="lbl mt-6">🎂 Data de nascimento</div>
+            <div style="display:flex;gap:8px;">
+              <select class="input" id="selNascDia" aria-label="Dia de nascimento" style="flex:1;"><option value="">Dia</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select>
+              <select class="input" id="selNascMes" aria-label="Mês de nascimento" style="flex:2;"><option value="">Mês</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
+              <input class="input" id="inpNascAno" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Ano" aria-label="Ano de nascimento" style="flex:1.4;">
+            </div>
+          </div>
+
           <div class="pop-foot">
             <button type="button" class="btn primary small btn-pesq-av" id="btnPesquisarAvancada" style="background:var(--ui-brand);color:var(--ui-brand-fg);border:1px solid var(--ui-brand);">🔍 Pesquisar</button>
             <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
@@ -781,14 +799,18 @@ async function _consultarMatsCriterios(ano, crit){
   const anoStr = String(ano).trim();
   const anoVals = isNaN(Number(anoStr)) ? [anoStr] : [anoStr, Number(anoStr)];   // anoLetivo pode estar como texto ou número
   const series = crit.series.length ? crit.series : [null];
-  const consultas = [];
+  const consultas = [], LIM = 300;
   anoVals.forEach(av => series.forEach(se => crit.situacoes.forEach(si => {
     const and = crit.and.slice();
     if(se) and.push(['serie', se]);
     if(si) and.push(['situacao', si]);
-    consultas.push(window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, { and }));
+    consultas.push(crit.nome
+      ? window.DB.anoAtivoMatriculas.whereRange('nome', crit.nome, crit.nome + '\uf8ff', { and: [['anoLetivo', av], ...and], limit: LIM })   // início do nome + igualdades, tudo no servidor
+      : window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, { and }));
   })));
-  let lista = _normalizarMats((await Promise.all(consultas)).flat()).filter(m => m.anoLetivo === anoStr);
+  const resultados = await Promise.all(consultas);
+  if(resultados.some(r => r.length >= LIM)) _toastAviso('Muitos resultados: mostrando só os primeiros. Refine o nome ou os filtros.');
+  let lista = _normalizarMats(resultados.flat()).filter(m => m.anoLetivo === anoStr);
   if(crit.semSit) lista = lista.filter(m => !m.situacao);
   _addMats(anoStr, lista);
   return lista;
@@ -842,24 +864,33 @@ async function garantirAlunos(ids){
 }
 
 /* Buscas por consulta (só rodam ao clicar em Pesquisar / Enter) */
-async function _idsPorTexto(termo){
-  const t = termo.trim();
-  const dig = t.replace(/\D/g, '');
-  let r = [];
-  if(dig.length === 11 && /^[\d.\-\s]+$/.test(t)){            // CPF exato, com ou sem pontuação
-    const fmt = dig.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    const [a, b] = await Promise.all([
-      window.DB.anoAtivoAlunos.whereEquals('cpfNum', dig, { limit: 1 }),
-      window.DB.anoAtivoAlunos.whereEquals('cpf', fmt, { limit: 1 })   // docs antigos sem cpfNum
-    ]);
-    r = [...a, ...b];
-  } else {
-    const nome = t.toUpperCase().replace(/\s+/g, ' ');
-    if(nome.replace(/[^A-ZÀ-Ü]/g, '').length < 3) return null;
-    r = await window.DB.anoAtivoAlunos.whereRange('nome', nome, nome + '\uf8ff', { limit: 50 });   // só início do nome
-  }
+function _ehCpfTermo(t){ return t.replace(/\D/g, '').length === 11 && /^[\d.\-\s]+$/.test(t); }
+// Início do nome em maiúsculas (mesmo formato gravado na matrícula); null se tiver menos de 3 letras
+function _nomeBusca(t){
+  const nome = t.trim().toUpperCase().replace(/\s+/g, ' ');
+  return nome.replace(/[^A-ZÀ-Ü]/g, '').length < 3 ? null : nome;
+}
+async function _idsPorCpf(termo){
+  const dig = termo.replace(/\D/g, '');
+  const fmt = dig.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  const [a, b] = await Promise.all([
+    window.DB.anoAtivoAlunos.whereEquals('cpfNum', dig, { limit: 1 }),
+    window.DB.anoAtivoAlunos.whereEquals('cpf', fmt, { limit: 1 })   // docs antigos sem cpfNum
+  ]);
+  const r = [...a, ...b];
   _guardarAlunos(r);   // os documentos já vieram: não baixar de novo
   return new Set(r.map(x => x.alunoId || x._id));
+}
+function _partesNasc(s){
+  s = String(s || '').trim(); let m;
+  if((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))        return { dia: +m[3], mes: +m[2], ano: +m[1] };
+  if((m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/))) return { dia: +m[1], mes: +m[2], ano: +m[3] };
+  return { dia: 0, mes: 0, ano: 0 };
+}
+function _nascFiltroAtual(){
+  const n = id => parseInt(document.getElementById(id)?.value || '', 10) || 0;
+  const ano = (document.getElementById('inpNascAno')?.value || '').trim();
+  return { dia: n('selNascDia'), mes: n('selNascMes'), ano: /^\d{4}$/.test(ano) ? +ano : 0 };
 }
 async function _idsAvancada(){
   const chk = id => document.getElementById(id)?.checked;
@@ -880,11 +911,17 @@ function _temFlagsAvancados(){
 // Critérios que moram na MATRÍCULA (viram consulta no servidor).
 function _criteriosMatricula(){
   const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
-  const c = { and: [], series: Array.from(seriesSelecionadasNorm()), situacoes: [null], semSit: false, readmissao: false, temCriterio: false };
+  const c = { and: [], series: Array.from(seriesSelecionadasNorm()), situacoes: [null], nome: null, semSit: false, readmissao: false, temCriterio: false };
   const turno = _turnoFiltroAtual(), modelo = _modeloFiltroAtual();
   if(turno)  c.and.push(['turno', turno]);
   if(modelo) c.and.push(['modelo', modelo]);
-  if(turno || modelo || c.series.length) c.temCriterio = true;
+  const sexo = document.getElementById('selSexoAv')?.value || '';
+  if(sexo) c.and.push(['sexo', sexo]);
+  const nasc = _nascFiltroAtual();
+  if(nasc.dia) c.and.push(['nascDia', nasc.dia]);
+  if(nasc.mes) c.and.push(['nascMes', nasc.mes]);
+  if(nasc.ano) c.and.push(['nascAno', nasc.ano]);
+  if(turno || modelo || sexo || nasc.dia || nasc.mes || nasc.ano || c.series.length) c.temCriterio = true;
   if(ehAtivo){
     if(document.getElementById('chkReadmissao')?.checked){
       c.and.push(['status', 'INATIVO']); c.readmissao = true; c.temCriterio = true;
@@ -908,6 +945,14 @@ async function pesquisar(){
   const ano = anoSelecionadoOuAtivo();
   const crit = _criteriosMatricula();
   const temFlags = _temFlagsAvancados();
+  const anoNasc = (document.getElementById('inpNascAno')?.value || '').trim();
+  if(anoNasc && !/^\d{4}$/.test(anoNasc)){ _toastAviso('Informe o ano de nascimento com 4 dígitos.'); return false; }
+  const ehCpf = !!termo && _ehCpfTermo(termo);
+  if(termo && !ehCpf){
+    crit.nome = _nomeBusca(termo);
+    if(!crit.nome){ _toastErro('Digite ao menos 3 letras do início do nome, ou o CPF completo.'); return false; }
+    crit.temCriterio = true;
+  }
   if(!termo && !crit.temCriterio && !temFlags){
     _toastAviso(crit.semSit ? 'Combine "Sem situação" com série, turno ou modelo para pesquisar.' : 'Digite um nome ou CPF, ou escolha ao menos um filtro para pesquisar.');
     return false;
@@ -915,10 +960,7 @@ async function pesquisar(){
   _pesquisando = true; _toastCarregando('Pesquisando…');
   try{
     let idsA = null;                                       // critérios do ALUNO (nome/CPF, NEE/AEE)
-    if(termo){
-      idsA = await _idsPorTexto(termo);
-      if(!idsA){ _toastErro('Digite ao menos 3 letras do início do nome, ou o CPF completo.'); return false; }
-    }
+    if(ehCpf) idsA = await _idsPorCpf(termo);
     if(temFlags){
       const f = await _idsAvancada();
       if(f) idsA = idsA ? new Set([...idsA].filter(x => f.has(x))) : f;
@@ -934,7 +976,12 @@ async function pesquisar(){
     _busca = { ids }; _jaFoiPesquisado = true;
     await _atualizarListaAlunos();
     return true;
-  }catch(e){ console.error('pesquisar:', e); _toastErro('Erro na pesquisa.'); return false; }
+  }catch(e){
+    console.error('pesquisar:', e);
+    if(e && e.code === 'failed-precondition') _toastErro('Falta criar um índice no Firestore para esta combinação de filtros. O link para criá-lo está no console do navegador (F12).');
+    else _toastErro('Erro na pesquisa.');
+    return false;
+  }
   finally{ _pesquisando = false; _toastLimpar(); }
 }
 // Mudança de filtro: a busca anterior deixa de valer (aperte Pesquisar de novo)
@@ -1149,6 +1196,13 @@ function _aplicarFiltrosComuns(list){
   if(turnoFiltro) list = list.filter(a => (a._turno||'').toUpperCase() === turnoFiltro);
   const modeloFiltro = _modeloFiltroAtual();
   if(modeloFiltro) list = list.filter(a => (a._modelo||'REGULAR').toUpperCase() === modeloFiltro);
+  const sexoF = document.getElementById('selSexoAv')?.value || '';
+  if(sexoF) list = list.filter(a => String(a.sexo || '').toUpperCase() === sexoF);
+  const nasc = _nascFiltroAtual();
+  if(nasc.dia || nasc.mes || nasc.ano) list = list.filter(a => {
+    const p = _partesNasc(a.dataNascimento);
+    return (!nasc.dia || p.dia === nasc.dia) && (!nasc.mes || p.mes === nasc.mes) && (!nasc.ano || p.ano === nasc.ano);
+  });
   const { status: statusFiltro, situacao: situacaoFiltro, situacaoIn, semSituacao } = _statusSituacaoFiltroAtual();
   if(semSituacao) list = list.filter(a => !(a._situacao||''));
   if(statusFiltro) list = list.filter(a => (a._status||'ATIVO') === statusFiltro);
@@ -2529,6 +2583,7 @@ document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   document.getElementById("subFiltroTrans").style.display = "none";
   document.querySelectorAll(".filtroTransItem").forEach(c=>c.checked=false);
   document.getElementById("chkFiltroAee").checked = false;
+  ["selSexoAv","selNascDia","selNascMes","inpNascAno"].forEach(id => { document.getElementById(id).value = ""; });
   if(window._atualizarBadgePesquisaAvancada) window._atualizarBadgePesquisaAvancada();
   _atualizarOpcoesSituacaoPassado();
   seriesSelecionadas = [];
@@ -2568,6 +2623,8 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
     if(document.getElementById("chkFiltroDef").checked) n++;
     if(document.getElementById("chkFiltroTrans").checked) n++;
     if(document.getElementById("chkFiltroAee").checked) n++;
+    if(document.getElementById("selSexoAv").value) n++;
+    if(_nascFiltroAtual().dia || _nascFiltroAtual().mes || _nascFiltroAtual().ano) n++;
     badge.style.display = n > 0 ? "block" : "none";
     badge.textContent = String(n);
   }
@@ -2591,6 +2648,7 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
   document.getElementById("chkReadmissao").addEventListener("change", atualizarBadge);
 })();
 document.getElementById("selSituacaoPassado").addEventListener("change", _filtroAlunoMudou);
+["selSexoAv","selNascDia","selNascMes","inpNascAno"].forEach(id => document.getElementById(id).addEventListener("change", ()=>{ window._atualizarBadgePesquisaAvancada(); _filtroAlunoMudou(); }));
 
 sortField.addEventListener("change", ()=>{ currentSortField = sortField.value; atualizarListaAlunos(); });
 btnToggleSort.addEventListener("click", ()=>{
@@ -2701,6 +2759,10 @@ function salvarEstadoPagina(){
     transMarcado: document.getElementById("chkFiltroTrans")?.checked || false,
     transSubtipos: Array.from(document.querySelectorAll(".filtroTransItem:checked")).map(c=>c.value),
     aeeMarcado: document.getElementById("chkFiltroAee")?.checked || false,
+    sexoAv: document.getElementById("selSexoAv")?.value || '',
+    nascDia: document.getElementById("selNascDia")?.value || '',
+    nascMes: document.getElementById("selNascMes")?.value || '',
+    nascAno: document.getElementById("inpNascAno")?.value || '',
   };
   sessionStorage.setItem('pesquisaAnoAtivoEstado', JSON.stringify(estado));
 }
@@ -2752,6 +2814,7 @@ function restaurarEstadoPagina(){
       const chk = document.getElementById("chkFiltroAee");
       if(chk) chk.checked = true;
     }
+    [["selSexoAv","sexoAv"],["selNascDia","nascDia"],["selNascMes","nascMes"],["inpNascAno","nascAno"]].forEach(([id, k]) => { const el = document.getElementById(id); if(el && estado[k]) el.value = estado[k]; });
     if(window._atualizarBadgePesquisaAvancada) window._atualizarBadgePesquisaAvancada();
     if(estado.modoFiltro){
       const radio = document.querySelector(`input[name="modoFiltro"][value="${estado.modoFiltro}"]`);
