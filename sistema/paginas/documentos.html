@@ -14,6 +14,9 @@
 })();
 </script>
 
+<!-- Loading: antes dos scripts globais (seção 18.1 do guia) -->
+<script src="/loading-overlay.js"></script>
+
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <!-- página exclusiva de ADMIN (guia RBAC, padrão 1) -->
@@ -196,13 +199,35 @@
       initCards();
     }
   }
-  function aguardarSessao(){
-    if(window.Auth && typeof Auth.getSession === 'function' && Auth.getSession()) aplicarPapeis();
-    else document.addEventListener('auth:ready', aplicarPapeis, { once: true });
+
+  /* Espera o Auth iniciar para decidir o acesso com o papel já confirmado.
+     O limite de tempo evita loading infinito. */
+  function _authPronto(ms){
+    return new Promise(function(resolve, reject){
+      if(!window.Auth || !Auth.onReady) return reject(new Error('Auth indisponível.'));
+      var t = setTimeout(function(){ reject(new Error('Tempo esgotado ao iniciar a sessão.')); }, ms || 15000);
+      Auth.onReady(function(){ clearTimeout(t); resolve(); });
+    });
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ initCards(); aguardarSessao(); });
-  else { initCards(); aguardarSessao(); }
+  /* Boot (seção 18.1): o finally esconde o overlay mesmo se algo falhar.
+     Se o Auth não responder, aplicarPapeis roda sem papel e bloqueia o card
+     (padrão seguro: só interface; a barreira real está nas páginas e nas regras). */
+  async function init(){
+    try {
+      initCards();
+      try { await _authPronto(); } catch(e){ console.warn('auth:', e); }
+      aplicarPapeis();
+    } finally {
+      try { if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+      catch(e){ console.warn('ajustarContraste:', e); }
+      try { Loading.esconder(); } catch(_){}
+    }
+  }
+  function boot(){ init().catch(function(e){ console.error('init:', e); }); }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 
   new MutationObserver(onThemeChange)
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
