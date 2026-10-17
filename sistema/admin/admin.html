@@ -41,6 +41,12 @@
 /* Sem overflow:hidden nos cards com ⓘ (cortaria o balão). */
 .config-card, .status-card { overflow: visible; }
 
+/* Cards extras (Ano letivo ativo e Status do banco): usam o mesmo grid dos cards de cima
+   e ocupam todas as colunas dele, então ficam com a largura exata do grid. */
+.grid-extras { grid-auto-rows: auto; row-gap: 18px; }
+.grid-extras > .config-card,
+.grid-extras > .status-card { grid-column: 1 / -1; }
+
 /* ── Card de destaque (guia 1.3b) ── */
 .config-card.card-destaque {
   --dest-fg: #ffffff;
@@ -120,7 +126,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
       <div class="card-icon">👥</div>
       <div class="card-title">Usuários e permissões</div>
       <div class="card-footer">
-        <div class="card-desc">Aprove cadastros, liste usuários e crie contas de administrador.</div>
+        <div class="card-desc">Gerencie os usuários do sistema e as permissões de acesso de cada um.</div>
       </div>
     </a>
 
@@ -129,7 +135,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
       <div class="card-icon">🏫</div>
       <div class="card-title">Cadastro de escolas</div>
       <div class="card-footer">
-        <div class="card-desc">Cadastre e gerencie escolas e schoolIds no sistema.</div>
+        <div class="card-desc">Gerencie as escolas e os schoolIds cadastrados no sistema.</div>
       </div>
     </a>
 
@@ -138,13 +144,13 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
       <div class="card-icon">🆔</div>
       <div class="card-title">Configuração de IDs</div>
       <div class="card-footer">
-        <div class="card-desc">Gere e atualize IDs automáticos, revise duplicatas e gere IDs do sistema.</div>
+        <div class="card-desc">Gerencie os IDs automáticos do sistema e revise duplicatas.</div>
       </div>
     </a>
 
   </div>
 
-  <div style="display: flex; flex-direction: column; gap: 18px;">
+  <div class="grid grid-atas grid-extras">
 
     <!-- Ano letivo ativo -->
     <div class="config-card card-destaque" id="cardAnoAtivo">
