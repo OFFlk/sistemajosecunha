@@ -204,7 +204,16 @@
   function ajustarContraste(seletor) {
     seletor = seletor || '.card-destaque';
     document.querySelectorAll(seletor).forEach((el) => {
+      // O card anima o background ao trocar de cor (transition). Enquanto a animação
+      // roda, getComputedStyle devolve a cor INTERMEDIÁRIA — no primeiro instante, ainda
+      // a cor antiga — e o contraste era calculado em cima da cor errada: ao trocar de
+      // Tan para outra cor (ou o inverso), os textos ficavam invertidos até clicar de novo
+      // na cor (aí a transição já tinha terminado). Lemos com a transição desligada, para
+      // pegar a cor FINAL, e devolvemos a transição logo em seguida.
+      const transicaoOriginal = el.style.transition;
+      el.style.transition = 'none';
       const luminancia = calcularLuminancia(getComputedStyle(el).backgroundColor);
+      el.style.transition = transicaoOriginal;
       if (luminancia === null) return;
       el.classList.toggle('contraste-claro', luminancia > 0.5);
     });
