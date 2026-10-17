@@ -2,6 +2,13 @@
 (function () {
   'use strict';
 
+  // Aplica o tema salvo imediatamente, antes do fetch do header (evita flash nos hubs)
+  try {
+    document.documentElement.setAttribute(
+      'data-theme', localStorage.getItem('ui_theme_v1') === 'dark' ? 'dark' : 'light'
+    );
+  } catch (_) {}
+
   // Páginas sem botões (index, login, cadastro)
   var PAGES_NONE = [
     '/index',
@@ -22,9 +29,10 @@
 
   // Hubs filhos: btn-back aponta para o hub pai (link fixo, não history.back)
   var PAGES_PARENT = {
-    '/ano-ativo/pesquisa-ano-ativo': '/ano-ativo/ano-ativo.html',
-    '/config/schema_ata':      '/config/config.html',
-    '/config/idaluno':         '/config/config.html'
+    '/ano-ativo/pesquisa-ano-ativo':     '/ano-ativo/ano-ativo.html',
+    // Após editar, o cadastro redireciona para a pesquisa; o Voltar da pesquisa
+    // deve ir SEMPRE ao hub (senão voltaria ao cadastro em modo edição).
+    '/funcionarios/pesquisa-funcionario': '/funcionarios/funcionarios.html'
   };
 
   // Normaliza o pathname: remove .html do final e barra final (exceto raiz)
@@ -129,6 +137,39 @@
   }
 
   // ─── 4. Chip de usuário + escola ──────────────────────────────────────────
+  // Listeners do document são registrados UMA vez; renderContext só troca o alvo.
+  var closeCurrentMenu = function () {};
+  var activeSelect = null;
+  var globalsBound = false;
+
+  function styleSelectOptions() {
+    var sel = activeSelect;
+    if (!sel || !sel.isConnected) return;
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var opts = Array.prototype.slice.call(sel.options);
+    if (!dark) {
+      opts.forEach(function (o) { o.style.background = ''; o.style.color = ''; });
+      return;
+    }
+    // <option> ignora CSS em vários navegadores: precisa de inline style.
+    var key = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
+    var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
+                  || { '--brand-text-d': '#c4b5fd' };
+    var bg = getComputedStyle(document.documentElement).getPropertyValue('--dropdown-bg').trim() || '#0f1829';
+    var color = palette['--brand-text-d'] || '#c4b5fd';
+    opts.forEach(function (o) { o.style.background = bg; o.style.color = color; });
+  }
+
+  function bindGlobalsOnce() {
+    if (globalsBound) return;
+    globalsBound = true;
+    document.addEventListener('click', function () { closeCurrentMenu(); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeCurrentMenu(); });
+    document.addEventListener('colorchange', styleSelectOptions);
+    new MutationObserver(styleSelectOptions)
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
   function safeParse(json, fallback) {
     try { var v = JSON.parse(json); return (v == null ? fallback : v); } catch (_) { return fallback; }
   }
@@ -150,6 +191,8 @@
   function renderContext() {
     var host = document.getElementById('headerContext');
     if (!host) return;
+    bindGlobalsOnce();
+    activeSelect = null;
     var s = getSession();
     host.innerHTML = '';
     if (!s) return;
@@ -221,8 +264,7 @@
       if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleMenu(); }
       if (ev.key === 'Escape') closeMenu();
     });
-    document.addEventListener('click', closeMenu);
-    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeMenu(); });
+    closeCurrentMenu = closeMenu;
 
     btnPerfil.addEventListener('click', function (ev) {
       ev.preventDefault(); ev.stopPropagation();
@@ -276,33 +318,8 @@
       });
       wrap.appendChild(sel);
 
-      // Aplica cores do tema nas <option> — navegadores ignoram CSS em <option>,
-      // então o único jeito confiável é setar o inline style de cada uma.
-      (function setupSelectOptionColors(selectEl) {
-        function styleOpts() {
-          var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-          if (!dark) {
-            Array.prototype.forEach.call(selectEl.options, function (o) {
-              o.style.background = '';
-              o.style.color = '';
-            });
-            return;
-          }
-          var key = (window.ThemeColors && window.ThemeColors.get) ? window.ThemeColors.get() : 'violet';
-          var palette = (window.ThemeColors && window.ThemeColors.palettes && window.ThemeColors.palettes[key])
-                        || { '--brand-text-d': '#c4b5fd' };
-          var bg = '#0f1829';
-          var color = palette['--brand-text-d'] || '#c4b5fd';
-          Array.prototype.forEach.call(selectEl.options, function (o) {
-            o.style.background = bg;
-            o.style.color = color;
-          });
-        }
-        styleOpts();
-        new MutationObserver(styleOpts)
-          .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-        document.addEventListener('colorchange', styleOpts);
-      })(sel);
+      activeSelect = sel;
+      styleSelectOptions();
     } else {
       var span = document.createElement('span');
       var sessionSchoolName = (s.schoolName || '').toString().trim();
