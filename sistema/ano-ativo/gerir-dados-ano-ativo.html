@@ -251,6 +251,42 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     </div>
   </div>
 
+  <!-- ── MIGRAÇÃO: dados de busca nas matrículas ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secMigracao', event)">
+      <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Lê todos os alunos e todas as matrículas uma única vez (1 leitura por documento). <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
+      <span class="sec-toggle" id="togSecMigracao">▼</span>
+    </div>
+    <div class="sec-body" id="secMigracao">
+      <div class="row-btns">
+        <button class="btn secondary" id="btnMgAnalisar" onclick="migracaoAnalisar()">🔍 Analisar</button>
+      </div>
+      <div id="mgPreview" class="mt-14" style="display:none;"></div>
+      <div class="row-btns mt-14" id="mgAplicarWrap" style="display:none;">
+        <button class="btn primary" id="btnMgAplicar" onclick="migracaoAplicar()">✅ Aplicar ajustes</button>
+      </div>
+      <div class="console" id="logMigracao" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── CONTADORES DAS TURMAS ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secContadores', event)">
+      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais e corrige as que divergirem. Lê as turmas e as matrículas ativas (1 leitura por aluno ativo). Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
+      <span class="sec-toggle" id="togSecContadores">▼</span>
+    </div>
+    <div class="sec-body" id="secContadores">
+      <div class="row-btns">
+        <button class="btn secondary" id="btnCtVerificar" onclick="contadoresVerificar()">🔍 Verificar</button>
+      </div>
+      <div id="ctPreview" class="mt-14" style="display:none;"></div>
+      <div class="row-btns mt-14" id="ctAplicarWrap" style="display:none;">
+        <button class="btn primary" id="btnCtAplicar" onclick="contadoresAplicar()">✅ Corrigir contadores</button>
+      </div>
+      <div class="console" id="logContadores" style="display:none;"></div>
+    </div>
+  </div>
+
   <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
   <div class="card card-destaque">
     <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
@@ -318,7 +354,8 @@ document.addEventListener('auth:ready', async function () {
     [
       'btnExportJSON', 'lblImportJSON',
       'btnBuscarAluno', 'btnExcluirAluno',
-      'btnBuscarTurma', 'btnExcluirTurma'
+      'btnBuscarTurma', 'btnExcluirTurma',
+      'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
@@ -329,6 +366,10 @@ document.addEventListener('auth:ready', async function () {
     window.executarExclusaoAluno    = () => {};
     window.buscarTurmaExcluir       = () => {};
     window.executarExclusaoTurma    = () => {};
+    window.migracaoAnalisar         = () => {};
+    window.migracaoAplicar          = () => {};
+    window.contadoresVerificar      = () => {};
+    window.contadoresAplicar        = () => {};
   }
 
   try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
@@ -524,6 +565,208 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
     cancelar.focus();
   });
+}
+
+/* =============================================
+   MIGRAÇÃO: dados de busca nas matrículas
+   (nome, sexo, nascDia/Mes/Ano + série/turno/modelo/status em maiúsculas)
+============================================= */
+const _ehInt = m => String(m || '').toUpperCase() === 'INTEGRAL';
+
+function _mgNormNome(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+}
+function _mgSerie(s) {
+  return String(s || '').trim().replace(/\s+/g, ' ').replace(/^EIXO\s*([12345])$/i, 'EIXO $1').toUpperCase();
+}
+// aceita AAAA-MM-DD, DD/MM/AAAA e DD-MM-AAAA; null se ilegível
+function _mgPartesNasc(s) {
+  s = String(s || '').trim(); let m, d, mes, a;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))         { a = +m[1]; mes = +m[2]; d = +m[3]; }
+  else if ((m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/))) { d = +m[1]; mes = +m[2]; a = +m[3]; }
+  else return null;
+  return (mes >= 1 && mes <= 12 && d >= 1 && d <= 31) ? { dia: d, mes, ano: a } : null;
+}
+// Calcula (sem gravar) o que precisa mudar em cada matrícula.
+function _mgCalcular(alunos, mats) {
+  const mapa = new Map(alunos.map(a => [String(a.alunoId || a._id), a]));
+  const patches = [], cont = { nome: 0, sexo: 0, nascDia: 0, nascMes: 0, nascAno: 0, serie: 0, turno: 0, modelo: 0, status: 0 };
+  const dataRuim = new Map(); let orfas = 0;
+  mats.forEach(m => {
+    const a = mapa.get(String(m.alunoId || '').trim());
+    const want = {
+      serie:  _mgSerie(m.serie),
+      turno:  String(m.turno || '').trim().toUpperCase(),
+      modelo: String(m.modelo || '').trim().toUpperCase() || 'REGULAR',
+      status: String(m.status || '').trim().toUpperCase() || 'ATIVO',
+    };
+    if (a) {
+      const p = _mgPartesNasc(a.dataNascimento);
+      if (String(a.dataNascimento || '').trim() && !p) dataRuim.set(String(a.alunoId || a._id), a.nome || a.nomeOficial || '');
+      Object.assign(want, {
+        nome: _mgNormNome(a.nome || a.nomeOficial), sexo: String(a.sexo || '').trim().toUpperCase(),
+        nascDia: p ? p.dia : null, nascMes: p ? p.mes : null, nascAno: p ? p.ano : null,
+      });
+    } else orfas++;
+    const patch = {};
+    Object.keys(want).forEach(k => {
+      const cur = m[k], w = want[k];
+      const igual = (typeof w === 'number' || w === null) ? ((cur === undefined ? null : cur) === w) : (String(cur == null ? '' : cur) === w);
+      if (!igual) { patch[k] = w; cont[k]++; }
+    });
+    if (Object.keys(patch).length) patches.push({ id: m._id, data: patch });
+  });
+  return { patches, cont, orfas, dataRuim };
+}
+
+let _MG = null;   // { patches }
+async function migracaoAnalisar() {
+  if (!IS_ADMIN || !escolaSelecionada()) return;
+  const ok = await _confirmModal({
+    titulo: 'Analisar matrículas',
+    corpo: 'Lê TODOS os alunos e TODAS as matrículas desta escola (1 leitura por documento).\n\nNada é gravado nesta etapa. Use uma vez, depois da atualização do sistema.',
+    textoConfirmar: 'Analisar',
+  });
+  if (!ok) return;
+  const btn = document.getElementById('btnMgAnalisar');
+  btn.disabled = true; _MG = null;
+  clearLogEl('logMigracao');
+  document.getElementById('mgPreview').style.display = 'none';
+  document.getElementById('mgAplicarWrap').style.display = 'none';
+  try {
+    setMsg('Lendo alunos e matrículas…', 'loading');
+    const [alunos, mats] = await Promise.all([window.DB.anoAtivoAlunos.list(), window.DB.anoAtivoMatriculas.list()]);
+    const r = _mgCalcular(alunos, mats);
+    _MG = { patches: r.patches };
+    const nomes = { nome: 'nome', sexo: 'sexo', nascDia: 'dia de nascimento', nascMes: 'mês de nascimento', nascAno: 'ano de nascimento', serie: 'série', turno: 'turno', modelo: 'modelo', status: 'status' };
+    const linhas = Object.keys(r.cont).filter(k => r.cont[k]).map(k => `<tr><td>${esc(nomes[k])}</td><td>${r.cont[k]}</td></tr>`).join('');
+    const ruins = Array.from(r.dataRuim.entries()).slice(0, 10).map(([id, n]) => `${esc(n || '(sem nome)')} (${esc(id)})`).join('; ');
+    const el = document.getElementById('mgPreview');
+    el.innerHTML =
+      `<div class="stats-row">` +
+      `<div class="stat-box"><div class="stat-num">${mats.length}</div><div class="stat-lbl">matrículas lidas</div></div>` +
+      `<div class="stat-box"><div class="stat-num">${r.patches.length}</div><div class="stat-lbl">precisam de ajuste</div></div>` +
+      `<div class="stat-box"><div class="stat-num">${r.orfas}</div><div class="stat-lbl">sem aluno (órfãs)</div></div></div>` +
+      (linhas ? `<div class="preview-scroll"><table><thead><tr><th>Campo</th><th>Matrículas a ajustar</th></tr></thead><tbody>${linhas}</tbody></table></div>`
+              : `<div class="muted mt-8">✅ Nenhum ajuste necessário.</div>`) +
+      (r.dataRuim.size ? `<div class="aviso-warn mt-12 mb-0">⚠️ ${r.dataRuim.size} aluno(s) com data de nascimento ilegível (ficam sem dia/mês/ano): ${ruins}${r.dataRuim.size > 10 ? '…' : ''}. Corrija no cadastro.</div>` : '') +
+      (r.orfas ? `<div class="aviso-warn mt-12 mb-0">⚠️ ${r.orfas} matrícula(s) sem aluno correspondente: só série, turno, modelo e status serão ajustados nelas.</div>` : '');
+    el.style.display = 'block';
+    document.getElementById('mgAplicarWrap').style.display = r.patches.length ? 'flex' : 'none';
+    setMsg(r.patches.length ? 'Análise concluída. Confira e aplique.' : 'Nenhum ajuste necessário.', 'ok');
+  } catch (e) {
+    logEl('❌ Erro na análise: ' + e.message, 'logMigracao');
+    setMsg('Erro na análise: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
+}
+
+async function migracaoAplicar() {
+  if (!IS_ADMIN || !_MG || !_MG.patches.length) return;
+  const n = _MG.patches.length;
+  const ok = await _confirmModal({
+    titulo: 'Aplicar ajustes nas matrículas',
+    corpo: `Gravar os ajustes em ${n} matrícula(s)?\n\nSó os campos de busca e a padronização são alterados; o restante da matrícula fica como está. Faça com ninguém cadastrando ao mesmo tempo.`,
+    textoConfirmar: 'Aplicar',
+  });
+  if (!ok) return;
+  const btn = document.getElementById('btnMgAplicar');
+  btn.disabled = true;
+  try {
+    setMsg('Gravando ajustes…', 'loading');
+    const ops = _MG.patches.map(p => ({ col: 'anoAtivoMatriculas', op: 'update', id: p.id, data: p.data }));
+    for (let i = 0; i < ops.length; i += 400) {
+      await window.DB.batchWrite(ops.slice(i, i + 400));
+      logEl(`  ✅ ${Math.min(i + 400, ops.length)} de ${ops.length} matrícula(s) ajustada(s).`, 'logMigracao');
+    }
+    logEl('🎉 Concluído. Próximo passo: verificar os contadores das turmas.', 'logMigracao');
+    setMsg('Matrículas ajustadas com sucesso!', 'ok');
+    _MG = null;
+    document.getElementById('mgPreview').style.display = 'none';
+    document.getElementById('mgAplicarWrap').style.display = 'none';
+    await inicializar();
+  } catch (e) {
+    logEl('❌ Erro ao gravar: ' + e.message + ' (cada lote é atômico; reanalise para ver o que falta).', 'logMigracao');
+    setMsg('Erro ao gravar: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
+}
+
+/* =============================================
+   CONTADORES DAS TURMAS (qtdAlunos / qtdIntegral)
+============================================= */
+let _CT = null;   // { difs, total, ano }
+async function contadoresVerificar() {
+  if (!IS_ADMIN || !escolaSelecionada()) return;
+  const ok = await _confirmModal({
+    titulo: 'Verificar contadores',
+    corpo: 'Lê as turmas do ano ativo e as matrículas ATIVAS de cada uma (1 leitura por aluno ativo).\n\nNada é gravado nesta etapa.',
+    textoConfirmar: 'Verificar',
+  });
+  if (!ok) return;
+  const btn = document.getElementById('btnCtVerificar');
+  btn.disabled = true; _CT = null;
+  clearLogEl('logContadores');
+  document.getElementById('ctPreview').style.display = 'none';
+  document.getElementById('ctAplicarWrap').style.display = 'none';
+  try {
+    setMsg('Conferindo contadores…', 'loading');
+    const ano = gaAnoAtivoDe(await window.DB.escola.get());
+    const turmas = (await window.DB.anoAtivoTurmas.list()).filter(t => String(t.anoLetivo).trim() === String(ano));
+    const linhas = [];
+    for (let i = 0; i < turmas.length; i += 10) {
+      await Promise.all(turmas.slice(i, i + 10).map(async t => {
+        const tid = t.turmaId || t._id;
+        const r = await window.DB.anoAtivoMatriculas.whereEquals('turmaId', tid, { and: [['status', 'ATIVO']] });
+        const ativas = r.filter(m => String(m.anoLetivo).trim() === String(ano));
+        linhas.push({ id: t._id || tid, nome: t.nome || tid, qtd: ativas.length, integral: ativas.filter(m => _ehInt(m.modelo)).length,
+          qtdAtual: t.qtdAlunos, integralAtual: t.qtdIntegral });
+      }));
+    }
+    const difs = linhas.filter(l => l.qtdAtual !== l.qtd || l.integralAtual !== l.integral)
+      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    _CT = { difs, total: linhas.length, ano };
+    const fmt = (q, i) => (q === undefined ? '—' : q) + ' / ' + (i === undefined ? '—' : i);
+    const el = document.getElementById('ctPreview');
+    el.innerHTML =
+      `<div class="stats-row">` +
+      `<div class="stat-box"><div class="stat-num">${linhas.length}</div><div class="stat-lbl">turmas de ${ano} conferidas</div></div>` +
+      `<div class="stat-box"><div class="stat-num">${difs.length}</div><div class="stat-lbl">com divergência</div></div></div>` +
+      (difs.length
+        ? `<div class="preview-scroll"><table><thead><tr><th>Turma</th><th>Contador (alunos / integral)</th><th>Real (alunos / integral)</th></tr></thead><tbody>` +
+          difs.map(d => `<tr><td>${esc(d.nome)}</td><td>${fmt(d.qtdAtual, d.integralAtual)}</td><td>${fmt(d.qtd, d.integral)}</td></tr>`).join('') + `</tbody></table></div>`
+        : `<div class="muted mt-8">✅ Todos os contadores estão corretos.</div>`);
+    el.style.display = 'block';
+    document.getElementById('ctAplicarWrap').style.display = difs.length ? 'flex' : 'none';
+    setMsg(difs.length ? 'Verificação concluída. Confira e corrija.' : 'Todos os contadores estão corretos.', 'ok');
+  } catch (e) {
+    logEl('❌ Erro na verificação: ' + e.message, 'logContadores');
+    setMsg('Erro na verificação: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
+}
+
+async function contadoresAplicar() {
+  if (!IS_ADMIN || !_CT || !_CT.difs.length) return;
+  const n = _CT.difs.length;
+  const ok = await _confirmModal({
+    titulo: 'Corrigir contadores',
+    corpo: `Gravar os valores reais em ${n} turma(s)?\n\nFaça com ninguém cadastrando, encerrando ou readmitindo ao mesmo tempo.`,
+    textoConfirmar: 'Corrigir',
+  });
+  if (!ok) return;
+  const btn = document.getElementById('btnCtAplicar');
+  btn.disabled = true;
+  try {
+    setMsg('Gravando contadores…', 'loading');
+    const ops = _CT.difs.map(d => ({ col: 'anoAtivoTurmas', op: 'update', id: d.id, data: { qtdAlunos: d.qtd, qtdIntegral: d.integral } }));
+    for (let i = 0; i < ops.length; i += 400) await window.DB.batchWrite(ops.slice(i, i + 400));
+    logEl(`🎉 ${n} turma(s) corrigida(s).`, 'logContadores');
+    setMsg('Contadores corrigidos!', 'ok');
+    _CT = null;
+    document.getElementById('ctPreview').style.display = 'none';
+    document.getElementById('ctAplicarWrap').style.display = 'none';
+  } catch (e) {
+    logEl('❌ Erro ao gravar: ' + e.message, 'logContadores');
+    setMsg('Erro ao gravar: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
 }
 
 /* =============================================
@@ -805,6 +1048,23 @@ async function executarExclusaoAluno() {
       ...elos.map(e => ({ col: 'alunos', op: 'delete', id: e._id || e.id })),
       { col: 'anoAtivoAlunos', op: 'delete', id: alunoId },
     ];
+    // contadores das turmas: cada matrícula ATIVA do ano ativo que sai libera 1 vaga (e 1 de integral, se for o caso)
+    const anoAtivoNum = gaAnoAtivoDe(await window.DB.escola.get());
+    const porTurma = new Map();
+    mats.forEach(m => {
+      if (String(m.status || 'ATIVO').toUpperCase() !== 'ATIVO' || String(m.anoLetivo).trim() !== String(anoAtivoNum)) return;
+      const c = porTurma.get(m.turmaId) || { q: 0, i: 0 };
+      c.q++; if (_ehInt(m.modelo)) c.i++;
+      porTurma.set(m.turmaId, c);
+    });
+    const FV = window.Auth.firebase.firestore.FieldValue;
+    for (const [turmaId, c] of porTurma) {
+      const t = await window.DB.anoAtivoTurmas.get(turmaId);   // só desconta se a turma ainda existe
+      if (!t) continue;
+      const data = { qtdAlunos: FV.increment(-c.q) };
+      if (c.i) data.qtdIntegral = FV.increment(-c.i);
+      ops.push({ col: 'anoAtivoTurmas', op: 'update', id: t._id, data });
+    }
     if (ops.length > 500) throw new Error(`Registros demais para um único lote (${ops.length}; máximo 500). Nada foi apagado.`);
     await window.DB.batchWrite(ops);
     logEl(`  ✅ ${mats.length} matrícula(s), ${elos.length} vínculo(s) e os dados pessoais apagados.`, 'logExcluirAluno');
