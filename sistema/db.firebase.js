@@ -184,11 +184,13 @@
        * @param {string} field  campo indexado (ex.: 'nomeBusca')
        * @param {*} start       valor inicial do intervalo (inclusive)
        * @param {*} end         valor final do intervalo (exclusive)
-       * @param {Object} [opts] { limit }
+       * @param {Object} [opts] { limit, and: [[campo, valor], ...] }
        */
       async whereRange(field, start, end, opts = {}) {
         await waitAuth();
-        let q = col(colName).where(field, '>=', start).where(field, '<', end);
+        let q = col(colName);
+        (opts.and || []).forEach(([f, v]) => { q = q.where(f, '==', v); });   // igualdades extras (exigem índice composto com o campo do intervalo)
+        q = q.where(field, '>=', start).where(field, '<', end);
         if (opts.limit) q = q.limit(opts.limit);
         const snap = await q.get();
         return snap2arr(snap);
