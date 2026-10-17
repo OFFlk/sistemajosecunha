@@ -623,8 +623,7 @@ function _modeloFiltroAtual(){
   return el ? (el.value || '') : '';
 }
 function modoFiltroAtual(){
-  const el = document.querySelector('input[name="modoFiltro"]:checked');
-  return el ? el.value : "ambos";
+  return "turma";   // os radios continuam ocultos no HTML; só existe o fluxo por turma/pesquisa
 }
 function calcIdade(dataStr){
   if(!dataStr) return "";
@@ -700,7 +699,9 @@ const btnToggleSort = document.getElementById("btnToggleSort");
 /* Leitura sob demanda: matrículas só do ano selecionado, alunos só das turmas marcadas */
 let _semEscola = false, _listaTok = 0;
 let _busca = null;   // { ids:Set } quando há busca por nome/CPF ou pesquisa avançada; null = fluxo por turma
-const _matsPorAno = new Map();
+const _matsPorAno = new Map();          // ano -> Map(_id -> matrícula) (só o que já foi lido)
+const _turmasCarregadas = new Set();    // 'turmaId|status' cujas matrículas já foram lidas por completo
+const _divergAvisadas = new Set();      // turmas cujo contador divergente já foi avisado
 let _alunosCarregados = new Set();
 function _normalizarAlunos(lista){
   return lista.map(a => {
@@ -731,14 +732,100 @@ function _dedupMats(arr){
   });
   return Array.from(seen.values());
 }
-async function garantirMatsDoAno(ano){
-  ano = String(ano || '').trim();
-  if(!ano){ mats = []; return; }
-  if(!_matsPorAno.has(ano)){
-    const vals = isNaN(Number(ano)) ? [ano] : [ano, Number(ano)];   // anoLetivo pode estar como texto ou número
-    _matsPorAno.set(ano, _dedupMats(await window.DB.anoAtivoMatriculas.whereIn('anoLetivo', vals)));
+function _normalizarMats(lista){
+  return lista.map(m => ({
+    ...m,
+    turmaId:   (m.turmaId || m.turma || m.TURMAID || "").trim(),
+    alunoId:   (m.alunoId || m.aluno || m.ALUNOID || "").trim(),
+    anoLetivo: (m.anoLetivo || m.ano || m.ANO || "").toString().trim(),
+    serie:     normSerie(m.serie || m.SERIE || ""),
+    status:    (m.status || "ATIVO").toString().trim().toUpperCase()
+  }));
+}
+function _sincMats(){
+  const mp = _matsPorAno.get(String(anoSelecionadoOuAtivo()).trim());
+  mats = mp ? _dedupMats(Array.from(mp.values())) : [];
+}
+function _addMats(ano, lista){
+  const k = String(ano || '').trim(); if(!k) return;
+  let mp = _matsPorAno.get(k); if(!mp){ mp = new Map(); _matsPorAno.set(k, mp); }
+  lista.forEach(m => mp.set(m._id || `${m.turmaId}|${m.alunoId}|${m.status}`, m));
+  _sincMats();
+}
+// Status que a lista por turma lê: ano ativo = ATIVO (ou INATIVO com "readmissão"); ano passado = todos.
+function _statusQuery(){ return _statusSituacaoFiltroAtual().status || ''; }
+
+// Lê as matrículas SÓ das turmas marcadas (equalidade no servidor; custo = alunos da turma).
+async function _garantirMatsDasTurmas(tMarcadas){
+  const st = _statusQuery();
+  const falt = tMarcadas.filter(t => !_turmasCarregadas.has(t.turmaId + '|' + st));
+  for(let i = 0; i < falt.length; i += 10){
+    await Promise.all(falt.slice(i, i + 10).map(async t => {
+      const r = await window.DB.anoAtivoMatriculas.whereEquals('turmaId', t.turmaId, { and: st ? [['status', st]] : [] });
+      _addMats(t.anoLetivo, _normalizarMats(r).filter(m => m.anoLetivo === String(t.anoLetivo).trim()));
+      _turmasCarregadas.add(t.turmaId + '|' + st);
+      // autoverificação do contador (sem custo extra: a lista já foi lida)
+      if(st === 'ATIVO' && typeof t.qtdAlunos === 'number' && !_divergAvisadas.has(t.turmaId)){
+        const real = _matsAtuaisDaTurma(t.turmaId, t.anoLetivo).length;
+        if(real !== t.qtdAlunos){
+          _divergAvisadas.add(t.turmaId);
+          _toastAviso(`O contador da turma "${t.nome || t.turmaId}" (${t.qtdAlunos}) difere da lista real (${real}). Rode a verificação em gestão do ano ativo.`);
+        }
+      }
+    }));
   }
-  mats = _matsPorAno.get(ano);
+}
+
+// Pesquisa por critérios da MATRÍCULA (série, turno, modelo, status, situação): consulta no servidor.
+async function _consultarMatsCriterios(ano, crit){
+  const anoStr = String(ano).trim();
+  const anoVals = isNaN(Number(anoStr)) ? [anoStr] : [anoStr, Number(anoStr)];   // anoLetivo pode estar como texto ou número
+  const series = crit.series.length ? crit.series : [null];
+  const consultas = [];
+  anoVals.forEach(av => series.forEach(se => crit.situacoes.forEach(si => {
+    const and = crit.and.slice();
+    if(se) and.push(['serie', se]);
+    if(si) and.push(['situacao', si]);
+    consultas.push(window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, { and }));
+  })));
+  let lista = _normalizarMats((await Promise.all(consultas)).flat()).filter(m => m.anoLetivo === anoStr);
+  if(crit.semSit) lista = lista.filter(m => !m.situacao);
+  _addMats(anoStr, lista);
+  return lista;
+}
+// Todas as matrículas (do ano) de alguns alunos: garante a "matrícula atual" correta (readmissão) e o enriquecimento.
+async function _completarMatsDosAlunos(ids, ano){
+  if(!ids.length) return;
+  const anoStr = String(ano).trim();
+  const r = await window.DB.anoAtivoMatriculas.whereIn('alunoId', ids);
+  _addMats(anoStr, _normalizarMats(r).filter(m => m.anoLetivo === anoStr));
+}
+
+// Quantidades do card: lista real (se a turma já foi lida) > contador gravado na turma > desconhecido.
+function _qtdsTurma(t){
+  const ehAtual = String(t.anoLetivo).trim() === String(anoAtivo).trim();
+  const st = ehAtual ? 'ATIVO' : '';
+  if(_turmasCarregadas.has(t.turmaId + '|' + st)){
+    const matsT = _matsAtuaisDaTurma(t.turmaId, t.anoLetivo);
+    return { qtd: matsT.length, integral: matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length };
+  }
+  if(ehAtual && typeof t.qtdAlunos === 'number') return { qtd: t.qtdAlunos, integral: typeof t.qtdIntegral === 'number' ? t.qtdIntegral : 0 };
+  return { qtd: null, integral: 0 };
+}
+function _atualizarBadgesTurmas(lista){
+  lista.forEach(t => {
+    const q = _qtdsTurma(t), id = CSS.escape(t.turmaId);
+    const b = document.querySelector(`[data-qtd-turma="${id}"]`);
+    if(b && q.qtd != null) b.textContent = `👥 ${q.qtd} aluno(s)`;
+    const bi = document.querySelector(`[data-int-turma="${id}"]`);
+    if(bi){ bi.textContent = `📚 ${q.integral} integral`; bi.hidden = !(q.integral > 0); }
+  });
+}
+function _guardarAlunos(lista){
+  const novos = lista.map(a => ({ ...a, alunoId: a.alunoId || a._id })).filter(a => a.alunoId && !_alunosCarregados.has(a.alunoId));
+  if(!novos.length) return;
+  alunos = alunos.concat(_normalizarAlunos(novos));
+  novos.forEach(a => _alunosCarregados.add(a.alunoId));
 }
 async function garantirAlunos(ids){
   const falt = Array.from(new Set(ids)).filter(id => id && !_alunosCarregados.has(id));
@@ -771,46 +858,91 @@ async function _idsPorTexto(termo){
     if(nome.replace(/[^A-ZÀ-Ü]/g, '').length < 3) return null;
     r = await window.DB.anoAtivoAlunos.whereRange('nome', nome, nome + '\uf8ff', { limit: 50 });   // só início do nome
   }
+  _guardarAlunos(r);   // os documentos já vieram: não baixar de novo
   return new Set(r.map(x => x.alunoId || x._id));
 }
 async function _idsAvancada(){
   const chk = id => document.getElementById(id)?.checked;
-  if(chk('chkReadmissao')){   // inativos do ano já estão nas matrículas carregadas
-    return new Set(mats.filter(m => String(m.status||'ATIVO').toUpperCase() === 'INATIVO').map(m => m.alunoId));
-  }
   const marcados = sel => Array.from(document.querySelectorAll(sel + ':checked')).map(c => c.value);
   let campos = [];   // consulta só o 1º grupo marcado; os demais refinam localmente (E entre grupos)
   if(chk('chkFiltroAee')) campos = ['aee'];
   else if(chk('chkFiltroDef')) campos = marcados('.filtroDefItem').length ? marcados('.filtroDefItem') : ['deficiencia'];
   else if(chk('chkFiltroTrans')) campos = marcados('.filtroTransItem').length ? marcados('.filtroTransItem') : ['transtorno'];
   if(!campos.length) return null;
-  const res = await Promise.all(campos.map(k => window.DB.anoAtivoAlunos.whereEquals(k, true)));
-  return new Set(res.flat().map(x => x.alunoId || x._id));
+  const res = (await Promise.all(campos.map(k => window.DB.anoAtivoAlunos.whereEquals(k, true)))).flat();
+  _guardarAlunos(res);
+  return new Set(res.map(x => x.alunoId || x._id));
 }
-async function pesquisarPorTexto(){
-  const termo = inpBusca.value.trim();
-  if(!termo){ _busca = null; _jaFoiPesquisado = true; atualizarListas(); return; }
-  try{
-    const ids = await _idsPorTexto(termo);
-    if(!ids){ _toastErro('Digite ao menos 3 letras do início do nome, ou o CPF completo.'); return; }
-    _busca = { ids }; _jaFoiPesquisado = true; atualizarListaAlunos();
-  }catch(e){ console.warn(e); _toastErro('Erro na busca.'); }
+function _temFlagsAvancados(){
+  const chk = id => document.getElementById(id)?.checked;
+  return !!(chk('chkFiltroAee') || chk('chkFiltroDef') || chk('chkFiltroTrans'));
 }
-async function pesquisarAvancada(){
-  try{
-    const ids = await _idsAvancada();
-    if(!ids){ _toastErro('Marque ao menos um filtro para pesquisar.'); return false; }
-    _busca = { ids }; _jaFoiPesquisado = true; atualizarListaAlunos(); return true;
-  }catch(e){ console.warn(e); _toastErro('Erro na pesquisa avançada.'); return false; }
-}
-let _qtCache = { ref: null, map: null };
-function _qtdTurma(turmaId){
-  if(_qtCache.ref !== mats){
-    const ano = anoSelecionadoOuAtivo(), mp = new Map();
-    turmas.forEach(t => mp.set(t.turmaId, _matsAtuaisDaTurma(t.turmaId, ano).length));
-    _qtCache = { ref: mats, map: mp };
+// Critérios que moram na MATRÍCULA (viram consulta no servidor).
+function _criteriosMatricula(){
+  const ehAtivo = String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim();
+  const c = { and: [], series: Array.from(seriesSelecionadasNorm()), situacoes: [null], semSit: false, readmissao: false, temCriterio: false };
+  const turno = _turnoFiltroAtual(), modelo = _modeloFiltroAtual();
+  if(turno)  c.and.push(['turno', turno]);
+  if(modelo) c.and.push(['modelo', modelo]);
+  if(turno || modelo || c.series.length) c.temCriterio = true;
+  if(ehAtivo){
+    if(document.getElementById('chkReadmissao')?.checked){
+      c.and.push(['status', 'INATIVO']); c.readmissao = true; c.temCriterio = true;
+      const sit = document.getElementById('selSituacao')?.value || '';
+      if(sit) c.and.push(['situacao', sit]);
+    } else c.and.push(['status', 'ATIVO']);
+  } else {
+    const sel = document.getElementById('selSituacaoPassado')?.value || '';
+    const nao = document.getElementById('chkNaoConcluintes')?.checked;
+    if(sel === '__SEM__') c.semSit = true;                 // campo ausente não é consultável: só refina outro critério
+    else if(sel){ c.situacoes = [sel]; c.temCriterio = true; }
+    else if(nao){ c.situacoes = ['TRANSFERIDO','DESISTENTE','FALECIDO']; c.temCriterio = true; }
   }
-  return _qtCache.map.get(turmaId) || 0;
+  return c;
+}
+let _pesquisando = false;
+// Botão Pesquisar (principal e da pesquisa avançada): todos os filtros preenchidos entram como E.
+async function pesquisar(){
+  if(_pesquisando) return false;
+  const termo = inpBusca.value.trim();
+  const ano = anoSelecionadoOuAtivo();
+  const crit = _criteriosMatricula();
+  const temFlags = _temFlagsAvancados();
+  if(!termo && !crit.temCriterio && !temFlags){
+    _toastAviso(crit.semSit ? 'Combine "Sem situação" com série, turno ou modelo para pesquisar.' : 'Digite um nome ou CPF, ou escolha ao menos um filtro para pesquisar.');
+    return false;
+  }
+  _pesquisando = true; _toastCarregando('Pesquisando…');
+  try{
+    let idsA = null;                                       // critérios do ALUNO (nome/CPF, NEE/AEE)
+    if(termo){
+      idsA = await _idsPorTexto(termo);
+      if(!idsA){ _toastErro('Digite ao menos 3 letras do início do nome, ou o CPF completo.'); return false; }
+    }
+    if(temFlags){
+      const f = await _idsAvancada();
+      if(f) idsA = idsA ? new Set([...idsA].filter(x => f.has(x))) : f;
+    }
+    let ids;
+    if(crit.temCriterio){                                  // critérios da MATRÍCULA: consulta no servidor
+      const lista = await _consultarMatsCriterios(ano, crit);
+      const idsM = new Set(lista.map(m => m.alunoId));
+      ids = idsA ? new Set([...idsM].filter(x => idsA.has(x))) : idsM;
+    } else ids = idsA;
+    // readmissão (e busca só por aluno): traz as demais matrículas do ano para resolver a matrícula "atual"
+    if(crit.readmissao || !crit.temCriterio) await _completarMatsDosAlunos(Array.from(ids), ano);
+    _busca = { ids }; _jaFoiPesquisado = true;
+    await _atualizarListaAlunos();
+    return true;
+  }catch(e){ console.error('pesquisar:', e); _toastErro('Erro na pesquisa.'); return false; }
+  finally{ _pesquisando = false; _toastLimpar(); }
+}
+// Mudança de filtro: a busca anterior deixa de valer (aperte Pesquisar de novo)
+function _filtroAlunoMudou(){ _busca = null; atualizarListaAlunos(); }
+function _filtroTurmaMudou(){ _busca = null; atualizarListas(); }
+function _qtdTurma(turmaId){
+  const t = turmas.find(x => x.turmaId === turmaId);
+  return (t ? _qtdsTurma(t).qtd : 0) ?? 0;
 }
 
 async function carregarDB(){
@@ -822,7 +954,7 @@ async function carregarDB(){
     if(window.Auth.getActiveSchoolId?.() === 'ADMIN'){ _semEscola = true; return; }
     const [turmasDB, dadosEscola] = await Promise.all([window.DB.anoAtivoTurmas.list(), window.DB.escola.get()]);
     const dados = { dadosEscola };
-    alunos = []; mats = []; _alunosCarregados = new Set(); _matsPorAno.clear();
+    alunos = []; mats = []; _alunosCarregados = new Set(); _matsPorAno.clear(); _turmasCarregadas.clear();
     turmas = Array.isArray(turmasDB) ? turmasDB : [];
     const _cfg = dados.dadosEscola?.configAnoAtivo;
     const _cfgV = (_cfg && typeof _cfg === 'object') ? (_cfg.anoAtivo ?? _cfg.ano ?? _cfg.anoLetivo) : _cfg;
@@ -883,7 +1015,7 @@ async function carregarDB(){
   selSerieAdd.innerHTML = '<option value="" disabled hidden selected>Escolha a série…</option>';
   seriesOrdenadas.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; selSerieAdd.appendChild(o); });
 
-  try{ await garantirMatsDoAno(anoSelecionadoOuAtivo()); }catch(e){ console.warn('matrículas:', e); _toastErro('Erro ao carregar as matrículas do ano.'); }
+  _sincMats();   // matrículas só sob demanda (por turma marcada ou ao Pesquisar)
 }
 
 function ordenarSeries(arr){
@@ -975,7 +1107,7 @@ function renderChips(){
     chip.innerHTML = `${s} <button title="Remover">×</button>`;
     chip.querySelector("button").addEventListener("click", ()=>{
       seriesSelecionadas = seriesSelecionadas.filter(x=>x!==s);
-      renderChips(); atualizarListas();
+      _busca = null; renderChips(); atualizarListas();
     });
     chipsSeries.appendChild(chip);
   });
@@ -999,6 +1131,8 @@ function turmasFiltradas(){
     // não deve aparecer na pesquisa — dado continua no banco, só some da lista.
     if((t.status||'').toString().trim().toUpperCase() === 'INATIVA') return false;
     if(!(!ano || String(t.anoLetivo) === String(ano))) return false;
+    const turnoF = _turnoFiltroAtual();
+    if(turnoF && String(t.turno||'').toUpperCase() !== turnoF) return false;
     if(setSeries.size === 0) return true;
     const seriesDaTurma = new Set();
     if(Array.isArray(t.series) && t.series.length){
@@ -1242,6 +1376,7 @@ function sortAlunos(alunosList){
 ========================= */
 function atualizarListas(){
   const tScope = sortTurmas(turmasFiltradas());
+  const _marcadasAntes = turmaIdsSelecionadasNoDOM();   // preserva as turmas marcadas ao refiltrar
   listaTurmas.innerHTML = "";
   countTurmas.textContent = tScope.length;
   if(tScope.length===0){
@@ -1254,14 +1389,13 @@ function atualizarListas(){
       const el = document.createElement("div");
       el.className="item selecionavel";
       const titulo = t.nome || `${t.serie || "Turma"} ${t.anoLetivo || ""}`.trim();
-      const matsT = _matsAtuaisDaTurma(t.turmaId, t.anoLetivo);
-      const qtdAlunos = matsT.length;
+      const q = _qtdsTurma(t);
+      const qtdAlunos = q.qtd == null ? '—' : q.qtd;
       const turmaOriginal = turmasMap.get(t.turmaId) || t;
       const seriesArr = Array.isArray(turmaOriginal.series) ? turmaOriginal.series : (t.serie ? [t.serie] : []);
       const seriesTxt = seriesArr.join(", ") || t.serie || "—";
       const profTxt   = turmaOriginal.professor || t.professor || "";
-      const qtdIntegral = matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length;
-      const modeloBadge = qtdIntegral > 0 ? `<span class="badge neutral">📚 ${qtdIntegral} integral</span>` : '';
+      const modeloBadge = `<span class="badge neutral" data-int-turma="${t.turmaId}" ${q.integral > 0 ? '' : 'hidden'}>📚 ${q.integral} integral</span>`;
 
       el.innerHTML = `
         <div class="selo-selecionado">✓</div>
@@ -1270,7 +1404,7 @@ function atualizarListas(){
           <hr class="separator-line">
           <div class="turma-chips">
             <div class="turma-chips-row">
-              <span class="badge">👥 ${qtdAlunos} aluno(s)</span>
+              <span class="badge" data-qtd-turma="${t.turmaId}">👥 ${qtdAlunos} aluno(s)</span>
               <span class="badge neutral">📚 ${seriesTxt}</span>
               ${modeloBadge}
             </div>
@@ -1279,7 +1413,7 @@ function atualizarListas(){
           </div>
         </div>
         <div class="right">
-          <label class="check-all"><input type="checkbox" class="chkTurma" data-turma="${t.turmaId}"> Selecionar</label>
+          <label class="check-all"><input type="checkbox" class="chkTurma" data-turma="${t.turmaId}" ${_marcadasAntes.has(t.turmaId) ? 'checked' : ''}> Selecionar</label>
         </div>
       `;
       listaTurmas.appendChild(el);
@@ -1345,8 +1479,15 @@ async function _atualizarListaAlunos(_tScope){
   }
   listaAlunos.innerHTML = `<div class="aviso-warn">⏳ Carregando alunos…</div>`;
   try{
-    const idsT = new Set(tMarcadas.map(t => t.turmaId));
-    await garantirAlunos(busca ? Array.from(busca.ids) : mats.filter(m => modo === "serie" || idsT.has(m.turmaId)).map(m => m.alunoId));
+    if(busca){
+      await garantirAlunos(Array.from(busca.ids));
+    } else {
+      await _garantirMatsDasTurmas(tMarcadas);
+      if(tok !== _listaTok) return;
+      _atualizarBadgesTurmas(tMarcadas);
+      const idsT = new Set(tMarcadas.map(t => t.turmaId)), st = _statusQuery();
+      await garantirAlunos(mats.filter(m => idsT.has(m.turmaId) && (!st || m.status === st)).map(m => m.alunoId));
+    }
   }catch(e){ console.warn('alunos:', e); _toastErro('Erro ao carregar os alunos.'); return; }
   if(tok !== _listaTok) return;   // outra seleção chegou depois
   let aScope = [];
@@ -2361,15 +2502,15 @@ function turmasSelecionadas(){
 }
 
 let _jaFoiPesquisado = false;
-document.getElementById("btnAtualizar").addEventListener("click", pesquisarPorTexto);
+document.getElementById("btnAtualizar").addEventListener("click", pesquisar);
 document.querySelectorAll('input[name="modoFiltro"]').forEach(r=>{ r.addEventListener("change", ()=>{ atualizarListaAlunos(); }); });
 document.getElementById("btnAddSerie").addEventListener("click", ()=>{
   const v = normSerie(selSerieAdd.value); if(!v) return;
-  if(!seriesSelecionadas.includes(v)){ seriesSelecionadas.push(v); renderChips(); atualizarListas(); }
+  if(!seriesSelecionadas.includes(v)){ seriesSelecionadas.push(v); _busca = null; renderChips(); atualizarListas(); }
   selSerieAdd.value = "";
 });
 document.getElementById("btnPesquisarAvancada").addEventListener("click", async ()=>{
-  if(await pesquisarAvancada()) document.getElementById("btnFecharPesquisaAvancada")?.click();
+  if(await pesquisar()) document.getElementById("btnFecharPesquisaAvancada")?.click();
 });
 document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   _busca = null;
@@ -2394,22 +2535,22 @@ document.getElementById("btnLimparFiltros").addEventListener("click", ()=>{
   renderChips();
   atualizarListas();
 });
-inpBusca.addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); pesquisarPorTexto(); } });
+inpBusca.addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); pesquisar(); } });
 selAno.addEventListener("change", async ()=>{
   _jaFoiPesquisado = true; _busca = null;
-  try{ await garantirMatsDoAno(selAno.value || anoAtivo); }catch(e){ console.warn(e); _toastErro('Erro ao carregar as matrículas do ano.'); return; }
+  _sincMats();   // matrículas do novo ano só são lidas ao marcar turma ou pesquisar
   _blocoStatusAtualizarVisibilidade(); atualizarListas();
 });
-document.getElementById("selTurno").addEventListener("change", ()=>{ atualizarListaAlunos(); });
-document.getElementById("selModelo").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("selTurno").addEventListener("change", _filtroTurmaMudou);
+document.getElementById("selModelo").addEventListener("change", _filtroAlunoMudou);
 document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
   const sel = document.getElementById("selSituacao");
   if(sel) sel.style.display = e.target.checked ? "" : "none";
 });
-document.getElementById("selSituacao").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("selSituacao").addEventListener("change", _filtroAlunoMudou);
 document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
   _atualizarOpcoesSituacaoPassado();
-  atualizarListaAlunos();
+  _filtroAlunoMudou();
 });
 
 // Painel de Pesquisa Avançada — abre/fecha, mostra sub-grid de deficiência/
@@ -2449,7 +2590,7 @@ document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{
   // A readmissão também conta pro badge (o listener de filtro dela já existe acima)
   document.getElementById("chkReadmissao").addEventListener("change", atualizarBadge);
 })();
-document.getElementById("selSituacaoPassado").addEventListener("change", ()=>{ atualizarListaAlunos(); });
+document.getElementById("selSituacaoPassado").addEventListener("change", _filtroAlunoMudou);
 
 sortField.addEventListener("change", ()=>{ currentSortField = sortField.value; atualizarListaAlunos(); });
 btnToggleSort.addEventListener("click", ()=>{
@@ -2663,8 +2804,7 @@ function restaurarEstadoPagina(){
     Loading.esconder(); return;
   }
   
-  // Tentar restaurar estado salvo (matrículas do ano salvo precisam estar carregadas antes)
-  try{ const _e = JSON.parse(sessionStorage.getItem('pesquisaAnoAtivoEstado')||'null'); if(_e && _e.anoSelecionado) await garantirMatsDoAno(_e.anoSelecionado); }catch(e){ console.warn(e); }
+  // Tentar restaurar estado salvo (as matrículas são lidas sob demanda, ao marcar turma)
   const estadoRestaurado = restaurarEstadoPagina();
   
   if(!estadoRestaurado){
