@@ -771,7 +771,11 @@ function _addMats(ano, lista){
   _sincMats();
 }
 // Status que a lista por turma lê: ano ativo = ATIVO (ou INATIVO com "readmissão"); ano passado = todos.
-function _statusQuery(){ return _statusSituacaoFiltroAtual().status || ''; }
+// Lista por TURMA: no ano ativo é sempre ATIVO (matrícula encerrada não pertence mais à turma; "readmissão" só vale no Pesquisar).
+// Ano passado: sem filtro de status (todas as matrículas já são encerradas).
+function _statusQuery(){
+  return String(anoSelecionadoOuAtivo()).trim() === String(anoAtivo).trim() ? 'ATIVO' : '';
+}
 
 // Lê as matrículas SÓ das turmas marcadas (equalidade no servidor; custo = alunos da turma).
 async function _garantirMatsDasTurmas(tMarcadas){
@@ -1526,6 +1530,11 @@ async function _atualizarListaAlunos(_tScope){
   const modo = modoFiltroAtual();
   const tok = ++_listaTok;
   const busca = _busca;
+  if(!busca && _statusQuery() === 'ATIVO' && document.getElementById('chkReadmissao')?.checked){
+    alunosOrdenados = []; countAlunos.textContent = "—";
+    listaAlunos.innerHTML = `<div class="aviso-warn">🔁 <b>Somente readmissão</b> vale para a pesquisa: aperte <b>Pesquisar</b> (as turmas marcadas são ignoradas). Para ver os alunos de uma turma, desmarque a readmissão.</div>`;
+    return;
+  }
   if(!busca && modo !== "serie" && !tMarcadas.length){
     alunosOrdenados = []; countAlunos.textContent = "—";
     listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ Para ver os alunos, marque uma ou mais turmas (ou a opção <b>Todos</b>) no card <b>Turmas</b>, à esquerda, ou faça uma busca no card de pesquisa.</div>`;
@@ -2601,6 +2610,7 @@ document.getElementById("selModelo").addEventListener("change", _filtroAlunoMudo
 document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
   const sel = document.getElementById("selSituacao");
   if(sel) sel.style.display = e.target.checked ? "" : "none";
+  _filtroAlunoMudou();   // com readmissão a lista por turma dá lugar ao aviso; ao desmarcar, volta às turmas
 });
 document.getElementById("selSituacao").addEventListener("change", _filtroAlunoMudou);
 document.getElementById("chkNaoConcluintes").addEventListener("change", ()=>{

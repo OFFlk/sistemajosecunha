@@ -248,7 +248,7 @@ function _setupFotoWidget(alunoId){
   // Sugere a foto mais recente já salva (qualquer matrícula/ano) pra esse aluno.
   (async () => {
     try{
-      const mats = await window.DB.anoAtivoMatriculas.list();
+      const mats = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', String(alunoId));   // só as deste aluno
       const maisRecente = mats
         .filter(m => m.alunoId === String(alunoId) && m.fotoUrl)
         .sort((a, b) => Number(b.anoLetivo) - Number(a.anoLetivo))[0];
@@ -441,6 +441,44 @@ const conteudo = document.getElementById('conteudo');
 
 let alunos = [], turmas = [], mats = [], anoAtivo = '';
 
+  // ── Cópia dos dados de BUSCA na matrícula + contadores da turma (igual ao cadastro-aluno-ativo) ──
+  // A pesquisa (pesquisa-ano-ativo) consulta a matrícula no servidor e não lê a coleção de alunos.
+  // Fonte da verdade = doc do aluno; a matrícula guarda uma cópia (nome, sexo, dia/mês/ano de nascimento).
+  // Quem altera dado pessoal grava aluno + TODAS as matrículas dele no mesmo batch (tudo ou nada).
+  function _camposBuscaMat(p){
+    const m = String((p && p.dataNascimento) || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return {
+      nome:    String((p && (p.nome || p.nomeOficial)) || '').trim(),
+      sexo:    String((p && p.sexo) || '').trim().toUpperCase(),
+      nascDia: m ? Number(m[3]) : null,
+      nascMes: m ? Number(m[2]) : null,
+      nascAno: m ? Number(m[1]) : null,
+    };
+  }
+  // Atualiza a cópia em cada matrícula que difere; se a matrícula já tem op no batch, mescla nela (não repete documento)
+  function _opsSyncBusca(matsDoAluno, campos, ops){
+    (matsDoAluno || []).forEach(m => {
+      if(!Object.keys(campos).some(k => (m[k] === undefined ? null : m[k]) !== campos[k])) return;
+      const ja = ops.find(o => o.col === 'anoAtivoMatriculas' && o.id === m._id);
+      if(ja) Object.assign(ja.data, campos);
+      else ops.push({ col:'anoAtivoMatriculas', op:'update', id: m._id, data: { ...campos } });
+    });
+  }
+  // Contadores no doc da turma (só matrículas ATIVAS do ano ativo): qtdAlunos e qtdIntegral. increment() = atômico.
+  const _ehIntegral = m => String(m || '').toUpperCase() === 'INTEGRAL';
+  function _turmaDocId(turmaId){
+    const t = turmas.find(x => x.turmaId === turmaId);
+    return t ? (t._id || t.turmaId) : null;
+  }
+  function _opContadorTurma(turmaId, dQtd, dInt){
+    if(!dQtd && !dInt) return null;
+    const id = _turmaDocId(turmaId); if(!id) return null;
+    const inc = window.Auth.firebase.firestore.FieldValue.increment;
+    const data = {}; if(dQtd) data.qtdAlunos = inc(dQtd); if(dInt) data.qtdIntegral = inc(dInt);
+    return { col:'anoAtivoTurmas', op:'update', id, data };
+  }
+
+
 function erro(msg){
   conteudo.innerHTML = `<div class="card"><div class="aviso-warn">⚠️ ${escapeHtml(msg)}</div></div>`;
 }
@@ -458,11 +496,16 @@ async function init(){
   });
 
   try{
-    const dados = await window.DB.loadAllAnoAtivo();
-    alunos = Array.isArray(dados.alunosDB) ? dados.alunosDB : [];
-    mats   = Array.isArray(dados.matriculasDB) ? dados.matriculasDB : [];
-    turmas = Array.isArray(dados.turmasDB) ? dados.turmasDB : [];
-    anoAtivo = (dados.dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
+    const [alunoDoc, matsDoAluno, turmasDB, dadosEscola] = await Promise.all([
+      window.DB.anoAtivoAlunos.get(alunoId),
+      window.DB.anoAtivoMatriculas.whereEquals('alunoId', alunoId),   // só as deste aluno
+      window.DB.anoAtivoTurmas.list(),
+      window.DB.escola.get(),
+    ]);
+    alunos = alunoDoc ? [alunoDoc] : [];
+    mats   = Array.isArray(matsDoAluno) ? matsDoAluno : [];
+    turmas = Array.isArray(turmasDB) ? turmasDB : [];
+    anoAtivo = (dadosEscola?.configAnoAtivo || '').toString().replace(/"/g,'').trim();
   }catch(e){
     console.error(e);
     erro('Erro ao carregar dados do Firestore. Tente novamente.');
@@ -470,7 +513,7 @@ async function init(){
     return;
   }
 
-  const aluno = alunos.find(a => (a.alunoId || a.id || '').toString().trim() === alunoId);
+  const aluno = alunos.find(a => (a.alunoId || a._id || a.id || '').toString().trim() === alunoId);
   if(!aluno){
     erro(`Aluno com ID "${alunoId}" não encontrado.`);
     setMsg(`Aluno com ID "${alunoId}" não encontrado.`, 'err');
@@ -608,8 +651,12 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
           </select>
         </div>
         <div class="field">
-          <label for="inpTurnoReadmissao">Turno</label>
-          <input id="inpTurnoReadmissao" type="text" disabled/>
+          <label for="selModeloReadmissao">Modelo de ensino</label>
+          <select id="selModeloReadmissao">
+            <option value="" disabled hidden selected></option>
+            <option value="REGULAR">Regular</option>
+            <option value="INTEGRAL">Integral</option>
+          </select>
         </div>
       </div>
 
@@ -626,7 +673,11 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
   const selAno   = document.getElementById('selAnoReadmissao');
   const selTurma = document.getElementById('selTurmaReadmissao');
   const selSerie = document.getElementById('selSerieReadmissao');
-  const inpTurno = document.getElementById('inpTurnoReadmissao');
+  const selModelo = document.getElementById('selModeloReadmissao');
+  // sugestão: modelo da última matrícula do aluno (ou do cadastro dele); continua obrigatório e editável
+  const _ult = mats.slice().sort((a, b) => (Number(b.anoLetivo) - Number(a.anoLetivo)) || String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')))[0];
+  const _mod = String((_ult && _ult.modelo) || aluno.modeloEnsino || '').toUpperCase();
+  if(_mod === 'REGULAR' || _mod === 'INTEGRAL') selModelo.value = _mod;
   const btn      = document.getElementById('btnConfirmarReadmissao');
 
   // Ano mudou → recarrega a seção inteira (turmas do ano + recheca matrícula ATIVO)
@@ -639,8 +690,6 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
     if(!t){
       selSerie.innerHTML = '<option value="" disabled hidden selected></option>';
       selSerie.disabled = true;
-      inpTurno.value = '';
-      inpTurno.disabled = true;
       return;
     }
     const series = Array.isArray(t.series) && t.series.length ? t.series : (t.serie ? [t.serie] : []);
@@ -651,8 +700,6 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
       selSerie.innerHTML = '<option value="">—</option>';
       selSerie.disabled = true;
     }
-    inpTurno.value = t.turno || '';
-    inpTurno.disabled = true; // turno é herdado da turma, não editável aqui
   });
 
   btn.addEventListener('click', async () => {
@@ -662,6 +709,10 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
 
     if(!ano || !turmaId){
       setMsg('Selecione o ano letivo e a turma antes de confirmar.', 'warn');
+      return;
+    }
+    if(!selModelo.value){
+      setMsg('Selecione o modelo de ensino (Regular ou Integral).', 'warn');
       return;
     }
 
@@ -682,19 +733,32 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
       const turmaObj = turmasDoAno.find(x => x.turmaId === turmaId);
       const matriculaId = window.MatriculaUtils.buildMatriculaId(turmaId, alunoId, ano);
 
-      const novaMatricula = window.MatriculaUtils.validarMatricula({
+      const modelo = selModelo.value;   // escolhido no formulário (a turma não define Regular/Integral)
+
+      let novaMatricula = window.MatriculaUtils.validarMatricula({
         _id: matriculaId,
         alunoId,
         turmaId,
         anoLetivo: String(ano),
         serie: serie || '',
         turno: (turmaObj && turmaObj.turno) || '',
-        modelo: (turmaObj && turmaObj.modelo) || 'REGULAR',
+        modelo,
         status: 'ATIVO',
         situacao: null,
       });
+      const camposBusca = _camposBuscaMat(aluno);
+      novaMatricula = { ...novaMatricula, ...camposBusca,
+        anoLetivo: Number(ano), serie: normSerie(serie || ''), turno: String((turmaObj && turmaObj.turno) || '').toUpperCase(),
+        modelo, criadoEm: novaMatricula.criadoEm || new Date().toISOString(),
+        encerradoEm: window.Auth.firebase.firestore.FieldValue.delete() };   // readmitir na mesma turma/ano reaproveita o doc: limpa o encerramento antigo
 
-      await window.DB.anoAtivoMatriculas.save(novaMatricula);
+      const ops = [{ col:'anoAtivoMatriculas', op:'set', id: matriculaId, data: novaMatricula }];
+      _opsSyncBusca(mats.filter(m => m._id !== matriculaId), camposBusca, ops);   // demais matrículas do aluno acompanham o dado pessoal
+      if(String(ano) === String(anoAtivo)){                                        // contador da turma (+1 aluno; +1 integral)
+        const cTurma = _opContadorTurma(turmaId, 1, _ehIntegral(modelo) ? 1 : 0);
+        if(cTurma) ops.push(cTurma);
+      }
+      await window.DB.batchWrite(ops);
       await enviarFotoPendenteReadmissao(alunoId, ano, matriculaId);
       setMsg('Readmissão concluída com sucesso!', 'ok');
 
