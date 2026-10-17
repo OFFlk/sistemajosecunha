@@ -74,6 +74,8 @@
    * pelo sistema (causa raiz de pegar a matrícula errada quando há mais
    * de uma para o mesmo aluno, ex.: após mudança de turma).
    *
+   * - Consulta no servidor só as matrículas do aluno e filtra o ano aqui
+   *   (anoLetivo pode estar gravado como texto ou número).
    * - Filtra sempre por alunoId + ano (nunca só por alunoId).
    * - Se por algum motivo houver mais de uma matrícula pro mesmo aluno+ano
    *   (resíduo de bug antigo), prioriza a que estiver ATIVO; se nenhuma
@@ -88,7 +90,8 @@
     const idNorm = String(alunoId).trim();
     const anoNorm = ano ? String(ano).trim() : '';
 
-    const todas = await window.DB.anoAtivoMatriculas.list();
+    // só as matrículas deste aluno (antes: list() da coleção inteira a cada chamada); o ano é filtrado abaixo
+    const todas = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', idNorm);
     const doAlunoNoAno = todas.filter(m => {
       const mAluno = String(m.alunoId || '').trim();
       const mAno = String(m.anoLetivo || m.ano || '').trim();
