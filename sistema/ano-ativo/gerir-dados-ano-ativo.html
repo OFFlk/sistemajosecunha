@@ -272,7 +272,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <!-- ── CONTADORES DAS TURMAS ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secContadores', event)">
-      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais e corrige as que divergirem. Lê as turmas e as matrículas ativas (1 leitura por aluno ativo). Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
+      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Lê as turmas e as matrículas ativas do ano (1 leitura por matrícula). Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
       <span class="sec-toggle" id="togSecContadores">▼</span>
     </div>
     <div class="sec-body" id="secContadores">
@@ -282,6 +282,9 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <div id="ctPreview" class="mt-14" style="display:none;"></div>
       <div class="row-btns mt-14" id="ctAplicarWrap" style="display:none;">
         <button class="btn primary" id="btnCtAplicar" onclick="contadoresAplicar()">✅ Corrigir contadores</button>
+      </div>
+      <div class="row-btns mt-14" id="ctDupWrap" style="display:none;">
+        <button class="btn danger" id="btnCtDuplicadas" onclick="duplicadasRemover()">🧹 Remover matrículas ativas duplicadas</button>
       </div>
       <div class="console" id="logContadores" style="display:none;"></div>
     </div>
@@ -355,7 +358,7 @@ document.addEventListener('auth:ready', async function () {
       'btnExportJSON', 'lblImportJSON',
       'btnBuscarAluno', 'btnExcluirAluno',
       'btnBuscarTurma', 'btnExcluirTurma',
-      'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar'
+      'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar', 'btnCtDuplicadas'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
@@ -370,6 +373,7 @@ document.addEventListener('auth:ready', async function () {
     window.migracaoAplicar          = () => {};
     window.contadoresVerificar      = () => {};
     window.contadoresAplicar        = () => {};
+    window.duplicadasRemover        = () => {};
   }
 
   try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
@@ -693,50 +697,83 @@ async function migracaoAplicar() {
 /* =============================================
    CONTADORES DAS TURMAS (qtdAlunos / qtdIntegral)
 ============================================= */
-let _CT = null;   // { difs, total, ano }
+let _CT = null;   // { difs, dups, total, ano, nomes }
+// Mesmas regras da pesquisa: cada aluno conta UMA vez, na sua matrícula ATIVA mais recente (encerradoEm || criadoEm).
+function _ctTs(m) {
+  const t = m.encerradoEm || m.criadoEm || null, d = t ? new Date(t) : null;
+  return d && !isNaN(d) ? d.getTime() : 0;
+}
+const _ctCanon = m => m._id === `MAT|${m.turmaId}|${m.alunoId}|${m.anoLetivo}`;
+function _ctCalcular(turmasAno, matsAtivas) {
+  const porAluno = new Map();
+  matsAtivas.forEach(m => {
+    const k = String(m.alunoId || '').trim(); if (!k) return;
+    if (!porAluno.has(k)) porAluno.set(k, []);
+    porAluno.get(k).push(m);
+  });
+  const cont = new Map(turmasAno.map(t => [String(t.turmaId || t._id), { qtd: 0, integral: 0 }]));
+  const dups = [];
+  porAluno.forEach((lista, alunoId) => {
+    const ord = lista.slice().sort((a, b) =>
+      (_ctTs(b) - _ctTs(a)) || ((_ctCanon(b) ? 1 : 0) - (_ctCanon(a) ? 1 : 0)) || ((b.fotoUrl ? 1 : 0) - (a.fotoUrl ? 1 : 0)));
+    const keep = ord[0], c = cont.get(String(keep.turmaId));
+    if (c) { c.qtd++; if (_ehInt(keep.modelo)) c.integral++; }
+    if (ord.length > 1) dups.push({ alunoId, nome: keep.nome || '', keep, remove: ord.slice(1), empate: _ctTs(ord[1]) === _ctTs(keep) });
+  });
+  return { cont, dups };
+}
+
 async function contadoresVerificar() {
   if (!IS_ADMIN || !escolaSelecionada()) return;
   const ok = await _confirmModal({
     titulo: 'Verificar contadores',
-    corpo: 'Lê as turmas do ano ativo e as matrículas ATIVAS de cada uma (1 leitura por aluno ativo).\n\nNada é gravado nesta etapa.',
+    corpo: 'Lê as turmas e as matrículas ATIVAS do ano ativo (1 leitura por matrícula ativa).\n\nCada aluno é contado uma vez, na matrícula ativa mais recente, igual à pesquisa. Duplicidades são listadas. Nada é gravado nesta etapa.',
     textoConfirmar: 'Verificar',
   });
   if (!ok) return;
   const btn = document.getElementById('btnCtVerificar');
   btn.disabled = true; _CT = null;
   clearLogEl('logContadores');
-  document.getElementById('ctPreview').style.display = 'none';
-  document.getElementById('ctAplicarWrap').style.display = 'none';
+  ['ctPreview', 'ctAplicarWrap', 'ctDupWrap'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   try {
     setMsg('Conferindo contadores…', 'loading');
     const ano = gaAnoAtivoDe(await window.DB.escola.get());
     const turmas = (await window.DB.anoAtivoTurmas.list()).filter(t => String(t.anoLetivo).trim() === String(ano));
-    const linhas = [];
-    for (let i = 0; i < turmas.length; i += 10) {
-      await Promise.all(turmas.slice(i, i + 10).map(async t => {
-        const tid = t.turmaId || t._id;
-        const r = await window.DB.anoAtivoMatriculas.whereEquals('turmaId', tid, { and: [['status', 'ATIVO']] });
-        const ativas = r.filter(m => String(m.anoLetivo).trim() === String(ano));
-        linhas.push({ id: t._id || tid, nome: t.nome || tid, qtd: ativas.length, integral: ativas.filter(m => _ehInt(m.modelo)).length,
-          qtdAtual: t.qtdAlunos, integralAtual: t.qtdIntegral });
-      }));
-    }
+    // anoLetivo pode estar como número ou texto: as duas consultas leem só matrículas ATIVAS do ano
+    const lidas = (await Promise.all([ano, String(ano)].map(av =>
+      window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, { and: [['status', 'ATIVO']] })))).flat();
+    const unicas = Array.from(new Map(lidas.map(m => [m._id, m])).values());
+    const { cont, dups } = _ctCalcular(turmas, unicas);
+    const linhas = turmas.map(t => {
+      const tid = String(t.turmaId || t._id), c = cont.get(tid);
+      return { id: t._id || tid, nome: t.nome || tid, qtd: c.qtd, integral: c.integral, qtdAtual: t.qtdAlunos, integralAtual: t.qtdIntegral };
+    });
     const difs = linhas.filter(l => l.qtdAtual !== l.qtd || l.integralAtual !== l.integral)
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
-    _CT = { difs, total: linhas.length, ano };
+    const nomes = new Map(turmas.map(t => [String(t.turmaId || t._id), t.nome || t.turmaId || t._id]));
+    _CT = { difs, dups, total: linhas.length, ano, nomes };
     const fmt = (q, i) => (q === undefined ? '—' : q) + ' / ' + (i === undefined ? '—' : i);
+    const nT = id => esc(nomes.get(String(id)) || id);
     const el = document.getElementById('ctPreview');
     el.innerHTML =
       `<div class="stats-row">` +
       `<div class="stat-box"><div class="stat-num">${linhas.length}</div><div class="stat-lbl">turmas de ${ano} conferidas</div></div>` +
-      `<div class="stat-box"><div class="stat-num">${difs.length}</div><div class="stat-lbl">com divergência</div></div></div>` +
+      `<div class="stat-box"><div class="stat-num">${difs.length}</div><div class="stat-lbl">com divergência</div></div>` +
+      `<div class="stat-box"><div class="stat-num">${dups.length}</div><div class="stat-lbl">alunos com matrícula ativa duplicada</div></div></div>` +
       (difs.length
         ? `<div class="preview-scroll"><table><thead><tr><th>Turma</th><th>Contador (alunos / integral)</th><th>Real (alunos / integral)</th></tr></thead><tbody>` +
           difs.map(d => `<tr><td>${esc(d.nome)}</td><td>${fmt(d.qtdAtual, d.integralAtual)}</td><td>${fmt(d.qtd, d.integral)}</td></tr>`).join('') + `</tbody></table></div>`
-        : `<div class="muted mt-8">✅ Todos os contadores estão corretos.</div>`);
+        : `<div class="muted mt-8">✅ Todos os contadores estão corretos.</div>`) +
+      (dups.length
+        ? `<div class="aviso-warn mt-12 mb-0">⚠️ ${dups.length} aluno(s) têm mais de uma matrícula ATIVA no ano (na mesma turma ou em turmas diferentes). A contagem acima já conta cada um uma vez; remova as extras para não distorcer outras telas.</div>` +
+          `<div class="preview-scroll"><table><thead><tr><th>Aluno</th><th>Fica</th><th>Remove</th></tr></thead><tbody>` +
+          dups.slice(0, 80).map(d => `<tr><td>${esc(d.nome || d.alunoId)}</td><td>${nT(d.keep.turmaId)}</td><td>${d.remove.map(r => nT(r.turmaId)).join(', ')}${d.empate ? ' <span class="badge neutral">sem data p/ decidir</span>' : ''}</td></tr>`).join('') +
+          `</tbody></table>${dups.length > 80 ? `<div class="muted">… e mais ${dups.length - 80} aluno(s).</div>` : ''}</div>`
+        : '');
     el.style.display = 'block';
     document.getElementById('ctAplicarWrap').style.display = difs.length ? 'flex' : 'none';
-    setMsg(difs.length ? 'Verificação concluída. Confira e corrija.' : 'Todos os contadores estão corretos.', 'ok');
+    document.getElementById('ctDupWrap').style.display = dups.length ? 'flex' : 'none';
+    setMsg(difs.length || dups.length ? 'Verificação concluída. Confira o resultado.' : 'Tudo certo: contadores corretos e sem duplicidades.', 'ok');
   } catch (e) {
     logEl('❌ Erro na verificação: ' + e.message, 'logContadores');
     setMsg('Erro na verificação: ' + e.message, 'err');
@@ -760,12 +797,42 @@ async function contadoresAplicar() {
     for (let i = 0; i < ops.length; i += 400) await window.DB.batchWrite(ops.slice(i, i + 400));
     logEl(`🎉 ${n} turma(s) corrigida(s).`, 'logContadores');
     setMsg('Contadores corrigidos!', 'ok');
-    _CT = null;
-    document.getElementById('ctPreview').style.display = 'none';
+    _CT.difs = [];
     document.getElementById('ctAplicarWrap').style.display = 'none';
   } catch (e) {
     logEl('❌ Erro ao gravar: ' + e.message, 'logContadores');
     setMsg('Erro ao gravar: ' + e.message, 'err');
+  } finally { btn.disabled = false; }
+}
+
+// Para cada aluno fica só a matrícula ATIVA atual; as outras são apagadas (mesma regra da "trocar de turma", que apaga a antiga).
+async function duplicadasRemover() {
+  if (!IS_ADMIN || !_CT || !_CT.dups.length) return;
+  const alunos = _CT.dups.length, extras = _CT.dups.reduce((s, d) => s + d.remove.length, 0);
+  const ok = await _confirmModal({
+    titulo: '⚠️ Remover matrículas duplicadas', corDestaque: 'danger',
+    corpo: `Apagar ${extras} matrícula(s) ativa(s) extra(s) de ${alunos} aluno(s)?\n\nPara cada aluno fica só a matrícula ativa mais recente (se faltar data, a de ID padrão). A foto é preservada na que fica.\n\nEsta ação NÃO PODE ser desfeita. Os contadores já foram calculados sem as extras.`,
+    textoConfirmar: 'Sim, remover',
+  });
+  if (!ok) return;
+  const btn = document.getElementById('btnCtDuplicadas');
+  btn.disabled = true;
+  try {
+    setMsg('Removendo duplicadas…', 'loading');
+    const ops = [];
+    _CT.dups.forEach(d => {
+      d.remove.forEach(r => ops.push({ col: 'anoAtivoMatriculas', op: 'delete', id: r._id }));
+      const comFoto = d.remove.find(r => r.fotoUrl);
+      if (!d.keep.fotoUrl && comFoto) ops.push({ col: 'anoAtivoMatriculas', op: 'update', id: d.keep._id, data: { fotoUrl: comFoto.fotoUrl, fotoFileId: comFoto.fotoFileId || null } });
+    });
+    for (let i = 0; i < ops.length; i += 400) await window.DB.batchWrite(ops.slice(i, i + 400));
+    logEl(`🎉 ${extras} matrícula(s) extra(s) removida(s) de ${alunos} aluno(s). Rode Verificar de novo para conferir.`, 'logContadores');
+    setMsg('Duplicadas removidas!', 'ok');
+    _CT.dups = [];
+    document.getElementById('ctDupWrap').style.display = 'none';
+  } catch (e) {
+    logEl('❌ Erro ao remover: ' + e.message, 'logContadores');
+    setMsg('Erro ao remover: ' + e.message, 'err');
   } finally { btn.disabled = false; }
 }
 
