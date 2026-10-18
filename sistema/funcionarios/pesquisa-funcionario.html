@@ -28,175 +28,107 @@
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/components.css">
-<link rel="stylesheet" href="/css/pesquisa-funcionario.css?v=4">
 
 <style>
-/* ── Aliases de marca (par claro/escuro) — mesmos nomes do cadastro-funcionario ──
-   var(--primary, #7c3aed) não existe no sistema (caía sempre no roxo fixo). */
-:root{
-  --pf-brand:var(--brand,#7c3aed);
-  --pf-brand-text:var(--brand-text,#6d28d9);
-  --pf-brand-faded:var(--brand-faded,#f5f3ff);
-  --pf-brand-border:var(--brand-border,#ddd6fe);
-}
-html[data-theme="dark"]{
-  --pf-brand:var(--brand-d,#8b5cf6);
-  --pf-brand-text:var(--brand-text-d,#c4b5fd);
-  --pf-brand-faded:var(--brand-faded-d,rgba(124,58,237,.18));
-  --pf-brand-border:var(--brand-border-d,#7c3aed);
-}
+/* Prefixo de variáveis desta página: pf- (pesquisa-funcionario). Hoje não há variável própria.
+   Card de destaque, botões, campos, chip (.badge), tooltip, popover/dropdown, modal, toast e .check são GLOBAIS:
+   aqui só layout e o que é exclusivo da página. O CSS externo desta página deixou de ser usado. */
 
-/* ── Card de destaque (guia, Parte 1.3b) — contraste vem de ThemeColors.ajustarContraste() ── */
-.card.card-destaque{
-  --dest-fg:#ffffff;
-  --dest-btn-bg:rgba(255,255,255,.18);
-  --dest-btn-bd:rgba(255,255,255,.40);
-  --dest-btn-hover:rgba(255,255,255,.28);
-  --dest-panel-bg:rgba(255,255,255,.10);
-  background:var(--btn-home-bg); border-color:var(--btn-home-border);
-}
-html[data-theme="dark"] .card.card-destaque{ background:var(--btn-home-bg); border-color:var(--btn-home-border); }
-.card.card-destaque.contraste-claro{
-  --dest-fg:#0f172a;
-  --dest-btn-bg:rgba(0,0,0,.08);
-  --dest-btn-bd:rgba(0,0,0,.25);
-  --dest-btn-hover:rgba(0,0,0,.16);
-  --dest-panel-bg:rgba(0,0,0,.06);
-  border-color:var(--border);
-}
-.card.card-destaque h2{ color:var(--dest-fg); }
-/* só o rótulo direto do campo: os <label> dentro dos chips de turno herdam a cor do chip */
-.card-destaque .field > label{ color:var(--dest-fg); }
-.card.card-destaque .btn.primary{ background:var(--dest-btn-bg); border:1.5px solid var(--dest-fg); color:var(--dest-fg); font-weight:800; }
-.card.card-destaque .btn.primary:hover:not(:disabled){ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
-.card.card-destaque .btn.secondary, .card.card-destaque .btn.ghost{ background:transparent; border:1.5px solid var(--dest-btn-bd); color:var(--dest-fg); }
-.card.card-destaque .btn.secondary:hover:not(:disabled), .card.card-destaque .btn.ghost:hover:not(:disabled){ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
-.card.card-destaque .btn:disabled, .card.card-destaque .btn:disabled:hover{
-  background:rgba(128,128,128,.28); border:1.5px solid rgba(128,128,128,.5); color:#6b7280; opacity:1; cursor:not-allowed; filter:none; box-shadow:none;
-}
-/* Chips de turno dentro do destaque: o "marcado" antes era só uma borda --brand (some contra o próprio card).
-   Agora: contorno translúcido; marcado = preenchimento sólido com o texto na cor do card (par calculado). */
-.card.card-destaque .turno-checkbox-wrap{ background:transparent; border-color:var(--dest-btn-bd); color:var(--dest-fg); }
-.card.card-destaque .turno-checkbox-wrap:hover{ background:var(--dest-btn-hover); border-color:var(--dest-fg); color:var(--dest-fg); }
-.card.card-destaque .turno-checkbox-wrap.checked{ background:var(--dest-fg); border-color:var(--dest-fg); color:var(--btn-home-bg); }
-.card.card-destaque .turno-checkbox-wrap.checked input[type="checkbox"]{ accent-color:var(--btn-home-bg); }
-/* Chip de aviso dos turnos: o padrão (--chip-bg) ficava da cor do body no claro e da cor do card no escuro */
-.card.card-destaque #turnoHint{ background:var(--dest-panel-bg); border:1px solid var(--dest-btn-bd); color:var(--dest-fg); }
-.ano-erro{ margin-top:6px; font-size:12px; font-weight:700; color:var(--dest-fg); }
+/* ── Layout ── */
+.wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
+.muted  { color: var(--ui-muted); }
+.col-todo { grid-column: 1 / -1; }
 
-/* ── Ícone de dica (ⓘ) — tooltip por toque/clique (guia, Parte 2) ── */
-.info-tip{
-  position:relative; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; margin-left:6px; border-radius:50%;
-  border:1.5px solid currentColor; color:inherit; opacity:.72;
-  font-size:11px; font-weight:700; font-style:italic; font-family:Georgia, "Times New Roman", serif;
-  line-height:1; cursor:pointer; user-select:none; vertical-align:middle;
-}
-.info-tip:hover, .info-tip.open{ opacity:1; background:rgba(127,127,127,.18); }
-.info-tip-bubble{
-  display:none; position:absolute; z-index:60; left:0; top:calc(100% + 8px);
-  width:min(260px, 70vw); max-height:180px; overflow-y:auto; padding:10px 12px; border-radius:10px;
-  background:var(--card); border:1.5px solid var(--border); color:var(--text);
-  box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:13px; font-weight:400; font-style:normal; line-height:1.4;
-  white-space:normal; cursor:default; text-align:left; text-transform:none; letter-spacing:normal;
-}
-.info-tip.open .info-tip-bubble{ display:block; }
+/* ── Card de filtros (destaque global): só layout ── */
+.ano-row    { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+.ano-field  { width: 220px; flex: 0 0 220px; margin: 0; }
+.ano-field select { width: 100%; }
+.ano-erro   { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--dest-fg); }
+.filters-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media(max-width:980px){ .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width:600px){ .filters-grid { grid-template-columns: 1fr; } }
+.bloco-turno { margin-top: 16px; }
+.lbl-turno   { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--dest-fg); opacity: .85; text-transform: uppercase; letter-spacing: .4px; }
+.turnos-row  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 
-/* ── Contador de resultados: badge com destaque (substitui o log "X funcionário(s) encontrado(s)") ── */
-#countFuncionarios{
-  font-size:14px; font-weight:800; padding:5px 14px;
-  background:var(--pf-brand); border-color:var(--pf-brand); color:var(--brand-fg,#fff);
-}
+/* Chip marcável de turno (receita do guia 4.5): desmarcado = contorno translúcido; marcado = preenchimento sólido --dest-fg */
+.turno-checkbox-wrap { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-text); font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; transition: background .15s, border-color .15s, color .15s; }
+.turno-checkbox-wrap input { margin: 0; cursor: pointer; }
+.turno-checkbox-wrap label { margin: 0; color: inherit; font-size: inherit; font-weight: inherit; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.card-destaque .turno-checkbox-wrap { background: transparent; border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+.card-destaque .turno-checkbox-wrap:hover { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
+.card-destaque .turno-checkbox-wrap.checked { background: var(--dest-fg); border-color: var(--dest-fg); color: var(--btn-home-bg); }
+.card-destaque .turno-checkbox-wrap.checked input[type="checkbox"] { accent-color: var(--btn-home-bg); }
+#turnoHint { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); color: var(--ui-chip-color); }
+.card-destaque #turnoHint { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
 
-/* ══ Padrão de exibição do sistema — adaptado de pesquisa-ano-ativo ══ */
-
-/* ── Painel único (sem "turma", diferente do aluno) ── */
-.panel         { background: var(--card-bg, var(--card)); border: 1px solid var(--card-border, var(--border)); border-radius: 14px; box-shadow: var(--shadow, 0 4px 20px rgba(0,0,0,0.06)); padding: 16px; margin-top: 16px; }
+/* ── Painel de resultados ── */
 .panel-head    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.panel h2      { font-size: 17px; margin: 0; font-weight: 800; }
-.count         { background: var(--chip-bg); border: 1px solid var(--line, var(--border)); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--chip-color, var(--text)); font-weight: 700; }
-.panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.titulo-painel { display: flex; align-items: center; gap: 10px; }
+.panel-head h2 { font-size: 17px; margin: 0; font-weight: 800; }
+.count         { background: var(--ui-chip-bg); border: 1px solid var(--ui-border); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--ui-chip-color); font-weight: 700; }
+/* Contador de resultados em destaque (não é .badge: é o número da tela) */
+#countFuncionarios { font-size: 14px; font-weight: 800; padding: 5px 14px; background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
+.count-selecionados { background: var(--ui-brand-faded); border-color: var(--ui-brand-border); color: var(--ui-brand-text); }
+.panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
+.check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); font-weight: 700; cursor: pointer; }
 .list          { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media(max-width:860px){ .list { grid-template-columns: 1fr; } }
-.loading       { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.loading       { font-size: 12px; color: var(--ui-muted); margin-top: 8px; }
 
-/* ── Cards de item (um por funcionário) ── */
-.item        { border: 1px solid var(--card-border, var(--border)); border-radius: 10px; padding: 14px; background: var(--card-bg, var(--card)); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; transition: background .2s, border-color .2s; }
+/* ── Ordenação ── */
+.sort-control  { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); border-radius: 10px; }
+.sort-control .lbl { margin: 0; white-space: nowrap; }
+.sort-control .input { flex: 1; }
+
+/* ── Sub-card (um por funcionário; definição local, igual à pesquisa-ano-ativo) ── */
+.item        { border: 1px solid var(--ui-border); border-radius: 10px; padding: 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .item .left  { min-width: 0; flex: 1; }
-.item .right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
-/* Sempre 3 blocos empilhados: nome / badges / meta-dados — não depende da largura */
-.item .title    { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 14px; }
-.item .nome     { font-weight: 800; }
-.item .badges   { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
-.item .badges .badge { margin: 0; }
-/* CPF: neutro (cinza do tema), pra se distinguir do badge de cargo, que é tingido de marca */
-.item .badge.badge-cpf { background: color-mix(in srgb, var(--text) 8%, transparent); border-color: color-mix(in srgb, var(--text) 24%, transparent); color: var(--text); }
-.item .meta-i { white-space: nowrap; }
-/* Botões do card: mesma largura, empilhados */
-.item .right { align-items: stretch; min-width: 112px; }
+.item .right { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-shrink: 0; min-width: 112px; }
 .item .right .btn { justify-content: center; }
-.item .right .check { justify-content: center; }
-.item .meta  { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+/* Sempre 3 blocos empilhados: nome / badges / meta-dados — não depende da largura */
+.item .title  { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 14px; }
+.item .nome   { font-weight: 800; }
+.item .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
+.item .meta   { margin-top: 6px; color: var(--ui-muted); font-size: 12px; line-height: 1.35; }
+.item .meta-i { white-space: nowrap; }
+input[type="checkbox"] { accent-color: var(--ui-brand); }   /* accent-color segue local (guia D6) */
 
-/* ── Seleção do card inteiro (checkbox oculto) — mesmo padrão do módulo de aluno ── */
+/* Seleção pelo card inteiro (a checkbox continua existindo, escondida) */
 .item.selecionavel { cursor: pointer; position: relative; }
 .item.selecionavel .check { display: none; }
-.item.selecionavel:has(.chkFuncionario:checked) {
-  background: var(--brand-faded);
-  border-color: var(--brand-hover, var(--brand-border));
-}
-html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
-  background: var(--brand-faded-d);
-  border-color: var(--brand-border-d);
-}
+.item.selecionavel:has(.chkFuncionario:checked) { background: var(--ui-brand-faded); border-color: var(--ui-brand); }
 .item.selecionavel .selo-selecionado {
-  display: none;
-  position: absolute; bottom: 10px; right: 10px;
+  display: none; position: absolute; bottom: 10px; right: 10px;
   width: 22px; height: 22px; border-radius: 50%;
-  background: var(--pf-brand); color: var(--brand-fg, #fff);
+  background: var(--ui-brand); color: var(--ui-brand-fg);
   align-items: center; justify-content: center;
   font-size: 12px; font-weight: 900; line-height: 1;
 }
 .item.selecionavel:has(.chkFuncionario:checked) .selo-selecionado { display: flex; }
-.check           { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
-.check input     { cursor: pointer; accent-color: var(--pf-brand); width: 18px; height: 18px; margin: 0; }
-.check-all       { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 700; cursor: pointer; }
-.check-all input { cursor: pointer; accent-color: var(--pf-brand); }
-.count-selecionados { background: var(--pf-brand-faded); border: 1px solid var(--pf-brand-border); color: var(--pf-brand-text); }
 
-/* ── Ordenação ── */
-.sort-control        { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--chip-bg); border: 1px solid var(--card-border, var(--border)); border-radius: 10px; }
-.sort-control label  { font-size: 13px; font-weight: 700; color: var(--chip-color, var(--text)); white-space: nowrap; }
-.sort-control select { flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--field-border, var(--border)); background: var(--field-bg, var(--card)); color: var(--text); font-size: 13px; font-family: 'Nunito', sans-serif; cursor: pointer; outline: none; }
-.sort-control select:focus { border-color: var(--pf-brand); }
-.sort-control button { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--card-border, var(--border)); background: var(--chip-bg); color: var(--chip-color, var(--text)); font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; transition: all .18s; }
-.sort-control button:hover { background: var(--pf-brand); border-color: var(--pf-brand); color: var(--brand-fg, #fff); }
+/* ── Modal (esqueleto global; aqui só o tamanho) ── */
+#modalBackdrop .modal { --modal-w: 900px; }
+body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atrás do modal */
 
-/* ── Botões do card de funcionário: agora são .btn.small do sistema.
-   Editar = .btn.secondary (tingido de marca, hover já tem par escuro); Visualizar = .btn.neutral ── */
-.btn.neutral { background: transparent; border-color: var(--border); color: var(--text); }
-.btn.neutral:hover { background: var(--pf-brand-faded); border-color: var(--pf-brand); color: var(--pf-brand-text); }
-.link-doc-ver { font-size: 12px; font-weight: 800; color: var(--pf-brand-text); text-decoration: none; }
-.link-doc-ver:hover { text-decoration: underline; }
-
-/* ── Badge de vínculo — cores por status ── */
-.badge-status.ce { background: rgba(234,179,8,.10);  border-color: rgba(234,179,8,.35);  color: #854d0e; }
-.badge-status.ps { background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.35); color: #1d4ed8; }
-.badge-status.ef { background: rgba(22,163,74,.10);  border-color: rgba(22,163,74,.30);  color: #166534; }
-
-/* ── Modal (ficha do funcionário) ── */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 1000; /* acima do header */ }
-.modal-backdrop.open { display: flex; }
-.modal          { width: min(900px, 96vw); max-height: 86vh; overflow: auto; background: var(--card-bg, var(--card)); border-radius: 14px; border: 1px solid var(--card-border, var(--border)); box-shadow: 0 30px 60px rgba(0,0,0,.25); }
-.modal-head     { position: sticky; top: 0; background: var(--card-bg, var(--card)); display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border, var(--border)); }
-.modal-head h3  { margin: 0; font-size: 16px; font-weight: 800; }
-.modal-body     { padding: 14px; }
-
-/* ── Ficha (modal): blocos de formação e NEE ── */
-.ficha-sub{font-size:11px;font-weight:800;color:var(--ui-muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px;}
-.ficha-chips{display:flex;flex-wrap:wrap;gap:6px;}
-.ficha-linha{font-size:13px;}
-.ficha-vazio{font-size:13px;color:var(--ui-muted);}
+/* ── Conteúdo do modal: ficha do funcionário ── */
+.foto-ficha       { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--ui-border); }
+.foto-ficha.vazia { background: var(--ui-chip-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.ficha-cab   { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-chip-bg); display: flex; align-items: center; gap: 12px; }
+.ficha-grid  { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ficha-campo { padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px; }
+.ficha-rot   { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .04em; }
+.ficha-val   { font-size: 13px; margin-top: 2px; }
+.ficha-sec   { margin-top: 16px; }
+.ficha-sec > .ficha-rot { margin-bottom: 6px; }
+.ficha-sub   { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 4px; }
+.ficha-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ficha-linha { font-size: 13px; }
+.ficha-txt, .ficha-vazio { font-size: 13px; color: var(--ui-muted); }
+.ficha-erro  { font-size: 13px; color: var(--ui-danger-fg); }
+.doc-linha   { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--ui-border); }
+.doc-linha .doc-nome { flex: 1; font-size: 13px; }
 </style>
 
 <!-- ══ Bibliotecas de Exportação (PDF / DOCX) ══ -->
@@ -223,11 +155,11 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     </div>
 
     <!-- Ano Ativo -->
-    <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;">
-      <div class="field" style="width:220px;flex:0 0 220px;margin:0;">
-        <label for="selectAnoAtivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Mostra os funcionários cadastrados no ano letivo escolhido. Ao abrir a página, o ano ativo definido pelo administrador já vem selecionado. Para consultar outro ano, escolha-o na lista, que traz os anos que possuem funcionários cadastrados.</span></span></label>
-        <select id="selectAnoAtivo" style="width:100%;"></select>
-        <div class="ano-erro" id="anoAtivoMsg" style="display:none;"></div>
+    <div class="ano-row">
+      <div class="field ano-field">
+        <label for="selectAnoAtivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Mostra os funcionários cadastrados no ano letivo escolhido. Ao abrir a página, o ano ativo definido pelo administrador já vem selecionado. Para consultar outro ano, escolha-o na lista, que traz os anos que possuem funcionários cadastrados.</span></span></label>
+        <select id="selectAnoAtivo"></select>
+        <div class="ano-erro" id="anoAtivoMsg" hidden></div>
       </div>
     </div>
 
@@ -264,8 +196,8 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     </div>
 
     <!-- Filtro de Turnos -->
-    <div style="margin-top:16px;">
-      <label style="display:block;font-size:12px;font-weight:700;margin-bottom:8px;color:var(--dest-fg);opacity:.85;text-transform:uppercase;letter-spacing:0.4px;">Turno</label>
+    <div class="bloco-turno">
+      <span class="lbl-turno">Turno</span>
       <div class="turnos-row">
         <label class="turno-checkbox-wrap" id="lblFMat">
           <input type="checkbox" id="fMat" value="MAT"/>
@@ -284,22 +216,22 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     </div>
 
     <!-- Ação: Limpar Filtros -->
-    <div class="filter-actions" style="margin-top:16px;">
-      <button class="btn ghost" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
+    <div class="filter-actions">
+      <button class="btn secondary" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
     </div>
   </section>
 
   <!-- ══════════════════════════════════════════
        PAINEL: Resultados (cards, padrão do sistema)
   ══════════════════════════════════════════ -->
-  <div class="panel">
+  <div class="card">
     <div class="panel-head">
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="titulo-painel">
         <h2>Funcionários</h2><span class="count" id="countFuncionarios">0</span>
       </div>
       <div class="panel-actions">
         <label class="check-all"><input type="checkbox" id="chkAllFuncionarios"> Todos</label>
-        <span class="count count-selecionados" id="countSelecionados" style="display:none;">0 selecionado(s)</span>
+        <span class="count count-selecionados" id="countSelecionados" hidden>0 selecionado(s)</span>
         <div class="rel-inline" id="wrapExportFuncionarios">
           <button class="btn primary" id="btnExportarFuncionarios" type="button" data-dropdown="dropExportFuncionarios" aria-haspopup="menu" aria-expanded="false">Exportar ▾</button>
           <!-- Dropdown no padrão global (.popover.menu): abrir/fechar é a delegação [data-dropdown] do script global abaixo -->
@@ -315,19 +247,19 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
     </div>
 
     <div class="sort-control">
-      <label>Ordenar por:</label>
-      <select id="sortField">
+      <label class="lbl" for="sortField">Ordenar por:</label>
+      <select class="input" id="sortField">
         <option value="nome">Nome</option>
         <option value="funcao">Função</option>
         <option value="cargaHoraria">Carga horária</option>
         <option value="_idade">Idade</option>
         <option value="status">Vínculo</option>
       </select>
-      <button type="button" id="btnToggleSort" title="Alternar ordem">↑↓</button>
+      <button type="button" class="btn secondary small" id="btnToggleSort" title="Alternar ordem">↑↓</button>
     </div>
 
     <div class="list" id="listaFuncionarios"></div>
-    <div class="loading" id="loadingFuncionarios" style="display:none;">Carregando...</div>
+    <div class="loading" id="loadingFuncionarios" hidden>Carregando...</div>
   </div>
 
 </main>
@@ -335,11 +267,11 @@ html[data-theme="dark"] .item.selecionavel:has(.chkFuncionario:checked) {
 <!-- ══════════════════════════════════════════
      MODAL: Ficha do funcionário
 ══════════════════════════════════════════ -->
-<div class="modal-backdrop" id="modalBackdrop">
-  <div class="modal">
+<div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+  <div class="modal scroll-body">
     <div class="modal-head">
       <h3 id="modalTitle">Ficha</h3>
-      <button class="btn ghost small" id="btnFecharModal" type="button">✕ Fechar</button>
+      <button class="btn secondary small" id="btnFecharModal" type="button">Fechar</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -608,7 +540,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     }catch(e){
       console.warn('carregarAnoAtivo:', e);
       anoAtivoMsg.textContent = '⚠️ Não foi possível carregar o ano ativo.';
-      anoAtivoMsg.style.display = 'block';
+      anoAtivoMsg.hidden = false;
     }
   }
 
@@ -650,7 +582,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
         throw new Error('db.firebase.js desatualizado: falta a coleção funcionariosMatriculas.');
       }
       if(!_cacheAno.has(chave)){
-        if(elLoading) elLoading.style.display = 'block';
+        if(elLoading) elLoading.hidden = false;
         const buscar = () => ano
           ? window.DB.funcionariosMatriculas.whereEquals('anoLetivo', Number(ano))
           : window.DB.funcionariosMatriculas.list();
@@ -670,7 +602,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
       erroCarga = (e && e.message) ? e.message : String(e);
       funcionarios = [];
     }finally{
-      if(elLoading) elLoading.style.display = 'none';
+      if(elLoading) elLoading.hidden = true;
     }
   }
 
@@ -866,7 +798,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     countEl.textContent = filtrados.length;
 
     if(!filtrados.length){
-      lista.innerHTML = '<div class="muted" style="grid-column:1/-1;">' + mensagemVazio() + '</div>';
+      lista.innerHTML = '<div class="muted col-todo">' + mensagemVazio() + '</div>';
       syncCheckAllFuncionarios();
       atualizarContadorSelecionados();
       return;
@@ -898,7 +830,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
             <span class="nome">${highlight(f.nome, query) || 'Sem nome'}</span>
             <div class="badges">
               <span class="badge">${highlight(f.funcao, query) || 'Sem função'}</span>
-              <span class="badge badge-cpf">CPF: ${highlight(f.cpf, query)}</span>
+              <span class="badge gray">CPF: ${highlight(f.cpf, query)}</span>
             </div>
           </div>
           <div class="meta">${meta}</div>
@@ -964,7 +896,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   function atualizarContadorSelecionados(){
     const n = document.querySelectorAll('.chkFuncionario:checked').length;
     countSelecionadosEl.textContent = `${n} selecionado(s)`;
-    countSelecionadosEl.style.display = n > 0 ? 'inline-block' : 'none';
+    countSelecionadosEl.hidden = !(n > 0);
   }
 
   chkAllFuncionarios.addEventListener('change', function(){
@@ -1083,11 +1015,11 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     const idade = calcAge(f.dataNascimento) || '—';
 
     const fotoHtml = f.fotoUrl
-      ? `<img src="${escapeHtml(f.fotoUrl)}" alt="Foto do funcionário" style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--card-border,var(--border));" onerror="this.replaceWith(Object.assign(document.createElement('div'),{innerHTML:'🧑',style:'width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--card-border,var(--border));'}))">`
-      : `<div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;background:var(--chip-bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--card-border,var(--border));">🧑</div>`;
+      ? `<img class="foto-ficha" src="${escapeHtml(f.fotoUrl)}" alt="Foto do funcionário" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'foto-ficha vazia',textContent:'🧑'}))">`
+      : `<div class="foto-ficha vazia">🧑</div>`;
 
     const cabecalho = `
-      <div style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--card-border,var(--border));border-radius:10px;background:var(--chip-bg);display:flex;align-items:center;gap:12px;">
+      <div class="ficha-cab">
         ${fotoHtml}
         <div>
           <b>${escapeHtml(f.nome || 'Sem nome')}</b> &nbsp;•&nbsp; ID: ${escapeHtml(f.funcId||'—')}
@@ -1106,26 +1038,26 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
       ['Escolaridade', ESCOLARIDADE_LABEL[f.escolaridade] || f.escolaridade],
     ];
     const campos = camposBasicos.map(([label, v]) => `
-      <div style="padding:8px 10px;border:1px solid var(--card-border,var(--border));border-radius:8px;">
-        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(label)}</div>
-        <div style="font-size:13px;margin-top:2px;">${escapeHtml(String(v || '—'))}</div>
+      <div class="ficha-campo">
+        <div class="ficha-rot">${escapeHtml(label)}</div>
+        <div class="ficha-val">${escapeHtml(String(v || '—'))}</div>
       </div>`).join('');
 
     const docsPlaceholderId = `docsFicha_${matId.replace(/[^a-zA-Z0-9_-]/g,'')}`;
 
     const rows = `${cabecalho}
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">${campos}</div>
-      <div style="margin-top:16px;">
-        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">NEE / Deficiência</div>
+      <div class="ficha-grid">${campos}</div>
+      <div class="ficha-sec">
+        <div class="ficha-rot">NEE / Deficiência</div>
         ${montarNeeDetalhado(f)}
       </div>
-      <div style="margin-top:16px;">
-        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Formação</div>
+      <div class="ficha-sec">
+        <div class="ficha-rot">Formação</div>
         ${montarFormacao(f)}
       </div>
-      <div style="margin-top:16px;">
-        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Documentos</div>
-        <div id="${docsPlaceholderId}" style="font-size:13px;color:var(--muted);">Carregando documentos…</div>
+      <div class="ficha-sec">
+        <div class="ficha-rot">Documentos</div>
+        <div id="${docsPlaceholderId}" class="ficha-txt">Carregando documentos…</div>
       </div>
     `;
     abrirModal('Ficha do funcionário', rows);
@@ -1141,19 +1073,19 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
       if(!resp.ok) throw new Error(data.error || 'Erro ao buscar documentos');
       const files = data.files || [];
       if(!files.length){
-        el.innerHTML = `<div style="font-size:13px;color:var(--muted);">Nenhum documento anexado</div>`;
+        el.innerHTML = `<div class="ficha-txt">Nenhum documento anexado</div>`;
         return;
       }
       el.innerHTML = files.map(f => {
         const icon = (f.mimeType||'').startsWith('image/') ? '🖼️' : '📄';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--card-border,var(--border));">
+        return `<div class="doc-linha">
           <span>${icon}</span>
-          <span style="flex:1;font-size:13px;">${escapeHtml(f.label||f.fileName)}</span>
-          <a href="${f.webViewLink}" target="_blank" rel="noopener" class="link-doc-ver">👁️ Ver</a>
+          <span class="doc-nome">${escapeHtml(f.label||f.fileName)}</span>
+          <a class="btn secondary small" href="${f.webViewLink}" target="_blank" rel="noopener">👁️ Ver</a>
         </div>`;
       }).join('');
     }catch(e){
-      el.innerHTML = `<div style="font-size:13px;color:#b91c1c;">Erro ao carregar documentos.</div>`;
+      el.innerHTML = `<div class="ficha-erro">Erro ao carregar documentos.</div>`;
     }
   }
 
