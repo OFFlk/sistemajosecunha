@@ -49,10 +49,10 @@
 .busca-field input { width: 100%; }
 @media(max-width:980px){ .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media(max-width:600px){ .filters-grid { grid-template-columns: 1fr; } }
-.bloco-turno { margin-top: 16px; }
+.linha-acoes { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.linha-acoes .bloco-turno { margin: 0 0 0 auto; }
 .lbl-turno   { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--dest-fg); opacity: .85; text-transform: uppercase; letter-spacing: .4px; }
 .turnos-row  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.filter-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 
 /* Chip marcável de turno (receita do guia 4.5): desmarcado = contorno translúcido; marcado = preenchimento sólido --dest-fg */
 .turno-checkbox-wrap { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-text); font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; transition: background .15s, border-color .15s, color .15s; }
@@ -190,7 +190,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       </div>
 
       <div class="rel" id="blocoPesquisaAvancada">
-      <button type="button" class="btn btn-avancada" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
+      <button type="button" class="btn btn-avancada field-h" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
         🔎 Pesquisa avançada
         <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
       </button>
@@ -272,29 +272,28 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       </div>
     </div>
 
-    <!-- Filtro de Turnos -->
-    <div class="bloco-turno">
-      <span class="lbl-turno">Turno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Marcando um turno, aparecem os funcionários que atuam nele (mesmo que atuem em outros também). Marcando dois ou mais, aparecem apenas os que atuam em todos os turnos marcados.</span></span></span>
-      <div class="turnos-row">
-        <label class="turno-checkbox-wrap" id="lblFMat">
-          <input type="checkbox" id="fMat" value="MAT"/>
-          <label for="fMat">🌅 Matutino</label>
-        </label>
-        <label class="turno-checkbox-wrap" id="lblFVes">
-          <input type="checkbox" id="fVes" value="VES"/>
-          <label for="fVes">☀️ Vespertino</label>
-        </label>
-        <label class="turno-checkbox-wrap" id="lblFNot">
-          <input type="checkbox" id="fNot" value="NOT"/>
-          <label for="fNot">🌙 Noturno</label>
-        </label>
-      </div>
-    </div>
-
-    <!-- Ação: Limpar Filtros -->
-    <div class="filter-actions">
+    <!-- Linha 3: Limpar filtros (esquerda) + Turnos (direita).
+         O painel da pesquisa avançada abre à direita, sobre os turnos, e deixa o "Limpar filtros" visível. -->
+    <div class="linha-acoes">
       <button class="btn secondary" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
 
+      <div class="bloco-turno" id="blocoTurno">
+        <span class="lbl-turno">Turno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Marcando um turno, aparecem os funcionários que atuam nele (mesmo que atuem em outros também). Marcando dois ou mais, aparecem apenas os que atuam em todos os turnos marcados.</span></span></span>
+        <div class="turnos-row">
+          <label class="turno-checkbox-wrap" id="lblFMat">
+            <input type="checkbox" id="fMat" value="MAT"/>
+            <label for="fMat">🌅 Matutino</label>
+          </label>
+          <label class="turno-checkbox-wrap" id="lblFVes">
+            <input type="checkbox" id="fVes" value="VES"/>
+            <label for="fVes">☀️ Vespertino</label>
+          </label>
+          <label class="turno-checkbox-wrap" id="lblFNot">
+            <input type="checkbox" id="fNot" value="NOT"/>
+            <label for="fNot">🌙 Noturno</label>
+          </label>
+        </div>
+      </div>
     </div>
   </section>
 
