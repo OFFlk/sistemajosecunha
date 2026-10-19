@@ -2259,14 +2259,30 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   }
   function _setNEE(f){
     // NEE
-    if(f.deficiencia){
-      if(f.deficiencia.possui) setNEE('def', true);
+    const d = f.deficiencia;
+    if(d){
+      const temItem = ['tea','altasHabilidades','defFisica','defIntelectual','defVisual','defAuditiva'].some(k => d[k]);
+      if(d.possui || temItem) setNEE('def', true);   // registro sem "possui" mas com item marcado também abre o painel
       ['tea','altas','fisica','intelectual'].forEach(k => {
         const mapKey = {tea:'tea',altas:'altasHabilidades',fisica:'defFisica',intelectual:'defIntelectual'}[k];
-        if(f.deficiencia[mapKey]){
+        if(d[mapKey]){
           const capK = {tea:'Tea',altas:'Altas',fisica:'Fisica',intelectual:'Intelectual'}[k];
           document.getElementById('chk'+capK).checked = true;
           syncSimple(k, 'item'+capK);
+        }
+      });
+      // Com especificação: visual e auditiva (marca a categoria e o subtipo salvo)
+      [['visual','defVisual','defVisualSub'],['auditiva','defAuditiva','defAuditivaSub']].forEach(([cat, k, sk]) => {
+        if(!d[k]) return;
+        toggleCat(cat, true);
+        const sub = d[sk];
+        if(!sub) return;
+        const radio = Array.from(document.querySelectorAll(`input[name="r${cap(cat)}"]`)).find(r => r.value === sub);
+        if(radio){
+          radio.checked = true;
+          selectSub(cat, sub, radio.closest('.nee-radio-item').textContent.trim());
+        } else {
+          WIZ[cat+'Sub'] = sub;   // valor fora da lista atual: preserva o dado ao salvar
         }
       });
     }
