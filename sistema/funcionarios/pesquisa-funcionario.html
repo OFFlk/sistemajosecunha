@@ -63,6 +63,25 @@
 #turnoHint { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); color: var(--ui-chip-color); }
 .card-destaque #turnoHint { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
 
+
+/* ── Pesquisa avançada (portada de pesquisa-ano-ativo) ── */
+.rel { position: relative; }
+.w-100 { width: 100%; }
+.mt-6 { margin-top: 6px; }
+.btn-avancada { position: relative; flex-shrink: 0; white-space: nowrap; }
+.btn-avancada:hover { filter: brightness(1.07); }
+.cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
+.pop-avancada { top: calc(100% + 6px); left: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
+.pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
+.check.forte  { font-weight: 700; }
+.sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
+.pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.pop-avancada .btn-pesq-av:hover { background: var(--ui-brand-hover) !important; border-color: var(--ui-brand-hover) !important; }
+.card-destaque .pop-avancada .btn.secondary {
+  --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
+  --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
+}
+
 /* ── Painel de resultados ── */
 .panel-head    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .titulo-painel { display: flex; align-items: center; gap: 10px; }
@@ -132,10 +151,9 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 .doc-linha .doc-nome { flex: 1; font-size: 13px; }
 </style>
 
-<!-- ══ Bibliotecas de Exportação (PDF / DOCX) ══ -->
+<!-- ══ Bibliotecas de Exportação (PDF) ══ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5/build/index.umd.min.js"></script>
 
 <title>Pesquisa de Funcionários • Ano Ativo</title>
 </head>
@@ -146,6 +164,8 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
 <!-- ══ MAIN CONTENT ══ -->
 <main class="wrap">
+
+  <div class="aviso-warn" id="avisoSemEscola" hidden>🔒 Escolha uma escola no topo da página para pesquisar funcionários.</div>
 
   <!-- ══════════════════════════════════════════
        CARD: Filtros de Pesquisa
@@ -216,9 +236,65 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       </div>
     </div>
 
-    <!-- Ação: Limpar Filtros -->
+    <!-- Ação: Limpar Filtros + Pesquisa avançada -->
     <div class="filter-actions">
       <button class="btn secondary" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
+
+      <div class="rel" id="blocoPesquisaAvancada">
+        <button type="button" class="btn btn-avancada" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
+          🔎 Pesquisa avançada
+          <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
+        </button>
+
+        <div class="popover pop-avancada" id="painelPesquisaAvancada" hidden>
+          <div>
+            <label class="check forte">
+              <input type="checkbox" id="chkFiltroDef">
+              ♿ Deficiência
+            </label>
+            <div class="sub-filtro" id="subFiltroDef" style="display:none;">
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
+              <label class="check"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
+            </div>
+          </div>
+
+          <div class="pop-div"></div>
+
+          <div>
+            <label class="check forte">
+              <input type="checkbox" id="chkFiltroAee">
+              🏫 Atua na sala do AEE
+            </label>
+          </div>
+
+          <div class="pop-div"></div>
+
+          <div>
+            <label class="lbl" for="selSexoAv">👤 Sexo</label>
+            <select class="input w-100" id="selSexoAv">
+              <option value="">Todos</option>
+              <option value="F">Feminino</option>
+              <option value="M">Masculino</option>
+              <option value="O">Outro</option>
+            </select>
+            <div class="lbl mt-6">🎂 Data de nascimento</div>
+            <div style="display:flex;gap:8px;">
+              <select class="input" id="selNascDia" aria-label="Dia de nascimento" style="flex:1;"><option value="">Dia</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select>
+              <select class="input" id="selNascMes" aria-label="Mês de nascimento" style="flex:2;"><option value="">Mês</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
+              <input class="input" id="inpNascAno" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Ano" aria-label="Ano de nascimento" style="flex:1.4;">
+            </div>
+          </div>
+
+          <div class="pop-foot">
+            <button type="button" class="btn primary small btn-pesq-av" id="btnPesquisarAvancada" style="background:var(--ui-brand);color:var(--ui-brand-fg);border:1px solid var(--ui-brand);">🔍 Pesquisar</button>
+            <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -238,7 +314,6 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <!-- Dropdown no padrão global (.popover.menu): abrir/fechar é a delegação [data-dropdown] do script global abaixo -->
           <div class="popover menu align-right" id="dropExportFuncionarios" hidden>
             <button class="btn quiet menu-item" id="btnExportFichaGeral" type="button">📋 Ficha geral (PDF)</button>
-            <button class="btn quiet menu-item" id="btnExportDocx" type="button">📄 Tabela completa (Word)</button>
             <button class="btn quiet menu-item" id="btnExportCsv" type="button">📊 CSV completo (todos os dados)</button>
             <div class="pop-div"></div>
             <button class="btn quiet menu-item" id="btnExportFichaIndividual" type="button">🧾 Ficha individual (PDF)</button>
@@ -259,8 +334,10 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       <button type="button" class="btn secondary small" id="btnToggleSort" title="Alternar ordem">↑↓</button>
     </div>
 
+    <!-- Estados da lista (guia 7.2): .aviso-warn como irmão do contêiner, nunca dentro dele -->
+    <div class="aviso-warn" id="avisoLista" hidden></div>
     <div class="list" id="listaFuncionarios"></div>
-    <div class="loading" id="loadingFuncionarios" hidden>Carregando...</div>
+    <div class="aviso-warn" id="loadingFuncionarios" hidden>ℹ️ Carregando funcionários…</div>
   </div>
 
 </main>
@@ -365,12 +442,29 @@ document.addEventListener('click', (e) => {
   _fecharDropdowns();                                       // clique fora
 });
 document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDropdowns(); });
+
+// Auth pronto antes de ler o banco (sessão em cache ou evento de pronto) — guia 18.1
+function _authPronto(){
+  return new Promise((resolve) => {
+    if(window.Auth && Auth.getSession && Auth.getSession()) return resolve();
+    if(window.Auth && typeof Auth.onReady === 'function') return Auth.onReady(resolve);
+    document.addEventListener('auth:ready', () => resolve(), { once: true });
+  });
+}
+// Admin global sem escola escolhida ("Todas as escolas"): o marcador 'ADMIN' não é escola — guia 18.3
+function _semEscola(){
+  try{
+    if(window.Auth && typeof Auth.semEscola === 'function') return !!Auth.semEscola();
+    const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : '';
+    return !sid || String(sid).trim().toUpperCase() === 'ADMIN';
+  }catch(_){ return false; }
+}
 </script>
 
 <script>
 /* ══════════════════════════════════════════════════════════
-   PESQUISA-FUNCIONARIO.JS
-   Script principal para a página de pesquisa de funcionários
+   SCRIPT PRINCIPAL DA PÁGINA (inline — não há arquivo .js externo)
+   Pesquisa de funcionários
    
    Funcionalidades:
    - Busca e filtros dinâmicos
@@ -436,9 +530,9 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   /* ══════════════════════════════════════════
      Estado Global
   ══════════════════════════════════════════ */
-  let funcionarios = [];   // matrículas carregadas (do ano selecionado; todas só em "Todos os anos")
+  let funcionarios = [];   // matrículas carregadas (só as do ano selecionado)
   let filtrados    = [];
-  const _cacheAno  = new Map();   // ano ('2026' | '*') -> matrículas já lidas: trocar de ano e voltar não relê o banco
+  const _cacheAno  = new Map();   // ano ('2026') -> matrículas já lidas: trocar de ano e voltar não relê o banco
   let _tkAno       = 0;           // descarta resposta atrasada se o usuário trocar de ano rápido
   let _anoAtivo    = '';   // controlado pelo select
 
@@ -495,10 +589,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   function prepararAcesso(){
     if(!_acessoPromise){
       _acessoPromise = (async () => {
-        await new Promise(res => {
-          if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-          document.addEventListener('auth:ready', res, {once:true});
-        });
+        await _authPronto();
         await esperarEscolaAtiva(6000);
       })();
     }
@@ -523,25 +614,22 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
       const anos = Array.from(anosSet).filter(Boolean).sort((a,b) => Number(a) - Number(b));
 
       selectAnoAtivo.innerHTML = '';
-      // Sem ano ativo configurado não há o que pré-selecionar: mantém o comportamento antigo (sem filtro de ano).
-      if(!anoAtivoReal){
-        const oTodos = document.createElement('option');
-        oTodos.value = ''; oTodos.textContent = 'Todos os anos';
-        selectAnoAtivo.appendChild(oTodos);
-      }
       anos.forEach(y => {
         const o = document.createElement('option');
         o.value = y; o.textContent = y;
         selectAnoAtivo.appendChild(o);
       });
-      // Abre já no ano ativo (não existe mais a opção "(usar ano ativo)").
-      selectAnoAtivo.value = anoAtivoReal || '';
+      // Abre já no ano ativo; sem ano ativo configurado, abre no ano mais recente que existe.
+      // Nunca há opção "Todos os anos": a leitura é sempre limitada a UM ano letivo.
+      selectAnoAtivo.value = anoAtivoReal || anos[anos.length - 1] || '';
 
       atualizarAnoEfetivo();
     }catch(e){
       console.warn('carregarAnoAtivo:', e);
-      anoAtivoMsg.textContent = '⚠️ Não foi possível carregar o ano ativo.';
-      anoAtivoMsg.hidden = false;
+      if(!_semEscola()){   // sem escola escolhida o aviso seria enganoso (guia 18.3)
+        anoAtivoMsg.textContent = '⚠️ Não foi possível carregar o ano ativo.';
+        anoAtivoMsg.hidden = false;
+      }
     }
   }
 
@@ -571,22 +659,25 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     return false;
   }
 
-  // Lê as matrículas do ano selecionado (1 query por ano; "Todos os anos" lê a coleção inteira).
+  // Lê só as matrículas do ano selecionado (1 query por ano, com cache).
   async function carregarMatriculas(){
     erroCarga = '';
     const ano = _anoAtivo;
-    const chave = ano || '*';
+    const chave = ano;
     const elLoading = document.getElementById('loadingFuncionarios');
     try{
       await prepararAcesso();
+      if(!ano){   // sem ano não se lê nada (nunca a coleção inteira)
+        funcionarios = [];
+        erroCarga = 'Nenhum ano letivo disponível para consultar.';
+        return;
+      }
       if(!window.DB || !window.DB.funcionariosMatriculas){
         throw new Error('db.firebase.js desatualizado: falta a coleção funcionariosMatriculas.');
       }
       if(!_cacheAno.has(chave)){
         if(elLoading) elLoading.hidden = false;
-        const buscar = () => ano
-          ? window.DB.funcionariosMatriculas.whereEquals('anoLetivo', Number(ano))
-          : window.DB.funcionariosMatriculas.list();
+        const buscar = () => window.DB.funcionariosMatriculas.whereEquals('anoLetivo', Number(ano));
         let docs;
         try{
           docs = await buscar();
@@ -650,7 +741,6 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   const elStatus   = document.getElementById('fStatus');
   const elFuncao   = document.getElementById('fFuncao');
   const elCargaH   = document.getElementById('fCargaH');
-  const elSexo     = document.getElementById('fSexo');
   const chkMat     = document.getElementById('fMat');
   const chkVes     = document.getElementById('fVes');
   const chkNot     = document.getElementById('fNot');
@@ -692,6 +782,58 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   }
 
   /* ══════════════════════════════════════════
+     Pesquisa avançada (portada de pesquisa-ano-ativo)
+  ══════════════════════════════════════════ */
+  const NEE_CHAVES = ['tea','altasHabilidades','defFisica','defIntelectual','defVisual','defAuditiva'];
+  function temDeficiencia(f){
+    const d = f.deficiencia;
+    if(d === true) return true;
+    return !!(d && typeof d === 'object' && NEE_CHAVES.some(k => d[k] === true));
+  }
+  // Ficha de funcionário não tem campo próprio de AEE: vale o campo "aee" (se existir) ou a função/cargo citar AEE.
+  function atuaNoAee(f){
+    if(f.aee === true) return true;
+    const t = normalize(f.funcao || '');
+    return /\baee\b/.test(t) || t.includes('atendimento educacional especializado');
+  }
+  function partesNasc(s){
+    s = String(s || '').trim(); let m;
+    if((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))        return { dia: +m[3], mes: +m[2], ano: +m[1] };
+    if((m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/))) return { dia: +m[1], mes: +m[2], ano: +m[3] };
+    return { dia: 0, mes: 0, ano: 0 };
+  }
+  function lerAvancada(){
+    const n = id => parseInt(document.getElementById(id)?.value || '', 10) || 0;
+    const anoTxt = (document.getElementById('inpNascAno')?.value || '').trim();
+    return {
+      def: !!document.getElementById('chkFiltroDef')?.checked,
+      defItens: Array.from(document.querySelectorAll('.filtroDefItem:checked')).map(c => c.value),
+      aee: !!document.getElementById('chkFiltroAee')?.checked,
+      sexo: document.getElementById('selSexoAv')?.value || '',
+      nasc: { dia: n('selNascDia'), mes: n('selNascMes'), ano: /^\d{4}$/.test(anoTxt) ? +anoTxt : 0 }
+    };
+  }
+  function atualizarBadgeAvancada(){
+    const av = lerAvancada();
+    let n = 0;
+    if(av.def) n++;
+    if(av.aee) n++;
+    if(av.sexo) n++;
+    if(av.nasc.dia || av.nasc.mes || av.nasc.ano) n++;
+    const badge = document.getElementById('badgePesquisaAvancada');
+    badge.style.display = n > 0 ? 'block' : 'none';
+    badge.textContent = String(n);
+  }
+  function limparAvancada(){
+    document.getElementById('chkFiltroDef').checked = false;
+    document.getElementById('subFiltroDef').style.display = 'none';
+    document.querySelectorAll('.filtroDefItem').forEach(c => c.checked = false);
+    document.getElementById('chkFiltroAee').checked = false;
+    ['selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => { document.getElementById(id).value = ''; });
+    atualizarBadgeAvancada();
+  }
+
+  /* ══════════════════════════════════════════
      Filtros
   ══════════════════════════════════════════ */
   function aplicarFiltros(){
@@ -701,6 +843,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     const cargaH  = elCargaH.value;
     const turnos  = getTurnosSelecionados();
     const base    = getFuncionariosDoAno();
+    const av      = lerAvancada();
 
     filtrados = base.filter(f => {
       // busca geral
@@ -718,8 +861,24 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
       if(funcao && (f.funcao||'').trim() !== funcao) return false;
       // carga horária — compara como string pois pode ser número ou string no banco
       if(cargaH && String(f.cargaHoraria||'').trim() !== cargaH) return false;
-      // sexo
-      if(elSexo && elSexo.value && f.sexo !== elSexo.value) return false;
+      // sexo (pesquisa avançada)
+      if(av.sexo && String(f.sexo||'').toUpperCase() !== av.sexo) return false;
+      // data de nascimento (dia / mês / ano — qualquer combinação)
+      if(av.nasc.dia || av.nasc.mes || av.nasc.ano){
+        const p = partesNasc(f.dataNascimento);
+        if(av.nasc.dia && p.dia !== av.nasc.dia) return false;
+        if(av.nasc.mes && p.mes !== av.nasc.mes) return false;
+        if(av.nasc.ano && p.ano !== av.nasc.ano) return false;
+      }
+      // deficiência: sem subtipo marcado = qualquer uma; com subtipos = qualquer um dos marcados
+      if(av.def){
+        const d = f.deficiencia;
+        if(av.defItens.length){
+          if(!(d && typeof d === 'object' && av.defItens.some(k => d[k] === true))) return false;
+        } else if(!temDeficiencia(f)) return false;
+      }
+      // AEE
+      if(av.aee && !atuaNoAee(f)) return false;
       // turnos: 1 selecionado = OU, 2+ = E
       if(turnos.length){
         const ft = Array.isArray(f.turnos) ? f.turnos : [];
@@ -782,15 +941,15 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   ══════════════════════════════════════════ */
   // Diz POR QUE a lista está vazia (falha de leitura, escola não selecionada, ano sem cadastros...).
   function mensagemVazio(){
+    if(_semEscola()) return '🔒 Escolha uma escola no topo da página para pesquisar funcionários.';
     if(erroCarga) return '⚠️ Não foi possível carregar os funcionários: ' + escapeHtml(erroCarga);
     let escola = '';
     try{ escola = (window.Auth && window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) || ''; }catch(_){}
     if(!funcionarios.length){
-      if(escola === 'ADMIN') return 'Nenhuma escola selecionada. Escolha uma escola no cabeçalho para ver os funcionários.';
-      return 'Nenhum funcionário matriculado' + (_anoAtivo ? ' no ano letivo ' + escapeHtml(_anoAtivo) : '') +
+      return 'ℹ️ Nenhum funcionário matriculado' + (_anoAtivo ? ' no ano letivo ' + escapeHtml(_anoAtivo) : '') +
              ' na escola ativa' + (escola ? ' (' + escapeHtml(escola) + ')' : '') + '.';
     }
-    return 'Nenhum funcionário encontrado para os filtros aplicados.';
+    return 'ℹ️ Nenhum funcionário encontrado para os filtros aplicados.';
   }
 
   function renderLista(){
@@ -798,13 +957,17 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
 
     countEl.textContent = filtrados.length;
 
+    const avisoLista = document.getElementById('avisoLista');
     if(!filtrados.length){
-      lista.innerHTML = '<div class="muted col-todo">' + mensagemVazio() + '</div>';
+      lista.innerHTML = '';
+      avisoLista.innerHTML = mensagemVazio();
+      avisoLista.hidden = false;
       syncCheckAllFuncionarios();
       atualizarContadorSelecionados();
       return;
     }
 
+    avisoLista.hidden = true;
     lista.innerHTML = '';
     filtrados.forEach(f => {
       try{
@@ -910,14 +1073,29 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   elStatus.addEventListener('change', aplicarFiltros);
   elFuncao.addEventListener('change', aplicarFiltros);
   elCargaH.addEventListener('change', aplicarFiltros);
-  if(elSexo) elSexo.addEventListener('change', aplicarFiltros);
+  document.getElementById('chkFiltroDef').addEventListener('change', function(){
+    document.getElementById('subFiltroDef').style.display = this.checked ? 'flex' : 'none';
+    if(!this.checked) document.querySelectorAll('.filtroDefItem').forEach(c => c.checked = false);
+    atualizarBadgeAvancada(); aplicarFiltros();
+  });
+  document.querySelectorAll('.filtroDefItem').forEach(c => c.addEventListener('change', aplicarFiltros));
+  ['chkFiltroAee','selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => { atualizarBadgeAvancada(); aplicarFiltros(); });
+  });
+  document.getElementById('inpNascAno').addEventListener('input', () => { atualizarBadgeAvancada(); aplicarFiltros(); });
+  function fecharPainelAvancado(){
+    document.getElementById('painelPesquisaAvancada').hidden = true;
+    document.getElementById('btnPesquisaAvancada').setAttribute('aria-expanded', 'false');
+  }
+  document.getElementById('btnPesquisarAvancada').addEventListener('click', () => { aplicarFiltros(); fecharPainelAvancado(); });
+  document.getElementById('btnFecharPesquisaAvancada').addEventListener('click', fecharPainelAvancado);
 
   document.getElementById('btnLimparFiltros').addEventListener('click', function(){
     elBusca.value  = '';
     elStatus.value = '';
     elFuncao.value = '';
     elCargaH.value = '';
-    if(elSexo) elSexo.value = '';
+    limparAvancada();
     chkMat.checked = false; document.getElementById('lblFMat').classList.remove('checked');
     chkVes.checked = false; document.getElementById('lblFVes').classList.remove('checked');
     chkNot.checked = false; document.getElementById('lblFNot').classList.remove('checked');
@@ -1115,14 +1293,18 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
 
   (async function init(){
     try{
+      await _authPronto();
+      document.getElementById('avisoSemEscola').hidden = !_semEscola();
       await carregarAnoAtivo();       // 1º: precisa saber o ano para ler só as matrículas dele
       await carregarMatriculas();
       popularSelects();
       aplicarFiltros();
     } finally {
-      if(window.Loading) Loading.esconder();
+      try{ if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
+      catch(e){ console.warn('ajustarContraste:', e); }
+      try{ if(window.Loading) Loading.esconder(); }catch(_){}
     }
-  })();
+  })().catch(e => { console.error('init:', e); try{ setMsg('Erro ao carregar a página.', 'err'); }catch(_){} });
 })();
 </script>
 
@@ -1131,13 +1313,11 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
 ══════════════════════════════════════════ -->
 <script id="exportacao-funcionarios-js">
 /* ══════════════════════════════════════════════════════════
-   EXPORTACAO-FUNCIONARIOS.JS
+   EXPORTAÇÃO DE FUNCIONÁRIOS (inline — não há arquivo .js externo)
    Exportação da pesquisa de funcionários:
      1. Ficha geral (PDF)  — tabela enxuta, respeita filtro/ordenação da tela
-     2. Tabela completa (DOCX) — todos os campos, em Word (softwares de RH
-        específicos só abrem Word)
-     3. CSV completo — todos os campos, exceto imagem/documento
-     4. Ficha individual (PDF) — uma página por funcionário, com foto (3x
+     2. CSV completo — todos os campos, exceto imagem/documento
+     3. Ficha individual (PDF) — uma página por funcionário, com foto (3x
         maior que a usada na ficha individual do aluno, a pedido)
 
    Fonte dos dados: window.PesquisaFuncionarios (exposto pelo script
@@ -1147,7 +1327,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
      - getParaExportar() -> regra de seleção já aplicada:
          nenhum card marcado  = getFiltrados()
          1+ cards marcados    = só os marcados, mantendo a ordem
-   Os 4 exports abaixo usam sempre getParaExportar().
+   Os 3 exports abaixo usam sempre getParaExportar().
    ══════════════════════════════════════════════════════════ */
 (function(){
 
@@ -1269,7 +1449,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     {key:'_idade',       label:'IDADE',      width:40},
   ];
 
-  // Tabela completa (DOCX) e CSV — todos os campos, exceto imagem/documento
+  // CSV completo — todos os campos, exceto imagem/documento
   const COLS_COMPLETO = [
     {key:'funcId',                 label:'ID'},
     {key:'anoLetivo',              label:'ANO LETIVO'},
@@ -1447,69 +1627,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   }
 
   /* ══════════════════════════════════════════
-     2) Tabela completa (DOCX) — todos os campos, em Word
-  ══════════════════════════════════════════ */
-  async function exportTabelaDocx(titulo, lista){
-    if(!lista.length){ setMsg('Nenhum funcionário para exportar.', 'warn'); return; }
-    const docxLib = window.docx;
-    if(!docxLib){ setMsg('Falha ao carregar a biblioteca de exportação Word. Verifique sua conexão.', 'err'); return; }
-    const { Document, Packer, Table, TableRow, TableCell, Paragraph, TextRun,
-            WidthType, HeadingLevel, AlignmentType } = docxLib;
-
-    const escola = await _carregarDadosEscola();
-    const enriquecidos = lista.map(enriquecerFuncionario);
-
-    const headerRow = new TableRow({
-      tableHeader: true,
-      children: COLS_COMPLETO.map(c => new TableCell({
-        shading: { fill: '0B3FBF' },
-        children: [new Paragraph({
-          children: [new TextRun({ text: c.label, bold: true, color: 'FFFFFF', size: 15 })],
-        })],
-      })),
-    });
-
-    const bodyRows = enriquecidos.map((f, i) => new TableRow({
-      children: COLS_COMPLETO.map(c => new TableCell({
-        shading: i % 2 === 1 ? { fill: 'F3F6FF' } : undefined,
-        children: [new Paragraph({
-          children: [new TextRun({ text: String(f[c.key] ?? '') || '—', size: 15 })],
-        })],
-      })),
-    }));
-
-    const nomeEscola = _getSchoolDisplayName(escola) || (escola && escola.nome) || '';
-
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            size: { orientation: 'landscape' },
-            margin: { top: 500, bottom: 500, left: 500, right: 500 },
-          },
-        },
-        children: [
-          ...(nomeEscola ? [new Paragraph({
-            children: [new TextRun({ text: nomeEscola.toUpperCase(), bold: true, size: 26, color: '0B3FBF' })],
-          })] : []),
-          new Paragraph({
-            children: [new TextRun({ text: titulo, bold: true, size: 22 })],
-            spacing: { after: 200 },
-          }),
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: [headerRow, ...bodyRows],
-          }),
-        ],
-      }],
-    });
-
-    const blob = await Packer.toBlob(doc);
-    _baixarBlob(blob, _buildFilename('Tabela_Completa_Funcionarios', escola, 'docx'));
-  }
-
-  /* ══════════════════════════════════════════
-     3) CSV completo — todos os campos, exceto imagem/documento
+     2) CSV completo — todos os campos, exceto imagem/documento
   ══════════════════════════════════════════ */
   async function exportCsvCompleto(lista){
     if(!lista.length){ setMsg('Nenhum funcionário para exportar.', 'warn'); return; }
@@ -1528,7 +1646,7 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
   }
 
   /* ══════════════════════════════════════════
-     4) Ficha individual (PDF) — uma página por funcionário, todos os dados
+     3) Ficha individual (PDF) — uma página por funcionário, todos os dados
      em formato de ficha (rótulo: valor). Foto 3x maior que a do aluno
      (aluno usa 40pt; aqui 120pt), a pedido.
   ══════════════════════════════════════════ */
@@ -1663,9 +1781,6 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     // O menu fecha sozinho ao clicar num item (delegação [data-dropdown]); o clique do item roda primeiro.
     document.getElementById('btnExportFichaGeral').addEventListener('click', function(){
       exportFichaGeralPdf(`${_tituloContexto()} • Ficha Geral de Funcionários`, lista());
-    });
-    document.getElementById('btnExportDocx').addEventListener('click', function(){
-      exportTabelaDocx(`${_tituloContexto()} • Tabela Completa de Funcionários`, lista());
     });
     document.getElementById('btnExportCsv').addEventListener('click', function(){
       exportCsvCompleto(lista());
