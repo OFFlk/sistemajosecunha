@@ -753,7 +753,15 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
         encerradoEm: window.Auth.firebase.firestore.FieldValue.delete() };   // readmitir na mesma turma/ano reaproveita o doc: limpa o encerramento antigo
 
       const ops = [{ col:'anoAtivoMatriculas', op:'set', id: matriculaId, data: novaMatricula }];
-      _opsSyncBusca(mats.filter(m => m._id !== matriculaId), camposBusca, ops);   // demais matrículas do aluno acompanham o dado pessoal
+      // O sistema mantém UMA matrícula por aluno/ano (a troca de turma também apaga a antiga). Ao readmitir, a matrícula ENCERRADA deste
+      // aluno no mesmo ano, em outra turma, é um resíduo: se ficar, o ID dela continua ocupado e trava voltar para aquela turma.
+      // (Na mesma turma o documento é reaproveitado, por isso fica de fora. Anos anteriores nunca são tocados.)
+      const todas = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', alunoId);   // leitura fresca, só deste aluno
+      const residuos = todas.filter(m => m._id !== matriculaId && String(m.anoLetivo).trim() === String(ano).trim()
+        && (m.status || 'ATIVO').toString().trim().toUpperCase() === 'INATIVO');
+      residuos.forEach(m => ops.push({ col:'anoAtivoMatriculas', op:'delete', id: m._id }));
+      const idsResiduo = new Set(residuos.map(m => m._id));
+      _opsSyncBusca(todas.filter(m => m._id !== matriculaId && !idsResiduo.has(m._id)), camposBusca, ops);   // demais matrículas do aluno acompanham o dado pessoal
       if(String(ano) === String(anoAtivo)){                                        // contador da turma (+1 aluno; +1 integral)
         const cTurma = _opContadorTurma(turmaId, 1, _ehIntegral(modelo) ? 1 : 0);
         if(cTurma) ops.push(cTurma);

@@ -1907,7 +1907,7 @@ function normSerie(s){
             '<p class="cm-corpo">Só aparecem turmas ativas do mesmo ano letivo da matrícula.</p>'+
             '<div class="field"><label for="trocarTurma">Nova turma</label><select id="trocarTurma"></select></div>'+
             '<div class="field mt-10"><label for="trocarSerie">Série</label><select id="trocarSerie"></select></div>'+
-            '<p class="cm-corpo cm-nota">⚠️ O modelo de ensino (Regular/Integral) pode ficar em branco na nova matrícula. Depois da troca, abra a edição do aluno na turma nova e informe o modelo.</p>'+
+            '<p class="cm-corpo cm-nota">O modelo de ensino (Regular/Integral) e a foto são mantidos na nova matrícula.</p>'+
             '<div class="cm-acoes"><button type="button" class="btn secondary" id="btnTrocarCancelar">Cancelar</button>'+
             '<button type="button" class="cm-ok" id="btnTrocarOk">Trocar de turma</button></div>'+
           '</div>';
@@ -1951,13 +1951,14 @@ function normSerie(s){
             const todas = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', editId);
             const atual = todas.find(m => m._id === mat._id);
             if(!atual || (atual.status || 'ATIVO').toUpperCase() !== 'ATIVO') throw new Error('A matrícula atual já não está ativa. Recarregue a página.');
-            if(todas.some(m => m.turmaId === t.turmaId && String(m.anoLetivo) === String(mat.anoLetivo)))
-              throw new Error('Este aluno já tem matrícula nessa turma em ' + mat.anoLetivo + '. Use a readmissão.');
+            // Já existe matrícula ENCERRADA dele nessa turma/ano (ex.: saiu de lá e foi readmitido em outra)? O ID de destino é o mesmo:
+            // o documento é reaproveitado e reativado, igual à readmissão. Matrícula ATIVA no ano cai na checagem abaixo.
+            const reaproveita = todas.some(m => m.turmaId === t.turmaId && String(m.anoLetivo) === String(mat.anoLetivo));
             if(todas.some(m => m._id !== mat._id && String(m.anoLetivo) === String(mat.anoLetivo) && (m.status || 'ATIVO').toUpperCase() === 'ATIVO'))
               throw new Error('Este aluno tem outra matrícula ATIVA em ' + mat.anoLetivo + '. Encerre-a antes.');
             const ok = await _confirmModal({
               titulo: '⚠️ Trocar de turma', textoConfirmar: 'Sim, trocar',
-              corpo: `Mover "${_escHtml(aluno.nome || editId)}" para "${_escHtml(t.nome || t.turmaId)}" (${_escHtml(mat.anoLetivo)})?\n\nA matrícula atual será substituída pela nova.`,
+              corpo: `Mover "${_escHtml(aluno.nome || editId)}" para "${_escHtml(t.nome || t.turmaId)}" (${_escHtml(mat.anoLetivo)})?\n\nA matrícula atual será substituída pela nova.` + (reaproveita ? '\n\nJá existe uma matrícula encerrada dele nessa turma: ela será reativada.' : ''),
             });
             if(!ok) return;
             const agora = new Date().toISOString();
@@ -1967,7 +1968,8 @@ function normSerie(s){
             if(mat.fotoUrl){ nova.fotoUrl = mat.fotoUrl; nova.fotoFileId = mat.fotoFileId || null; }   // mesmo ano = mesmo arquivo no Cloudinary
             if(window.MatriculaUtils) nova = window.MatriculaUtils.validarMatricula(nova);
             nova = { ...nova, ..._camposBuscaMat(aluno), serie: normSerie(nova.serie),
-              turno: String(nova.turno || '').toUpperCase(), modelo: String(nova.modelo || 'REGULAR').toUpperCase() };
+              turno: String(nova.turno || '').toUpperCase(), modelo: String(nova.modelo || 'REGULAR').toUpperCase(),
+              ...(reaproveita ? { encerradoEm: window.Auth.firebase.firestore.FieldValue.delete() } : {}) };   // limpa o encerramento antigo
             const opsTroca = [
               { col:'anoAtivoMatriculas', op:'delete', id: mat._id },
               { col:'anoAtivoMatriculas', op:'set',    id: novoId,  data: nova },
