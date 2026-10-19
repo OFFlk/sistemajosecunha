@@ -92,11 +92,13 @@
 .pop-cols-acoes .btn { flex: 1; }
 
 /* ── Painéis (Turmas / Alunos) ── */
+.panel-head    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.titulo-painel { display: flex; align-items: center; gap: 10px; }
 .split .card h2 { font-size: 17px; margin: 0; font-weight: 800; }
 .count         { background: var(--ui-chip-bg); border: 1px solid var(--ui-border); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--ui-chip-color); font-weight: 700; }
 .panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
 .check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); font-weight: 700; cursor: pointer; }
-.lista-itens   { display: flex; flex-direction: column; gap: 8px; }   /* era .list (nome reservado do global, guia 1.3) */
+.list          { display: flex; flex-direction: column; gap: 8px; }
 
 /* ── Ordenação ── */
 .sort-control  { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); border-radius: 10px; }
@@ -104,8 +106,8 @@
 .sort-control .lbl { margin: 0; white-space: nowrap; }
 .sort-control .input { flex: 1; }
 
-/* ── Item de resultado: a caixa (borda, fundo, raio, padding) é do .subcard global; aqui só o layout ── */
-.item        { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+/* ── Sub-card (D19: definição local) ── */
+.item        { border: 1px solid var(--ui-border); border-radius: 10px; padding: 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .item .left  { min-width: 0; flex: 1; }
 .item .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .item .title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 800; font-size: 14px; }
@@ -113,6 +115,7 @@
 .item .meta  { margin-top: 6px; color: var(--ui-muted); font-size: 12px; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .item .meta.txt { display: block; }
 .item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; }
+input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color segue local */
 .separator-line { border: none; border-top: 1px solid var(--ui-border); margin: 8px 0; }
 .turma-chips     { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .turma-chips-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -193,8 +196,8 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
         <label for="inpBusca">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por nome ou CPF. A busca por nome precisa de no mínimo 3 letras e vale só para o início do nome: pesquisar “ana” mostra nomes que começam com Ana e ignora nomes com “ana” no meio, como Mariana. A busca por CPF só funciona com os 11 números preenchidos; usar ou não pontos e traço é irrelevante.</span></span></label>
         <div class="busca-row">
           <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF"/>
-          <button class="btn primary field-h nowrap" id="btnAtualizar">🔍 Pesquisar</button>
-          <button class="btn secondary field-h nowrap" id="btnLimparFiltros">🧹 Limpar filtros</button>
+          <button class="btn primary nowrap" id="btnAtualizar">🔍 Pesquisar</button>
+          <button class="btn secondary nowrap" id="btnLimparFiltros">🧹 Limpar filtros</button>
         </div>
       </div>
 
@@ -298,7 +301,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
             <select id="selSerieAdd">
               <option value="" disabled hidden selected>Escolha a série…</option>
             </select>
-            <button class="btn secondary field-h nowrap" id="btnAddSerie">+ Adicionar</button>
+            <button class="btn primary nowrap" id="btnAddSerie">+ Adicionar</button>
           </div>
         </div>
         <div class="field">
@@ -345,8 +348,10 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
   <!-- Turmas + Alunos lado a lado -->
   <div class="split">
     <div class="card">
-      <div class="card-head">
-        <h2>Turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span> <span class="count" id="countTurmas">0</span></h2>
+      <div class="panel-head">
+        <div class="titulo-painel">
+          <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
+        </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllTurmas"> Todos</label>
           <button class="btn" id="btnTurmasTabela">Abrir tabela</button>
@@ -362,18 +367,20 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <option value="turno">Turno</option>
         </select>
       </div>
-      <div class="lista-itens" id="listaTurmas"></div>
+      <div class="list" id="listaTurmas"></div>
       <div class="loading" id="loadingTurmas"></div>
     </div>
 
     <div class="card">
-      <div class="card-head">
-        <h2>Alunos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span> <span class="count" id="countAlunos">0</span></h2>
+      <div class="panel-head">
+        <div class="titulo-painel">
+          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
+        </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
           <button class="btn" id="btnAlunosTabela">Abrir tabela</button>
           <div class="rel-inline" id="wrapExportAlunos">
-            <button class="btn primary" id="btnAlunosPdf" type="button" data-dropdown="dropExportAlunos" aria-haspopup="menu" aria-expanded="false">Exportar PDF ▾</button>
+            <button class="btn primary" id="btnAlunosPdf" type="button" data-dropdown="dropExportAlunos" aria-haspopup="menu" aria-expanded="false">Exportar ▾</button>
             <div class="popover menu align-right" id="dropExportAlunos" hidden>
               <button class="btn quiet menu-item" id="btnExportLista">📋 Lista de alunos</button>
               <button class="btn quiet menu-item" id="btnExportTurma">🏫 Separado por turma</button>
@@ -399,7 +406,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
         <button type="button" class="btn secondary small" id="btnToggleSort" title="Alternar ordem">↑↓</button>
       </div>
 
-      <div class="lista-itens" id="listaAlunos"></div>
+      <div class="list" id="listaAlunos"></div>
       <div class="loading" id="loadingAlunos"></div>
     </div>
   </div>
@@ -492,33 +499,30 @@ window.addEventListener('unhandledrejection', () => {
   if(t && t.classList.contains('toast-loading')) _toastErro('⚠️ Não foi possível concluir a operação.');
 });
 
-/* ── Modal de confirmação (substitui confirm() nativo) — guia, seção 10.4 ── */
-// corDestaque: 'danger' = ação destrutiva (título e botão vermelhos); 'ok' = contraponto positivo (verde); outro = cor de marca.
+/* ── Modal de confirmação (substitui confirm() nativo) — guia v5, seção 8.3 ── */
+// corDestaque: 'danger' = ação destrutiva (botão vermelho); qualquer outro = cor de marca.
 function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
   return new Promise((resolve) => {
     const perigo = corDestaque === 'danger';
-    const positivo = corDestaque === 'ok';
-    const variante = perigo ? ' perigo' : positivo ? ' ok' : '';
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop open';
     backdrop.innerHTML =
-      `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true">`+
-        `<h3 class="cm-titulo${variante}">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
+      `<div class="cm-box" role="dialog" aria-modal="true">`+
+        `<h3 class="cm-titulo${perigo ? ' perigo' : ''}">${escapeHtml(titulo || 'Confirmar ação')}</h3>`+
         `<p class="cm-corpo">${corpo || ''}</p>`+
         (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${escapeHtml(digitar)}">` : '')+
         `<div class="cm-acoes">`+
           `<button type="button" class="btn secondary" id="_confirmModalCancelar">${escapeHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${escapeHtml(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="cm-ok${perigo ? ' perigo' : ''}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${escapeHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
     const ok = backdrop.querySelector('#_confirmModalOk');
     const cancelar = backdrop.querySelector('#_confirmModalCancelar');
     const input = backdrop.querySelector('#_confirmModalInput');
-    function fechar(r){ document.removeEventListener('keydown', onKey, true); backdrop.remove(); resolve(r); }
-    // Esc em CAPTURA + stopPropagation: com um modal da página aberto por baixo, o Esc fecha só este
-    function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } }
-    document.addEventListener('keydown', onKey, true);
+    function fechar(r){ document.removeEventListener('keydown', onKey); backdrop.remove(); resolve(r); }
+    function onKey(ev){ if(ev.key === 'Escape') fechar(false); }
+    document.addEventListener('keydown', onKey);
     ok.addEventListener('click', () => fechar(true));
     cancelar.addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
@@ -998,7 +1002,7 @@ async function carregarDB(){
       if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
       document.addEventListener('auth:ready', res, {once:true});
     });
-    if(Auth.semEscola()){ _semEscola = true; return; }   // admin global em "Todas as escolas" (guia 18.3)
+    if(window.Auth.getActiveSchoolId?.() === 'ADMIN'){ _semEscola = true; return; }
     const [turmasDB, dadosEscola] = await Promise.all([window.DB.anoAtivoTurmas.list(), window.DB.escola.get()]);
     const dados = { dadosEscola };
     alunos = []; mats = []; _alunosCarregados = new Set(); _matsPorAno.clear(); _turmasCarregadas.clear();
@@ -1441,7 +1445,7 @@ function atualizarListas(){
 
     tScope.forEach(t=>{
       const el = document.createElement("div");
-      el.className="item subcard selecionavel";
+      el.className="item selecionavel";
       const titulo = t.nome || `${t.serie || "Turma"} ${t.anoLetivo || ""}`.trim();
       const q = _qtdsTurma(t);
       const qtdAlunos = q.qtd == null ? '—' : q.qtd;
@@ -1570,7 +1574,7 @@ async function _atualizarListaAlunos(_tScope){
   } else {
     aScope.forEach(a=>{
       const el=document.createElement("div");
-      el.className="item subcard selecionavel";
+      el.className="item selecionavel";
       const nasc = formatarDataBR(a.dataNascimento) || "—";
       const idade = a.idade || calcIdade(a.dataNascimento) || "—";
       const turnoDesc  = a._turno  ? `${_turnoEmoji(a._turno)} ${a._turno}` : "—";
@@ -2861,49 +2865,49 @@ function restaurarEstadoPagina(){
    Init
 ========================= */
 (async function init(){
-  try{
-    await carregarDB();
-    if(_semEscola){
-      listaTurmas.innerHTML = `<div class="aviso-warn" id="avisoSemEscola">⚠️ Escolha uma escola no topo da página para pesquisar alunos.</div>`;
-      listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
-      return;
-    }
-    if(!anoAtivo){
-      listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
-      listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
-      return;
-    }
-
-    // Tentar restaurar estado salvo (as matrículas são lidas sob demanda, ao marcar turma)
-    const estadoRestaurado = restaurarEstadoPagina();
-
-    if(!estadoRestaurado){
-      renderChips();
-      _blocoStatusAtualizarVisibilidade();
-      if(anoAtivo && selAno.value){
-        _jaFoiPesquisado = true;
-        atualizarListas();
-      } else {
-        listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
-        listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ As turmas e alunos aparecerão após a pesquisa.</div>`;
-        countTurmas.textContent = "—"; countAlunos.textContent = "—";
-      }
-    }
-
-    // Salvar estado apenas ao navegar para edição (não ao fechar/recarregar)
-    // Isso garante que ao abrir a página do zero, nenhum estado antigo seja restaurado
-    window.addEventListener('beforeunload', ()=>{
-      const destino = document.__pesquisaDestino || '';
-      if(destino.includes('cadastro-aluno-ativo') || destino.includes('readmitir-aluno')) salvarEstadoPagina();
-      else sessionStorage.removeItem('pesquisaAnoAtivoEstado');
-    });
-  } finally {
-    // Card de destaque já existe no HTML: contraste e overlay mesmo se algo falhar ou houver retorno antecipado (guia 18.1)
-    try{ if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
-    catch(e){ console.warn('ajustarContraste:', e); }
-    try{ Loading.esconder(); }catch(_){}
+  await carregarDB();
+  if(_semEscola){
+    listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Selecione uma escola no cabeçalho para pesquisar. Os dados de todas as escolas ficam na gestão do ano ativo.</div>`;
+    listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
+    Loading.esconder(); return;
   }
-})().catch(e => { console.error('init:', e); _toastErro('Erro ao iniciar a página.'); });
+  if(!anoAtivo){
+    listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Ano ativo não definido. Defina-o no módulo de administração.</div>`;
+    listaAlunos.innerHTML = ""; countTurmas.textContent = "—"; countAlunos.textContent = "—";
+    Loading.esconder(); return;
+  }
+  
+  // Tentar restaurar estado salvo (as matrículas são lidas sob demanda, ao marcar turma)
+  const estadoRestaurado = restaurarEstadoPagina();
+  
+  if(!estadoRestaurado){
+    renderChips();
+    _blocoStatusAtualizarVisibilidade();
+    if(anoAtivo && selAno.value){
+      _jaFoiPesquisado = true;
+      atualizarListas();
+    } else {
+      listaTurmas.innerHTML = `<div class="aviso-warn">⚠️ Selecione o ano letivo ou clique em <b>Pesquisar</b> para carregar as turmas.</div>`;
+      listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ As turmas e alunos aparecerão após a pesquisa.</div>`;
+      countTurmas.textContent = "—"; countAlunos.textContent = "—";
+    }
+  }
+  
+  // Card de destaque já existe no HTML: ajusta o contraste (guia v5, 4.2)
+  try{
+    if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
+  }catch(e){ console.warn('ajustarContraste:', e); }
+
+  // Salvar estado apenas ao navegar para edição (não ao fechar/recarregar)
+  // Isso garante que ao abrir a página do zero, nenhum estado antigo seja restaurado
+  window.addEventListener('beforeunload', ()=>{
+    // Só salva se estiver indo para a página de edição
+    const destino = document.__pesquisaDestino || '';
+    if(destino.includes('cadastro-aluno-ativo') || destino.includes('readmitir-aluno')) salvarEstadoPagina();
+    else sessionStorage.removeItem('pesquisaAnoAtivoEstado');
+  });
+  Loading.esconder();
+})().catch(e => { console.error('init:', e); _toastErro('Erro ao iniciar a página.'); Loading.esconder(); });
 
 })();
 </script>
