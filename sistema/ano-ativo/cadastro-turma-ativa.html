@@ -314,18 +314,18 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
   let ANO_CONFIG = null; // escola.configAnoAtivo
 
   // Admin global em "Todas as escolas": o marcador "ADMIN" não é uma escola (leitura volta vazia, escrita é bloqueada).
-  function _semEscola(){ return String(window.Auth.getActiveSchoolId() || "").trim().toUpperCase() === "ADMIN"; }
+  function _semEscola(){ return window.Auth.semEscola(); }
 
   async function carregarTurmasCache(){
     try{
-      const lista = _semEscola()
-        ? ((await window.DB.loadAllAnoAtivo()).turmasDB || []) // só leitura, junta todas as escolas
-        : await window.DB.anoAtivoTurmas.list();
+      if(_semEscola()){ TURMAS_CACHE = []; return true; }   // sem escola escolhida: não lê nada (aviso na lista)
+      const lista = await window.DB.anoAtivoTurmas.list();   // só a coleção de turmas
       TURMAS_CACHE = Array.isArray(lista) ? lista : [];
       return true;
     }catch(e){ console.warn("[cadastro-turma-ativa] carregarTurmasCache:", e); TURMAS_CACHE = []; return false; }
   }
   async function carregarAnoConfig(){
+    if(_semEscola()){ ANO_CONFIG = null; return; }
     try{ const esc = await window.DB.escola.get(); ANO_CONFIG = (esc && esc.configAnoAtivo != null) ? esc.configAnoAtivo : null; }
     catch(e){ console.warn("[cadastro-turma-ativa] carregarAnoConfig:", e); ANO_CONFIG = null; }
   }
@@ -586,6 +586,11 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
   function renderListaTurmas(){
     const list = $("listaTurmas");
     if(!list) return;
+    if(_semEscola()){
+      list.innerHTML = '<div class="aviso-warn" id="avisoSemEscola">⚠️ Escolha uma escola no topo da página para cadastrar turmas.</div>';
+      const c = $("countTurmasLista"); if(c) c.textContent = "";
+      return;
+    }
 
     const filtroAno = $("filtroAnoLista")?.value || "";
     const filtroStatus = $("filtroStatusLista")?.value || "";
@@ -747,7 +752,8 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 
     setMsg("Salvando…", "loading");
     try{
-      await window.DB.anoAtivoTurmas.save({ ...t, status: vaiInativar ? "INATIVA" : "ATIVA" });
+      // só o status: regravar a turma inteira (cache da página) sobrescreveria qtdAlunos/qtdIntegral com o valor de quando a página abriu
+      await window.DB.anoAtivoTurmas.save({ _id: t._id || t.turmaId, status: vaiInativar ? "INATIVA" : "ATIVA" });
     }catch(e){
       console.warn("[toggleStatusTurma]", e);
       setMsg("Erro ao alterar o status da turma.", "err");
@@ -844,13 +850,15 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
     if(btn) btn.disabled = true;
     setMsg("Salvando…", "loading");
     try{
-      let payload;
+      let payload, anoDaTurma;
       if(ehEdicao){
         // get() lê direto o documento (o list() tem cache de 30s no db.firebase.js).
         const original = await window.DB.anoAtivoTurmas.get(editingTurmaId);
         if(!original) throw Object.assign(new Error("turma inexistente"), { userMsg: "Essa turma não existe mais no banco — recarregue a página." });
         // Só nome, turno e professor mudam; ID, ano, séries, status e criadoEm ficam como estão.
-        payload = { ...original, nome, turno: $("turno")?.value || original.turno, professor: professor || "" };
+        // Grava só estes campos (o save é merge): não regrava qtdAlunos/qtdIntegral, que mudam com cadastros e transferências de alunos.
+        payload = { _id: editingTurmaId, nome, turno: $("turno")?.value || original.turno, professor: professor || "" };
+        anoDaTurma = original.anoLetivo;
       }else{
         const ano = parseInt($("anoSelect")?.value || getAnoAtivoDefault(), 10) || getAnoAtivoDefault();
         const turmaId = pickNextIdForBase(buildTurmaIdBase(), getTurmas());
@@ -859,11 +867,13 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
         payload = {
           _id: turmaId, id: turmaId, turmaId, nome, anoLetivo: ano,
           series: [...seriesSel], turno: $("turno")?.value || "MATUTINO",
-          professor: professor || "", criadoEm: Date.now(), status: "ATIVA"
+          professor: professor || "", criadoEm: Date.now(), status: "ATIVA",
+          qtdAlunos: 0, qtdIntegral: 0      // contadores mantidos pelo cadastro/readmissão de alunos (ver pesquisa-ano-ativo)
         };
+        anoDaTurma = ano;
       }
       await window.DB.anoAtivoTurmas.save(payload);
-      await garantirAnoAtivoConfig(parseInt(payload.anoLetivo, 10));
+      await garantirAnoAtivoConfig(parseInt(anoDaTurma, 10));
     }catch(e){
       console.warn("[salvarTurma]", e);
       setMsg((e && e.userMsg) || "Erro ao salvar turma.", "err");
