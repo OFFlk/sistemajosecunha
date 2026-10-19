@@ -207,8 +207,13 @@ html[data-theme="dark"] {
 
 /* ============================================================
    BOTÃO VOLTAR
+   Hover = UMA camada de preenchimento (::before) que entra da direita
+   para a esquerda, cobrindo ícone, divisória e texto ao mesmo tempo.
+   Os filhos ficam transparentes: só o botão tem fundo, então não há
+   metades dessincronizadas.
    ============================================================ */
 .btn-back {
+  position: relative; isolation: isolate;
   display: inline-flex; align-items: stretch;
   border-radius: 8px; overflow: hidden;
   border: 1px solid var(--btn-back-border);
@@ -216,22 +221,32 @@ html[data-theme="dark"] {
   text-decoration: none; cursor: pointer;
   font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
   white-space: nowrap;
-  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.btn-back::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: var(--hdr-hover-fill);
+  transform: translateX(101%);
+  transition: transform 0.22s ease;
 }
 .btn-back:hover {
-  background: var(--hdr-hover-fill);
   border-color: var(--hdr-accent);
   box-shadow: var(--hdr-hover-ring);
 }
+.btn-back:hover::before { transform: translateX(0); }
 .btn-back .b-icon {
-  padding: 8px 10px; background: var(--btn-back-icon-bg); color: var(--btn-back-color);
+  padding: 8px 10px; background: transparent; color: var(--btn-back-color);
   font-size: 13px; font-weight: 800; border-right: 1px solid var(--btn-back-border);
-  display: flex; align-items: center; transition: all 0.18s;
+  display: flex; align-items: center;
+  transition: border-color 0.22s ease;
 }
-.btn-back:hover .b-icon { background: transparent; }
+.btn-back:hover .b-icon { border-right-color: var(--hdr-accent); }
 .btn-back .b-label {
   padding: 8px 13px; color: var(--btn-back-color);
   font-size: 13px; font-weight: 800; display: flex; align-items: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-back::before { transition: none; }
 }
 
 
