@@ -91,7 +91,8 @@
 .item .title  { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 14px; }
 .item .nome   { font-weight: 800; }
 .item .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; }
-.item .meta   { margin-top: 6px; color: var(--ui-muted); font-size: 12px; line-height: 1.35; }
+.item .meta   { margin-top: 6px; color: var(--ui-muted); font-size: 12px; line-height: 1.35; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.item .meta + .meta { margin-top: 4px; }
 .item .meta-i { white-space: nowrap; }
 input[type="checkbox"] { accent-color: var(--ui-brand); }   /* accent-color segue local (guia D6) */
 
@@ -809,17 +810,13 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
       try{
       const nasc  = formatDate(f.dataNascimento) || '—';
       const idade = calcAge(f.dataNascimento) || '—';
-      const ch    = f.cargaHoraria ? escapeHtml(f.cargaHoraria) + 'H' : '—';
-      const vinc  = escapeHtml(STATUS_LABEL[f.status] || f.status || '—');
-      // Resumo do card: só o essencial. Sexo, cor/raça e naturalidade ficam só na ficha (Visualizar).
-      const meta = [
-        `Nasc: ${escapeHtml(nasc)}`,
-        `RG/CNH: ${highlight(f.rgCnh, query)}`,
-        `Idade: ${escapeHtml(idade)}`,
-        `Turnos: ${escapeHtml(turnosTexto(f.turnos))}`,
-        `C.H.: ${ch}`,
-        `Vínculo: ${vinc}`
-      ].map(t => `<span class="meta-i">${t}</span>`).join(' • ');
+      // Card em 4 linhas: 1 nome · 2 chips (função, CPF) · 3 nascimento e idade · 4 RG/CNH, turnos e chips de NEE.
+      // C.H. e vínculo saíram do card (continuam na ficha). Sexo, cor/raça e naturalidade também só na ficha.
+      const linha3 = [`Nasc: ${escapeHtml(nasc)}`, `Idade: ${escapeHtml(idade)}`]
+        .map(t => `<span class="meta-i">${t}</span>`).join(' • ');
+      const linha4 = [`RG/CNH: ${highlight(f.rgCnh, query) || '—'}`, `Turnos: ${escapeHtml(turnosTexto(f.turnos))}`]
+        .map(t => `<span class="meta-i">${t}</span>`).join(' • ');
+      const neeChips = neeItens(f).map(t => `<span class="badge small gray">${t}</span>`).join('');
       const matId = matIdDe(f);
       const el    = document.createElement('div');
       el.className = 'item selecionavel';
@@ -833,11 +830,12 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
               <span class="badge gray">CPF: ${highlight(f.cpf, query)}</span>
             </div>
           </div>
-          <div class="meta">${meta}</div>
+          <div class="meta"><span class="meta-txt">${linha3}</span></div>
+          <div class="meta"><span class="meta-txt">${linha4}</span>${neeChips}</div>
         </div>
         <div class="right">
           <a class="btn small secondary" href="cadastro-funcionario.html?editar=${encodeURIComponent(matId)}">✏️ Editar</a>
-          <button type="button" class="btn small secondary" data-view-mat="${escapeHtml(matId)}">👁️ Visualizar</button>
+          <button type="button" class="btn small primary" data-view-mat="${escapeHtml(matId)}">👁️ Visualizar</button>
           <label class="check">
             <input type="checkbox" class="chkFuncionario" data-func="${escapeHtml(f.funcId)}" data-mat="${escapeHtml(matId)}" />
             <span>Selecionar</span>
@@ -961,7 +959,8 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     if(e.target === modalBackdrop) fecharModal();
   });
 
-  function montarNeeDetalhado(f){
+  // Rótulos de NEE (já escapados). Usado na ficha (completo) e no card (linha 4).
+  function neeItens(f){
     const d = f.deficiencia || {};
     const itens = [];
     if(d.tea)              itens.push('🧩 TEA');
@@ -970,6 +969,11 @@ document.addEventListener('keydown', (e) => { if(e.key === 'Escape') _fecharDrop
     if(d.defIntelectual)   itens.push('🧠 Deficiência intelectual');
     if(d.defVisual)        itens.push('👁️ Deficiência visual' + (d.defVisualSub ? ` (${escapeHtml(d.defVisualSub)})` : ''));
     if(d.defAuditiva)      itens.push('👂 Deficiência auditiva / surdez' + (d.defAuditivaSub ? ` (${escapeHtml(d.defAuditivaSub)})` : ''));
+    return itens;
+  }
+
+  function montarNeeDetalhado(f){
+    const itens = neeItens(f);
     if(!itens.length){
       return `<div class="ficha-vazio">Nenhuma</div>`;
     }
