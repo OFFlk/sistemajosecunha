@@ -44,7 +44,9 @@
 .ano-field  { width: 220px; flex: 0 0 220px; margin: 0; }
 .ano-field select { width: 100%; }
 .ano-erro   { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--dest-fg); }
-.filters-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.filters-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.busca-field { flex: 1 1 280px; min-width: 0; margin: 0; }
+.busca-field input { width: 100%; }
 @media(max-width:980px){ .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media(max-width:600px){ .filters-grid { grid-template-columns: 1fr; } }
 .bloco-turno { margin-top: 16px; }
@@ -60,8 +62,7 @@
 .card-destaque .turno-checkbox-wrap:hover { background: var(--dest-btn-hover); border-color: var(--dest-fg); color: var(--dest-fg); }
 .card-destaque .turno-checkbox-wrap.checked { background: var(--dest-fg); border-color: var(--dest-fg); color: var(--btn-home-bg); }
 .card-destaque .turno-checkbox-wrap.checked input[type="checkbox"] { accent-color: var(--btn-home-bg); }
-#turnoHint { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); color: var(--ui-chip-color); }
-.card-destaque #turnoHint { background: var(--dest-panel-bg); border-color: var(--dest-btn-bd); color: var(--dest-fg); }
+.lbl-turno .info-tip-bubble { text-transform: none; letter-spacing: 0; }
 
 
 /* ── Pesquisa avançada (portada de pesquisa-ano-ativo) ── */
@@ -71,12 +72,12 @@
 .btn-avancada { position: relative; flex-shrink: 0; white-space: nowrap; }
 .btn-avancada:hover { filter: brightness(1.07); }
 .cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
-.pop-avancada { top: calc(100% + 6px); left: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
+.pop-avancada { top: calc(100% + 6px); right: 0; left: auto; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
 .pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
 .pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-.pop-avancada .btn-pesq-av:hover { background: var(--ui-brand-hover) !important; border-color: var(--ui-brand-hover) !important; }
+@media(max-width:700px){ .pop-avancada { right: auto; left: 0; max-width: calc(100vw - 48px); } }
 .card-destaque .pop-avancada .btn.secondary {
   --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
   --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
@@ -175,22 +176,77 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       <h2>Filtros de pesquisa</h2>
     </div>
 
-    <!-- Ano Ativo -->
+    <!-- Linha 1: ano letivo + busca geral + pesquisa avançada -->
     <div class="ano-row">
       <div class="field ano-field">
         <label for="selectAnoAtivo">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Mostra os funcionários cadastrados no ano letivo escolhido. Ao abrir a página, o ano ativo definido pelo administrador já vem selecionado. Para consultar outro ano, escolha-o na lista, que traz os anos que possuem funcionários cadastrados.</span></span></label>
         <select id="selectAnoAtivo"></select>
         <div class="ano-erro" id="anoAtivoMsg" hidden></div>
       </div>
+
+      <div class="field busca-field">
+        <label for="fBusca">Busca geral</label>
+        <input id="fBusca" type="text" placeholder="Nome, CPF, RG/CNH, função, naturalidade..." autocomplete="off"/>
+      </div>
+
+      <div class="rel" id="blocoPesquisaAvancada">
+      <button type="button" class="btn btn-avancada" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
+        🔎 Pesquisa avançada
+        <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
+      </button>
+
+      <div class="popover pop-avancada" id="painelPesquisaAvancada" hidden>
+        <div>
+          <label class="check forte">
+            <input type="checkbox" id="chkFiltroDef">
+            ♿ Deficiência
+          </label>
+          <div class="sub-filtro" id="subFiltroDef" style="display:none;">
+            <label class="check"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
+            <label class="check"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
+            <label class="check"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
+            <label class="check"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
+            <label class="check"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
+            <label class="check"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
+          </div>
+        </div>
+
+        <div class="pop-div"></div>
+
+        <div>
+          <label class="check forte">
+            <input type="checkbox" id="chkFiltroAee">
+            🏫 Atua na sala do AEE
+          </label>
+        </div>
+
+        <div class="pop-div"></div>
+
+        <div>
+          <label class="lbl" for="selSexoAv">👤 Sexo</label>
+          <select class="input w-100" id="selSexoAv">
+            <option value="">Todos</option>
+            <option value="F">Feminino</option>
+            <option value="M">Masculino</option>
+            <option value="O">Outro</option>
+          </select>
+          <div class="lbl mt-6">🎂 Data de nascimento</div>
+          <div style="display:flex;gap:8px;">
+            <select class="input" id="selNascDia" aria-label="Dia de nascimento" style="flex:1;"><option value="">Dia</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select>
+            <select class="input" id="selNascMes" aria-label="Mês de nascimento" style="flex:2;"><option value="">Mês</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
+            <input class="input" id="inpNascAno" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Ano" aria-label="Ano de nascimento" style="flex:1.4;">
+          </div>
+        </div>
+
+        <div class="pop-foot">
+          <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
+        </div>
+      </div>
+    </div>
     </div>
 
     <!-- Grid de Filtros -->
     <div class="filters-grid">
-      <div class="field">
-        <label for="fBusca">Busca geral</label>
-        <input id="fBusca" type="text" placeholder="Nome, CPF, RG/CNH, função, naturalidade..." autocomplete="off"/>
-      </div>
-      
       <div class="field">
         <label for="fStatus">Status / Vínculo</label>
         <select id="fStatus">
@@ -218,7 +274,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
     <!-- Filtro de Turnos -->
     <div class="bloco-turno">
-      <span class="lbl-turno">Turno</span>
+      <span class="lbl-turno">Turno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Marcando um turno, aparecem os funcionários que atuam nele (mesmo que atuem em outros também). Marcando dois ou mais, aparecem apenas os que atuam em todos os turnos marcados.</span></span></span>
       <div class="turnos-row">
         <label class="turno-checkbox-wrap" id="lblFMat">
           <input type="checkbox" id="fMat" value="MAT"/>
@@ -232,69 +288,13 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
           <input type="checkbox" id="fNot" value="NOT"/>
           <label for="fNot">🌙 Noturno</label>
         </label>
-        <span id="turnoHint">Sem filtro de turno</span>
       </div>
     </div>
 
-    <!-- Ação: Limpar Filtros + Pesquisa avançada -->
+    <!-- Ação: Limpar Filtros -->
     <div class="filter-actions">
       <button class="btn secondary" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
 
-      <div class="rel" id="blocoPesquisaAvancada">
-        <button type="button" class="btn btn-avancada" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
-          🔎 Pesquisa avançada
-          <span class="cont-filtros" id="badgePesquisaAvancada" style="display:none;">0</span>
-        </button>
-
-        <div class="popover pop-avancada" id="painelPesquisaAvancada" hidden>
-          <div>
-            <label class="check forte">
-              <input type="checkbox" id="chkFiltroDef">
-              ♿ Deficiência
-            </label>
-            <div class="sub-filtro" id="subFiltroDef" style="display:none;">
-              <label class="check"><input type="checkbox" class="filtroDefItem" value="tea">🧩 TEA</label>
-              <label class="check"><input type="checkbox" class="filtroDefItem" value="altasHabilidades">⭐ Altas habilidades / superdotação</label>
-              <label class="check"><input type="checkbox" class="filtroDefItem" value="defFisica">🦽 Deficiência física</label>
-              <label class="check"><input type="checkbox" class="filtroDefItem" value="defIntelectual">🧠 Deficiência intelectual</label>
-              <label class="check"><input type="checkbox" class="filtroDefItem" value="defVisual">👁️ Deficiência visual</label>
-              <label class="check"><input type="checkbox" class="filtroDefItem" value="defAuditiva">👂 Deficiência auditiva / surdez</label>
-            </div>
-          </div>
-
-          <div class="pop-div"></div>
-
-          <div>
-            <label class="check forte">
-              <input type="checkbox" id="chkFiltroAee">
-              🏫 Atua na sala do AEE
-            </label>
-          </div>
-
-          <div class="pop-div"></div>
-
-          <div>
-            <label class="lbl" for="selSexoAv">👤 Sexo</label>
-            <select class="input w-100" id="selSexoAv">
-              <option value="">Todos</option>
-              <option value="F">Feminino</option>
-              <option value="M">Masculino</option>
-              <option value="O">Outro</option>
-            </select>
-            <div class="lbl mt-6">🎂 Data de nascimento</div>
-            <div style="display:flex;gap:8px;">
-              <select class="input" id="selNascDia" aria-label="Dia de nascimento" style="flex:1;"><option value="">Dia</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select>
-              <select class="input" id="selNascMes" aria-label="Mês de nascimento" style="flex:2;"><option value="">Mês</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
-              <input class="input" id="inpNascAno" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Ano" aria-label="Ano de nascimento" style="flex:1.4;">
-            </div>
-          </div>
-
-          <div class="pop-foot">
-            <button type="button" class="btn primary small btn-pesq-av" id="btnPesquisarAvancada" style="background:var(--ui-brand);color:var(--ui-brand-fg);border:1px solid var(--ui-brand);">🔍 Pesquisar</button>
-            <button type="button" class="btn secondary small" id="btnFecharPesquisaAvancada">Fechar</button>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -744,7 +744,6 @@ function _semEscola(){
   const chkMat     = document.getElementById('fMat');
   const chkVes     = document.getElementById('fVes');
   const chkNot     = document.getElementById('fNot');
-  const turnoHint  = document.getElementById('turnoHint');
   const lista      = document.getElementById('listaFuncionarios');
   const countEl    = document.getElementById('countFuncionarios');
   const sortFieldEl = document.getElementById('sortField');
@@ -757,7 +756,6 @@ function _semEscola(){
     chk.addEventListener('change', function(){
       const lbl = chk.closest('.turno-checkbox-wrap');
       lbl.classList.toggle('checked', chk.checked);
-      atualizarTurnoHint();
       aplicarFiltros();
     });
   });
@@ -768,17 +766,6 @@ function _semEscola(){
     if(chkVes.checked) t.push('VES');
     if(chkNot.checked) t.push('NOT');
     return t;
-  }
-
-  function atualizarTurnoHint(){
-    const t = getTurnosSelecionados();
-    if(!t.length){
-      turnoHint.textContent = 'Sem filtro de turno aplicado.';
-    } else if(t.length === 1){
-      turnoHint.textContent = 'Modo OU — exibe funcionários que atuam neste turno (mesmo que atuem em outros também).';
-    } else {
-      turnoHint.textContent = 'Modo E — exibe apenas funcionários que atuam em TODOS os turnos selecionados.';
-    }
   }
 
   /* ══════════════════════════════════════════
@@ -979,7 +966,7 @@ function _semEscola(){
         .map(t => `<span class="meta-i">${t}</span>`).join(' • ');
       const linha4 = [`RG/CNH: ${highlight(f.rgCnh, query) || '—'}`, `Turnos: ${escapeHtml(turnosTexto(f.turnos))}`]
         .map(t => `<span class="meta-i">${t}</span>`).join(' • ');
-      const neeChips = neeItens(f).map(t => `<span class="badge small gray">${t}</span>`).join('');
+      const neeChips = neeCurtos(f).map(t => `<span class="badge small gray">${t}</span>`).join('');
       const matId = matIdDe(f);
       const el    = document.createElement('div');
       el.className = 'item selecionavel';
@@ -1087,7 +1074,6 @@ function _semEscola(){
     document.getElementById('painelPesquisaAvancada').hidden = true;
     document.getElementById('btnPesquisaAvancada').setAttribute('aria-expanded', 'false');
   }
-  document.getElementById('btnPesquisarAvancada').addEventListener('click', () => { aplicarFiltros(); fecharPainelAvancado(); });
   document.getElementById('btnFecharPesquisaAvancada').addEventListener('click', fecharPainelAvancado);
 
   document.getElementById('btnLimparFiltros').addEventListener('click', function(){
@@ -1103,7 +1089,6 @@ function _semEscola(){
     currentSortOrder  = 'asc';
     sortFieldEl.value = 'nome';
     btnToggleSort.textContent = '↑↓';
-    atualizarTurnoHint();
     aplicarFiltros(); // ano permanece o mesmo
   });
 
@@ -1137,7 +1122,20 @@ function _semEscola(){
     if(e.target === modalBackdrop) fecharModal();
   });
 
-  // Rótulos de NEE (já escapados). Usado na ficha (completo) e no card (linha 4).
+  // Rótulos CURTOS de NEE só para o card (cabem na linha 4 mesmo com vários); a ficha usa neeItens (completo, com subtipo).
+  function neeCurtos(f){
+    const d = f.deficiencia || {};
+    const itens = [];
+    if(d.tea)              itens.push('🧩 TEA');
+    if(d.altasHabilidades) itens.push('⭐ Altas hab.');
+    if(d.defFisica)        itens.push('♿ Def. física');
+    if(d.defIntelectual)   itens.push('🧠 Def. intelectual');
+    if(d.defVisual)        itens.push('👁️ Def. visual');
+    if(d.defAuditiva)      itens.push('👂 Def. auditiva');
+    return itens;
+  }
+
+  // Rótulos de NEE (já escapados). Usado na ficha (completo).
   function neeItens(f){
     const d = f.deficiencia || {};
     const itens = [];
