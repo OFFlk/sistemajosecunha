@@ -50,25 +50,12 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   overflow-y:auto; margin-top:12px;
 }
 
-.stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
-.stat-box { flex:1; min-width:120px; background:var(--ui-brand-faded); border:1px solid var(--ui-border); border-radius:10px; padding:12px 16px; text-align:center; }
-.stat-num { font-size:26px; font-weight:800; color:var(--ui-brand-text); line-height:1; }
-.stat-lbl { font-size:12px; color:var(--ui-muted); margin-top:4px; }
+.stats-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }   /* a caixa (.stat-box/.stat-num/.stat-lbl) é do global */
 
-/* Aviso somente-leitura: âmbar fixo (D7) */
-#avisoReadonly {
-  display:none; align-items:center; gap:8px;
-  background:var(--ui-st-warn-bg); color:var(--ui-st-warn-fg);
-  border:1px solid var(--ui-st-warn-bd); border-radius:8px;
-  padding:10px 14px; font-size:13px; font-weight:700; margin-bottom:16px;
-}
+/* Aviso somente-leitura: .aviso-warn global; aqui só o espaçamento */
+#avisoReadonly { margin-bottom:16px; }
 
-.sec-header { display:flex; align-items:center; justify-content:space-between; cursor:default; user-select:none; }
-.sec-header.fechada { cursor:pointer; }
-.card:not(.card-destaque) .sec-header.fechada:hover h3 { color:var(--ui-brand-text); }
-.sec-toggle { font-size:16px; transition:transform .2s; display:inline-block; cursor:pointer; padding:4px 8px; }
-.sec-toggle.collapsed { transform:rotate(-90deg); }
-.sec-body.collapsed { display:none; }
+/* card recolhível (.sec-header/.sec-toggle/.sec-body): CSS é do global (components.css); aqui só o JS (toggleSec) */
 
 /* ── Migração (status ok/aviso/perigo: candidato a global, D3) ── */
 .migr-item {
@@ -105,10 +92,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 /* ── Card de destaque: fundo, h3, botões, tabela e .aviso-warn são do global (components.css).
       Aqui só o que é desta página, usando --dest-* ── */
-.card-destaque .sec-toggle { color:var(--dest-fg); }
-.card-destaque .stat-box { background:var(--ui-cell-bg); border-color:transparent; }
-.card-destaque.contraste-claro .stat-box { border-color:var(--ui-border); }
-.card-destaque .stat-lbl { color:var(--ui-muted); }
 
 /* ── Backup (exportar à esquerda, importar à direita) ── */
 .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
@@ -123,7 +106,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 <div class="container">
 
-  <div id="avisoReadonly">
+  <div class="aviso-warn" id="avisoReadonly" hidden>
     <span class="aviso-ico">🔒</span>
     Somente administradores podem modificar os dados. Você está em modo de visualização.
   </div>
@@ -139,7 +122,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     <div class="row-btns mt-14">
       <button class="btn secondary" onclick="carregarDados()">🔄 Carregar dados</button>
     </div>
-    <div class="aviso-warn mt-12 mb-0" id="avisoSemEscola" style="display:none;">⚠️ Nenhuma escola selecionada ("Todas as escolas"). Escolha uma escola para ver os números e usar as ferramentas.</div>
     <div class="console" id="logGeral" style="display:none;"></div>
   </div>
 
@@ -147,7 +129,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secPesquisa', event)">
       <h3>🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
-      <span class="sec-toggle" id="togSecPesquisa">▼</span>
+      <button type="button" class="sec-toggle" id="togSecPesquisa" aria-expanded="true" aria-controls="secPesquisa" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secPesquisa">
       <div id="psqFixa" style="display:none;"><span class="psq-chip">🔒 <span id="psqFixaNome"></span></span>
@@ -156,13 +138,13 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <label class="check"><input type="checkbox" id="psqTodas" onchange="psqTodasMudou()"> Todas as escolas</label>
       <div class="row-btns mt-10">
         <select id="psqSel" class="input cresce" onfocus="psqRenderSel()"></select>
-        <button class="btn secondary" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
+        <button class="btn secondary field-h" id="psqBtnAdd" onclick="psqAdicionar()">➕ Adicionar</button>
       </div>
       <div class="psq-chips" id="psqChips"></div>
       </div>
       <div class="row-btns">
         <input type="number" id="psqAno" class="input cresce" min="2000" max="2100" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
-        <button class="btn primary" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
+        <button class="btn primary field-h" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
     </div>
@@ -172,12 +154,12 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secExcluirAluno', event)">
       <h3>🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
-      <span class="sec-toggle" id="togSecExcluirAluno">▼</span>
+      <button type="button" class="sec-toggle" id="togSecExcluirAluno" aria-expanded="true" aria-controls="secExcluirAluno" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secExcluirAluno">
       <div class="row-btns">
         <input type="text" id="inpAlunoIdExcluir" class="input cresce" placeholder="alunoId (ex.: ALU-000123)">
-        <button class="btn secondary" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
+        <button class="btn secondary field-h" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewAluno" class="mt-14" style="display:none;">
@@ -199,12 +181,12 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secExcluirTurma', event)">
       <h3>🗑️ Excluir turma (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove uma turma (<b>anoAtivoTurmas</b>) e as matrículas (<b>anoAtivoMatriculas</b>) que apontam para ela, evitando matrículas órfãs. Os alunos não são apagados. <b>Ação irreversível.</b></span></span></h3>
-      <span class="sec-toggle" id="togSecExcluirTurma">▼</span>
+      <button type="button" class="sec-toggle" id="togSecExcluirTurma" aria-expanded="true" aria-controls="secExcluirTurma" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secExcluirTurma">
       <div class="row-btns">
         <input type="text" id="inpTurmaIdExcluir" class="input cresce" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)">
-        <button class="btn secondary" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
+        <button class="btn secondary field-h" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
       </div>
 
       <div id="previewTurma" class="mt-14" style="display:none;">
@@ -223,7 +205,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secGerarAta', event)">
       <h3>📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Informe o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
-      <span class="sec-toggle" id="togSecGerarAta">▼</span>
+      <button type="button" class="sec-toggle" id="togSecGerarAta" aria-expanded="true" aria-controls="secGerarAta" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secGerarAta">
       <div class="row-btns mt-0">
@@ -255,7 +237,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secMigracao', event)">
       <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Lê todos os alunos e todas as matrículas uma única vez (1 leitura por documento). <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
-      <span class="sec-toggle" id="togSecMigracao">▼</span>
+      <button type="button" class="sec-toggle" id="togSecMigracao" aria-expanded="true" aria-controls="secMigracao" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secMigracao">
       <div class="row-btns">
@@ -273,7 +255,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secContadores', event)">
       <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Lê as turmas e as matrículas ativas do ano (1 leitura por matrícula). Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
-      <span class="sec-toggle" id="togSecContadores">▼</span>
+      <button type="button" class="sec-toggle" id="togSecContadores" aria-expanded="true" aria-controls="secContadores" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secContadores">
       <div class="row-btns">
@@ -294,7 +276,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card card-destaque">
     <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
       <h3>💾 Backup do ano ativo</h3>
-      <span class="sec-toggle" id="togSecBackup">▼</span>
+      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-controls="secBackup" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secBackup">
       <div class="bk-grid">
@@ -353,7 +335,7 @@ document.addEventListener('auth:ready', async function () {
   IS_ADMIN = (role === 'admin');
 
   if (!IS_ADMIN) {
-    document.getElementById('avisoReadonly').style.display = 'flex';
+    document.getElementById('avisoReadonly').hidden = false;
     [
       'btnExportJSON', 'lblImportJSON',
       'btnBuscarAluno', 'btnExcluirAluno',
@@ -424,13 +406,11 @@ async function inicializar() {
   await waitAuth();
 
   const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
-  if (!sid || String(sid).toUpperCase() === 'ADMIN') {
+  if (Auth.semEscola()) {
     ['statTurmas', 'statAlunos', 'statMatriculas'].forEach(id => { document.getElementById(id).textContent = '—'; });
-    document.getElementById('avisoSemEscola').style.display = '';
     _visaoCarregada = false;
     return;
   }
-  document.getElementById('avisoSemEscola').style.display = 'none';
   if (!_visaoCarregada) return;
 
   try {
@@ -464,7 +444,7 @@ function toggleSec(id) {
   const tog  = document.getElementById('togSec' + id.replace('sec','').replace(/^./,c=>c.toUpperCase()));
   if (!body) return;
   const col = body.classList.toggle('collapsed');
-  if (tog) tog.classList.toggle('collapsed', col);
+  if (tog) { tog.classList.toggle('collapsed', col); tog.setAttribute('aria-expanded', String(!col)); }
   const hdr = body.previousElementSibling;
   if (hdr) hdr.classList.toggle('fechada', col);
 }
@@ -970,7 +950,7 @@ let _alunoParaExcluir = null; // { aluno, alunoId, mats, elos, docs, fotos }
 
 function escolaSelecionada() {
   const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
-  if (!sid || String(sid).toUpperCase() === 'ADMIN') {
+  if (Auth.semEscola()) {
     setMsg('Selecione uma escola (você está em "Todas as escolas").', 'err');
     return false;
   }
@@ -1405,7 +1385,7 @@ async function gaCarregar() {
   try {
     await waitAuth();
     const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
-    if (!sid || String(sid).toUpperCase() === 'ADMIN') {
+    if (Auth.semEscola()) {
       setMsg('Selecione uma escola para gerar atas (você está em "Todas as escolas").', 'err');
       return;
     }
@@ -1753,8 +1733,7 @@ function psqEscolas() {
   return out.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 function psqGlobal() {
-  const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
-  return !sid || String(sid).toUpperCase() === 'ADMIN';
+  return Auth.semEscola();
 }
 async function psqIniciar() {
   const glob = psqGlobal();
