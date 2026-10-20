@@ -214,15 +214,6 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
         <div class="pop-div"></div>
 
         <div>
-          <label class="check forte">
-            <input type="checkbox" id="chkFiltroAee">
-            🏫 Atua na sala do AEE
-          </label>
-        </div>
-
-        <div class="pop-div"></div>
-
-        <div>
           <label class="lbl" for="selSexoAv">👤 Sexo</label>
           <select class="input w-100" id="selSexoAv">
             <option value="">Todos</option>
@@ -454,8 +445,7 @@ function _authPronto(){
 function _semEscola(){
   try{
     if(window.Auth && typeof Auth.semEscola === 'function') return !!Auth.semEscola();
-    const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : '';
-    return !sid || String(sid).trim().toUpperCase() === 'ADMIN';
+    return !!(window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId() === 'ADMIN');
   }catch(_){ return false; }
 }
 </script>
@@ -776,12 +766,6 @@ function _semEscola(){
     if(d === true) return true;
     return !!(d && typeof d === 'object' && NEE_CHAVES.some(k => d[k] === true));
   }
-  // Ficha de funcionário não tem campo próprio de AEE: vale o campo "aee" (se existir) ou a função/cargo citar AEE.
-  function atuaNoAee(f){
-    if(f.aee === true) return true;
-    const t = normalize(f.funcao || '');
-    return /\baee\b/.test(t) || t.includes('atendimento educacional especializado');
-  }
   function partesNasc(s){
     s = String(s || '').trim(); let m;
     if((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))        return { dia: +m[3], mes: +m[2], ano: +m[1] };
@@ -794,7 +778,6 @@ function _semEscola(){
     return {
       def: !!document.getElementById('chkFiltroDef')?.checked,
       defItens: Array.from(document.querySelectorAll('.filtroDefItem:checked')).map(c => c.value),
-      aee: !!document.getElementById('chkFiltroAee')?.checked,
       sexo: document.getElementById('selSexoAv')?.value || '',
       nasc: { dia: n('selNascDia'), mes: n('selNascMes'), ano: /^\d{4}$/.test(anoTxt) ? +anoTxt : 0 }
     };
@@ -803,7 +786,6 @@ function _semEscola(){
     const av = lerAvancada();
     let n = 0;
     if(av.def) n++;
-    if(av.aee) n++;
     if(av.sexo) n++;
     if(av.nasc.dia || av.nasc.mes || av.nasc.ano) n++;
     const badge = document.getElementById('badgePesquisaAvancada');
@@ -814,7 +796,6 @@ function _semEscola(){
     document.getElementById('chkFiltroDef').checked = false;
     document.getElementById('subFiltroDef').style.display = 'none';
     document.querySelectorAll('.filtroDefItem').forEach(c => c.checked = false);
-    document.getElementById('chkFiltroAee').checked = false;
     ['selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => { document.getElementById(id).value = ''; });
     atualizarBadgeAvancada();
   }
@@ -863,8 +844,6 @@ function _semEscola(){
           if(!(d && typeof d === 'object' && av.defItens.some(k => d[k] === true))) return false;
         } else if(!temDeficiencia(f)) return false;
       }
-      // AEE
-      if(av.aee && !atuaNoAee(f)) return false;
       // turnos: 1 selecionado = OU, 2+ = E
       if(turnos.length){
         const ft = Array.isArray(f.turnos) ? f.turnos : [];
@@ -1065,7 +1044,7 @@ function _semEscola(){
     atualizarBadgeAvancada(); aplicarFiltros();
   });
   document.querySelectorAll('.filtroDefItem').forEach(c => c.addEventListener('change', aplicarFiltros));
-  ['chkFiltroAee','selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => {
+  ['selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => { atualizarBadgeAvancada(); aplicarFiltros(); });
   });
   document.getElementById('inpNascAno').addEventListener('input', () => { atualizarBadgeAvancada(); aplicarFiltros(); });

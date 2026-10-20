@@ -2049,6 +2049,12 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       return;
     }
 
+    // NEE: marcar "Sim" exige especificar ao menos uma deficiência/condição
+    if(WIZ.def === true && !(WIZ.tea || WIZ.altas || WIZ.fisica || WIZ.intelectual || WIZ.visual || WIZ.auditiva)){
+      _toastErro('⚠️ Você marcou “Sim” em NEE: selecione ao menos uma deficiência ou condição (ou marque “Não”).');
+      return;
+    }
+
     // Monta objeto
     const cpf = stripNum(document.getElementById('cpf').value);
     const funcaoRaw = document.getElementById('funcao').value;
