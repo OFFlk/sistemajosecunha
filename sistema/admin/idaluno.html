@@ -4,1113 +4,481 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <link rel="icon" href="../icon.png" type="image/png"/>
+<script>(function(){const t=localStorage.getItem('ui_theme_v1')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 
-<!-- Tema antecipado (evita flash de tema errado) -->
-<script>(function(){const t=localStorage.getItem('ui_theme_v1')||'light';document.documentElement.setAttribute('data-theme',t);})();
-</script>
-
-<!-- Scripts globais -->
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
 
-<!-- Fonte -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-
-<!-- CSS globais -->
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
+<link rel="stylesheet" href="/css/components.css">
 
-<!-- CSS específico desta página -->
 <style>
-
-
-  :root{
-    --bg:           #f4f3ff;
-    --card:         #ffffff;
-    --text:         #1e1b4b;
-    --muted:        #6b7280;
-    --border:       var(--brand-border, #ddd6fe);
-    --shadow:       0 4px 20px rgba(0,0,0,0.06);
-    --primary:      var(--brand, #7c3aed);
-    --primary2:     var(--brand-hover, #6d28d9);
-    --danger:       #b91c1c;
-    --danger2:      #991b1b;
-    --chip:         var(--brand-faded, #f5f3ff);
-    --chipText:     var(--brand-text, #6d28d9);
-    --ink:          #1e1b4b;
-    --line:         var(--brand-border, #ddd6fe);
-    --radius:       14px;
-    --chip-bg:      var(--brand-faded);
-    --chip-border:  var(--brand-border);
-    --chip-color:   var(--brand-text);
-    --chip-name:    #4b5563;
-    --mark-bg:      var(--brand-faded);
-    --sub-color:    var(--brand-text);
-    --school-bg:    var(--brand-faded);
-    --school-color: var(--brand-text);
-  }
-  html[data-theme="dark"]{
-    --bg:           #0a0e1a;
-    --card:         #131c2e;
-    --text:         #e2e8f0;
-    --muted:        #94a3b8;
-    --border:       #2a3a5c;
-    --shadow:       0 4px 24px rgba(0,0,0,0.4);
-    --primary:      var(--brand-d, #7c3aed);
-    --primary2:     var(--brand-hover-d, #6d28d9);
-    --chip:         var(--brand-faded-d, rgba(124,58,237,0.28));
-    --chipText:     var(--brand-text-d, #c4b5fd);
-    --ink:          #e2e8f0;
-    --line:         #1e2540;
-    --chip-bg:      var(--brand-faded-d);
-    --chip-border:  var(--brand-border-d);
-    --chip-color:   var(--brand-text-d);
-    --chip-name:    var(--brand-text-d);
-    --mark-bg:      var(--brand-faded-d);
-    --sub-color:    var(--brand-text-d);
-    --school-bg:    var(--brand-faded-d);
-    --school-color: var(--brand-text-d);
-  }
-
-  *{box-sizing:border-box}
-  body{
-    margin:0;
-    font-family:'Nunito',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    background: var(--bg);
-    color:var(--text);
-    min-height:100vh;
-    transition: background 0.3s, color 0.3s;
-  }
-  body::before{
-    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
-    background: var(--glow, none);
-  }
-  html[data-theme="dark"] body{
-    background:
-      radial-gradient(ellipse 800px 400px at 20% 0%, rgba(124,58,237,0.10) 0%, transparent 70%),
-      radial-gradient(ellipse 600px 400px at 80% 60%, rgba(59,130,246,0.06) 0%, transparent 70%),
-      var(--bg);
-  }
-  a{color:inherit}
-
-  /* Layout */
-  .container{max-width:1060px;margin:0 auto;padding:44px 36px 52px;position:relative;z-index:1;}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px 26px;box-shadow:var(--shadow);margin-bottom:18px;transition:background 0.3s,border-color 0.3s;}
-  h2{margin:0 0 6px;font-size:17px;font-weight:800;color:var(--text);}
-  h3{margin:0 0 10px;font-size:15px;font-weight:800;color:var(--text);}
-  .muted{color:var(--muted)}
-  .warn{background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.30);padding:12px 14px;border-radius:10px;font-size:13px;}
-  .ok{background:rgba(22,163,74,.10);border:1px solid rgba(22,163,74,.30);padding:12px 14px;border-radius:10px;font-size:13px;}
-
-  /* Form */
-  label{display:block;font-weight:700;margin-bottom:6px;font-size:13px;}
-  /* Escopado a .container: o header (fetch de header-component.html) fica
-     FORA do .container, então isso nunca toca no <select> do school-pill. */
-  .container input,.container select,.container textarea{
-    width:100%;padding:10px 14px;border-radius:10px;
-    border:1px solid var(--border);
-    background:var(--card);color:var(--text);
-    outline:none;font-family:'Nunito',system-ui,sans-serif;font-size:14px;
-    transition:border-color 0.15s,box-shadow 0.15s;
-  }
-  html[data-theme="dark"] .container input,html[data-theme="dark"] .container select,html[data-theme="dark"] .container textarea{
-    background:#0a1426;border-color:#1e2540;
-  }
-  .container input:focus,.container select:focus,.container textarea:focus{
-    border-color:var(--brand,#7c3aed);
-    box-shadow:0 0 0 3px rgba(0,0,0,0.06);
-  }
-  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
-  @media (max-width: 900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-  @media (max-width: 540px){.grid{grid-template-columns:1fr;}}
-
-  /* Buttons */
-  .btn, a.btn{
-    appearance:none;border:1px solid transparent;border-radius:10px;
-    padding:10px 16px;font-size:14px;font-weight:800;cursor:pointer;
-    text-decoration:none;display:inline-flex;align-items:center;gap:8px;justify-content:center;
-    user-select:none;font-family:'Nunito',system-ui,sans-serif;
-    transition:background .18s, border-color .18s, transform .06s;
-  }
-  .btn:active{transform:translateY(1px)}
-  .btn-primary{background:var(--brand,#7c3aed);border-color:var(--brand,#7c3aed);color:#fff;}
-  .btn-primary:hover{background:var(--brand-hover,#6d28d9);border-color:var(--brand-hover,#6d28d9);}
-  html[data-theme="dark"] .btn-primary{background:var(--brand-d,#7c3aed);border-color:var(--brand-d,#7c3aed);}
-  html[data-theme="dark"] .btn-primary:hover{background:var(--brand-hover-d,#6d28d9);border-color:var(--brand-hover-d,#6d28d9);}
-  .btn-danger{background:#b91c1c;border-color:#b91c1c;color:#fff;}
-  .btn-danger:hover{background:#991b1b;border-color:#991b1b;}
-  html[data-theme="dark"] .btn-danger{background:#b91c1c;border-color:#b91c1c;}
-  html[data-theme="dark"] .btn-danger:hover{background:#991b1b;border-color:#991b1b;}
-  .btn-gray{background:var(--brand-faded,rgba(124,58,237,0.12));border:1px solid var(--brand,#7c3aed);color:var(--brand,#7c3aed);}
-  html[data-theme="dark"] .btn-gray{background:var(--brand-faded-d,rgba(124,58,237,0.28));border-color:var(--brand-border-d,#7c3aed);color:var(--brand-text-d,#c4b5fd);}
-  .btn-gray:hover{background:var(--brand-faded,#f5f3ff);border-color:var(--brand-border,#ddd6fe);color:var(--brand-text,#6d28d9);}
-  html[data-theme="dark"] .btn-gray:hover{background:var(--brand-d,#a78bfa);border-color:var(--brand-d,#a78bfa);color:#ffffff;}
-  .btn-ghost{background:transparent;border-color:var(--border);color:var(--text);}
-  .btn-ghost:hover{background:var(--brand-faded,#f5f3ff);border-color:var(--brand-border,#ddd6fe);color:var(--brand-text,#6d28d9);}
-  html[data-theme="dark"] .btn-ghost:hover{background:var(--brand-faded-d,rgba(124,58,237,0.28));border-color:var(--brand-border-d,#7c3aed);color:var(--brand-text-d,#c4b5fd);}
-
-  /* Tables */
-  table{width:100%;border-collapse:separate;border-spacing:0;margin-top:10px;overflow:hidden;border-radius:10px;border:1px solid var(--border);}
-  th,td{padding:10px;border-bottom:1px solid var(--border);text-align:center;font-size:13px;}
-  th{background:var(--chip);font-weight:800;font-size:12px;color:var(--muted);}
-  tr:last-child td{border-bottom:none}
-
-  /* Dark mode fixes: duplicatas details box (inline light styles) */
-  html[data-theme="dark"] #sugDetalhes{
-    background: rgba(15,23,42,.55) !important;
-    border-color: rgba(255,255,255,.14) !important;
-  }
-  html[data-theme="dark"] #sugDetalhes,
-  html[data-theme="dark"] #sugDetalhes .small,
-  html[data-theme="dark"] #sugDetalhes b,
-  html[data-theme="dark"] #sugDetalhes span{
-    color: rgba(226,232,240,.92) !important;
-  }
-  html[data-theme="dark"] #sugDetalhes label{
-    color: rgba(226,232,240,.85) !important;
-  }
-  html[data-theme="dark"] #sugDetalhes select{
-    background: rgba(2,6,23,.55) !important;
-    color: rgba(226,232,240,.92) !important;
-    border-color: rgba(255,255,255,.16) !important;
-  }
-
-  html[data-theme="dark"] .container select option{
-    background: #0b1220;
-    color: rgba(226,232,240,.92);
-  }
-
-
-
-/* ── Overlay de progresso ── */
-#overlayUnioes{
-  position:fixed; inset:0; z-index:9999;
-  background:rgba(15,23,42,.72);
-  backdrop-filter:blur(4px);
-  display:flex; align-items:center; justify-content:center;
-  padding:18px;
-}
-.overlay-card{
-  background:var(--card); border-radius:14px;
-  border:1px solid var(--border);
-  box-shadow:0 30px 60px rgba(0,0,0,.25);
-  padding:28px 32px; max-width:440px; width:100%;
-  text-align:center;
-}
-.overlay-card h3{ margin:0 0 8px; font-size:18px; }
-.overlay-card .sub{ font-size:13px; color:#64748b; margin-bottom:18px; }
-.progress-track{
-  background:#e5e7eb; border-radius:999px; height:10px;
-  overflow:hidden; margin-bottom:12px;
-}
-.progress-fill{
-  height:100%; border-radius:999px;
-  background:linear-gradient(90deg,var(--brand,#7c3aed),var(--brand-hover,#6d28d9));
-  transition:width .3s ease;
-}
-.overlay-warn{
-  font-size:12px; color:#b91c1c; font-weight:700;
-  background:#fee2e2; border:1px solid #fecaca;
-  border-radius:8px; padding:8px 12px; margin-top:10px;
-}
-.fila-badge{
-  display:inline-flex; align-items:center; gap:6px;
-  background:#fef3c7; border:1px solid #fcd34d;
-  color:#92400e; font-size:12px; font-weight:800;
-  border-radius:999px; padding:3px 10px; margin-left:8px;
-}
-
-
+  /* sigla da página: ida */
+  .container{max-width:1060px;margin:0 auto;padding:44px 36px 52px}
+  .barra{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:12px 0}
+  .barra .field{min-width:220px}
+  .stats-row{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0}
+  .item{display:flex;gap:14px;justify-content:space-between;margin-top:10px}
+  .item .left{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  .item .right{display:flex;flex-direction:column;gap:8px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .rolagem{max-height:280px;overflow-y:auto}
+  .list-item.sel{background:var(--ui-brand-faded);cursor:pointer}
+  .list-item{cursor:pointer}
+  .manual{display:flex;gap:8px;align-items:flex-end;margin-top:14px}
+  .manual .field{flex:1;min-width:0}
+  .mt-12{margin-top:12px}
+  @media (max-width:700px){.item{flex-direction:column}.container{padding:24px 16px}}
 </style>
-
-<title>Admin - Verificação de Alunos</title>
+<title>Verificação de Alunos</title>
 </head>
 <body>
-
 <div id="header-placeholder"></div>
 
 <div class="container">
-<div class="card">
-<h2>Verificação e fusão de alunos (Atas ↔ Ano-Ativo)</h2>
-<p class="small">
-Detecta possíveis duplicatas/vínculos entre os catálogos de Atas e Ano-Ativo por
-semelhança de nome. A criação de IDs de Atas acontece em <b>cadastro-turma.html</b>
-ao salvar a turma — esta página não cria IDs, só une/vincula os que já existem.
-</p>
-<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-<button class="btn btn-danger" onclick="limparDuplicatasFirestore()" title="Verifica alunos-atas e anoAtivoAlunos por documentos com alunoId repetido (não deveria ocorrer em uso normal — segurança contra dado legado)">🧹 Verificar duplicatas no Firestore</button>
-<div style="flex:1;min-width:260px">
-<label class="small">Similaridade mínima</label>
-<input id="cut" max="95" min="70" style="width:100%" type="range" value="85"/>
-<div class="small">Atual: <b><span id="cutVal">85</span>%</b></div>
-</div>
-</div>
-<div class="hr"></div>
-<div style="display:flex;gap:8px">
-<button class="btn btn-primary" id="tab1" onclick="aba('alunos')">1) Alunos + ID</button>
-<button class="btn btn-gray" id="tab2" onclick="aba('sug')">2) Prováveis duplicatas</button>
-</div>
-<div class="small" id="resumo" style="margin-top:10px"></div>
-<div class="small" id="metaSistema" style="margin-top:6px; color:#666"></div>
-<div id="abaAlunos" style="margin-top:10px">
-<input id="filtroAluno" placeholder="Filtrar por nome ou ID" style="width:100%"/>
-<select id="listaAlunos" size="12" style="width:100%;margin-top:8px"></select>
-<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-<button class="btn btn-gray" onclick="marcarDuplicadoManual()" type="button">🔎 Este aluno tem duplicata</button>
-</div>
-</div>
-<div id="abaSug" style="margin-top:10px;display:none">
-<input id="filtroSug" placeholder="Filtrar sugestões" style="width:100%"/>
-<select id="listaSug" size="12" style="width:100%;margin-top:8px"></select>
-<div id="sugDetalhes" style="margin-top:10px; padding:10px; border:1px solid #ddd; border-radius:6px; background:#fafafa;">
-<div class="small" style="margin-bottom:8px"><b>Selecionado:</b> <span id="sugSelecionadoTxt">—</span></div>
-<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-<label class="small" style="min-width:170px">Nome oficial após unir:</label>
-<select id="nomeOficialEscolha" style="min-width:340px; flex:1"></select>
-</div>
-<div class="small" style="margin-top:6px; color:#666">Dica: escolha o nome mais correto (acentos / completo). Isso será o nome exibido na lista principal para o ID mantido.</div>
-</div>
-<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-<button class="btn btn-primary" onclick="unirSelecionados()" type="button">➕ Enfileirar união (B → A)</button>
-<button class="btn btn-gray" onclick="marcarComoDiferentes()" type="button">São pessoas diferentes</button>
-</div>
-<div id="filaResumo" style="display:none; margin-top:14px; padding:12px; background:#fffbeb; border:1px solid #fcd34d; border-radius:12px; font-size:13px;">
-  <div style="font-weight:800; margin-bottom:8px;">⏳ Uniões na fila <span id="filaCount" class="fila-badge">0</span></div>
-  <div id="filaLista" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; margin-bottom:10px;"></div>
-  <div style="display:flex; gap:8px; flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="aplicarFilaUnioes()" type="button" id="btnAplicarFila">💾 Aplicar uniões</button>
-    <button class="btn btn-gray" onclick="limparFila()" type="button">🗑️ Limpar fila</button>
-  </div>
-</div>
-</div>
-</div>
-
-<!-- Overlay de progresso (fica oculto até aplicarFilaUnioes ser chamado) -->
-<div id="overlayUnioes" style="display:none;">
-  <div class="overlay-card">
-    <h3>🔄 Aplicando uniões</h3>
-    <div class="sub" id="overlaySubtitle">Processando...</div>
-    <div class="progress-track">
-      <div class="progress-fill" id="overlayBar" style="width:0%"></div>
+  <div class="card">
+    <h2 class="section-title">Verificação e vínculo de alunos</h2>
+    <div class="aviso-warn" id="avisoSemEscola" hidden>ℹ️ Escolha uma escola no topo da página para verificar alunos.</div>
+    <div class="barra">
+      <button class="btn primary" id="tab1" type="button" data-act="aba" data-a="atas">1) Duplicatas em Atas</button>
+      <button class="btn secondary" id="tab2" type="button" data-act="aba" data-a="cross">2) Ano-Ativo ↔ Atas</button>
+      <div class="field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
+        <input id="cut" type="range" min="70" max="95" value="85"/></div>
     </div>
-    <div id="overlayStep" style="font-size:13px; color:#64748b; margin-bottom:4px;"></div>
-    <div class="overlay-warn">⚠️ Não feche nem recarregue esta página</div>
+  </div>
+
+  <div class="card" id="abaAtas">
+    <div class="aviso-warn">ℹ️ Nada é lido do banco até você apertar <b>Carregar</b>. A análise de trajetória lê só as matrículas dos alunos com nome parecido.</div>
+    <div class="barra">
+      <button class="btn secondary" type="button" data-act="carAtas">🔄 Carregar alunos de Atas</button>
+      <button class="btn primary" type="button" id="btnTraj" data-act="traj1" disabled>🧭 Analisar trajetória</button>
+      <label class="check"><input type="checkbox" id="mostrarInc"> Mostrar incompatíveis</label>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statAlunos">—</div><div class="stat-lbl">Alunos</div></div>
+      <div class="stat-box"><div class="stat-num" id="statPares">—</div><div class="stat-lbl">Pares por nome</div></div>
+      <div class="stat-box"><div class="stat-num" id="statOk">—</div><div class="stat-lbl">Trajetória compatível</div></div>
+    </div>
+    <div id="listaAtas"></div>
+  </div>
+
+  <div class="card" id="abaCross" hidden>
+    <div class="aviso-warn">ℹ️ Aqui ficam os alunos do Ano-Ativo ainda sem vínculo com Atas. Os dois IDs continuam existindo; o vínculo é gravado em <b>alunos</b>.</div>
+    <div class="barra">
+      <button class="btn secondary" type="button" data-act="carPend">🔄 Carregar pendentes do Ano-Ativo</button>
+      <div class="field"><label for="filtroPend">Filtrar por nome</label><input class="input" id="filtroPend" placeholder="Nome ou ID"/></div>
+    </div>
+    <div class="stats-row"><div class="stat-box"><div class="stat-num" id="statPend">—</div><div class="stat-lbl">Sem vínculo</div></div></div>
+    <div class="list rolagem" id="listaPend"></div>
+    <div id="painelCross" class="mt-12"></div>
   </div>
 </div>
 
-<!-- Lógica específica desta página -->
 <script>
+const $ = id => document.getElementById(id);
+function _escHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const nrm = s => window.Identidade.normNome(s);
 
-/* =========================
-   Utilitários / Storage
-========================= */
-const $ = (id)=>document.getElementById(id);
+/* ── Toasts e modal (guia seção 10) ── */
+const _TOAST = { ok:{cls:'toast-ok',ms:2500}, err:{cls:'toast-err',ms:4500}, warn:{cls:'toast-warn',ms:4000}, loading:{cls:'toast-loading',ms:0} };
+function _showToast(msg, tipo){
+  const ex = $('_toastGlobal'); if(ex) ex.remove();
+  const cfg = _TOAST[tipo] || _TOAST.warn;
+  const t = document.createElement('div'); t.id = '_toastGlobal'; t.className = 'toast ' + cfg.cls;
+  t.setAttribute('role', tipo === 'err' ? 'alert' : 'status');
+  const sp = document.createElement('span'); sp.className = 'toast-msg'; sp.textContent = msg;
+  const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'toast-close'; bt.textContent = '✕'; bt.setAttribute('aria-label','Fechar aviso'); bt.onclick = () => t.remove();
+  t.append(sp, bt); document.body.appendChild(t);
+  if(cfg.ms) setTimeout(() => { if(t.isConnected) t.remove(); }, cfg.ms);
+}
+function _toastLimpar(){ const t = $('_toastGlobal'); if(t && t.classList.contains('toast-loading')) t.remove(); }
+function setMsg(text, kind){
+  const t = (text || '').toString(); if(!t) return;
+  if(kind === 'err') _showToast('⚠️ ' + t, 'err');
+  else if(kind === 'ok') _showToast('✅ ' + t, 'ok');
+  else if(kind === 'warn') _showToast('⚠️ ' + t, 'warn');
+  else if(kind === 'loading') _showToast('⏳ ' + t, 'loading');
+  else { console.warn('[toast] kind desconhecido:', kind); _showToast(t, 'warn'); }
+}
+window.addEventListener('unhandledrejection', () => { const t = $('_toastGlobal'); if(t && t.classList.contains('toast-loading')) _showToast('⚠️ Não foi possível concluir a operação.', 'err'); });
 
-function escapeHtml(s){
-  return String(s||"")
-    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
-}
-function normNome(s){
-  return String(s||"").trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-    .replace(/\s+/g," ");
-}
-function lerJSON(k, fallback){
-  try {
-    const _sid = (window.Auth?.getActiveSchoolId?.() || (()=>{
-      try{ const s=window.Auth?.getSession?.(); const sid=(s?.schoolId||'').toUpperCase();
-        if(sid==='ADMIN') return (localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN';
-        return sid||''; }catch(_){ return ''; }})());
-    const _sk = _sid ? `schools:${_sid}:${k}` : k;
-    const raw = localStorage.getItem(_sk) || localStorage.getItem(k); // fallback legado
-    return JSON.parse(raw || JSON.stringify(fallback));
-  } catch { return fallback; }
-}
-function salvarJSON(k, v){
-  // Grava local com chave scoped (prefixo escola)
-  const _sid = (window.Auth?.getActiveSchoolId?.() || (()=>{
-    try{ const s=window.Auth?.getSession?.(); const sid=(s?.schoolId||'').toUpperCase();
-      if(sid==='ADMIN') return (localStorage.getItem('admin_active_school_v1')||'').trim()||'ADMIN';
-      return sid||''; }catch(_){ return ''; }})());
-  const _sk = _sid ? `schools:${_sid}:${k}` : k;
-  localStorage.setItem(_sk, JSON.stringify(v));
-  // Espelha no Firestore em paralelo
-  const _MAP={turmasDB:'turmas',
-               atasDB:'atas',matriculasDB:'matriculas',turmasMetaDB:null,
-               anoAtivoTurmasDB_v1:'anoAtivoTurmas', anoAtivoMatriculasDB_v1:'anoAtivoMatriculas'};
-  try{
-    if(window.DB && window.Auth && window.Auth.getSession()){
-      const col=_MAP[k]; if(col===undefined) return;
-      if(col===null) return; // turmasMetaDB: sem coleção dedicada
-      const fc=window.DB[col]; if(!fc) return;
-      Array.isArray(v)?fc.saveAll(v).catch(()=>{}):fc.save(v).catch(()=>{});
-    }
-  }catch(_){}
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar }){
+  return new Promise(resolve => {
+    const perigo = corDestaque === 'danger', v = perigo ? ' perigo' : corDestaque === 'ok' ? ' ok' : '';
+    const bd = document.createElement('div'); bd.className = 'modal-backdrop open';
+    bd.innerHTML = `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true"><h3 class="cm-titulo${v}">${_escHtml(titulo || 'Confirmar ação')}</h3><p class="cm-corpo">${corpo || ''}</p><div class="cm-acoes"><button type="button" class="btn secondary" id="_cmC">${_escHtml(textoCancelar || 'Cancelar')}</button><button type="button" class="cm-ok${v}" id="_cmO">${_escHtml(textoConfirmar || 'Continuar')}</button></div></div>`;
+    document.body.appendChild(bd);
+    const fechar = r => { document.removeEventListener('keydown', onKey, true); bd.remove(); resolve(r); };
+    const onKey = ev => { if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } };
+    document.addEventListener('keydown', onKey, true);
+    bd.querySelector('#_cmO').onclick = () => fechar(true);
+    bd.querySelector('#_cmC').onclick = () => fechar(false);
+    bd.addEventListener('click', ev => { if(ev.target === bd) fechar(false); });
+    bd.querySelector('#_cmC').focus();
+  });
 }
 
-function lerTurmasDB(){ return lerJSON("turmasDB", []); }
-function salvarTurmasDB(v){ salvarJSON("turmasDB", v||[]); }
+function _semEscola(){ const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : ''; return !sid || String(sid).trim().toUpperCase() === 'ADMIN'; }
+function _authPronto(){ return new Promise(r => { if(window.Auth && Auth.getSession && Auth.getSession()) return r(); if(window.Auth && Auth.onReady) Auth.onReady(r); else r(); }); }
 
-// Uma linha de ALUNOS (tabela em memória, montada no boot a partir de
-// alunos-atas + anoAtivoAlunos): { id, nomeOficial, origem: 'atas'|'anoAtivo'|'ambos' }
-// `origem: 'ambos'` = já fundido (mesmo alunoId presente nas duas coleções).
+/* ── Estado ── */
+let ATAS = [], ATAS_IDX = new Map(), ELOS = new Map(), ELO_AA = new Map(), carregouAtas = false;
+let SUGS = [], SKIP = new Set(), MATS = new Map(), AAMATS = new Map(), ESCOLA = null;
+let AAPEND = [], AA_SEL = null, LIM = 25;
+const chave = (a, b) => [String(a), String(b)].sort().join('|');
+const num = id => { const m = String(id || '').match(/(\d+)/); return m ? parseInt(m[1], 10) : Infinity; };
 
-// pares ignorados (decisão "são pessoas diferentes")
-function lerIgnorados(){ return lerJSON("alunosDupeIgnorados", []); }
-function salvarIgnorados(v){ salvarJSON("alunosDupeIgnorados", v||[]); }
-function chavePar(a,b){
-  const x = String(a||""), y = String(b||"");
-  return [x,y].sort().join("|");
-}
-
-/* =========================
-   Similaridade (Jaro-Winkler simplificado)
-========================= */
-function similaridade(a,b){
-  a = normNome(a); b = normNome(b);
-  if (!a || !b) return 0;
-  if (a === b) return 1;
-
-  const mDist = Math.floor(Math.max(a.length, b.length)/2)-1;
-  const aMatch = new Array(a.length).fill(false);
-  const bMatch = new Array(b.length).fill(false);
-
-  let matches = 0;
-  for (let i=0;i<a.length;i++){
-    const start = Math.max(0, i-mDist);
-    const end = Math.min(i+mDist+1, b.length);
-    for (let j=start;j<end;j++){
-      if (bMatch[j]) continue;
-      if (a[i] !== b[j]) continue;
-      aMatch[i]=true; bMatch[j]=true; matches++; break;
+/* ── Similaridade (Jaro-Winkler; recebe nomes já normalizados) ── */
+function jw(a, b){
+  if(!a || !b) return 0; if(a === b) return 1;
+  const md = Math.max(0, Math.floor(Math.max(a.length, b.length) / 2) - 1), am = [], bm = [];
+  let m = 0;
+  for(let i = 0; i < a.length; i++){
+    for(let j = Math.max(0, i - md); j < Math.min(i + md + 1, b.length); j++){
+      if(bm[j] || a[i] !== b[j]) continue; am[i] = bm[j] = true; m++; break;
     }
   }
-  if (!matches) return 0;
-
-  let t = 0;
-  let k = 0;
-  for (let i=0;i<a.length;i++){
-    if (!aMatch[i]) continue;
-    while(!bMatch[k]) k++;
-    if (a[i] !== b[k]) t++;
-    k++;
-  }
-  t = t/2;
-
-  const jaro = (matches/a.length + matches/b.length + (matches-t)/matches)/3;
-  let l = 0;
-  for (; l<4 && l<a.length && l<b.length && a[l]===b[l]; l++);
-  const p = 0.1;
-  return jaro + l*p*(1-jaro);
+  if(!m) return 0;
+  let t = 0, k = 0;
+  for(let i = 0; i < a.length; i++){ if(!am[i]) continue; while(!bm[k]) k++; if(a[i] !== b[k]) t++; k++; }
+  t /= 2;
+  const j = (m / a.length + m / b.length + (m - t) / m) / 3;
+  let l = 0; while(l < 4 && l < a.length && l < b.length && a[l] === b[l]) l++;
+  return j + l * 0.1 * (1 - j);
 }
 
-/* =========================
-   Estado UI
-========================= */
-let ALUNOS = [];
-let SUGS = [];
-
-/* =========================
-   UI abas / resumo
-========================= */
-function aba(x){
-  $("abaAlunos").style.display = (x==="alunos") ? "block" : "none";
-  $("abaSug").style.display    = (x==="sug")    ? "block" : "none";
-  $("tab1").className = (x==="alunos") ? "btn btn-primary" : "btn btn-gray";
-  $("tab2").className = (x==="sug") ? "btn btn-primary" : "btn btn-gray";
+/* Índice por token e por "token com 1 letra removida": só compara nomes que
+   compartilham alguma chave (pega erro de digitação sem comparar todos os pares). */
+function chaves(nb){
+  const ks = new Set();
+  nb.split(' ').filter(t => t.length >= 3).forEach(t => { ks.add(t); for(let i = 0; i < t.length; i++) ks.add(t.slice(0, i) + t.slice(i + 1)); });
+  return ks;
 }
-
-function atualizarResumo(msg){
-  $("resumo").innerHTML = msg ? msg : "";
+function indexar(lista){
+  const idx = new Map();
+  lista.forEach((x, i) => chaves(x.nb).forEach(k => { if(!idx.has(k)) idx.set(k, []); idx.get(k).push(i); }));
+  return idx;
 }
-
-/* =========================
-   IDs automáticos
-========================= */
-// Criação de alunoId de Atas acontece em cadastro-turma.html (garantirIds()).
-// gerarIds()/gerarIdsSistema() removidos desta página por serem redundantes
-// e, no caso de gerarIds(), estarem quebrados (chamavam findOrCreateBatch()
-// sem await) — decisão tomada na rodada de redesenho do módulo de Atas.
-
-/* =========================
-   Catálogo ALUNOS (alunos-atas + anoAtivoAlunos + elo)
-========================= */
-
-// Extrai a parte numérica de "ALU-000123" pra comparação de "menor ID".
-function _numAlunoId(id){
-  const m = String(id||"").match(/(\d+)/);
-  return m ? parseInt(m[1], 10) : Infinity;
-}
-// true se a vence (é a mesma ou menor que b)
-function _idMenorOuIgual(a, b){ return _numAlunoId(a) <= _numAlunoId(b); }
-
-/**
- * Recarrega ALUNOS a partir do Firestore (bulk — necessário pra comparação
- * par-a-par de nomes; ver nota sobre isso na conversa). Cada linha:
- * { id, nomeOficial, origem: 'atas'|'anoAtivo'|'ambos' }.
- * origem:'ambos' = mesmo alunoId já existe nas duas coleções (já fundido).
- */
-async function recarregarAlunos(){
-  const [atasDocs, aaDocs] = await Promise.all([
-    window.DB['alunos-atas'].list(),
-    window.DB.anoAtivoAlunos.list(),
-  ]);
-
-  const porId = new Map();
-  for (const d of atasDocs){
-    const id = String(d.alunoId || d._id || "").trim();
-    if (!id) continue;
-    porId.set(id, { id, nomeOficial: d.nome || d.nomeOficial || "", origem: "atas" });
-  }
-  for (const d of aaDocs){
-    const id = String(d.alunoId || d._id || "").trim();
-    if (!id) continue;
-    const nome = d.nome || d.nomeCompleto || d.nomeOficial || "";
-    const existente = porId.get(id);
-    if (existente){
-      existente.origem = "ambos";
-      // Nome do Ano-Ativo tende a ser mais completo (tem cadastro formal) —
-      // prevalece na exibição quando já está fundido.
-      if (nome) existente.nomeOficial = nome;
-    } else {
-      porId.set(id, { id, nomeOficial: nome, origem: "anoAtivo" });
-    }
-  }
-
-  ALUNOS = Array.from(porId.values())
-    .sort((a,b)=>String(a.nomeOficial||"").localeCompare(String(b.nomeOficial||""),'pt-BR'));
-  return ALUNOS;
-}
-
-/* =========================
-   Aba 1: alunos + ação manual
-========================= */
-function renderAlunos(){
-  const f = normNome($("filtroAluno").value||"");
-  const lista = f ? ALUNOS.filter(a => normNome(a.nomeOficial).includes(f) || normNome(a.id).includes(f)) : ALUNOS;
-
-  $("listaAlunos").innerHTML = lista.map(a =>
-    `<option value="${escapeHtml(a.id)}">${escapeHtml(a.nomeOficial)} — ${escapeHtml(a.id)}</option>`
-  ).join("");
-
-  if (!lista.length) $("listaAlunos").innerHTML = `<option value="">(Nenhum aluno)</option>`;
-}
-
-function alunoSelecionadoId(){
-  const sel = $("listaAlunos");
-  return sel && sel.value ? sel.value : "";
-}
-
-function marcarDuplicadoManual(){
-  const id = alunoSelecionadoId();
-  if (!id){ alert("Selecione um aluno na lista."); return; }
-
-  if (!SUGS.length){
-    alert("Ainda não há sugestões. Reduza a similaridade mínima e tente de novo.");
-    return;
-  }
-
-  $("filtroSug").value = id;
-  renderSugestoes();
-  aba("sug");
-  atualizarResumo(`🔎 Mostrando sugestões que envolvem <b>${escapeHtml(id)}</b>.`);
-}
-
-/* =========================
-   Aba 2: sugestões
-========================= */
-function escolherMelhorNome(aNome, bNome){
-  // heurística simples: preferir o que tem mais letras + contém acento (quando existir)
-  const temAcento = (s)=>String(s||"").normalize("NFD").match(/[\u0300-\u036f]/);
-  const aScore = (String(aNome||"").length) + (temAcento(aNome)?5:0);
-  const bScore = (String(bNome||"").length) + (temAcento(bNome)?5:0);
-  return (bScore > aScore) ? "B" : "A";
-}
-
-function _seriesDoAluno(alunoId){
-  // Retorna string resumida das séries e anos encontrados nas turmas para este alunoId
-  // Lê AMBOS os módulos: atas (turmasDB) e ano-ativo (anoAtivoTurmasDB_v1 + anoAtivoMatriculasDB_v1)
-  if(!alunoId) return "";
-  const achados = [];
-  const id = String(alunoId);
-
-  // --- Módulo de atas ---
-  for(const t of lerTurmasDB()){
-    if(!Array.isArray(t.alunos)) continue;
-    const al = t.alunos.find(a => String(a.alunoId||"") === id);
-    if(al){
-      const ano  = String(t.anoLetivo || "?");
-      const serie = String(al.serie || t.serieTexto || (Array.isArray(t.seriesTurma) ? t.seriesTurma[0] : "") || "?");
-      achados.push(`${serie}/${ano}`);
-    }
-  }
-
-  // --- Módulo ano-ativo: matrículas ---
-  const matsAA = lerJSON("anoAtivoMatriculasDB_v1", []);
-  const turmasAA = lerJSON("anoAtivoTurmasDB_v1", []);
-  for(const m of matsAA){
-    if(String(m.alunoId||"") !== id) continue;
-    const ano   = String(m.anoLetivo || "?");
-    let serie   = String(m.serie || "");
-    // fallback: busca na turma correspondente
-    if(!serie && m.turmaId){
-      const t = turmasAA.find(t => (t.turmaId||t.id) === m.turmaId);
-      if(t) serie = Array.isArray(t.series) ? t.series[0] : (t.serie || "");
-    }
-    if(serie || ano !== "?") achados.push(`${serie||"?"}/${ano} [AA]`);
-  }
-
-  return achados.join(" • ") || "sem série";
-}
-
-function gerarSugestoes(){
-  const cut = (parseInt($("cut").value||"85",10) || 85)/100;
-  const ignorados = new Set(lerIgnorados());
-
-  // Cache de séries (O(n) em vez de O(n³))
-  const seriesCache = {};
-  for(const a of ALUNOS){
-    seriesCache[a.id] = _seriesDoAluno(a.id);
-  }
-
-  const sugs = [];
-  for (let i=0;i<ALUNOS.length;i++){
-    for (let j=i+1;j<ALUNOS.length;j++){
-      const a = ALUNOS[i], b = ALUNOS[j];
-      const par = chavePar(a.id, b.id);
-      if (ignorados.has(par)) continue;
-
-      const s = similaridade(a.nomeOficial, b.nomeOficial);
-      if (s >= cut){
-        const distintos = a.origem !== b.origem;
-        const modulosDiferentes = distintos && a.origem !== "ambos" && b.origem !== "ambos";
-
-        let pA, pB;
-        if (modulosDiferentes){
-          // Cross-módulo: o lado Ano-Ativo SEMPRE sobrevive, independente
-          // do valor numérico do ID. Mídia no Cloudinary (avatar/documentos)
-          // é vinculada pelo alunoId do Ano-Ativo — se o ID de Atas vencesse,
-          // a mídia ficaria órfã (bug já visto e corrigido antes, na v11).
-          const swap = a.origem !== "anoAtivo";
-          pA = swap ? b : a; pB = swap ? a : b;
-        } else {
-          // Mesmo módulo (ou envolve um lado já fundido, 'ambos'): sem
-          // vínculo de mídia em jogo aqui — regra é sempre o menor ID,
-          // independente do nome que o usuário escolher manter.
-          const swap = !_idMenorOuIgual(a.id, b.id);
-          pA = swap ? b : a; pB = swap ? a : b;
-        }
-
-        sugs.push({
-          ida:   pA.id, idb:   pB.id,
-          aNome: pA.nomeOficial, bNome: pB.nomeOficial,
-          aSeries: seriesCache[pA.id],
-          bSeries: seriesCache[pB.id],
-          score: s,
-          modulosDiferentes, // flag para UI
-        });
-      }
-    }
-  }
-  sugs.sort((x,y)=>y.score-x.score);
-  SUGS = sugs;
-  renderSugestoes();
-  atualizarSugDetalhes(null);
-}
-
-function renderSugestoes(){
-  const f = normNome($("filtroSug").value||"");
-  const lista = f ? SUGS.filter(x =>
-    normNome(x.aNome).includes(f) ||
-    normNome(x.bNome).includes(f) ||
-    normNome(x.ida).includes(f) ||
-    normNome(x.idb).includes(f)
-  ) : SUGS;
-
-  $("listaSug").innerHTML = lista.map((x)=>{
-    const pct = Math.round(x.score*100);
-    const aInfo = `${escapeHtml(x.aNome)} [${escapeHtml(x.aSeries||"?")}] (${escapeHtml(x.ida)})`;
-    const bInfo = `${escapeHtml(x.bNome)} [${escapeHtml(x.bSeries||"?")}] (${escapeHtml(x.idb)})`;
-    // Módulos diferentes (atas &harr; ano-ativo): é vinculação, não duplicata
-    const prefix = x.modulosDiferentes
-      ? `🔗 ${pct}% [Atas&harr;AnoAtivo]`
-      : `${pct}%`;
-    return `<option value="${escapeHtml(chavePar(x.ida,x.idb))}">${prefix} | ${aInfo} &harr; ${bInfo}</option>`;
-  }).join("");
-
-  if (!lista.length) $("listaSug").innerHTML = `<option value="">(Nenhuma sugestão)</option>`;
-}
-
-function encontrarSugPorChave(ch){
-  return SUGS.find(x => chavePar(x.ida,x.idb) === ch) || null;
-}
-
-function sugestaoSelecionada(){
-  const sel = $("listaSug");
-  if (!sel || !sel.value) return null;
-  return encontrarSugPorChave(sel.value);
-}
-
-function atualizarSugDetalhes(x){
-  const txt = $("sugSelecionadoTxt");
-  const selNome = $("nomeOficialEscolha");
-  if (!txt || !selNome) return;
-
-  if (!x){
-    txt.textContent = "—";
-    selNome.innerHTML = `<option value="">(selecione uma sugestão)</option>`;
-    return;
-  }
-
-  const pct = Math.round(x.score*100);
-  txt.textContent = `${pct}% | ${x.aNome} [${x.aSeries||"?"}] (${x.ida}) &harr; ${x.bNome} [${x.bSeries||"?"}] (${x.idb})`;
-
-  selNome.innerHTML =
-    `<option value="A">${escapeHtml(x.aNome)} (manter este nome)</option>`+
-    `<option value="B">${escapeHtml(x.bNome)} (manter este nome)</option>`;
-
-  const best = escolherMelhorNome(x.aNome, x.bNome);
-  selNome.value = best;
-}
-
-/* =========================
-   Fila de uniões (aplica em lote ao clicar em Salvar)
-========================= */
-let FILA_UNIOES = []; // [{ida, idb, nomeFinal}]
-
-function unirSelecionados(){
-  const x = sugestaoSelecionada();
-  if (!x){ alert("Selecione uma sugestão."); return; }
-
-  const escolha = $("nomeOficialEscolha")?.value || "A";
-  const nomeFinal = (escolha === "B") ? x.bNome : x.aNome;
-
-  // Verifica se já está na fila
-  const jaExiste = FILA_UNIOES.some(f =>
-    chavePar(f.ida, f.idb) === chavePar(x.ida, x.idb)
-  );
-  if(jaExiste){
-    atualizarResumo(`⚠️ Esta união já está na fila.`);
-    return;
-  }
-
-  // Adiciona à fila (não salva nada ainda)
-  FILA_UNIOES.push({ ida: x.ida, idb: x.idb, nomeFinal });
-
-  // Remove da lista de sugestões visíveis
-  SUGS = SUGS.filter(s => chavePar(s.ida, s.idb) !== chavePar(x.ida, x.idb));
-  renderSugestoes();
-  atualizarSugDetalhes(null);
-
-  renderFila();
-  atualizarResumo(`➕ Adicionado à fila: <b>${escapeHtml(x.idb)}</b> &rarr; <b>${escapeHtml(x.ida)}</b> (${FILA_UNIOES.length} pendente(s))`);
-}
-
-function renderFila(){
-  const box = $("filaResumo");
-  const count = $("filaCount");
-  const lista = $("filaLista");
-  if(!box || !count || !lista) return;
-
-  count.textContent = FILA_UNIOES.length;
-  box.style.display = FILA_UNIOES.length ? "block" : "none";
-
-  lista.innerHTML = FILA_UNIOES.map((f, i) =>
-    `<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <span><b>${escapeHtml(f.nomeFinal)}</b> — manter <code>${escapeHtml(f.ida)}</code>, remover <code>${escapeHtml(f.idb)}</code></span>
-      <button onclick="removerDaFila(${i})" style="border:0;background:transparent;cursor:pointer;color:#b91c1c;font-size:14px;font-weight:900;" title="Remover da fila">✕</button>
-    </div>`
-  ).join("");
-}
-
-function removerDaFila(idx){
-  const removido = FILA_UNIOES.splice(idx, 1)[0];
-  if(removido){
-    // Devolve para SUGS se ainda fizer sentido
-    gerarSugestoes(); // reconstrói sugestões com base nos dados atuais
-  }
-  renderFila();
-  atualizarResumo(`🗑️ Removido da fila. ${FILA_UNIOES.length} pendente(s).`);
-}
-
-function limparFila(){
-  if(!FILA_UNIOES.length) return;
-  if(!confirm("Limpar todas as uniões da fila?")) return;
-  FILA_UNIOES = [];
-  gerarSugestoes();
-  renderFila();
-  atualizarResumo("Fila limpa.");
-}
-
-async function aplicarFilaUnioes(){
-  if(!FILA_UNIOES.length){ alert("Nenhuma união na fila."); return; }
-
-  const total = FILA_UNIOES.length;
-  const overlay = $("overlayUnioes");
-  const bar     = $("overlayBar");
-  const step    = $("overlayStep");
-  const sub     = $("overlaySubtitle");
-
-  // Mostra overlay
-  overlay.style.display = "flex";
-  sub.textContent = `${total} união(ões) a processar`;
-  bar.style.width = "0%";
-
-  // Bloqueia fechamento acidental
-  const beforeUnload = (e) => {
-    e.preventDefault();
-    e.returnValue = "Há uniões sendo processadas. Tem certeza que quer sair?";
-    return e.returnValue;
+function paresInternos(cut){
+  const N = ATAS.length, vis = new Set(), out = [];
+  const tenta = (i, j) => {
+    if(i > j) [i, j] = [j, i];
+    const k = i * N + j; if(vis.has(k)) return; vis.add(k);
+    if(ATAS[i].ver || ATAS[j].ver) return;
+    const s = jw(ATAS[i].nb, ATAS[j].nb); if(s >= cut) out.push([i, j, s]);
   };
-  window.addEventListener("beforeunload", beforeUnload);
-
-  const fila = [...FILA_UNIOES]; // cópia para iterar com segurança
-  FILA_UNIOES = [];
-
-  // Ano ativo do sistema (dadosEscola.configAnoAtivo — ver admin.html),
-  // buscado uma vez só, fora do loop, pra não reler o doc da escola a cada
-  // união processada.
-  let anoAtivoAtual = null;
-  try {
-    const escola = await window.DB.escola.get();
-    anoAtivoAtual = escola?.configAnoAtivo || null;
-  } catch(e) {
-    console.warn('[aplicarFilaUnioes] configAnoAtivo:', e);
-  }
-
-  let processados = 0;
-  for(const { ida, idb, nomeFinal } of fila){
-    step.textContent = `Unindo: ${nomeFinal} (${processados + 1}/${total})`;
-    bar.style.width = `${Math.round((processados / total) * 100)}%`;
-
-    // yield para o browser renderizar o progresso
-    await new Promise(r => setTimeout(r, 0));
-
-    await fundir(ida, idb, nomeFinal, anoAtivoAtual);
-    processados++;
-  }
-
-  await recarregarAlunos();
-  renderAlunos();
-  gerarSugestoes();
-
-  bar.style.width = "100%";
-  step.textContent = `✅ ${total} união(ões) aplicada(s)!`;
-
-  await new Promise(r => setTimeout(r, 1200));
-
-  overlay.style.display = "none";
-  window.removeEventListener("beforeunload", beforeUnload);
-
-  renderFila();
-  // Fica na aba de sugestões, campo limpo
-  $("filtroSug").value = "";
-  renderSugestoes();
-  atualizarResumo(`✅ ${total} união(ões) aplicada(s) com sucesso.`);
+  const grupo = arr => { for(let x = 0; x < arr.length; x++) for(let y = x + 1; y < arr.length; y++) tenta(arr[x], arr[y]); };
+  ATAS_IDX.forEach(arr => { if(arr.length > 1 && arr.length <= 80) grupo(arr); });   // chave muito comum (ex.: "silva") é ignorada
+  const ex = new Map();
+  ATAS.forEach((a, i) => { if(!ex.has(a.nb)) ex.set(a.nb, []); ex.get(a.nb).push(i); });
+  ex.forEach(arr => { if(arr.length > 1) grupo(arr); });                              // nomes idênticos sempre entram
+  return out;
 }
 
-function marcarComoDiferentes(){
-  const x = sugestaoSelecionada();
-  if (!x){ alert("Selecione uma sugestão."); return; }
+/* ── Trajetória (série × ano × resultado) ── */
+const normMat = m => ({ ano: Number(m.anoLetivo), s: (String(m.serie || '').match(/\d+/) || [])[0], res: m.resultado || ({APROVADO:'AP', REPROVADO:'REP'})[m.situacao] || '', ata: m.ataId || '' });
+function avaliar(A, B, cross){
+  if(!A.length || !B.length) return { st:'inc', m:['Sem matrículas em um dos lados'] };
+  const ev = [...A.map(x => ({...x, l:'A'})), ...B.map(x => ({...x, l:'B'}))].filter(x => isFinite(x.ano)).sort((p, q) => p.ano - q.ano);
+  const bad = [], inc = []; let ok = 0;
+  if(!cross){ const as = new Set(A.map(x => x.ata)); if(B.some(x => x.ata && as.has(x.ata))) bad.push('estão na mesma ata'); }
+  for(let i = 0; i < ev.length - 1; i++){
+    const p = ev[i], q = ev[i + 1]; if(p.l === q.l) continue;
+    const dA = q.ano - p.ano, s1 = p.s == null ? null : +p.s, s2 = q.s == null ? null : +q.s;
+    if(dA === 0){
+      if(!cross){ bad.push(`os dois têm matrícula em ${p.ano}`); continue; }
+      if(s1 != null && s2 != null && s1 !== s2) bad.push(`${p.ano}: séries diferentes (${s1}º × ${s2}º)`); else ok++;
+      continue;
+    }
+    if(s1 == null || s2 == null){ inc.push('série não comparável'); continue; }
+    const d = s2 - s1;
+    if(d < 0 || d > dA) bad.push(`${p.ano}→${q.ano}: ${s1}º→${s2}º é impossível`);
+    else if((p.res === 'AP' && d >= 1) || ((p.res === 'REP' || p.res === 'CON') && d === 0)) ok++;
+    else inc.push(`${p.ano}→${q.ano}: ${s1}º→${s2}º (${p.res || 'sem resultado'})`);
+  }
+  if(bad.length) return { st:'bad', m:bad };
+  if(ok && !inc.length) return { st:'ok', m:[`${ok} transição(ões) coerente(s)`] };
+  return { st:'inc', m: inc.length ? inc : ['Sem transição comparável'] };
+}
+const stBadge = st => st === 'ok' ? '<span class="badge small ok">Trajetória compatível</span>' : st === 'bad' ? '<span class="badge small bad">Incompatível</span>' : st === 'inc' ? '<span class="badge small gray">Inconclusiva</span>' : '<span class="badge small gray">Não analisada</span>';
+const resumo = id => { const m = MATS.get(id); return m ? (m.map(x => ({a:+x.anoLetivo, s:x.serie})).sort((p, q) => p.a - q.a).map(x => `${x.s}/${x.a}`).join(' · ') || 'sem matrículas') : ''; };
 
-  const msg = `Marcar como pessoas diferentes?\n\n${x.aNome} (${x.ida})\n≠\n${x.bNome} (${x.idb})\n\nIsso evita que essa sugestão volte.`;
-  if (!confirm(msg)) return;
-
-  const ign = new Set(lerIgnorados());
-  ign.add(chavePar(x.ida, x.idb));
-  salvarIgnorados(Array.from(ign));
-
-  // remove do array e atualiza lista
-  SUGS = SUGS.filter(s => chavePar(s.ida, s.idb) !== chavePar(x.ida, x.idb));
-  renderSugestoes();
-  atualizarSugDetalhes(null);
-  atualizarResumo("✅ Marcado como pessoas diferentes. (Salvo em alunosDupeIgnorados)");
+async function carregarMats(ids){
+  const f = [...new Set(ids)].filter(i => !MATS.has(i)); if(!f.length) return;
+  const r = await window.DB.matriculas.whereIn('alunoId', f);
+  f.forEach(i => MATS.set(i, []));
+  r.forEach(m => { const a = MATS.get(String(m.alunoId)); if(a) a.push(m); });
 }
 
-/**
- * Funde idEngolido em idManter. Algoritmo genérico por coleção — não
- * precisa saber de antemão se é duplicata do mesmo módulo ou fusão
- * cross-módulo; isso é decidido implicitamente por onde cada ID já existe.
- *
- * Pra cada coleção (alunos-atas, anoAtivoAlunos):
- *  - Se só idEngolido tem doc lá → cria o mesmo doc em idManter (cópia),
- *    apaga o de idEngolido, reescreve turmas/matriculas dessa coleção.
- *  - Se os dois têm doc lá → é duplicata dentro da própria coleção: mescla
- *    (nome final) no doc de idManter, apaga o de idEngolido, reescreve
- *    turmas/matriculas.
- *  - Se só idManter tem doc lá → nada a fazer nessa coleção (já estava
- *    correto), só atualiza o nome se for o caso.
- *
- * Ao final, se idManter passou a existir NAS DUAS coleções, é uma fusão
- * cross-módulo de verdade → grava/atualiza o elo em `alunos`. Se idEngolido
- * já tinha um elo próprio (era um 'ambos' sendo fundido em outro ID), esse
- * elo antigo é removido (ficaria órfão apontando pra um ID que não existe
- * mais em lugar nenhum).
- *
- * Segurança: numa fusão cross-módulo genuína (um lado só existe em Atas, o
- * outro só em Ano-Ativo), o lado Ano-Ativo tem que sobreviver sempre —
- * mídia no Cloudinary é vinculada por esse alunoId (ver v11). Se o chamador
- * passar na direção errada, corrige sozinho.
- */
-async function fundir(idManter, idEngolido, nomeOficialFinal, anoAtivoAtual){
-  idManter = String(idManter).trim();
-  idEngolido = String(idEngolido).trim();
-  if (!idManter || !idEngolido || idManter === idEngolido) return;
-
-  const [manterAtas, engolidoAtas, manterAA, engolidoAA, eloEngolido] = await Promise.all([
-    window.Identidade.buscarAtasPorId(idManter),
-    window.Identidade.buscarAtasPorId(idEngolido),
-    window.DB.anoAtivoAlunos.get(idManter),
-    window.DB.anoAtivoAlunos.get(idEngolido),
-    window.Identidade.buscarElo(idEngolido),
-  ]);
-
-  const crossGenuino = (!!manterAtas !== !!manterAA) && (!!engolidoAtas !== !!engolidoAA)
-                       && (!!manterAtas !== !!engolidoAtas);
-  if (crossGenuino && !manterAA && engolidoAA){
-    console.warn('[fundir] Direção invertida: Ano-Ativo sempre sobrevive em fusão cross-módulo. Corrigindo automaticamente.');
-    return fundir(idEngolido, idManter, nomeOficialFinal, anoAtivoAtual);
-  }
-
-  let tocouAtas = false, tocouAA = false;
-
-  // ── alunos-atas ──
-  if (engolidoAtas){
-    if (manterAtas){
-      await window.Identidade.vincularAtasExplicito(idManter, { nome: nomeOficialFinal });
-    } else {
-      await window.Identidade.salvarAtas({ ...engolidoAtas, alunoId: idManter, nome: nomeOficialFinal });
-    }
-    await window.Identidade.removerAtas(idEngolido);
-    tocouAtas = true;
-  } else if (manterAtas && nomeOficialFinal){
-    await window.Identidade.vincularAtasExplicito(idManter, { nome: nomeOficialFinal });
-  }
-
-  // ── anoAtivoAlunos ──
-  if (engolidoAA){
-    const base = manterAA ? {} : { ...engolidoAA };
-    delete base._id;
-    await window.DB.anoAtivoAlunos.save({ ...base, _id: idManter, alunoId: idManter, nome: nomeOficialFinal });
-    await window.DB.anoAtivoAlunos.remove(idEngolido);
-    tocouAA = true;
-  } else if (manterAA && nomeOficialFinal){
-    await window.DB.anoAtivoAlunos.save({ _id: idManter, nome: nomeOficialFinal });
-  }
-
-  // ── Reescreve referências (só no(s) lado(s) onde idEngolido existia) ──
-  if (tocouAtas){
-    const turmas = lerTurmasDB();
-    let turmasTouched = false;
-    for (const t of turmas){
-      if (!Array.isArray(t.alunos)) continue;
-      for (const al of t.alunos){
-        if (al.alunoId === idEngolido){ al.alunoId = idManter; turmasTouched = true; }
-      }
-    }
-    if (turmasTouched) salvarTurmasDB(turmas);
-
-    const matsAtas = await window.DB.matriculas.whereEquals('alunoId', idEngolido);
-    for (const m of matsAtas){
-      await window.DB.matriculas.save({ ...m, alunoId: idManter });
-    }
-    // Recalcula ultimoAnoRegistro considerando as matrículas recém-migradas
-    // pra idManter (a lacuna do "de onde vem o ano ativo" foi fechada:
-    // dadosEscola.configAnoAtivo, buscado uma vez em aplicarFilaUnioes() e
-    // repassado aqui). Depende de `anoLetivo` denormalizado em cada doc de
-    // matrículas — matrículas de import legado ainda sem esse campo não
-    // entram na conta (ver comentário na função, em identidade-aluno.js).
-    if (window.Identidade?.recalcularUltimoAnoRegistroBatch) {
-      try {
-        await window.Identidade.recalcularUltimoAnoRegistroBatch([idManter], anoAtivoAtual);
-      } catch(e) {
-        console.warn('[fundir] recalcularUltimoAnoRegistroBatch erro:', e);
-      }
-    }
-  }
-
-  if (tocouAA){
-    const turmasAA = lerJSON("anoAtivoTurmasDB_v1", []);
-    let touched = false;
-    for (const t of turmasAA){
-      if (!Array.isArray(t.alunos)) continue;
-      for (const al of t.alunos){
-        if (String(al.alunoId||"") === idEngolido){ al.alunoId = idManter; touched = true; }
-      }
-    }
-    if (touched) salvarJSON("anoAtivoTurmasDB_v1", turmasAA);
-
-    const matsAA = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', idEngolido);
-    for (const m of matsAA){
-      await window.DB.anoAtivoMatriculas.save({ ...m, alunoId: idManter });
-    }
-  }
-
-  // ── Elo cross-módulo ──
-  const finalTemAtas = !!(manterAtas || engolidoAtas);
-  const finalTemAA = !!(manterAA || engolidoAA);
-  if (finalTemAtas && finalTemAA){
-    const aaFinal = manterAA || engolidoAA;
-    await window.Identidade.salvarElo({
-      alunoId: idManter,
-      atasId: eloEngolido?.atasId || (manterAtas ? idManter : idEngolido),
-      anoAtivoId: eloEngolido?.anoAtivoId || (manterAA ? idManter : idEngolido),
-      idEngolido,
-      nome: nomeOficialFinal,
-      cpf: aaFinal?.cpf || eloEngolido?.cpf || '',
-    });
-  }
-  // idEngolido está sempre totalmente retirado do sistema aqui — se ele
-  // tinha elo próprio, remove (ficaria órfão apontando pra um ID inexistente).
-  if (eloEngolido){
-    await window.DB.alunos.remove(idEngolido);
-  }
-
-  atualizarResumo(`✅ Unificado: <b>${escapeHtml(idEngolido)}</b> &rarr; <b>${escapeHtml(idManter)}</b> • Nome oficial: <b>${escapeHtml(nomeOficialFinal)}</b>`);
+/* ── Carga sob demanda ── */
+async function escola(){
+  if(!ESCOLA) ESCOLA = (await DB.escola.get()) || {};
+  return ESCOLA;
+}
+async function carregarAtas(forcar){
+  if(carregouAtas && !forcar) return;
+  const [docs, elos] = await Promise.all([DB['alunos-atas'].list(), DB.alunos.list(), escola()]);
+  ATAS = docs.map(d => { const nome = d.nome || ''; return { id: String(d.alunoId || d._id).trim(), nome, nb: nrm(nome), ver: !!d.verificadoManual }; }).filter(x => x.id && x.nb);
+  ELOS = new Map(); ELO_AA = new Map();
+  elos.forEach(e => { const n = Identidade.normalizarElo(e); if(n.atasId) ELOS.set(n.atasId, n); if(n.anoAtivoId) ELO_AA.set(n.anoAtivoId, n); });
+  ATAS_IDX = indexar(ATAS); carregouAtas = true;
+}
+/* Indicador no documento do aluno: quem tem verificadoManual:true é ignorado pela detecção. */
+async function marcarVerificado(col, ids){
+  if(_semEscola()) return;
+  await DB.batchWrite(ids.map(id => ({ col, op:'set', id, data:{ verificadoManual:true } })));
 }
 
-
-function atualizarMetaSistema(){
-  const turmas = lerTurmasDB();
-  const nAtas = ALUNOS.filter(a => a.origem === "atas" || a.origem === "ambos").length;
-  const nAA   = ALUNOS.filter(a => a.origem === "anoAtivo" || a.origem === "ambos").length;
-  const nAmbos = ALUNOS.filter(a => a.origem === "ambos").length;
-
-  $("metaSistema").innerHTML =
-    `Sistema: turmasDB=<b>${turmas.length}</b> • alunos-atas=<b>${nAtas}</b> • anoAtivoAlunos=<b>${nAA}</b> • já fundidos=<b>${nAmbos}</b>`;
+/* ── Aba 1: duplicatas dentro de Atas ── */
+const rk = e => e && e.anoAtivoId ? 2 : e ? 1 : 0;
+function montarSugs(){
+  const cut = (+$('cut').value || 85) / 100;
+  SUGS = paresInternos(cut).map(([i, j, s]) => {
+    const x = ATAS[i], y = ATAS[j], ex = ELOS.get(x.id), ey = ELOS.get(y.id), rx = rk(ex), ry = rk(ey);
+    const troca = ry > rx || (ry === rx && num(y.id) < num(x.id));
+    const conf = (rx === 2 && ry === 2 && ex.anoAtivoId !== ey.anoAtivoId) ? 'Os dois já estão vinculados a alunos diferentes do Ano-Ativo' : '';
+    return { a: troca ? y : x, b: troca ? x : y, score: s, st: conf ? 'bad' : 'nao', m: conf ? [conf] : [], conf };
+  }).sort((p, q) => q.score - p.score);
+  aplicarTraj(); renderAtas();
 }
-
-/* =========================
-   Limpeza de duplicatas no Firestore
-   Legado do modelo antigo, onde `alunos` era um catálogo grande e podia
-   acumular doc._id != alunoId por bug de escrita. No modelo novo, save()
-   sempre usa alunoId como _id do documento (ver db.firebase.js), então
-   duplicata no sentido antigo não deveria mais ser possível — mas mantido
-   como rede de segurança contra dado legado ainda não migrado, agora
-   varrendo alunos-atas e anoAtivoAlunos (não mais `alunos`, que é só o
-   elo, com poucos docs e sem esse risco).
-========================= */
-async function limparDuplicatasFirestore(){
-  if(!window.DB || !window.DB['alunos-atas'] || !window.DB.anoAtivoAlunos){
-    alert("DB não disponível. Faça login primeiro.");
-    return;
-  }
-  if(!confirm("Isso vai buscar TODOS os documentos em alunos-atas e anoAtivoAlunos e remover os com alunoId duplicado, mantendo apenas o mais recente. Continuar?")){
-    return;
-  }
-
-  atualizarResumo("🔄 Buscando documentos no Firestore...");
-  try{
-    let totalRemovidos = 0;
-    for (const colecao of [window.DB['alunos-atas'], window.DB.anoAtivoAlunos]){
-      const docs = await colecao.list();
-
-      const byAlunoId = new Map();
-      for(const d of docs){
-        const aid = (d.alunoId || d._id || "").toString().trim();
-        if(!aid) continue;
-        const prev = byAlunoId.get(aid);
-        const dTs = (d.updatedAt?.seconds || 0);
-        const pTs = (prev?.updatedAt?.seconds || 0);
-        if(!prev || dTs >= pTs) byAlunoId.set(aid, d);
-      }
-
-      const toRemove = docs.filter(d => {
-        const aid = (d.alunoId || d._id || "").toString().trim();
-        if(!aid) return false;
-        const winner = byAlunoId.get(aid);
-        return winner && d._id !== winner._id;
-      });
-
-      for(const d of toRemove) await colecao.remove(d._id);
-      totalRemovidos += toRemove.length;
-    }
-
-    if(!totalRemovidos){
-      atualizarResumo("✅ Nenhuma duplicata encontrada no Firestore.");
-    } else {
-      await recarregarAlunos();
-      renderAlunos();
-      gerarSugestoes();
-      atualizarMetaSistema();
-      atualizarResumo(`✅ ${totalRemovidos} duplicata(s) removida(s) do Firestore.`);
-    }
-  }catch(e){
-    console.error(e);
-    atualizarResumo(`❌ Erro ao limpar duplicatas: ${e.message || e}`);
-  }
-}
-
-/* =========================
-   Boot
-========================= */
-document.addEventListener("DOMContentLoaded", async ()=>{
-  // Pré-carrega turmas/matrículas no localStorage (ainda usado por
-  // lerTurmasDB()/_seriesDoAluno() e pela reescrita de referências em
-  // fundir()). O catálogo de alunos (alunos-atas/anoAtivoAlunos) NÃO passa
-  // mais por aqui — é lido direto do Firestore em recarregarAlunos().
-  try{
-    await new Promise(res=>{
-      if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
-      document.addEventListener('auth:ready', res, {once:true});
-    });
-    const dados = await window.DB.loadAll();
-    const dadosAA = await window.DB.loadAllAnoAtivo();
-    const sid = window.Auth.getActiveSchoolId ? window.Auth.getActiveSchoolId() : '';
-    if(sid){
-      const pre=(k)=>`schools:${sid}:${k}`;
-      if(dados.turmasDB)       localStorage.setItem(pre('turmasDB'),               JSON.stringify(dados.turmasDB));
-      if(dadosAA.turmasDB)     localStorage.setItem(pre('anoAtivoTurmasDB_v1'),     JSON.stringify(dadosAA.turmasDB));
-      if(dadosAA.matriculasDB) localStorage.setItem(pre('anoAtivoMatriculasDB_v1'), JSON.stringify(dadosAA.matriculasDB));
-    }
-  }catch(e){ console.warn('idaluno Firestore pré-carga:', e); }
-
-  $("cutVal").textContent = $("cut").value;
-
-  $("cut").addEventListener("input", ()=>{
-    $("cutVal").textContent = $("cut").value;
+function aplicarTraj(){
+  SUGS.forEach(s => {
+    if(s.conf || !MATS.has(s.a.id) || !MATS.has(s.b.id)) return;
+    const r = avaliar(MATS.get(s.a.id).map(normMat), MATS.get(s.b.id).map(normMat), false); s.st = r.st; s.m = r.m;
   });
+}
+function melhorNome(a, b){ const sc = s => s.length + (/[\u00C0-\u00FF]/.test(s) ? 10 : 0); return sc(b) > sc(a) ? 1 : 0; }
+function renderAtas(){
+  const ord = { ok:0, inc:1, nao:2, bad:3 }, inc = $('mostrarInc').checked;
+  const vis = SUGS.filter(s => inc || s.st !== 'bad').sort((p, q) => ord[p.st] - ord[q.st] || q.score - p.score);
+  $('statAlunos').textContent = carregouAtas ? ATAS.length : '—';
+  $('statPares').textContent = carregouAtas ? SUGS.length : '—';
+  $('statOk').textContent = carregouAtas ? SUGS.filter(s => s.st === 'ok').length : '—';
+  if(!carregouAtas){ $('listaAtas').innerHTML = ''; return; }
+  if(!vis.length){ $('listaAtas').innerHTML = '<div class="aviso-warn">ℹ️ Nenhuma sugestão com esta similaridade.</div>'; return; }
+  const bloco = (x, i) => `<div><b>${_escHtml(x.nome)}</b> <span class="badge small gray">${_escHtml(x.id)}</span>${ELOS.get(x.id)?.anoAtivoId ? ' <span class="badge small neutral">vinculado ao Ano-Ativo</span>' : ''} <span class="help">${_escHtml(resumo(x.id))}</span></div>`;
+  $('listaAtas').innerHTML = vis.slice(0, LIM).map(s => {
+    const k = chave(s.a.id, s.b.id), mb = melhorNome(s.a.nome, s.b.nome);
+    return `<div class="item subcard" data-k="${_escHtml(k)}">
+      <div class="left">
+        <div class="chips"><span class="badge small">${Math.round(s.score * 100)}%</span>${stBadge(s.st)}<span class="badge small gray">mantém ${_escHtml(s.a.id)}</span></div>
+        ${bloco(s.a)}${bloco(s.b)}
+        <div class="help">${_escHtml(s.m.join(' • '))}</div>
+        <div class="field"><label>Nome oficial após corrigir</label><select data-nome>
+          <option value="0"${mb === 0 ? ' selected' : ''}>${_escHtml(s.a.nome)}</option><option value="1"${mb === 1 ? ' selected' : ''}>${_escHtml(s.b.nome)}</option></select></div>
+      </div>
+      <div class="right">
+        <button class="btn primary small" type="button" data-act="corrigir"${s.conf ? ' disabled' : ''}>Corrigir</button>
+        <button class="btn neutral small" type="button" data-act="dif">São diferentes</button>
+      </div></div>`;
+  }).join('') + (vis.length > LIM ? `<div class="mt-12"><button class="btn secondary" type="button" data-act="mais">Mostrar mais (${vis.length - LIM})</button></div>` : '');
+}
+async function analisarTrajetoria(){
+  const ids = SUGS.flatMap(s => [s.a.id, s.b.id]);
+  setMsg(`Lendo matrículas de ${new Set(ids).size} aluno(s)…`, 'loading');
+  try{ await carregarMats(ids); aplicarTraj(); renderAtas(); setMsg('Trajetória analisada.', 'ok'); }
+  catch(e){ console.error('analisarTrajetoria:', e); setMsg('Não foi possível ler as matrículas.', 'err'); }
+}
 
-  $("filtroAluno").addEventListener("input", renderAlunos);
-  $("filtroSug").addEventListener("input", renderSugestoes);
+/* Une idGone em idKeep (alunos-atas, matrículas, notas na ata e elo) num único batch atômico. */
+function anoMaisProximo(anos, ativo){
+  const v = anos.map(Number).filter(Number.isFinite); if(!v.length) return null;
+  const at = Number(ativo), ant = Number.isFinite(at) ? v.filter(a => a <= at) : [];
+  return ant.length ? Math.max(...ant) : Number.isFinite(at) ? v.reduce((b, a) => Math.abs(a - at) < Math.abs(b - at) ? a : b) : Math.max(...v);
+}
+async function fundirAtas(keep, gone, nome){
+  const [mk, mg, eK, eG] = await Promise.all([
+    DB.matriculas.whereEquals('alunoId', keep), DB.matriculas.whereEquals('alunoId', gone),
+    Identidade.buscarElo(keep), Identidade.buscarElo(gone)]);
+  const ataK = new Set(mk.map(m => m.ataId));
+  if(mg.some(m => ataK.has(m.ataId))) throw new Error('Os dois alunos estão na mesma ata: são pessoas diferentes.');
+  if(rk(eG) > rk(eK) || (eK?.anoAtivoId && eG?.anoAtivoId && eK.anoAtivoId !== eG.anoAtivoId)) throw new Error('Os vínculos mudaram desde o carregamento. Recarregue os alunos.');
 
-  $("listaSug").addEventListener("change", ()=>{
-    const x = sugestaoSelecionada();
-    atualizarSugDetalhes(x);
-  });
-
-  const db = lerTurmasDB();
-  if (!db.length){
-    atualizarResumo("⚠️ <b>turmasDB</b> está vazio neste domínio. Abra este Admin pelo <b>mesmo localhost</b> do sistema.");
-  } else {
-    // recarregarAlunos() enxerga alunos dos DOIS módulos (alunos-atas +
-    // anoAtivoAlunos), lendo direto do Firestore (sem catálogo em memória
-    // persistente entre visitas — ver redesenho de leituras excessivas).
-    await recarregarAlunos();
-    if (ALUNOS.length){
-      renderAlunos();
-      gerarSugestoes();
-      atualizarResumo(`DB detectado. Alunos (ambos módulos): <b>${ALUNOS.length}</b> • Sugestões: <b>${SUGS.length}</b>`);
-    } else {
-      atualizarResumo("DB detectado, mas nenhum aluno encontrado em alunos-atas/anoAtivoAlunos.");
+  const ops = [], tcache = new Map();
+  for(const m of mg){
+    const { _id, ...d } = m;
+    if(_id.endsWith('|' + gone)){
+      const nid = _id.slice(0, -gone.length) + keep;
+      ops.push({ col:'matriculas', op:'set', id:nid, data:{ ...d, id:nid, alunoId:keep } }, { col:'matriculas', op:'delete', id:_id });
+    } else ops.push({ col:'matriculas', op:'set', id:_id, data:{ alunoId:keep } });
+    const tk = m.turmaId;
+    if(!tcache.has(tk)){
+      const id = m.turmaId, doc = id ? await DB.turmas.get(id) : null;
+      if(!doc) throw new Error('Turma não encontrada: ' + tk);
+      tcache.set(tk, { id, doc });
     }
   }
+  for(const { id, doc } of tcache.values()){
+    const al = Array.isArray(doc.alunos) ? doc.alunos : [];
+    if(al.some(a => String(a.alunoId) === keep)) throw new Error('Os dois alunos aparecem na ata ' + id + '.');
+    if(!al.some(a => String(a.alunoId) === gone)) throw new Error('Aluno ' + gone + ' não encontrado na ata ' + id + '.');
+    ops.push({ col:'turmas', op:'set', id, data:{ alunos: al.map(a => String(a.alunoId) === gone ? { ...a, alunoId: keep } : a) } });
+  }
+  const ano = anoMaisProximo([...mk, ...mg].map(m => m.anoLetivo), (await escola()).configAnoAtivo);
+  ops.push({ col:'alunos-atas', op:'set', id:keep, data:{ alunoId:keep, nome, nomeBusca:nrm(nome), ultimoAnoRegistro:ano, atualizadoEm:new Date().toISOString() } },
+           { col:'alunos-atas', op:'delete', id:gone });
+  if(eG) ops.push({ col:'alunos', op:'delete', id:Identidade.eloId(gone) });
+  if(ops.length > 500) throw new Error('Operação grande demais para um batch (' + ops.length + ').');
+  await DB.batchWrite(ops);
 
-  atualizarMetaSistema();
-  aba("alunos");
-  atualizarSugDetalhes(null);
+  // memória
+  const k = ATAS.find(a => a.id === keep); if(k){ k.nome = nome; k.nb = nrm(nome); }
+  ATAS = ATAS.filter(a => a.id !== gone); ATAS_IDX = indexar(ATAS); ELOS.delete(gone);
+  MATS.set(keep, [...mk, ...mg.map(m => ({ ...m, alunoId: keep }))]); MATS.delete(gone);
+  montarSugs();
+}
 
-  Loading.esconder(); // ← linha adicionada
+/* ── Aba 2: Ano-Ativo ↔ Atas ── */
+const nomeAA = d => d.nomeOficial || d.nome || d.nomeCompleto || '';
+async function carregarPend(){
+  await carregarAtas(true);
+  const aa = await DB.anoAtivoAlunos.list();
+  AAPEND = aa.filter(d => !d.verificadoManual).map(d => ({ id: String(d.alunoId || d._id).trim(), nome: nomeAA(d), nb: nrm(nomeAA(d)) }))
+    .filter(x => x.id && !ELO_AA.has(x.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  renderPend();
+}
+function renderPend(){
+  $('statPend').textContent = carregouAtas ? AAPEND.length : '—';
+  const f = nrm($('filtroPend').value || '');
+  const l = AAPEND.filter(a => !f || a.nb.includes(f) || a.id.toLowerCase().includes(f)).slice(0, 100);
+  $('listaPend').innerHTML = !carregouAtas ? '' : l.length
+    ? l.map(a => `<div class="list-item${a.id === AA_SEL ? ' sel' : ''}" data-act="sel" data-a="${_escHtml(a.id)}">${_escHtml(a.nome)} <span class="badge small gray">${_escHtml(a.id)}</span></div>`).join('')
+    : '<div class="aviso-warn">ℹ️ Nenhum aluno do Ano-Ativo pendente.</div>';
+}
+function candidatosDe(aa){
+  const cut = (+$('cut').value || 85) / 100 - 0.05, idx = new Set();
+  chaves(aa.nb).forEach(k => (ATAS_IDX.get(k) || []).forEach(i => idx.add(i)));
+  return [...idx].map(i => ATAS[i]).filter(a => !ELOS.get(a.id)?.anoAtivoId && !SKIP.has(aa.id + '|' + a.id))
+    .map(a => ({ a, s: jw(aa.nb, a.nb) })).filter(x => x.s >= cut).sort((p, q) => q.s - p.s).slice(0, 8);
+}
+function cardCross(a, s){
+  return `<div class="item subcard" data-b="${_escHtml(a.id)}"><div class="left">
+    <div class="chips"><span class="badge small">${Math.round(s * 100)}%</span>${ELOS.get(a.id)?.dadosPessoais ? '<span class="badge small gray">tem dados pessoais do histórico</span>' : ''}</div>
+    <div><b>${_escHtml(a.nome)}</b> <span class="badge small gray">${_escHtml(a.id)}</span></div>
+    <div class="help" data-traj></div></div>
+    <div class="right"><button class="btn secondary small" type="button" data-act="trajx" data-b="${_escHtml(a.id)}">Ver trajetória</button>
+    <button class="btn primary small" type="button" data-act="vinc" data-b="${_escHtml(a.id)}">Vincular</button>
+    <button class="btn neutral small" type="button" data-act="difx" data-b="${_escHtml(a.id)}">Não é o mesmo</button></div></div>`;
+}
+function renderPainel(){
+  const aa = AAPEND.find(a => a.id === AA_SEL); if(!aa){ $('painelCross').innerHTML = ''; return; }
+  const c = candidatosDe(aa);
+  $('painelCross').innerHTML = `<h3>${_escHtml(aa.nome)} <span class="badge small gray">${_escHtml(aa.id)}</span></h3>
+    ${c.length ? c.map(x => cardCross(x.a, x.s)).join('') : '<div class="aviso-warn">ℹ️ Nenhum aluno de Atas com nome parecido. Se você já sabe o ID em Atas, informe abaixo.</div>'}
+    <div class="manual"><div class="field"><label for="idManual">ID do aluno em Atas</label><input class="input" id="idManual" placeholder="ALU-000000"/></div>
+    <button class="btn secondary field-h" type="button" data-act="buscarId">Buscar</button>
+    <button class="btn neutral field-h" type="button" data-act="semAtas">Sem equivalente em Atas</button></div><div id="manualRes"></div>`;
+}
+async function trajetoriaCross(atasId, el){
+  await carregarMats([atasId]);
+  if(!AAMATS.has(AA_SEL)) AAMATS.set(AA_SEL, await DB.anoAtivoMatriculas.whereEquals('alunoId', AA_SEL));
+  const aam = AAMATS.get(AA_SEL), r = avaliar(MATS.get(atasId).map(normMat), aam.map(normMat), true);
+  const aaTxt = aam.map(x => ({a:+x.anoLetivo, s:x.serie})).sort((p, q) => p.a - q.a).map(x => `${x.s}/${x.a}`).join(' · ') || 'sem matrículas';
+  el.innerHTML = `${stBadge(r.st)} ${_escHtml(r.m.join(' • '))}<br>Atas: ${_escHtml(resumo(atasId))}<br>Ano-Ativo: ${_escHtml(aaTxt)}`;
+}
+async function vincular(aaId, atasId){
+  const [eA, eAA, aa, at] = await Promise.all([Identidade.buscarElo(atasId), Identidade.buscarEloPorAnoAtivoId(aaId), DB.anoAtivoAlunos.get(aaId), Identidade.buscarAtasPorId(atasId)]);
+  if(!aa) throw new Error('Aluno do Ano-Ativo não encontrado.');
+  if(!at) throw new Error('Aluno de Atas não encontrado.');
+  if(eA?.anoAtivoId && eA.anoAtivoId !== aaId) throw new Error('Esse aluno de Atas já está vinculado a ' + eA.anoAtivoId + '.');
+  if(eAA && eAA.atasId !== atasId) throw new Error('Esse aluno do Ano-Ativo já está vinculado a ' + eAA.atasId + '.');
+  const cpf = String(aa.cpfNum || aa.cpf || '').replace(/\D/g, '');
+  if(cpf.length === 11){
+    const outro = await Identidade.buscarEloPorCpf(cpf);
+    if(outro && outro.atasId !== atasId) throw new Error('O CPF desse aluno já está no histórico em nome de ' + (outro.nome || outro.atasId) + '.');
+  }
+  const ops = [Identidade.prepararElo({ atasId, anoAtivoId: aaId, nome: at.nome, ...(cpf.length === 11 ? { cpf } : {}), dadosPessoais: Identidade.campoRemover() })];
+  const dp = eA?.dadosPessoais || {}, mig = {};   // nada se perde ao apagar dadosPessoais do elo
+  ['nis', 'nascimentoEstrangeiro'].forEach(k => { if(dp[k] !== undefined && dp[k] !== '' && (aa[k] === undefined || aa[k] === '')) mig[k] = dp[k]; });
+  if(Object.keys(mig).length) ops.push({ col:'anoAtivoAlunos', op:'set', id:aaId, data:mig });
+  await DB.batchWrite(ops);
+  ELOS.set(atasId, { atasId, anoAtivoId: aaId, nome: at.nome }); ELO_AA.set(aaId, ELOS.get(atasId));
+  AAPEND = AAPEND.filter(a => a.id !== aaId); AA_SEL = null; renderPend(); renderPainel();
+}
+
+/* ── Eventos ── */
+function aba(x){
+  $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross';
+  $('tab1').className = 'btn ' + (x === 'atas' ? 'primary' : 'secondary'); $('tab2').className = 'btn ' + (x === 'cross' ? 'primary' : 'secondary');
+}
+async function comLoading(msg, fn){
+  if(_semEscola()) return;
+  setMsg(msg, 'loading');
+  try{ await fn(); _toastLimpar(); }
+  catch(e){ console.error(msg, e); setMsg('Não foi possível ler os dados.', 'err'); }
+}
+document.addEventListener('click', async ev => {
+  document.querySelectorAll('.info-tip.open').forEach(o => o.classList.remove('open'));
+  const b = ev.target.closest('[data-act]'); if(!b) return;
+  const act = b.dataset.act, card = b.closest('.subcard');
+  try{
+    if(act === 'aba') return aba(b.dataset.a);
+    if(act === 'carAtas') return comLoading('Carregando alunos de Atas…', async () => { await carregarAtas(true); $('btnTraj').disabled = false; montarSugs(); });
+    if(act === 'carPend') return comLoading('Carregando pendentes…', carregarPend);
+    if(act === 'traj1') return analisarTrajetoria();
+    if(act === 'mais'){ LIM += 25; return renderAtas(); }
+    if(act === 'sel'){ AA_SEL = b.dataset.a; renderPend(); return renderPainel(); }
+
+    if(act === 'corrigir' || act === 'dif'){
+      const s = SUGS.find(x => chave(x.a.id, x.b.id) === card.dataset.k); if(!s) return;
+      if(act === 'dif'){
+        if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(s.a.nome)} (${_escHtml(s.a.id)})\n≠\n${_escHtml(s.b.nome)} (${_escHtml(s.b.id)})\n\nOs dois ficam marcados como verificados e deixam de aparecer nas sugestões.` })) return;
+        await marcarVerificado('alunos-atas', [s.a.id, s.b.id]);
+        [s.a, s.b].forEach(x => { const r = ATAS.find(y => y.id === x.id); if(r) r.ver = true; });
+        SUGS = SUGS.filter(x => !x.a.ver && !x.b.ver); return renderAtas();
+      }
+      const nome = [s.a.nome, s.b.nome][+card.querySelector('[data-nome]').value];
+      const perde = ELOS.get(s.b.id)?.dadosPessoais ? `\n\n⚠️ Os dados pessoais guardados para ${_escHtml(s.b.id)} serão descartados.` : '';
+      if(!await _confirmModal({ titulo:'Corrigir aluno duplicado?', corpo:`Manter <strong>${_escHtml(s.a.id)}</strong> e absorver <strong>${_escHtml(s.b.id)}</strong>.\nNome oficial: <strong>${_escHtml(nome)}</strong>.\nMatrículas e notas de ${_escHtml(s.b.id)} passam para ${_escHtml(s.a.id)}.${perde}`, textoConfirmar:'Corrigir' })) return;
+      setMsg('Corrigindo…', 'loading');
+      await fundirAtas(s.a.id, s.b.id, nome); setMsg('Alunos unidos.', 'ok'); return;
+    }
+    if(act === 'trajx'){ setMsg('Lendo matrículas…', 'loading'); await trajetoriaCross(b.dataset.b, card.querySelector('[data-traj]')); return _toastLimpar(); }
+    if(act === 'difx'){ SKIP.add(AA_SEL + '|' + b.dataset.b); return renderPainel(); }
+    if(act === 'semAtas'){
+      if(!await _confirmModal({ titulo:'Marcar como verificado?', corpo:'Este aluno do Ano-Ativo não tem equivalente em Atas. Ele deixa de aparecer nesta lista.' })) return;
+      await marcarVerificado('anoAtivoAlunos', [AA_SEL]); AAPEND = AAPEND.filter(a => a.id !== AA_SEL); AA_SEL = null; renderPend(); return renderPainel();
+    }
+    if(act === 'vinc'){
+      const at = ATAS.find(a => a.id === b.dataset.b) || { id: b.dataset.b, nome: card.querySelector('b').textContent }, aa = AAPEND.find(a => a.id === AA_SEL);
+      const perde = ELOS.get(at.id)?.dadosPessoais ? '\n\n⚠️ Os dados pessoais guardados no histórico serão apagados (o Ano-Ativo passa a ser a fonte).' : '';
+      if(!await _confirmModal({ titulo:'Vincular alunos?', corpo:`Ano-Ativo: <strong>${_escHtml(aa.nome)}</strong> (${_escHtml(aa.id)})\nAtas: <strong>${_escHtml(at.nome)}</strong> (${_escHtml(at.id)})${perde}`, textoConfirmar:'Vincular' })) return;
+      setMsg('Vinculando…', 'loading');
+      await vincular(aa.id, at.id); setMsg('Alunos vinculados.', 'ok'); return;
+    }
+    if(act === 'buscarId'){
+      const id = ($('idManual').value || '').trim().toUpperCase(); if(!id) return;
+      const at = await Identidade.buscarAtasPorId(id), aa = AAPEND.find(a => a.id === AA_SEL);
+      if(!at){ $('manualRes').innerHTML = ''; return setMsg('ID não encontrado em Atas.', 'warn'); }
+      if(!ELOS.has(id) && ELOS.size === 0) await carregarAtas(true);
+      if(ELOS.get(id)?.anoAtivoId){ $('manualRes').innerHTML = ''; return setMsg('Esse aluno de Atas já está vinculado a outro aluno do Ano-Ativo.', 'warn'); }
+      $('manualRes').innerHTML = cardCross({ id, nome: at.nome }, jw(aa.nb, nrm(at.nome)));
+    }
+  }catch(e){ console.error('acao ' + act + ':', e); setMsg(e.message || 'Não foi possível concluir a ação.', 'err'); }
 });
 
+/* ── Boot ── */
+async function init(){
+  try{
+    await _authPronto();
+    $('avisoSemEscola').hidden = !_semEscola();
+    $('cut').addEventListener('input', () => { $('cutVal').textContent = $('cut').value; if(carregouAtas){ montarSugs(); renderPainel(); } });
+    $('mostrarInc').addEventListener('change', renderAtas);
+    $('filtroPend').addEventListener('input', renderPend);
+    aba('atas');
+  } finally {
+    try{ if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }catch(e){ console.warn('ajustarContraste:', e); }
+    try{ Loading.esconder(); }catch(_){}
+  }
+}
+init().catch(e => { console.error('init:', e); setMsg('Erro ao carregar a página.', 'err'); });
 </script>
 
-<!-- header-logic: monta header, tema, chip e auth guard -->
 <script src="../header-logic.js"></script>
-
 </body>
 </html>
