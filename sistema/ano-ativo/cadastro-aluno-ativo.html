@@ -325,6 +325,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 <div id="header-placeholder"></div>
 
 <main class="wrap">
+<div class="aviso-warn" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no topo da página para cadastrar alunos.</div>
 <section class="card card-destaque topo-destaque">
 <div class="card-head">
 <h2>Selecionar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">As turmas listadas no seletor abaixo foram previamente cadastradas no cadastro de turmas! Selecione uma turma antes de começar a cadastrar um aluno. Na edição, turma e ano ficam travados (a série pode ser corrigida aqui); para mudar o aluno de turma, use o botão “Trocar de turma” no fim da página.</span></span></h2>
@@ -1248,7 +1249,7 @@ function normSerie(s){
   if(window._modoEdicaoId){
     return await _atualizarAluno();
   }
-  if((window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) === 'ADMIN')
+  if(window.Auth.semEscola())
     return setMsg("Selecione uma escola no topo da página antes de cadastrar.", "err");
   const turmaSel = getSelectedTurma();
   if(!turmaSel) return setMsg("Selecione uma turma.", "err");
@@ -1498,7 +1499,7 @@ function normSerie(s){
 
   async function _atualizarAluno(){
     const alunoId = window._modoEdicaoId;
-    if((window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) === 'ADMIN')
+    if(window.Auth.semEscola())
       return setMsg('Selecione uma escola no topo da página antes de salvar.', 'err');
 
     const nome   = normalizeName(document.getElementById('nome')?.value || '');
@@ -3262,6 +3263,8 @@ function normSerie(s){
         if(window.Auth && window.Auth.getSession && window.Auth.getSession()) return res();
         document.addEventListener('auth:ready', res, { once: true });
       });
+      // Admin global em "Todas as escolas": não há escola para ler. Só avisa (o finally abaixo ainda libera a tela).
+      if(window.Auth.semEscola()){ document.getElementById('avisoSemEscola').hidden = false; return; }
       // Só turmas + doc da escola. Aluno e matrícula nunca são carregados em bloco.
       const [turmas, escola] = await Promise.all([window.DB.anoAtivoTurmas.list(), window.DB.escola.get()]);
       CACHE.turmas = Array.isArray(turmas) ? turmas : [];
