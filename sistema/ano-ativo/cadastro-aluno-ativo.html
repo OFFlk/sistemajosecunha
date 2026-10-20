@@ -339,7 +339,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 </div>
 <div>
 <label for="anoLetivo">Ano letivo</label>
-<input id="anoLetivo" max="2100" min="2000" type="number"/>
+<select id="anoLetivo"></select>
 </div>
 <div id="wrapStatusPadrao">
 <label for="statusPadrao" id="labelStatusPadrao">Status padrão da matrícula</label>
@@ -988,6 +988,25 @@ function normSerie(s){
   const sexo = document.getElementById("sexo");
   const corRaca = document.getElementById("corRaca");
 
+  // ---------- ano letivo: select com os anos das turmas cadastradas (+ ano ativo), igual ao da pesquisa ----------
+  function loadAnoOptions(){
+    const atual = String(anoLetivo.value || '').trim();
+    const anos = new Set();
+    getTurmas().forEach(t => { if(t.anoLetivo) anos.add(String(t.anoLetivo).trim()); });
+    anos.add(String(getAnoAtivoDefault()));
+    if(atual) anos.add(atual);   // não perde um ano já escolhido (ex.: edição abriu antes das turmas carregarem)
+    anoLetivo.innerHTML = Array.from(anos).filter(Boolean).sort((a,b) => Number(a) - Number(b))
+      .map(y => `<option value="${y}">${y}</option>`).join('');
+    if(atual) anoLetivo.value = atual;
+  }
+  // Garante que um ano exista no select antes de atribuir .value (edição de matrícula antiga, retomada pós-salvar)
+  function _garantirOpcaoAno(ano){
+    const y = String(ano == null ? '' : ano).trim();
+    if(!y || [...anoLetivo.options].some(o => o.value === y)) return;
+    const o = document.createElement('option'); o.value = y; o.textContent = y; anoLetivo.appendChild(o);
+    [...anoLetivo.options].sort((a,b) => Number(a.value) - Number(b.value)).forEach(op => anoLetivo.appendChild(op));
+  }
+
   // ---------- init ----------
   function getAnoAtivoDefault(){
     let v = CACHE.anoAtivo;
@@ -1169,7 +1188,7 @@ function normSerie(s){
     }
     const tid = t.turmaId || t.id;
     // Preenche o anoLetivo a partir da turma SOMENTE se o campo estiver vazio
-    if(!anoLetivo.value) anoLetivo.value = t.anoLetivo || getAnoAtivoDefault();
+    if(!anoLetivo.value){ const _a = t.anoLetivo || getAnoAtivoDefault(); _garantirOpcaoAno(_a); anoLetivo.value = String(_a); }
     // Turno não é mais escolhido no cadastro de aluno — é herdado da turma selecionada.
     if(turnoHidden) turnoHidden.value = t.turno ? String(t.turno).toUpperCase() : '';
     loadSerieOptionsForTurma(t, !!preserveSerieValue);
@@ -1481,7 +1500,7 @@ function normSerie(s){
     // Hard refresh (padrão do módulo): o toast e a turma escolhida sobrevivem ao reload
     try{
       sessionStorage.setItem('anoAtivoAluno:toast', JSON.stringify({ msg, kind: avisos.length ? 'warn' : 'ok' }));
-      sessionStorage.setItem('anoAtivoAluno:retomar', JSON.stringify({ turmaId: tid, ano }));
+      sessionStorage.setItem('anoAtivoAluno:retomar', JSON.stringify({ turmaId: tid, ano, statusPadrao: (statusPadrao && statusPadrao.value) || '' }));
     }catch(_){}
     recarregando = true;
     window.location.reload();
@@ -1833,7 +1852,8 @@ function normSerie(s){
           // então se isso não rodar primeiro a turma do ano certo nem aparece
           // nas opções.
           if(matAluno.anoLetivo != null){
-            anoLetivo.value = matAluno.anoLetivo;
+            _garantirOpcaoAno(matAluno.anoLetivo);
+            anoLetivo.value = String(matAluno.anoLetivo);
             anoLetivo.dispatchEvent(new Event('change'));
           }
           // Aguarda o select ser populado (pode não estar ainda)
@@ -3256,6 +3276,17 @@ function normSerie(s){
   });
   _aplicarBloqueioPorTurma(); // estado inicial: sem turma, formulário bloqueado
 
+  // Formulário de cadastro: sem sugestões do navegador (histórico do que já foi digitado) em nenhum campo de texto.
+  // Vale também para campos criados depois (modais, profissionais de apoio…).
+  (function(){
+    const SEL = 'input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]):not([type=button]):not([type=submit]), textarea';
+    const aplicar = () => document.querySelectorAll(SEL).forEach(el => { if(el.getAttribute('autocomplete') !== 'off') el.setAttribute('autocomplete', 'off'); });
+    aplicar();
+    let agendado = false;
+    new MutationObserver(() => { if(agendado) return; agendado = true; requestAnimationFrame(() => { agendado = false; aplicar(); }); })
+      .observe(document.body, { childList: true, subtree: true });
+  })();
+
   // init run — aguarda Firestore antes de popular a UI
   (async function initRun(){
     try{
@@ -3270,7 +3301,8 @@ function normSerie(s){
       CACHE.turmas = Array.isArray(turmas) ? turmas : [];
       CACHE.anoAtivo = (escola && escola.configAnoAtivo != null) ? escola.configAnoAtivo : null;
 
-      anoLetivo.value = getAnoAtivoDefault();
+      loadAnoOptions();
+      anoLetivo.value = String(getAnoAtivoDefault());
       if(pillAnoAtivo){ pillAnoAtivo.textContent = `ano ativo: ${anoLetivo.value || getAnoAtivoDefault()}`; }
       loadTurmaOptions();
       refreshTurmaInfo();
@@ -3278,10 +3310,22 @@ function normSerie(s){
         const ret = JSON.parse(sessionStorage.getItem('anoAtivoAluno:retomar') || 'null');
         const tst = JSON.parse(sessionStorage.getItem('anoAtivoAluno:toast') || 'null');
         sessionStorage.removeItem('anoAtivoAluno:retomar'); sessionStorage.removeItem('anoAtivoAluno:toast');
-        if(ret && ret.turmaId && [...turmaSelect.options].some(o => o.value === ret.turmaId)){
-          turmaSelect.value = ret.turmaId;
-          if(ret.ano) anoLetivo.value = ret.ano;
-          turmaSelect.dispatchEvent(new Event('change'));
+        if(ret && ret.turmaId){
+          // 1º o ANO (as turmas listadas dependem dele: em ano retroativo a turma não está na lista do ano ativo),
+          // 2º a turma, 3º a situação padrão. Só o formulário (etapas 1 e 2) volta em branco.
+          if(ret.ano){
+            _garantirOpcaoAno(ret.ano);
+            anoLetivo.value = String(ret.ano);
+            anoLetivo.dispatchEvent(new Event('change'));   // recarrega as turmas desse ano e os campos de situação
+          }
+          if([...turmaSelect.options].some(o => o.value === ret.turmaId)){
+            turmaSelect.value = ret.turmaId;
+            turmaSelect.dispatchEvent(new Event('change'));
+          }
+          if(ret.statusPadrao && [...statusPadrao.options].some(o => o.value === ret.statusPadrao)){
+            statusPadrao.value = ret.statusPadrao;
+            statusPadrao.dispatchEvent(new Event('change'));   // propaga para o campo "Situação" do aluno
+          }
         }
         if(tst && tst.msg) setMsg(tst.msg, tst.kind || 'ok');
       }catch(e){ console.warn('retomada pós-salvar:', e); }
