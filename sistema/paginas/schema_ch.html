@@ -42,11 +42,9 @@
 .ch-f-anoman{ flex:0 0 150px; min-width:150px; }
 .ch-f-serie{ flex:0 0 230px; min-width:160px; }
 
-/* campos de carga horária: compactos (só números, até 4 dígitos) */
-.ch-cargas-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:10px 32px; }
-.ch-carga-item{ display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; }
-.ch-carga-item .lbl{ margin:0; flex:1 1 auto; min-width:0; text-align:right; }
-.ch-carga-item .input{ flex:0 0 88px; width:88px; text-align:center; }
+/* campos de carga horária: .field padrão (rótulo em cima, campo embaixo), colunas de largura fixa e pouco espaço entre elas */
+.ch-cargas-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),240px)); gap:14px 16px; align-items:end; }
+.ch-cargas-grid .field{ min-width:0; }
 
 /* anos | séries lado a lado (divisórias usam os tokens do card de destaque) */
 .ch-aplic{ display:grid; grid-template-columns:1fr 1fr; gap:0 32px; margin-top:6px; }
@@ -216,7 +214,12 @@
    Futuro: virá do "Schema para históricos (padrão)" do schemaAta (ver doc-schema-historico.md);
    quando isso acontecer, só esta constante muda. */
 const CATALOGO_HISTORICO = ['LP','MAT','CIE','HIS','GEO','ART','EDF','ER','ING'];
-const DISC = CATALOGO_HISTORICO.map(c=>[c,c]);
+// Nome completo de cada código (só exibição: a chave gravada continua sendo o código)
+const NOMES_HISTORICO = {
+  LP:'Língua Portuguesa', MAT:'Matemática', CIE:'Ciências', HIS:'História', GEO:'Geografia',
+  ART:'Arte', EDF:'Educação Física', ER:'Ensino Religioso', ING:'Língua Inglesa'
+};
+const DISC = CATALOGO_HISTORICO.map(c=>[c, NOMES_HISTORICO[c] || c]);
 
 function nrm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim(); }
 // Reduz um texto de série livre (ex: "1º Ano", "1ºano", "1o ano do EF") a uma forma
@@ -333,7 +336,7 @@ function chOrdenar(arr){
 
 function chDisciplinas(){
   // usar as disciplinas do modelo/tabela atual
-  const base = (Array.isArray(DISC)?DISC:[]).map(d=>({code:String(d[0]||'').toUpperCase(), label:String(d[0]||'').toUpperCase()}));
+  const base = (Array.isArray(DISC)?DISC:[]).map(d=>({code:String(d[0]||'').toUpperCase(), label:String(d[1]||d[0]||'')}));
   const map=new Map();
   base.forEach(x=>map.set(x.code,x));
   return [...map.values()];
@@ -649,11 +652,11 @@ function chInitUI(){
   const discs=chDisciplinas();
   const grid=document.getElementById('chCargasGrid');
   if(grid){
-    grid.innerHTML = discs.map(d=>`<div class="ch-carga-item"><label class="lbl" for="chCarga-${esc(d.code)}">${esc(d.label && d.label!==d.code ? d.code+' — '+d.label : d.code)}</label><input class="input" id="chCarga-${esc(d.code)}" data-ch-carga="${esc(d.code)}" inputmode="numeric" maxlength="4" placeholder="Ex.: 200" oninput="this.value=this.value.replace(/\D+/g,'').slice(0,4)"></div>`).join('');
+    grid.innerHTML = discs.map(d=>`<div class="field"><label for="chCarga-${esc(d.code)}">${esc(d.label || d.code)}</label><input id="chCarga-${esc(d.code)}" data-ch-carga="${esc(d.code)}" inputmode="numeric" maxlength="4" placeholder="Ex.: 200" oninput="this.value=this.value.replace(/\D+/g,'').slice(0,4)"></div>`).join('');
   }
   const gridT2=document.getElementById('chCargasGridT2');
   if(gridT2){
-    gridT2.innerHTML = ATIVIDADES_T2.map(([code,label])=>`<div class="ch-carga-item"><label class="lbl" for="chCargaT2-${esc(code)}">${esc(label)}</label><input class="input" id="chCargaT2-${esc(code)}" data-ch-carga-t2="${esc(code)}" inputmode="numeric" maxlength="4" placeholder="Ex.: 40" oninput="this.value=this.value.replace(/\D+/g,'').slice(0,4)"></div>`).join('');
+    gridT2.innerHTML = ATIVIDADES_T2.map(([code,label])=>`<div class="field"><label for="chCargaT2-${esc(code)}">${esc(label)}</label><input id="chCargaT2-${esc(code)}" data-ch-carga-t2="${esc(code)}" inputmode="numeric" maxlength="4" placeholder="Ex.: 40" oninput="this.value=this.value.replace(/\D+/g,'').slice(0,4)"></div>`).join('');
   }
   // a tabela de regras só é desenhada depois da carga do servidor (init)
   chRenderAnoSelect(); chRenderAnosSelecionados(); chRenderSeriesSelecionadas();
