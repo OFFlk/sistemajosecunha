@@ -18,6 +18,7 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script>window.Auth && window.Auth.requireRole ? Auth.requireRole('admin') : Auth.requireAuth();</script>
 <script>
 (function(){
@@ -171,6 +172,17 @@
   .info-tip.open .info-tip-bubble{ display:block; }
   .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
   .info-tip-bubble.align-right{ left:auto; right:0; }
+
+  /* ── Card de registro de alterações (layout; a aparência vem do global) ── */
+  .log-linha { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .log-linha .field { flex: 1 1 260px; min-width: 0; max-width: 420px; }
+  #modalLogs .modal { --modal-w: 1000px; --modal-h: 85vh; }
+  .log-scroll { overflow-x: auto; }
+  .log-scroll table { width: 100%; min-width: 760px; }
+  .log-quando { white-space: nowrap; }
+  .log-sub { display: block; font-size: 12px; color: var(--ui-muted); }
+  .log-rodape { margin-right: auto; }
+  .log-det-corpo { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; padding: 10px 12px; border-radius: 8px; background: var(--ui-chip-bg); border: 1px solid var(--ui-chip-border); color: var(--ui-text); }
 </style>
 
 <title>Backup e restaurar</title>
@@ -239,12 +251,38 @@
     </div>
   </div>
 
+  <div class="card" id="cardLogs">
+    <div class="card-title">📜 Registro de alterações <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Mostra quem criou, editou ou excluiu dados, e quando. Os registros só são lidos quando você aperta Consultar (cada leitura conta na cota do Firestore): aparecem os 50 mais recentes, e Carregar mais traz os anteriores. Registros com mais de <span id="logRetDias">365</span> dias são apagados automaticamente.</span></span></div>
+    <div class="log-linha">
+      <div class="field">
+        <label for="logsEscola">Escola</label>
+        <select id="logsEscola">
+          <option value="__todas__">Todas as escolas</option>
+        </select>
+      </div>
+      <button class="btn primary field-h" id="btnConsultarLogs" onclick="consultarLogs()" type="button">Consultar</button>
+    </div>
+  </div>
+
 </div>
 
 <footer>
   <div class="l-fdot"></div>
   sistema interno de gestão escolar · desenvolvido sob medida
 </footer>
+
+<!-- Modal do registro de alterações (aberto só ao apertar Consultar) -->
+<div class="modal-backdrop" id="modalLogs">
+  <div class="modal scroll-body" role="dialog" aria-modal="true" aria-labelledby="modalLogsTitulo">
+    <div class="modal-head"><h3 id="modalLogsTitulo">Registro de alterações</h3><button class="btn quiet small" type="button" aria-label="Fechar" onclick="fecharLogs()">✕</button></div>
+    <div class="modal-body" id="logsCorpo"></div>
+    <div class="modal-foot">
+      <span class="help log-rodape" id="logsRodape" aria-live="polite"></span>
+      <button class="btn secondary" id="btnMaisLogs" type="button" onclick="carregarMaisLogs()" hidden>Carregar mais</button>
+      <button class="btn cancel" type="button" onclick="fecharLogs()">Fechar</button>
+    </div>
+  </div>
+</div>
 
 <!-- 1. header-logic (sempre primeiro — monta header, tema, chip, auth guard) -->
 <script src="../header-logic.js"></script>
@@ -554,6 +592,175 @@
     renderMeta();
   }
 
+  /* ══════════════════════════════════════════
+     LOG DAS AÇÕES EM MASSA (restaurar / limpar)
+     Um registro por escola, sem cópia dos documentos (para isso existe
+     o backup). Não bloqueia nem derruba a ação se o registro falhar.
+  ══════════════════════════════════════════ */
+  function _logAcao(acao, schoolIds, resumo, colecao){
+    if (!window.Log) return;
+    schoolIds.forEach(sid => { Log.registrar({ acao, schoolId: sid, colecao: colecao || null, resumo }); });
+  }
+
+  /* ══════════════════════════════════════════
+     REGISTRO DE ALTERAÇÕES — consulta sob demanda
+     Nada é lido no boot: só ao apertar "Consultar", e só da opção
+     escolhida no select (uma escola ou todas), 50 por vez.
+  ══════════════════════════════════════════ */
+  const LOGS_TODAS  = '__todas__';
+  const LOGS_PAGINA = 50;
+  // Mapa único ação → rótulo e cor do chip (guia, seção 6).
+  // ⚠️ Cores PROVISÓRIAS: aguardam o mapa definido pelo usuário.
+  const LOG_ACAO = {
+    criar:     { rot: 'Criou',     cls: 'ok' },
+    editar:    { rot: 'Editou',    cls: 'neutral' },
+    excluir:   { rot: 'Excluiu',   cls: 'bad' },
+    restaurar: { rot: 'Restaurou', cls: 'ok' },
+    limpeza:   { rot: 'Limpeza',   cls: 'bad' },
+  };
+  let _logsEstado = null;   // { alvo, rotulo, rotulos, ultimoDoc, total, mapa }
+
+  // Preenche o select do card com as escolas que a página já carregou
+  // (copia as opções do select de escopo: 0 leituras extras).
+  function _logPopularEscolas(){
+    const dst = document.getElementById('logsEscola');
+    const src = document.getElementById('scopeSchoolSelect');
+    if (!dst || !src) return;
+    const prev = dst.value;
+    const opts = Array.from(src.options).filter(o => o.value);
+    dst.innerHTML = `<option value="${LOGS_TODAS}">Todas as escolas</option>` +
+      opts.map(o => `<option value="${_escHtml(o.value)}">${_escHtml(o.textContent.trim())}</option>`).join('');
+    dst.value = Array.from(dst.options).some(o => o.value === prev) ? prev : LOGS_TODAS;
+    const ret = document.getElementById('logRetDias');
+    if (ret && window.Log && Log.RETENCAO_DIAS) ret.textContent = Log.RETENCAO_DIAS;
+  }
+
+  function _logData(ts){
+    try{
+      const dt = ts && typeof ts.toDate === 'function' ? ts.toDate() : null;
+      return dt ? dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
+    }catch(_e){ return '—'; }
+  }
+  function _logJsonBonito(s){
+    try{ return JSON.stringify(JSON.parse(s), null, 2); }catch(_e){ return String(s); }
+  }
+  function _logDetalheTexto(d){
+    const p = [];
+    if (d.resumo) p.push('Resumo: ' + d.resumo);
+    if (d.campos && d.campos.length) p.push('Campos: ' + d.campos.join(', '));
+    if (d.antes)  p.push('Antes:\n'  + _logJsonBonito(d.antes));
+    if (d.depois) p.push('Depois:\n' + _logJsonBonito(d.depois));
+    return p.join('\n\n');
+  }
+
+  function _logLinha(id, d, mostrarEscola, st){
+    const a = LOG_ACAO[d.acao] || { rot: d.acao || '—', cls: '' };
+    const quem = d.nome || d.email || d.uid || '—';
+    const sub  = (d.nome && d.email) ? `<span class="log-sub">${_escHtml(d.email)}</span>` : '';
+    const onde = [d.colecao, d.docId].filter(Boolean).join(' / ') || '—';
+    const pag  = d.pagina ? `<span class="log-sub">${_escHtml(d.pagina)}</span>` : '';
+    const temDet = !!(d.resumo || (d.campos && d.campos.length) || d.antes || d.depois);
+    const colunas = mostrarEscola ? 6 : 5;
+    return `<tr>` +
+        `<td class="log-quando">${_escHtml(_logData(d.criadoEm))}</td>` +
+        `<td>${_escHtml(quem)}${sub}</td>` +
+        (mostrarEscola ? `<td>${_escHtml((st.rotulos.get(d.schoolId)) || d.schoolId || '—')}</td>` : '') +
+        `<td><span class="badge small ${a.cls}">${_escHtml(a.rot)}</span></td>` +
+        `<td>${_escHtml(onde)}${pag}</td>` +
+        `<td>${temDet ? `<button class="btn quiet small" type="button" onclick="alternarDetalheLog('${_escHtml(id)}')">Detalhes</button>` : ''}</td>` +
+      `</tr>` +
+      (temDet ? `<tr id="logDet_${_escHtml(id)}" hidden><td colspan="${colunas}"><div class="log-det-corpo"></div></td></tr>` : '');
+  }
+
+  // O texto do detalhe só é montado quando a linha é aberta (o "antes" de uma exclusão pode ser grande).
+  function alternarDetalheLog(id){
+    const tr = document.getElementById('logDet_' + id);
+    if (!tr) return;
+    const corpo = tr.querySelector('.log-det-corpo');
+    if (tr.hidden && !corpo.dataset.pronto){
+      const d = _logsEstado && _logsEstado.mapa.get(id);
+      if (d){ corpo.textContent = _logDetalheTexto(d); corpo.dataset.pronto = '1'; }
+    }
+    tr.hidden = !tr.hidden;
+  }
+
+  function _logsEsc(ev){
+    if (ev.key === 'Escape'){ ev.stopPropagation(); fecharLogs(); }
+  }
+  function _logsAbrirModal(titulo){
+    const b = document.getElementById('modalLogs');
+    document.getElementById('modalLogsTitulo').textContent = titulo;
+    document.getElementById('logsRodape').textContent = '';
+    document.getElementById('btnMaisLogs').hidden = true;
+    b.onclick = (ev) => { if (ev.target === b) fecharLogs(); };
+    b.style.display = 'flex';
+    b.classList.add('open');
+    document.addEventListener('keydown', _logsEsc, true);
+  }
+  function fecharLogs(){
+    const b = document.getElementById('modalLogs');
+    b.classList.remove('open');
+    b.style.display = '';
+    document.removeEventListener('keydown', _logsEsc, true);
+    _logsEstado = null;                                   // descarta uma consulta ainda em andamento
+    document.getElementById('logsCorpo').innerHTML = '';
+  }
+
+  async function consultarLogs(){
+    if (!window.Auth || !Auth.db){ setMsg('O banco ainda não está pronto. Tente de novo em instantes.', 'warn'); return; }
+    const sel = document.getElementById('logsEscola');
+    const alvo = sel.value || LOGS_TODAS;
+    const rotulo = (sel.selectedOptions[0] && sel.selectedOptions[0].textContent.trim()) || alvo;
+    const rotulos = new Map(Array.from(sel.options).map(o => [o.value, o.textContent.trim()]));
+    _logsEstado = { alvo, rotulo, rotulos, ultimoDoc: null, total: 0, mapa: new Map() };
+    _logsAbrirModal('Registro de alterações — ' + rotulo);
+    document.getElementById('logsCorpo').innerHTML = '<div class="aviso-warn">⏳ Carregando registros…</div>';
+    await _logsBuscar(true);
+  }
+  function carregarMaisLogs(){ return _logsBuscar(false); }
+
+  async function _logsBuscar(primeira){
+    const st = _logsEstado;
+    if (!st) return;
+    const corpo = document.getElementById('logsCorpo');
+    const btnMais = document.getElementById('btnMaisLogs');
+    btnMais.disabled = true;
+    try{
+      let q = Auth.db.collection((window.Log && Log.COLECAO) || 'logs');
+      if (st.alvo !== LOGS_TODAS) q = q.where('schoolId', '==', st.alvo);
+      q = q.orderBy('criadoEm', 'desc');
+      if (st.ultimoDoc) q = q.startAfter(st.ultimoDoc);
+      const snap = await q.limit(LOGS_PAGINA).get();
+      if (_logsEstado !== st) return;                      // o modal foi fechado enquanto carregava
+
+      const mostrarEscola = st.alvo === LOGS_TODAS;
+      const linhas = snap.docs.map(doc => { const d = doc.data(); st.mapa.set(doc.id, d); return _logLinha(doc.id, d, mostrarEscola, st); }).join('');
+      if (primeira){
+        corpo.innerHTML = snap.empty
+          ? `<div class="aviso-warn">ℹ️ Nenhum registro encontrado para ${_escHtml(st.rotulo)}.</div>`
+          : `<div class="log-scroll"><table><thead><tr><th>Quando</th><th>Quem</th>${mostrarEscola ? '<th>Escola</th>' : ''}<th>Ação</th><th>Registro</th><th>Detalhes</th></tr></thead><tbody id="logsTbody">${linhas}</tbody></table></div>`;
+      } else if (linhas){
+        document.getElementById('logsTbody').insertAdjacentHTML('beforeend', linhas);
+      }
+      if (snap.docs.length) st.ultimoDoc = snap.docs[snap.docs.length - 1];
+      st.total += snap.size;
+      document.getElementById('logsRodape').textContent = st.total ? `${st.total} registro(s) carregado(s)` : '';
+      btnMais.hidden = snap.size < LOGS_PAGINA;
+    } catch(e){
+      console.error('[admin_backup] consulta de logs falhou:', e);
+      if (_logsEstado !== st) return;
+      const semIndice = e && e.code === 'failed-precondition';
+      const semAcesso = e && e.code === 'permission-denied';
+      const msg = semIndice ? 'Falta criar um índice no Firestore para esta consulta. O link para criá-lo está no console do navegador.'
+                : semAcesso ? 'Sem permissão para ler os registros (regras do Firestore).'
+                : 'Não foi possível carregar os registros.';
+      if (primeira) corpo.innerHTML = `<div class="aviso-warn">⚠️ ${_escHtml(msg)}</div>`;
+      setMsg(msg, 'err');
+    } finally {
+      btnMais.disabled = false;
+    }
+  }
+
   function downloadText(filename, text){
     const blob = new Blob([text], { type: "application/json;charset=utf-8" });
     const url  = URL.createObjectURL(blob);
@@ -693,6 +900,7 @@
       if (!ok) return;
 
       setMsg("Restaurando no Firestore…", "loading");
+      _logAcao('restaurar', [schoolId], `Restauração iniciada — coleções: ${keys.join(', ')}`);
       try{
         for (const k of keys){
           const col = FS_MAP[k]; if (!col) continue;
@@ -717,6 +925,7 @@
       if (!ok){ setMsg("Restauração cancelada.", "warn"); return; }
 
       setMsg(`Restaurando ${schoolIds.length} escola(s) no Firestore…`, "loading");
+      _logAcao('restaurar', schoolIds, 'Restauração de todas as escolas iniciada');
       try{
         for (const schoolId of schoolIds){
           const schoolData = _backupParsed.bySchool[schoolId] || {};
@@ -752,6 +961,7 @@
       const ok = await _confirmar(`Tem certeza? Isso apagará TODOS os dados da escola "${schoolId}" no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de ata, schemas de CH, funcionários e notas trimestrais.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.`, { titulo: "Apagar TODOS os dados", perigo: true, textoConfirmar: "Apagar tudo" });
       if (!ok) return;
       setMsg(`Apagando todos os dados da escola "${schoolId}"…`, "loading");
+      _logAcao('limpeza', [schoolId], 'Apagou TODOS os dados da escola', allColNames.join(', '));
       for (const k of SYSTEM_KEYS) localStorage.removeItem(scopedKey(k));
       try{
         await Promise.all(allColNames.map(col => _clearFSColFor(schoolId, col)));
@@ -765,6 +975,7 @@
       const ok = await _confirmar(`Tem certeza? Isso apagará TODOS os dados de TODAS as ${schoolIds.length} escola(s) no Firestore — turmas, alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico), além de schemas de ata, schemas de CH, funcionários e notas trimestrais.\n\nDados de login NÃO serão apagados.\n\nEssa ação não pode ser desfeita.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Apagar TODOS os dados de TODAS as escolas", perigo: true, textoConfirmar: "Apagar tudo", digitar: "APAGAR TUDO" });
       if (!ok){ setMsg("Limpeza cancelada.", "warn"); return; }
       setMsg(`Apagando todos os dados de ${schoolIds.length} escola(s)…`, "loading");
+      _logAcao('limpeza', schoolIds, 'Apagou TODOS os dados (limpeza de todas as escolas)', allColNames.join(', '));
       try{
         for (const schoolId of schoolIds){
           await Promise.all(allColNames.map(col => _clearFSColFor(schoolId, col)));
@@ -788,6 +999,7 @@
       const ok = await _confirmar(`Apagar turmas da escola "${schoolId}"? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.`, { titulo: "Apagar turmas", perigo: true, textoConfirmar: "Apagar turmas" });
       if (!ok) return;
       setMsg("Apagando turmas do Firestore…", "loading");
+      _logAcao('limpeza', [schoolId], 'Apagou turmas, atas e matrículas', TURMAS_RELATED_COLS.join(', '));
       ["turmasDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoTurmasDB","anoAtivoMatriculasDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
         await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
@@ -801,6 +1013,7 @@
       const ok = await _confirmar(`Apagar turmas de TODAS as ${schoolIds.length} escola(s)? Remove turmas, atas e matrículas dos módulos de ano ativo e de atas (histórico) no Firestore.\nAlunos, funcionários, catálogo, schemas e notas permanecem intactos.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Apagar turmas de todas as escolas", perigo: true, textoConfirmar: "Apagar turmas" });
       if (!ok) return;
       setMsg(`Apagando turmas de ${schoolIds.length} escola(s)…`, "loading");
+      _logAcao('limpeza', schoolIds, 'Apagou turmas, atas e matrículas', TURMAS_RELATED_COLS.join(', '));
       try{
         for (const schoolId of schoolIds){
           await Promise.all(TURMAS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
@@ -824,6 +1037,7 @@
       const ok = await _confirmar(`Limpar alunos/IDs da escola "${schoolId}"? Remove a coleção de alunos, matrículas e atas do Firestore.\nTurmas e funcionários permanecem.`, { titulo: "Limpar alunos / IDs", perigo: true, textoConfirmar: "Limpar alunos" });
       if (!ok) return;
       setMsg("Apagando alunos do Firestore…", "loading");
+      _logAcao('limpeza', [schoolId], 'Apagou alunos, matrículas e atas', ALUNOS_RELATED_COLS.join(', '));
       ["alunosDB","alunosAliasesDB","atasDB","matriculasDB","turmasMetaDB","anoAtivoAlunosDB","anoAtivoMatriculasDB"].forEach(k => localStorage.removeItem(scopedKey(k)));
       try{
         await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
@@ -837,6 +1051,7 @@
       const ok = await _confirmar(`Limpar alunos/IDs de TODAS as ${schoolIds.length} escola(s)? Remove alunos, matrículas e atas dos módulos de ano ativo e de atas (histórico) no Firestore.\nTurmas e funcionários permanecem.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Limpar alunos / IDs de todas as escolas", perigo: true, textoConfirmar: "Limpar alunos" });
       if (!ok) return;
       setMsg(`Apagando alunos de ${schoolIds.length} escola(s)…`, "loading");
+      _logAcao('limpeza', schoolIds, 'Apagou alunos, matrículas e atas', ALUNOS_RELATED_COLS.join(', '));
       try{
         for (const schoolId of schoolIds){
           await Promise.all(ALUNOS_RELATED_COLS.map(col => _clearFSColFor(schoolId, col)));
@@ -860,6 +1075,7 @@
       const ok = await _confirmar(`Apagar os funcionários da escola "${schoolId}" no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.`, { titulo: "Apagar funcionários", perigo: true, textoConfirmar: "Apagar funcionários" });
       if (!ok) return;
       setMsg("Apagando funcionários do Firestore…", "loading");
+      _logAcao('limpeza', [schoolId], 'Apagou funcionários', 'funcionarios');
       localStorage.removeItem(scopedKey("funcionariosDB"));
       try{
         await _clearFSColFor(schoolId, 'funcionarios');
@@ -873,6 +1089,7 @@
       const ok = await _confirmar(`Apagar os funcionários de TODAS as ${schoolIds.length} escola(s) no Firestore?\nTurmas, alunos, atas e matrículas permanecem intactos.\n\nEssa ação não pode ser desfeita sem um backup.\n\nEscolas: ${schoolIds.join(", ")}`, { titulo: "Apagar funcionários de todas as escolas", perigo: true, textoConfirmar: "Apagar funcionários" });
       if (!ok) return;
       setMsg(`Apagando funcionários de ${schoolIds.length} escola(s)…`, "loading");
+      _logAcao('limpeza', schoolIds, 'Apagou funcionários', 'funcionarios');
       try{
         for (const schoolId of schoolIds){
           await _clearFSColFor(schoolId, 'funcionarios');
@@ -1021,7 +1238,10 @@
     document.getElementById("scopeSchoolSelect").addEventListener("change", renderMeta);
 
     function boot(){
-      populateSchoolSelect().then(renderMeta).catch(e => {
+      populateSchoolSelect().then(() => {
+        try { _logPopularEscolas(); } catch(e){ console.error('[admin_backup] select de escolas do log:', e); }
+        return renderMeta();
+      }).catch(e => {
         console.error('[admin_backup] falha no boot:', e);
         try { Loading.esconder(); } catch(_e){}
       });
