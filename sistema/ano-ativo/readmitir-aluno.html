@@ -19,6 +19,7 @@
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../matricula-utils.js"></script>
 <script src="../theme-colors.js"></script>
 
@@ -767,6 +768,19 @@ async function montarFormularioPara(painel, aluno, anoEscolhido, anosDisponiveis
         if(cTurma) ops.push(cTurma);
       }
       await window.DB.batchWrite(ops);
+      // Log: 1 registro por readmissão (contador da turma, cópia de busca nas outras matrículas e foto não entram).
+      // Mesma turma/ano com matrícula encerrada = reativação (editar); caso contrário nasce uma matrícula (criar).
+      if(window.Log){
+        const _reaproveitada = todas.find(m => m._id === matriculaId) || null;   // já lida acima: sem leitura extra
+        const _resumoLog = `Readmissão — ${aluno.nome || aluno.nomeOficial || alunoId} — turma ${(turmaObj && (turmaObj.nome || turmaObj.turmaId)) || turmaId}, ${ano}`
+          + (_reaproveitada ? ' (reativou matrícula encerrada)' : '')
+          + (residuos.length ? ` (apagou ${residuos.length} matrícula(s) encerrada(s) residual(is) do mesmo ano)` : '');
+        const _depoisLog = { ...novaMatricula, encerradoEm: null };   // o delete() do Firestore não aparece no log: null mostra a limpeza
+        if(residuos.length) _depoisLog._residuosApagados = residuos.map(m => ({ id: m._id, turmaId: m.turmaId, status: m.status || null, situacao: m.situacao || null }));
+        if(_reaproveitada) await Log.registrar({ acao: 'editar', colecao: 'anoAtivoMatriculas', docId: matriculaId, resumo: _resumoLog,
+          antes: _reaproveitada, depois: _depoisLog, parcial: true });
+        else await Log.registrar({ acao: 'criar', colecao: 'anoAtivoMatriculas', docId: matriculaId, resumo: _resumoLog, depois: _depoisLog });
+      }
       await enviarFotoPendenteReadmissao(alunoId, ano, matriculaId);
       setMsg('Readmissão concluída com sucesso!', 'ok');
 
