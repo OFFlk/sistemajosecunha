@@ -19,6 +19,7 @@
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../theme-colors.js"></script>
 
 <!-- Fonte -->
@@ -804,7 +805,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     if(!nome){ setMsg("Informe o nome da turma (ou deixe o preenchimento automático e ajuste depois).", "err"); return; }
 
     const now = new Date().toISOString();
-    let payload, ano = null;
+    let payload, ano = null, docOriginalLog = null;
 
     if(ehEdicao){
       // EDIÇÃO: o ID nunca muda. Só turno e nome são gravados; ano, séries, schema,
@@ -812,6 +813,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       // não vai no payload é preservado, inclusive os alunos lançados em cadastro-atas.html).
       const docOriginal = getTurmas().find(t => t && t.turmaId === editingTurmaId);
       if(!docOriginal){ setMsg("Não foi possível localizar a turma original — recarregue a página.", "err"); return; }
+      docOriginalLog = docOriginal;   // log: como a turma estava antes (já em memória, sem leitura extra)
       payload = {
         _id: editingTurmaId,
         id: editingTurmaId,
@@ -864,6 +866,15 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       console.warn('[salvarTurma]', e);
       setMsg("Erro ao salvar turma.", "err");
       return;
+    }
+
+    // Log (log.js): 1 registro por "Salvar". Aguardado porque a edição recarrega a página logo abaixo.
+    // O índice de anos (registrarAnoNoIndice) é consequência da criação: não entra no log.
+    if(window.Log){
+      const { schemaSnapshot: _schemaFora, ...depoisLog } = payload;   // o snapshot do schema é grande e não muda aqui
+      await Log.registrar(ehEdicao
+        ? { acao:"editar", colecao:"turmas", docId:editingTurmaId, resumo:`Turma ${nome}`, antes:docOriginalLog, depois:depoisLog, parcial:true }
+        : { acao:"criar",  colecao:"turmas", docId:payload.turmaId, resumo:`Turma criada: ${nome} — ${ano}`, depois:depoisLog });
     }
 
     // EDIÇÃO: hard refresh. A página fica estática depois de salvar, então
