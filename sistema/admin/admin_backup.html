@@ -266,7 +266,10 @@
 
 </div>
 
-
+<footer>
+  <div class="l-fdot"></div>
+  sistema interno de gestão escolar · desenvolvido sob medida
+</footer>
 
 <!-- Modal do registro de alterações (aberto só ao apertar Consultar) -->
 <div class="modal-backdrop" id="modalLogs">
@@ -656,6 +659,7 @@
     const sub  = (d.nome && d.email) ? `<span class="log-sub">${_escHtml(d.email)}</span>` : '';
     const onde = [d.colecao, d.docId].filter(Boolean).join(' / ') || '—';
     const pag  = d.pagina ? `<span class="log-sub">${_escHtml(d.pagina)}</span>` : '';
+    const res  = d.resumo ? `<span class="log-sub">${_escHtml(d.resumo)}</span>` : '';
     const temDet = !!(d.resumo || (d.campos && d.campos.length) || d.antes || d.depois);
     const colunas = mostrarEscola ? 6 : 5;
     return `<tr>` +
@@ -663,7 +667,7 @@
         `<td>${_escHtml(quem)}${sub}</td>` +
         (mostrarEscola ? `<td>${_escHtml((st.rotulos.get(d.schoolId)) || d.schoolId || '—')}</td>` : '') +
         `<td><span class="badge small ${a.cls}">${_escHtml(a.rot)}</span></td>` +
-        `<td>${_escHtml(onde)}${pag}</td>` +
+        `<td>${_escHtml(onde)}${res}${pag}</td>` +
         `<td>${temDet ? `<button class="btn quiet small" type="button" onclick="alternarDetalheLog('${_escHtml(id)}')">Detalhes</button>` : ''}</td>` +
       `</tr>` +
       (temDet ? `<tr id="logDet_${_escHtml(id)}" hidden><td colspan="${colunas}"><div class="log-det-corpo"></div></td></tr>` : '');
