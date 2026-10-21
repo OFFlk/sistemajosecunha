@@ -98,6 +98,20 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
 @media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
 /* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
+
+/* ── Consistência (matrículas sem turma/aluno, alunos sem matrícula): layout local; cor só por .badge / --ui-* ── */
+.cons-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.cons-barra .cons-ano { width:130px; }
+.cons-barra .cons-busca { flex:1; min-width:200px; }
+.cons-area[hidden] { display:none; }
+.cons-lista { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+.cons-item { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.cons-left { flex:1; min-width:240px; }
+.cons-tit { font-size:14px; font-weight:800; margin-bottom:6px; word-break:break-word; }
+.cons-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.cons-det { margin-top:6px; word-break:break-word; }
+.cons-right { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.cons-pag { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -272,6 +286,50 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     </div>
   </div>
 
+  <!-- ── CONSISTÊNCIA ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secConsist', event)">
+      <h3>🔍 Consistência</h3>
+      <button type="button" class="sec-toggle" id="togSecConsist" aria-expanded="true" aria-controls="secConsist" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secConsist">
+      <div class="muted">Procura matrículas que ficaram soltas (sem turma ou sem aluno), alunos sem nenhuma matrícula e matrículas com ID fora do padrão. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede confirmação. Dados de busca divergentes e contadores das turmas continuam nos dois cards acima.</div>
+      <div class="cons-barra">
+        <input type="text" class="input cons-ano" id="consAno" inputmode="numeric" maxlength="4" placeholder="Ano (ex.: 2025)" autocomplete="off">
+        <button class="btn primary field-h" id="btnConsVerificar" onclick="consVerificar(false)">🔍 Verificar o ano</button>
+        <button class="btn secondary field-h" id="btnConsGlobal" onclick="consVerificar(true)">🌐 Verificação global</button>
+      </div>
+      <div class="muted mt-8">Por ano, lê as turmas e as matrículas do ano e os alunos dessas matrículas (1 leitura por documento). A verificação global lê todas as turmas, todas as matrículas e todos os alunos da escola e é a única que acha alunos sem matrícula.</div>
+
+      <div class="cons-area mt-14" id="consArea" hidden>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-num" id="consStat_B1">0</div><div class="stat-lbl">B1 · Matrícula sem turma</div></div>
+          <div class="stat-box"><div class="stat-num" id="consStat_B2">0</div><div class="stat-lbl">B2 · Matrícula sem aluno</div></div>
+          <div class="stat-box"><div class="stat-num" id="consStat_B3">0</div><div class="stat-lbl">B3 · Aluno sem matrícula</div></div>
+          <div class="stat-box"><div class="stat-num" id="consStat_B5">0</div><div class="stat-lbl">B5 · ID fora do padrão</div></div>
+        </div>
+        <div class="cons-barra">
+          <select class="input" id="consTipo" onchange="consFiltroMudou()" aria-label="Filtrar por tipo">
+            <option value="">Todos os tipos</option>
+            <option value="B1">B1 · Matrícula sem turma</option>
+            <option value="B2">B2 · Matrícula sem aluno</option>
+            <option value="B3">B3 · Aluno sem matrícula</option>
+            <option value="B5">B5 · ID fora do padrão</option>
+          </select>
+          <input type="text" class="input cons-busca" id="consBusca" oninput="consFiltroMudou()" placeholder="Filtrar por nome, ID do aluno ou turma" autocomplete="off">
+          <span class="badge small" id="consEscopo"></span>
+        </div>
+        <div class="cons-lista" id="consLista"></div>
+        <div class="cons-pag" id="consPag" hidden>
+          <button class="btn neutral small" id="btnConsAnt" onclick="consPag(-1)">← Anterior</button>
+          <span class="badge small" id="consPagInfo"></span>
+          <button class="btn neutral small" id="btnConsProx" onclick="consPag(1)">Próxima →</button>
+        </div>
+      </div>
+      <div class="console" id="logConsist" style="display:none;"></div>
+    </div>
+  </div>
+
   <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
   <div class="card card-destaque">
     <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
@@ -340,7 +398,8 @@ document.addEventListener('auth:ready', async function () {
       'btnExportJSON', 'lblImportJSON',
       'btnBuscarAluno', 'btnExcluirAluno',
       'btnBuscarTurma', 'btnExcluirTurma',
-      'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar', 'btnCtDuplicadas'
+      'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar', 'btnCtDuplicadas',
+      'btnConsVerificar', 'btnConsGlobal'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
@@ -356,6 +415,8 @@ document.addEventListener('auth:ready', async function () {
     window.contadoresVerificar      = () => {};
     window.contadoresAplicar        = () => {};
     window.duplicadasRemover        = () => {};
+    window.consVerificar            = () => {};
+    window.consAcao                 = () => {};
   }
 
   try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
@@ -1971,6 +2032,262 @@ function psqPdf() {
   doc.save(psqNomeArq('pdf'));
 }
 
+
+/* =============================================
+   CONSISTÊNCIA — matrículas soltas e alunos sem matrícula (B1, B2, B3, B5)
+   Nada é corrigido sozinho: cada correção relê o banco, confere se o estado ainda é
+   o do relatório, mostra o que vai mudar, pede confirmação e grava num batchWrite atômico.
+   (B4 "dados copiados divergentes" = card "Dados de busca nas matrículas";
+    contadores e matrículas ativas duplicadas = card "Contadores das turmas".)
+============================================= */
+const CONS_TIPOS = {
+  B1: { rot: 'Matrícula sem turma', chip: 'bad'  },
+  B2: { rot: 'Matrícula sem aluno', chip: 'bad'  },
+  B3: { rot: 'Aluno sem matrícula', chip: 'gray' },
+  B5: { rot: 'ID fora do padrão',   chip: 'gray' },
+};
+const CONS_PAG = 50;
+let _cons = { itens: [], uid: 0, pag: 1, escopo: '', rodou: false };
+let _consOcupado = false;
+
+function _consS(v) { return (v == null ? '' : String(v)).trim(); }
+function _consNorm(s) { return _consS(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' '); }
+function _consDedup(...arrs) {
+  const m = new Map();
+  arrs.forEach(a => (a || []).forEach(d => m.set(d._id, d)));
+  return [...m.values()];
+}
+// Leituras pontuais (1 por ID). Erro de leitura NÃO vira "não existe": propaga.
+async function _consGetMuitos(colecao, ids) {
+  const lista = [...ids], out = new Map();
+  for (let i = 0; i < lista.length; i += 15) {
+    const parte = lista.slice(i, i + 15);
+    const rs = await Promise.all(parte.map(id => window.DB[colecao].get(id)));
+    parte.forEach((id, k) => out.set(id, rs[k]));
+  }
+  return out;
+}
+function _consIndexar(docs, ...campos) {          // ID do documento + campos alternativos → doc
+  const m = new Map();
+  docs.forEach(d => { m.set(d._id, d); campos.forEach(c => { const v = _consS(d[c]); if (v) m.set(v, d); }); });
+  return m;
+}
+
+/* ── leitura ── */
+async function _consLerAno(ano) {
+  const n = Number(ano), s = String(ano);
+  // anoLetivo pode estar como número ou texto: as duas consultas
+  const [t1, t2, m1, m2] = await Promise.all([
+    window.DB.anoAtivoTurmas.whereEquals('anoLetivo', n),     window.DB.anoAtivoTurmas.whereEquals('anoLetivo', s),
+    window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', n), window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', s),
+  ]);
+  const mats = _consDedup(m1, m2);
+  const turmaMap = _consIndexar(_consDedup(t1, t2), 'turmaId');
+  // turmas citadas pelas matrículas que não vieram na consulta (de outro ano, ou realmente inexistentes)
+  const faltam = new Set(mats.map(m => _consS(m.turmaId)).filter(id => id && !turmaMap.has(id)));
+  (await _consGetMuitos('anoAtivoTurmas', faltam)).forEach((d, id) => { if (d) turmaMap.set(id, d); });
+
+  const ids = [...new Set(mats.map(m => _consS(m.alunoId)).filter(Boolean))];
+  const alunoMap = _consIndexar(await window.DB.anoAtivoAlunos.whereIn('alunoId', ids), 'alunoId');
+  // quem a consulta por campo não achou, confirma pelo ID do documento antes de acusar
+  (await _consGetMuitos('anoAtivoAlunos', ids.filter(id => !alunoMap.has(id)))).forEach((d, id) => { if (d) alunoMap.set(id, d); });
+  return { global: false, mats, turmaMap, alunoMap, alunos: null };
+}
+async function _consLerTudo() {
+  const [turmas, mats, alunos] = await Promise.all([
+    window.DB.anoAtivoTurmas.list(), window.DB.anoAtivoMatriculas.list(), window.DB.anoAtivoAlunos.list(),
+  ]);
+  return { global: true, mats, turmaMap: _consIndexar(turmas, 'turmaId'), alunoMap: _consIndexar(alunos, 'alunoId'), alunos };
+}
+
+/* ── análise ── */
+function _consAnalisar(ctx) {
+  const itens = [];
+  for (const m of ctx.mats) {
+    const alunoId = _consS(m.alunoId), turmaId = _consS(m.turmaId);
+    const base = { matId: m._id, alunoId, turmaId, ano: _consS(m.anoLetivo), nome: _consS(m.nome), status: _consS(m.status) || 'ATIVO' };
+    if (!turmaId || !ctx.turmaMap.has(turmaId)) {
+      itens.push({ tipo: 'B1', ...base, detalhe: ['A turma ' + (turmaId || '(vazia)') + ' não existe em anoAtivoTurmas.'] });
+    }
+    if (alunoId && !ctx.alunoMap.has(alunoId)) {
+      itens.push({ tipo: 'B2', ...base, detalhe: ['O aluno ' + alunoId + ' não existe em anoAtivoAlunos. Os dados pessoais não podem ser recriados a partir da matrícula.'] });
+    }
+    const esperado = 'MAT|' + turmaId + '|' + alunoId + '|' + _consS(m.anoLetivo);
+    if (!alunoId || !turmaId) {
+      itens.push({ tipo: 'B5', ...base, detalhe: ['A matrícula está sem ' + [!alunoId ? 'alunoId' : '', !turmaId ? 'turmaId' : ''].filter(Boolean).join(' e ') + '.'] });
+    } else if (m._id !== esperado) {
+      itens.push({ tipo: 'B5', ...base, detalhe: ['ID do documento: ' + m._id, 'Esperado pelos campos: ' + esperado] });
+    }
+  }
+  if (ctx.global) {                                          // só a verificação global enxerga alunos sem matrícula
+    const comMat = new Set(ctx.mats.map(m => _consS(m.alunoId)));
+    for (const a of ctx.alunos) {
+      const id = _consS(a.alunoId || a._id);
+      if (comMat.has(id)) continue;
+      itens.push({ tipo: 'B3', alunoId: id, nome: _consS(a.nome || a.nomeOficial), ano: '', turmaId: '',
+        detalhe: ['O cadastro não tem matrícula em nenhum ano. Não é necessariamente erro: pode ser um cadastro ainda sem matrícula.'] });
+    }
+  }
+  return itens;
+}
+
+/* ── verificação ── */
+async function consVerificar(global) {
+  if (!IS_ADMIN || _consOcupado || !escolaSelecionada()) return;
+  let ano = '';
+  if (global) {
+    const sim = await _confirmModal({
+      titulo: 'Verificação global',
+      corpo: 'Vai ler TODAS as turmas, TODAS as matrículas e TODOS os alunos desta escola (1 leitura por documento).\nPode gastar muitas leituras do banco. Nada é alterado.',
+      textoConfirmar: 'Verificar tudo',
+    });
+    if (!sim) return;
+  } else {
+    ano = _consS(document.getElementById('consAno').value);
+    if (!/^\d{4}$/.test(ano)) { setMsg('Informe o ano com 4 dígitos (ex.: 2025).', 'warn'); return; }
+  }
+  _consOcupado = true;
+  const b1 = document.getElementById('btnConsVerificar'), b2 = document.getElementById('btnConsGlobal');
+  b1.disabled = b2.disabled = true;
+  setMsg(global ? 'Verificando tudo…' : 'Verificando ' + ano + '…', 'loading');
+  try {
+    await waitAuth();
+    const ctx = global ? await _consLerTudo() : await _consLerAno(ano);
+    const itens = _consAnalisar(ctx);
+    _cons.itens = itens.map(i => ({ ...i, uid: ++_cons.uid }));
+    _cons.pag = 1; _cons.escopo = global ? 'Global' : 'Ano ' + ano; _cons.rodou = true;
+    _consRender();
+    setMsg(itens.length ? itens.length + ' ocorrência(s) encontrada(s).' : 'Nenhuma inconsistência encontrada.', itens.length ? 'warn' : 'ok');
+  } catch (e) {
+    console.error('[consistencia] verificar:', e);
+    setMsg('Não foi possível concluir a verificação: ' + (e && e.message || 'erro'), 'err');
+  } finally {
+    _consOcupado = false; b1.disabled = b2.disabled = false;
+  }
+}
+
+/* ── lista, filtros, paginação ── */
+function _consFiltrados() {
+  const tipo = document.getElementById('consTipo').value;
+  const q = _consNorm(document.getElementById('consBusca').value);
+  return _cons.itens.filter(i => {
+    if (tipo && i.tipo !== tipo) return false;
+    return !q || _consNorm([i.nome, i.alunoId, i.turmaId].join(' ')).includes(q);
+  });
+}
+function consFiltroMudou() { _cons.pag = 1; _consRender(); }
+function consPag(d) { _cons.pag += d; _consRender(); }
+
+function _consItemHtml(i) {
+  const t = CONS_TIPOS[i.tipo];
+  const chips = ['<span class="badge small ' + t.chip + '">' + i.tipo + ' · ' + esc(t.rot) + '</span>'];
+  if (i.ano) chips.push('<span class="badge small">' + esc(i.ano) + '</span>');
+  if (i.turmaId) chips.push('<span class="badge small gray">' + esc(i.turmaId) + '</span>');
+  if (i.alunoId) chips.push('<span class="badge small gray">' + esc(i.alunoId) + '</span>');
+  if (i.status && i.matId) chips.push('<span class="badge small neutral">' + esc(i.status) + '</span>');
+  const det = (i.detalhe || []).filter(Boolean).map(l => '<div class="muted cons-det">' + esc(l) + '</div>').join('');
+  const b = (acao, cls, txt) => '<button type="button" class="btn ' + cls + ' small" onclick="consAcao(' + i.uid + ',\'' + acao + '\',this)">' + txt + '</button>';
+  const botoes = {
+    B1: [b('apagarMat', 'danger', '🗑 Apagar matrícula')],
+    B2: [b('apagarMat', 'danger', '🗑 Apagar matrícula')],
+    B3: [b('abrirExcluir', 'secondary', '↗ Abrir em "Excluir aluno"')],
+  }[i.tipo] || ['<span class="badge small gray">só relatório</span>'];
+  return '<div class="cons-item subcard">' +
+    '<div class="cons-left"><div class="cons-tit">' + esc(i.nome || '(sem nome)') + '</div><div class="cons-chips">' + chips.join('') + '</div>' + det + '</div>' +
+    '<div class="cons-right">' + botoes.join('') + '</div></div>';
+}
+function _consRender() {
+  const area = document.getElementById('consArea');
+  area.hidden = !_cons.rodou;
+  if (!_cons.rodou) return;
+  Object.keys(CONS_TIPOS).forEach(t => { document.getElementById('consStat_' + t).textContent = _cons.itens.filter(i => i.tipo === t).length; });
+  document.getElementById('consEscopo').textContent = 'Escopo: ' + _cons.escopo;
+  const fil = _consFiltrados();
+  const paginas = Math.max(1, Math.ceil(fil.length / CONS_PAG));
+  _cons.pag = Math.min(Math.max(1, _cons.pag), paginas);
+  const fatia = fil.slice((_cons.pag - 1) * CONS_PAG, _cons.pag * CONS_PAG);
+  document.getElementById('consLista').innerHTML = fatia.length ? fatia.map(_consItemHtml).join('')
+    : '<div class="muted">' + (_cons.itens.length ? 'Nenhum item com esse filtro.' : 'Nenhuma inconsistência encontrada neste escopo.') + '</div>';
+  document.getElementById('consPag').hidden = fil.length <= CONS_PAG;
+  document.getElementById('consPagInfo').textContent = 'Página ' + _cons.pag + ' de ' + paginas;
+  document.getElementById('btnConsAnt').disabled = _cons.pag <= 1;
+  document.getElementById('btnConsProx').disabled = _cons.pag >= paginas;
+}
+// apagar uma matrícula resolve todos os itens (B1/B2/B5) que apontam para ela
+function _consRemoverMat(matId) { _cons.itens = _cons.itens.filter(i => i.matId !== matId); _consRender(); }
+function _consMudou() { setMsg('O estado do banco mudou desde a verificação. Rode a verificação de novo.', 'warn'); }
+
+/* ── correções ── */
+async function consAcao(uid, acao, btn) {
+  if (!IS_ADMIN || _consOcupado) return;
+  const it = _cons.itens.find(x => x.uid === uid);
+  if (!it) return;
+  const fn = { apagarMat: _consApagarMat, abrirExcluir: _consAbrirExcluir }[acao];
+  if (!fn) return;
+  _consOcupado = true; if (btn) btn.disabled = true;
+  try { await fn(it); }
+  catch (e) { console.error('[consistencia] ' + acao + ':', e); setMsg('Não foi possível concluir: ' + (e && e.message || 'erro'), 'err'); }
+  finally { _consOcupado = false; if (btn) btn.disabled = false; }
+}
+
+// B1 e B2 — apagar a matrícula solta
+async function _consApagarMat(it) {
+  const m = await window.DB.anoAtivoMatriculas.get(it.matId);
+  if (!m) { _consRemoverMat(it.matId); setMsg('Essa matrícula já não existe.', 'warn'); return; }
+  const [turma, aluno] = await Promise.all([
+    it.turmaId ? window.DB.anoAtivoTurmas.get(it.turmaId) : null,
+    it.alunoId ? window.DB.anoAtivoAlunos.get(it.alunoId) : null,
+  ]);
+  if ((it.tipo === 'B1' && turma) || (it.tipo === 'B2' && aluno)) { _consMudou(); return; }
+
+  const ops = [{ col: 'anoAtivoMatriculas', op: 'delete', id: it.matId }];
+  const linhas = [
+    'Matrícula: ' + it.matId,
+    'Aluno: ' + (it.nome || '—') + ' (' + (it.alunoId || '—') + ')',
+    'Turma: ' + (it.turmaId || '—') + ' · ano ' + (it.ano || '—') + ' · ' + (it.status || 'ATIVO'),
+    it.tipo === 'B1' ? 'A turma não existe mais.' : 'O cadastro do aluno não existe mais.',
+  ];
+  // matrícula ATIVA do ano ativo numa turma que ainda existe: libera a vaga (mesma regra do "Excluir aluno")
+  if (turma && String(m.status || 'ATIVO').toUpperCase() === 'ATIVO') {
+    const anoAtivo = gaAnoAtivoDe(await window.DB.escola.get());
+    if (_consS(m.anoLetivo) === String(anoAtivo)) {
+      const FV = window.Auth.firebase.firestore.FieldValue;
+      const data = { qtdAlunos: FV.increment(-1) };
+      if (_ehInt(m.modelo)) data.qtdIntegral = FV.increment(-1);
+      ops.push({ col: 'anoAtivoTurmas', op: 'update', id: turma._id, data });
+      linhas.push('', 'O contador da turma ' + (turma.nome || turma._id) + ' será reduzido em 1' + (_ehInt(m.modelo) ? ' (e o de integral também)' : '') + '.');
+    }
+  }
+  if (m.fotoFileId) linhas.push('', 'O avatar desta matrícula será apagado do armazenamento, se nenhuma outra matrícula o usar.');
+  linhas.push('', 'Não dá para desfazer.');
+
+  const ok = await _confirmModal({ titulo: 'Apagar matrícula?', corpo: linhas.map(esc).join('\n'), corDestaque: 'danger', textoConfirmar: 'Apagar matrícula' });
+  if (!ok) return;
+  await window.DB.batchWrite(ops);
+
+  if (m.fotoFileId) {                    // só depois do Firestore: mídia órfã é pior que arquivo a mais
+    let emUso = !!(aluno && aluno.fotoFileId === m.fotoFileId);
+    if (!emUso) {
+      try { emUso = (await window.DB.anoAtivoMatriculas.whereEquals('fotoFileId', m.fotoFileId, { limit: 1 })).length > 0; }
+      catch (e) { emUso = true; logEl('  ⚠️ Não foi possível checar o uso do avatar ' + m.fotoFileId + '; mantido por segurança.', 'logConsist'); }
+    }
+    if (!emUso) await _apagarArquivoRemoto(m.fotoFileId, 'image', 'Avatar (' + m.fotoFileId + ')', 'logConsist');
+  }
+  _consRemoverMat(it.matId);
+  setMsg('Matrícula apagada.', 'ok');
+}
+
+// B3 — não duplica a exclusão: abre o fluxo completo de "Excluir aluno" (documentos, avatar, elo, contadores)
+async function _consAbrirExcluir(it) {
+  const campo = document.getElementById('inpAlunoIdExcluir');
+  const corpo = document.getElementById('secExcluirAluno');
+  if (!campo || !corpo) return;
+  if (corpo.classList.contains('collapsed')) toggleSec('secExcluirAluno');
+  campo.value = it.alunoId;
+  corpo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  await buscarAlunoExcluir();
+}
+/* FIM CONSISTÊNCIA */
 </script>
 
 </body>
