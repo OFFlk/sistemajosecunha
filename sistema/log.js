@@ -30,6 +30,7 @@
      noBatch(batch, e)   registro dentro de um batch (atômico com a alteração).
      salvarDoc / excluirDoc   atalhos para um documento só.
    Se `schoolId` não for informado, usa a escola ativa (Auth.getActiveSchoolId()).
+   Em 'editar' com save parcial (merge), passe `parcial: true`.
    ════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
@@ -37,7 +38,7 @@
   var COLECAO = 'logs';
   var RETENCAO_DIAS = 365;            // quanto tempo o log fica (TTL em `expiraEm`)
   var LIMITE_JSON = 60000;            // caracteres por campo antes/depois
-  var IGNORAR = { updatedAt: 1, createdAt: 1, _id: 1 };   // não contam como alteração
+  var IGNORAR = { updatedAt: 1, createdAt: 1, atualizadoEm: 1, criadoEm: 1, _id: 1, id: 1 };   // não contam como alteração
 
   /* ── utilitários ── */
   function _db() { return global.Auth && global.Auth.db; }
@@ -145,7 +146,14 @@
     var antes = null, depois = null, campos = null;
 
     if (acao === 'editar') {
-      var d = _diff(e.antes, e.depois);
+      // `parcial: true` = o save é um merge (só os campos do payload mudam): compara só essas chaves,
+      // senão tudo que existe no documento e não foi enviado apareceria como "removido".
+      var antesCmp = e.antes;
+      if (e.parcial && e.antes && e.depois) {
+        antesCmp = {};
+        Object.keys(e.depois).forEach(function (k) { antesCmp[k] = e.antes[k]; });
+      }
+      var d = _diff(antesCmp, e.depois);
       if (!d.campos.length) return null;
       campos = d.campos; antes = d.antes; depois = d.depois;
     } else if (acao === 'criar') {
