@@ -56,6 +56,18 @@
 /* editor de dados pessoais */
 .g-rg{ display:grid; grid-template-columns:90px 1fr; gap:8px; }
 .g-nat{ display:grid; grid-template-columns:1fr 92px; gap:8px; }
+.nat-wrap{ position:relative; min-width:0; }
+.nat-wrap > input{ width:100%; box-sizing:border-box; }
+.nat-ghost-layer{ display:none; position:absolute; inset:0; box-sizing:border-box; pointer-events:none; white-space:nowrap; overflow:hidden; color:transparent; }
+.nat-wrap.nat-ready .nat-ghost-layer{ display:flex; }
+.nat-wrap.nat-ready > input{ position:relative; background:transparent !important; }
+.nat-wrap.nat-ready > input:disabled{ opacity:.5; cursor:not-allowed; }
+.nat-ghost-layer .ghost-tail{ color:var(--ui-muted, #888); }
+.nat-dropdown{ display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:40; background:var(--ui-surface, var(--bg, #fff)); color:var(--ui-text, inherit); border:1px solid var(--ui-border, #ccc); border-radius:10px; box-shadow:0 8px 24px rgba(15,23,42,.10); max-height:200px; overflow-y:auto; }
+.nat-dropdown.open{ display:block; }
+.nat-opt{ padding:9px 12px; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.nat-opt:hover, .nat-opt.active{ background:var(--ui-chip-bg, rgba(127,127,127,.15)); }
+.nat-opt .nat-uf{ font-size:11px; font-weight:800; color:var(--ui-chip-color, inherit); background:var(--ui-chip-bg, rgba(127,127,127,.15)); border-radius:999px; padding:2px 7px; flex-shrink:0; }
 .nat-topo{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; }
 .nat-topo .lbl, .nat-topo .check{ margin:0; }
 
@@ -351,28 +363,17 @@ function titleCaseCidade(str){
     return w.replace(/(^|-)(\p{L})/gu,(m,p,c)=>p+c.toUpperCase());
   }).join(' ');
 }
-/* ===== municipios.json (raiz do sistema) → { UF:[cidades] } =====
-   Aceita os formatos usuais: [{nome,uf|sigla|estado}], {SP:[...]}, {estados:[{sigla,cidades:[...]}]} e o formato do IBGE. */
+/* ===== municipios.json (raiz do sistema): lista de pares [cidade, uf] → { UF:[cidades] } ===== */
 const MUN_URLS = ['/municipios.json','../municipios.json','municipios.json'];
 let _munPromise = null;
 function _normalizaMunicipios(raw){
+  if(!Array.isArray(raw)) return null;
   const out = {};
-  const add = (uf,nome)=>{ uf=String(uf||'').trim().toUpperCase(); nome=String(nome||'').trim(); if(!/^[A-Z]{2}$/.test(uf)||!nome) return; (out[uf]=out[uf]||[]).push(nome); };
-  const ufDe = (o)=> o.uf ?? o.UF ?? o.sigla ?? o.siglaUF ?? o.estado ?? o.state ?? o.microrregiao?.mesorregiao?.UF?.sigla ?? o['regiao-imediata']?.['regiao-intermediaria']?.UF?.sigla ?? '';
-  const nomeDe = (o)=> o.nome ?? o.municipio ?? o.cidade ?? o.name ?? '';
-  const walk = (node,uf)=>{
-    if(Array.isArray(node)){ node.forEach(x=>{ if(typeof x==='string') add(uf,x); else if(x && typeof x==='object') walkObj(x,uf); }); }
-    else if(node && typeof node==='object') walkObj(node,uf);
-  };
-  const walkObj = (o,uf)=>{
-    const lista = o.cidades || o.municipios || o.cities;
-    if(Array.isArray(lista)){ walk(lista, ufDe(o)||uf); return; }
-    if(Array.isArray(o.estados)){ walk(o.estados,''); return; }
-    const nome = nomeDe(o), u = ufDe(o)||uf;
-    if(typeof nome==='string' && nome && u){ add(u,nome); return; }
-    Object.keys(o).forEach(k=>{ if(/^[A-Za-z]{2}$/.test(k)) walk(o[k],k.toUpperCase()); });
-  };
-  walk(raw,'');
+  raw.forEach(it=>{
+    if(!Array.isArray(it)) return;
+    const c = String(it[0]||'').trim(), u = String(it[1]||'').trim().toUpperCase();
+    if(c && /^[A-Z]{2}$/.test(u)) (out[u] = out[u] || []).push(c);
+  });
   const ufs = Object.keys(out);
   if(!ufs.length) return null;
   ufs.forEach(u=>{ out[u] = Array.from(new Set(out[u].map(titleCaseCidade))).sort((a,b)=>a.localeCompare(b,'pt-BR')); });
@@ -384,7 +385,7 @@ function carregarMunicipios(){
     for(const u of MUN_URLS){
       try{ const r = await fetch(u); if(!r.ok) continue; const m = _normalizaMunicipios(await r.json()); if(m) return m; }catch(_){ /* tenta o próximo caminho */ }
     }
-    console.warn('municipios.json não encontrado ou em formato não reconhecido — naturalidade segue como texto livre.');
+    console.warn('Lista de municípios (/municipios.json) indisponível — naturalidade segue como texto livre.');
     return null;
   })();
   return _munPromise;
@@ -773,7 +774,7 @@ function renderDadosPessoaisEditor(){
     <div class="field"><label for="pfNis">NIS</label><input id="pfNis" data-pf="nis" value="${esc(v('nis',e.nis||''))}" ${dis}></div>
     <div class="field"><label for="pfSexo">Sexo</label><select id="pfSexo" data-pf="sexo" ${dis}><option value=""></option><option value="M" ${String(v('sexo',e.sexo||'')).toUpperCase()==='M'?'selected':''}>M</option><option value="F" ${String(v('sexo',e.sexo||'')).toUpperCase()==='F'?'selected':''}>F</option></select></div>
     <div class="field"><label for="pfNasc">Data nascimento</label><input id="pfNasc" type="date" data-pf="dataNascimento_iso" value="${esc(dateISO)}" ${dis}></div>
-    <div class="field"><div class="nat-topo"><label class="lbl" for="pfNat">Naturalidade</label><label class="check"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div><div class="g-nat"><input id="pfNat" data-pf="naturalidade" list="dlNaturalidade" autocomplete="off" value="${esc(ed.naturalidade!=null ? ed.naturalidade : titleCaseCidade(e.naturalidade||''))}" ${dis}><select data-pf="ufNascimento" aria-label="UF de nascimento" ${nascEstr?'disabled':''} ${dis}><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div><datalist id="dlNaturalidade"></datalist></div>
+    <div class="field"><div class="nat-topo"><label class="lbl" for="pfNat">Naturalidade</label><label class="check"><input type="checkbox" data-pf="nascimentoEstrangeiro" ${nascEstr?'checked':''} ${dis}> Estrangeiro</label></div><div class="g-nat"><div class="nat-wrap"><div class="nat-ghost-layer" id="pfNatGhost" aria-hidden="true"></div><input id="pfNat" data-pf="naturalidade" autocomplete="off" autocorrect="off" spellcheck="false" value="${esc(ed.naturalidade!=null ? ed.naturalidade : titleCaseCidade(e.naturalidade||''))}" ${dis}><div class="nat-dropdown" id="pfNatDropdown" role="listbox"></div></div><select data-pf="ufNascimento" aria-label="UF de nascimento" ${nascEstr?'disabled':''} ${dis}><option value=""></option>${UFS_BR.map(uf=>`<option value="${uf}" ${uf===ufNasc?'selected':''}>${uf}</option>`).join('')}</select></div></div>
     <div class="field"><label for="pfMae">Mãe</label><input id="pfMae" data-pf="mae" value="${esc(v('mae',e.mae||''))}" ${dis}></div>
     <div class="field"><label for="pfPai">Pai</label><input id="pfPai" data-pf="pai" value="${esc(v('pai',e.pai||''))}" ${dis}></div>
   </div>`;
@@ -797,24 +798,69 @@ function renderDadosPessoaisEditor(){
   rgTipoSel.addEventListener('change', ()=>{ state.edits.pessoais.rgCnTipo=rgTipoSel.value; rgInp.value=(rgTipoSel.value==='CN'?maskCN(rgInp.value):maskRG(rgInp.value)); state.edits.pessoais.rgCn=rgInp.value; rer(); });
   rgInp.addEventListener('input', ()=>{ rgInp.value=(rgTipoSel.value==='CN'?maskCN(rgInp.value):maskRG(rgInp.value)); state.edits.pessoais.rgCn=rgInp.value; rer(); });
   dtInp.addEventListener('change', ()=>{ state.edits.pessoais.dataNascimento = dtInp.value ? fmtBRDate(dtInp.value) : ''; rer(); });
-  // Naturalidade: sugestões do municipios.json só da UF escolhida + padronização "Nome da Cidade"
-  const natInp=q('[data-pf="naturalidade"]'), ufSel=q('[data-pf="ufNascimento"]'), estrChk=q('[data-pf="nascimentoEstrangeiro"]'), dlNat=box.querySelector('#dlNaturalidade');
-  const ufNatAtual=()=> (estrChk && estrChk.checked) ? '' : String(ufSel.value||'').toUpperCase();
-  const atualizarSugestoesNat=async()=>{
-    const mun=await carregarMunicipios(); if(!mun || !dlNat || !dlNat.isConnected) return;
-    dlNat.innerHTML=(mun[ufNatAtual()]||[]).map(n=>`<option value="${esc(n)}"></option>`).join('');
+  // Naturalidade — mesmo fluxo do cadastro: UF primeiro → cidade com sugestões (municipios.json, só da UF escolhida)
+  const natInp=q('[data-pf="naturalidade"]'), ufSel=q('[data-pf="ufNascimento"]'), estrChk=q('[data-pf="nascimentoEstrangeiro"]');
+  const natWrap=natInp.closest('.nat-wrap'), natGhost=box.querySelector('#pfNatGhost'), natDd=box.querySelector('#pfNatDropdown');
+  let natLista=[], natAtivo=-1, natTocado=false;
+  const natEst=()=>!!(estrChk && estrChk.checked);
+  const natUF=()=> natEst() ? '' : String(ufSel.value||'').toUpperCase();
+  const natNorm=(s)=>String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const natMelhor=(val)=>{ if(!val) return null; const n=natNorm(val); return natLista.find(c=>natNorm(c).startsWith(n)) || null; };
+  const natSugestoes=(val)=>{ if(!val) return []; const n=natNorm(val); return natLista.filter(c=>natNorm(c).startsWith(n)).slice(0,8); };
+  const natFecha=()=>{ natDd.classList.remove('open'); natAtivo=-1; };
+  const natGhostAtualiza=()=>{
+    const val=natInp.value, m=natMelhor(val);
+    if(!m || !val){ natGhost.innerHTML=''; return; }
+    natGhost.innerHTML=`<span style="visibility:hidden">${esc(val)}</span><span class="ghost-tail">${esc(m.slice(val.length))}</span>`;
   };
-  const normalizarNat=async()=>{
+  const natAbre=(val)=>{
+    const ops=natSugestoes(val); if(!ops.length){ natFecha(); return; }
+    natAtivo=-1;
+    natDd.innerHTML=ops.map((c,i)=>`<div class="nat-opt" role="option" data-idx="${i}" data-cidade="${esc(c)}"><span>${esc(c)}</span><span class="nat-uf">${esc(natUF())}</span></div>`).join('');
+    natDd.classList.add('open');
+  };
+  const natAplica=(cidade)=>{ natInp.value=cidade; state.edits.pessoais.naturalidade=cidade; natGhost.innerHTML=''; natFecha(); rer(); };
+  const natSincroniza=async()=>{
+    const est=natEst(), sem=!ufSel.value;
+    natInp.disabled = !est && sem;
+    natInp.placeholder = est ? 'Nascido(a) no exterior' : (sem ? 'Selecione a UF primeiro' : 'Cidade de nascimento');
+    const mun = est ? null : await carregarMunicipios();
+    natLista = (mun && mun[natUF()]) || [];
+  };
+  const natNormaliza=()=>{   // ao sair do campo: nome da lista, ou "Nome da Cidade" se não estiver nela
     const bruto=natInp.value.trim(); if(!bruto) return;
-    const mun=await carregarMunicipios(); const lista=(mun && mun[ufNatAtual()]) || [];
-    const val = lista.find(n=>nrm(n)===nrm(bruto)) || titleCaseCidade(bruto);
-    if(natInp.isConnected && natInp.value!==val) natInp.value=val;
-    state.edits.pessoais.naturalidade=val; rer();
+    const val = natLista.find(c=>natNorm(c)===natNorm(bruto)) || titleCaseCidade(bruto);
+    if(natInp.value!==val) natInp.value=val;
+    if(state.edits.pessoais.naturalidade!==val){ state.edits.pessoais.naturalidade=val; rer(); }
   };
-  natInp.addEventListener('change', normalizarNat);
-  ufSel.addEventListener('change', atualizarSugestoesNat);
-  if(estrChk) estrChk.addEventListener('change', atualizarSugestoesNat);
-  atualizarSugestoesNat();
+  // o ghost copia a tipografia do campo; o campo fica transparente sobre o fundo do wrapper
+  { const cs=getComputedStyle(natInp);
+    natWrap.style.background=cs.backgroundColor; natWrap.style.borderRadius=cs.borderRadius;
+    Object.assign(natGhost.style,{ padding:`${cs.paddingTop} ${cs.paddingRight} ${cs.paddingBottom} ${cs.paddingLeft}`, fontSize:cs.fontSize, fontFamily:cs.fontFamily, fontWeight:cs.fontWeight, letterSpacing:cs.letterSpacing, lineHeight:cs.lineHeight, border:`${cs.borderTopWidth} solid transparent`, alignItems:'center' });
+    natWrap.classList.add('nat-ready'); }
+  natInp.addEventListener('input', ()=>{ natTocado=true; natGhostAtualiza(); natAbre(natInp.value); });
+  natInp.addEventListener('keydown', (e)=>{
+    const itens=natDd.querySelectorAll('.nat-opt'), aberto=natDd.classList.contains('open');
+    if(e.key==='Tab' || e.key==='Enter'){
+      if(aberto && natAtivo>=0 && itens[natAtivo]){ e.preventDefault(); natAplica(itens[natAtivo].dataset.cidade); return; }
+      const m=natMelhor(natInp.value);
+      if(m && natInp.value!==m){ e.preventDefault(); natAplica(m); return; }
+      natFecha(); return;
+    }
+    if(e.key==='ArrowDown'){ e.preventDefault(); if(!aberto) natAbre(natInp.value); const n=natDd.querySelectorAll('.nat-opt').length; natAtivo=Math.min(natAtivo+1,n-1); natDd.querySelectorAll('.nat-opt').forEach((el,i)=>el.classList.toggle('active',i===natAtivo)); return; }
+    if(e.key==='ArrowUp'){ e.preventDefault(); natAtivo=Math.max(natAtivo-1,-1); itens.forEach((el,i)=>el.classList.toggle('active',i===natAtivo)); return; }
+    if(e.key==='Escape'){ natFecha(); natGhost.innerHTML=''; }
+  });
+  natDd.addEventListener('mousedown', (e)=>{ const op=e.target.closest('.nat-opt'); if(!op) return; e.preventDefault(); natAplica(op.dataset.cidade); });
+  natInp.addEventListener('blur', ()=>{ natFecha(); natGhost.innerHTML=''; if(natTocado) natNormaliza(); });
+  ufSel.addEventListener('change', async()=>{
+    natFecha(); natGhost.innerHTML='';
+    await natSincroniza();
+    // cidade de outra UF não vale mais (igual ao cadastro)
+    if(natInp.value && natLista.length && !natLista.some(c=>natNorm(c)===natNorm(natInp.value))){ natInp.value=''; state.edits.pessoais.naturalidade=''; rer(); }
+  });
+  if(estrChk) estrChk.addEventListener('change', ()=>{ natFecha(); natGhost.innerHTML=''; natSincroniza(); });
+  natSincroniza();
 }
 function getFilteredRegs(){ if(!state.selected) return []; return (state.selected.registros||[]).filter(r=>formatoPermite(r.serieAluno||r.serieTextoTurma)); }
 function renderTimeline(){
