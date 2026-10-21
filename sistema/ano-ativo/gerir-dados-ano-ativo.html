@@ -18,6 +18,7 @@
 <!-- página exclusiva de ADMIN -->
 <script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js?v=2"></script>
 
@@ -716,13 +717,23 @@ async function migracaoAplicar() {
   if (!ok) return;
   const btn = document.getElementById('btnMgAplicar');
   btn.disabled = true;
+  let _feitos = 0;   // só para o log (lotes já gravados)
   try {
     setMsg('Gravando ajustes…', 'loading');
     const ops = _MG.patches.map(p => ({ col: 'anoAtivoMatriculas', op: 'update', id: p.id, data: p.data }));
     for (let i = 0; i < ops.length; i += 400) {
       await window.DB.batchWrite(ops.slice(i, i + 400));
-      logEl(`  ✅ ${Math.min(i + 400, ops.length)} de ${ops.length} matrícula(s) ajustada(s).`, 'logMigracao');
+      _feitos = Math.min(i + 400, ops.length);
+      logEl(`  ✅ ${_feitos} de ${ops.length} matrícula(s) ajustada(s).`, 'logMigracao');
     }
+    if (window.Log) {   // 1 registro: contagem por campo (sem cópia das matrículas)
+      const porCampo = {};
+      _MG.patches.forEach(p => Object.keys(p.data).forEach(k => { porCampo[k] = (porCampo[k] || 0) + 1; }));
+      await Log.registrar({ acao: 'editar', colecao: 'anoAtivoMatriculas',
+        resumo: `Migração: ajustou ${n} matrícula(s) (campos de busca e padronização)`,
+        antes: {}, depois: { matriculasAjustadas: n, camposAjustados: porCampo } });
+    }
+    _feitos = 0;   // concluído: um erro posterior (ex.: ao recarregar a tela) não é "interrupção"
     logEl('🎉 Concluído. Próximo passo: verificar os contadores das turmas.', 'logMigracao');
     setMsg('Matrículas ajustadas com sucesso!', 'ok');
     _MG = null;
@@ -730,6 +741,8 @@ async function migracaoAplicar() {
     document.getElementById('mgAplicarWrap').style.display = 'none';
     await inicializar();
   } catch (e) {
+    if (_feitos && window.Log) await Log.registrar({ acao: 'editar', colecao: 'anoAtivoMatriculas',
+      resumo: `Migração INTERROMPIDA por erro: ${_feitos} de ${n} matrícula(s) já gravada(s)`, antes: {}, depois: { matriculasGravadas: _feitos } });
     logEl('❌ Erro ao gravar: ' + e.message + ' (cada lote é atômico; reanalise para ver o que falta).', 'logMigracao');
     setMsg('Erro ao gravar: ' + e.message, 'err');
   } finally { btn.disabled = false; }
@@ -832,15 +845,27 @@ async function contadoresAplicar() {
   if (!ok) return;
   const btn = document.getElementById('btnCtAplicar');
   btn.disabled = true;
+  let _feitos = 0;   // só para o log (lotes já gravados)
+  const _difsLog = _CT.difs.slice();   // _CT.difs é esvaziado no fim
   try {
     setMsg('Gravando contadores…', 'loading');
     const ops = _CT.difs.map(d => ({ col: 'anoAtivoTurmas', op: 'update', id: d.id, data: { qtdAlunos: d.qtd, qtdIntegral: d.integral } }));
-    for (let i = 0; i < ops.length; i += 400) await window.DB.batchWrite(ops.slice(i, i + 400));
+    for (let i = 0; i < ops.length; i += 400) { await window.DB.batchWrite(ops.slice(i, i + 400)); _feitos = Math.min(i + 400, ops.length); }
+    if (window.Log) {   // 1 registro: por turma, "alunos / integral" antes → depois
+      const fmtC = (q, i) => (q === undefined ? '—' : q) + ' / ' + (i === undefined ? '—' : i);
+      const antesL = {}, depoisL = {};
+      _difsLog.forEach(d => { const k = `${d.nome} (${d.id})`; antesL[k] = fmtC(d.qtdAtual, d.integralAtual); depoisL[k] = fmtC(d.qtd, d.integral); });
+      await Log.registrar({ acao: 'editar', colecao: 'anoAtivoTurmas',
+        resumo: `Corrigiu contadores de ${n} turma(s) — ano ${_CT.ano} (valores: alunos / integral)`, antes: antesL, depois: depoisL });
+    }
+    _feitos = 0;
     logEl(`🎉 ${n} turma(s) corrigida(s).`, 'logContadores');
     setMsg('Contadores corrigidos!', 'ok');
     _CT.difs = [];
     document.getElementById('ctAplicarWrap').style.display = 'none';
   } catch (e) {
+    if (_feitos && window.Log) await Log.registrar({ acao: 'editar', colecao: 'anoAtivoTurmas',
+      resumo: `Correção de contadores INTERROMPIDA por erro: ${_feitos} de ${_difsLog.length} turma(s) já gravada(s)`, antes: {}, depois: { turmasGravadas: _feitos } });
     logEl('❌ Erro ao gravar: ' + e.message, 'logContadores');
     setMsg('Erro ao gravar: ' + e.message, 'err');
   } finally { btn.disabled = false; }
@@ -858,6 +883,7 @@ async function duplicadasRemover() {
   if (!ok) return;
   const btn = document.getElementById('btnCtDuplicadas');
   btn.disabled = true;
+  let _feitos = 0;   // só para o log (operações já gravadas)
   try {
     setMsg('Removendo duplicadas…', 'loading');
     const ops = [];
@@ -866,12 +892,21 @@ async function duplicadasRemover() {
       const comFoto = d.remove.find(r => r.fotoUrl);
       if (!d.keep.fotoUrl && comFoto) ops.push({ col: 'anoAtivoMatriculas', op: 'update', id: d.keep._id, data: { fotoUrl: comFoto.fotoUrl, fotoFileId: comFoto.fotoFileId || null } });
     });
-    for (let i = 0; i < ops.length; i += 400) await window.DB.batchWrite(ops.slice(i, i + 400));
+    for (let i = 0; i < ops.length; i += 400) { await window.DB.batchWrite(ops.slice(i, i + 400)); _feitos = Math.min(i + 400, ops.length); }
+    if (window.Log) {   // 1 registro: lista enxuta das removidas (limitada a 150) e qual matrícula ficou
+      const removidas = _CT.dups.flatMap(d => d.remove.map(r => ({ ..._logMatCompacta(r), mantida: d.keep._id })));
+      await Log.registrar({ acao: 'excluir', colecao: 'anoAtivoMatriculas',
+        resumo: `Removeu ${extras} matrícula(s) ativa(s) duplicada(s) de ${alunos} aluno(s)`,
+        antes: { totalRemovidas: removidas.length, removidas: removidas.slice(0, 150) } });
+    }
+    _feitos = 0;
     logEl(`🎉 ${extras} matrícula(s) extra(s) removida(s) de ${alunos} aluno(s). Rode Verificar de novo para conferir.`, 'logContadores');
     setMsg('Duplicadas removidas!', 'ok');
     _CT.dups = [];
     document.getElementById('ctDupWrap').style.display = 'none';
   } catch (e) {
+    if (_feitos && window.Log) await Log.registrar({ acao: 'excluir', colecao: 'anoAtivoMatriculas',
+      resumo: `Remoção de duplicadas INTERROMPIDA por erro: ${_feitos} operação(ões) já gravada(s) — rode Verificar de novo`, antes: {} });
     logEl('❌ Erro ao remover: ' + e.message, 'logContadores');
     setMsg('Erro ao remover: ' + e.message, 'err');
   } finally { btn.disabled = false; }
@@ -959,6 +994,7 @@ async function importarJSON(event) {
     const lblImp = document.getElementById('lblImportJSON');
     if (lblImp) { lblImp.style.pointerEvents = 'none'; lblImp.style.opacity = '0.5'; }
 
+    const _impLog = [];   // só para o log (o que já foi gravado)
     try {
       let dump;
       try { dump = JSON.parse(reader.result); }
@@ -982,9 +1018,12 @@ async function importarJSON(event) {
       setMsg('Importando backup…', 'loading');
 
       // Salva em lotes nas coleções novas
-      if (turmas.length)     await window.DB.anoAtivoTurmas.saveAll(turmas);
-      if (alunos.length)     await window.DB.anoAtivoAlunos.saveAll(alunos);
-      if (matriculas.length) await window.DB.anoAtivoMatriculas.saveAll(matriculas);
+      if (turmas.length)     { await window.DB.anoAtivoTurmas.saveAll(turmas);          _impLog.push(turmas.length + ' turma(s)'); }
+      if (alunos.length)     { await window.DB.anoAtivoAlunos.saveAll(alunos);          _impLog.push(alunos.length + ' aluno(s)'); }
+      if (matriculas.length) { await window.DB.anoAtivoMatriculas.saveAll(matriculas);  _impLog.push(matriculas.length + ' matrícula(s)'); }
+      if (window.Log) await Log.registrar({ acao: 'restaurar',
+        resumo: `Importou backup JSON (${file.name}): ${turmas.length} turma(s), ${alunos.length} aluno(s), ${matriculas.length} matrícula(s)` });
+      _impLog.length = 0;   // concluído: um erro posterior (ex.: ao recarregar a tela) não é "interrupção"
 
       logEl(`✅ Importação concluída.`, 'logImport');
       logEl(`  Turmas: ${turmas.length} · Alunos: ${alunos.length} · Matrículas: ${matriculas.length}`, 'logImport');
@@ -993,6 +1032,8 @@ async function importarJSON(event) {
       await inicializar();
 
     } catch(e) {
+      if (_impLog.length && window.Log) await Log.registrar({ acao: 'restaurar',
+        resumo: `Importação de backup JSON INTERROMPIDA por erro — já gravado: ${_impLog.join(', ')}` });
       logEl('❌ Erro ao importar: ' + e.message, 'logImport');
       setMsg('Erro ao importar: ' + e.message, 'err');
     } finally {
@@ -1008,6 +1049,12 @@ async function importarJSON(event) {
    EXCLUSÃO PONTUAL — ALUNO
 ============================================= */
 let _alunoParaExcluir = null; // { aluno, alunoId, mats, elos, docs, fotos }
+
+// Resumo enxuto de uma matrícula para o log de exclusões em lote/cascata (não é a cópia completa do documento)
+function _logMatCompacta(m) {
+  return { id: m._id, alunoId: m.alunoId, turmaId: m.turmaId, anoLetivo: m.anoLetivo, status: m.status || 'ATIVO',
+           situacao: m.situacao || null, serie: m.serie || null, modelo: m.modelo || null, criadoEm: m.criadoEm || null };
+}
 
 function escolaSelecionada() {
   const sid = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
@@ -1175,6 +1222,9 @@ async function executarExclusaoAluno() {
     }
     if (ops.length > 500) throw new Error(`Registros demais para um único lote (${ops.length}; máximo 500). Nada foi apagado.`);
     await window.DB.batchWrite(ops);
+    if (window.Log) await Log.registrar({ acao: 'excluir', colecao: 'anoAtivoAlunos', docId: alunoId,
+      resumo: `Excluiu aluno ${aluno.nome || aluno.nomeOficial || alunoId} — ${mats.length} matrícula(s), ${elos.length} vínculo(s), ${docs.length} documento(s), ${fotos.length} avatar(es)`,
+      antes: { ...aluno, _matriculas: mats.map(_logMatCompacta), _elos: elos.map(e => ({ id: e._id || e.id, atasId: e.atasId || null })) } });
     logEl(`  ✅ ${mats.length} matrícula(s), ${elos.length} vínculo(s) e os dados pessoais apagados.`, 'logExcluirAluno');
 
     for (const f of docs) await _apagarArquivoRemoto(f.fileId, f.resourceType, `Documento "${f.label || f.fileName}"`, 'logExcluirAluno');
@@ -1287,6 +1337,9 @@ async function executarExclusaoTurma() {
     ];
     if (ops.length > 500) throw new Error(`Registros demais para um único lote (${ops.length}; máximo 500). Nada foi apagado.`);
     await window.DB.batchWrite(ops);
+    if (window.Log) await Log.registrar({ acao: 'excluir', colecao: 'anoAtivoTurmas', docId: turmaId,
+      resumo: `Excluiu turma ${turma.nome || turmaId} (${turma.anoLetivo || '?'}) — ${mats.length} matrícula(s), ${fotos.length} avatar(es)`,
+      antes: { ...turma, _matriculas: mats.slice(0, 200).map(_logMatCompacta), _totalMatriculas: mats.length } });
     logEl(`  ✅ ${mats.length} matrícula(s) e a turma apagadas.`, 'logExcluirTurma');
 
     for (const id of fotos) {
@@ -1682,6 +1735,10 @@ async function gaGerar() {
 
     logEl(`Gravando ${ops.length} documento(s) num único lote…`, GA_LOG);
     await window.DB.batchWrite(ops);
+    if (window.Log) await Log.registrar({ acao: 'criar', colecao: 'turmas', docId: p.turmaIdAtas,
+      resumo: `Gerou ata no módulo de Atas — ${p.turma.nome} (${p.ano}): ${p.rows.length} aluno(s), ${p.novos} novo(s) em alunos-atas`,
+      depois: { turmaId: p.turmaIdAtas, ataId, nome: p.turma.nome, anoLetivo: p.ano, turno: p.turnoFull, serieTexto,
+                schemaId: p.schema.id, anoAtivoTurmaId: p.turmaId, alunos: p.rows.length, alunosNovosEmAtas: p.novos } });
 
     const idx = await gaRegistrarAnoNoIndice(p.ano);
     logEl(`✅ Ata gerada: ${p.turmaIdAtas}`, GA_LOG);
@@ -2264,6 +2321,9 @@ async function _consApagarMat(it) {
   const ok = await _confirmModal({ titulo: 'Apagar matrícula?', corpo: linhas.map(esc).join('\n'), corDestaque: 'danger', textoConfirmar: 'Apagar matrícula' });
   if (!ok) return;
   await window.DB.batchWrite(ops);
+  if (window.Log) await Log.registrar({ acao: 'excluir', colecao: 'anoAtivoMatriculas', docId: it.matId,
+    resumo: `Apagou matrícula solta (${it.tipo === 'B1' ? 'turma não existe' : 'aluno não existe'}) — ${it.nome || it.alunoId || '—'}, turma ${it.turmaId || '—'}, ano ${it.ano || '—'}`,
+    antes: m });
 
   if (m.fotoFileId) {                    // só depois do Firestore: mídia órfã é pior que arquivo a mais
     let emUso = !!(aluno && aluno.fotoFileId === m.fotoFileId);
