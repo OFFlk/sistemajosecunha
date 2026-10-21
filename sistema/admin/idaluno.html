@@ -48,6 +48,7 @@
       <button class="btn primary" id="tab1" type="button" data-act="aba" data-a="atas">1) Duplicatas em Atas</button>
       <button class="btn secondary" id="tab2" type="button" data-act="aba" data-a="cross">2) Ano-Ativo ↔ Atas</button>
       <button class="btn secondary" id="tab3" type="button" data-act="aba" data-a="vinc">3) Vínculos</button>
+      <button class="btn secondary" id="tab4" type="button" data-act="aba" data-a="verif">4) Verificados</button>
       <div class="field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
         <input id="cut" type="range" min="70" max="95" value="85"/></div>
     </div>
@@ -96,6 +97,16 @@
     </div>
     <div class="stats-row"><div class="stat-box"><div class="stat-num" id="statVinc">—</div><div class="stat-lbl">Vínculos</div></div></div>
     <div id="listaVinc"></div>
+  </div>
+
+  <div class="card" id="abaVerif" hidden>
+    <div class="aviso-warn">ℹ️ Pares marcados como "são diferentes" e alunos marcados como verificados. "Voltar a analisar" faz o par (ou o aluno) voltar a ser sugerido.</div>
+    <div class="barra">
+      <button class="btn secondary" type="button" data-act="carVerif">🔄 Carregar verificados</button>
+      <div class="field"><label for="filtroVerif">Filtrar por nome ou ID</label><input class="input" id="filtroVerif" placeholder="Nome ou ID"/></div>
+    </div>
+    <div class="stats-row"><div class="stat-box"><div class="stat-num" id="statVerif">—</div><div class="stat-lbl">Verificados</div></div></div>
+    <div id="listaVerif"></div>
   </div>
 </div>
 
@@ -148,7 +159,7 @@ function _authPronto(){ return new Promise(r => { if(window.Auth && Auth.getSess
 
 /* ── Estado ── */
 let ATAS = [], ATAS_IDX = new Map(), ELOS = new Map(), ELO_AA = new Map(), carregouAtas = false;
-let SUGS = [], SKIP = new Set(), MATS = new Map(), AAMATS = new Map(), ESCOLA = null;
+let SUGS = [], AAALL = [], MATS = new Map(), AAMATS = new Map(), ESCOLA = null;
 let AAPEND = [], AA_SEL = null, LIM = 25, PARES2 = [];
 const chave = (a, b) => [String(a), String(b)].sort().join('|');
 const num = id => { const m = String(id || '').match(/(\d+)/); return m ? parseInt(m[1], 10) : Infinity; };
@@ -189,7 +200,7 @@ function paresInternos(cut){
   const tenta = (i, j) => {
     if(i > j) [i, j] = [j, i];
     const k = i * N + j; if(vis.has(k)) return; vis.add(k);
-    if(ATAS[i].ver || ATAS[j].ver) return;
+    if(ATAS[i].ver || ATAS[j].ver || difPar(ATAS[i], ATAS[j])) return;
     const s = jw(ATAS[i].nb, ATAS[j].nb); if(s >= cut) out.push([i, j, s]);
   };
   const grupo = arr => { for(let x = 0; x < arr.length; x++) for(let y = x + 1; y < arr.length; y++) tenta(arr[x], arr[y]); };
@@ -243,10 +254,18 @@ async function escola(){
 async function carregarAtas(forcar){
   if(carregouAtas && !forcar) return;
   const [docs, elos] = await Promise.all([DB['alunos-atas'].list(), DB.alunos.list(), escola()]);
-  ATAS = docs.map(d => { const nome = d.nome || ''; return { id: String(d.alunoId || d._id).trim(), nome, nb: nrm(nome), ver: !!d.verificadoManual }; }).filter(x => x.id && x.nb);
+  ATAS = docs.map(d => { const nome = d.nome || ''; return { id: String(d.alunoId || d._id).trim(), nome, nb: nrm(nome), ver: !!d.verificadoManual, dif: new Set(d.diferentes || []) }; }).filter(x => x.id && x.nb);
   ELOS = new Map(); ELO_AA = new Map();
   elos.forEach(e => { const n = Identidade.normalizarElo(e); if(n.atasId) ELOS.set(n.atasId, n); if(n.anoAtivoId) ELO_AA.set(n.anoAtivoId, n); });
   ATAS_IDX = indexar(ATAS); carregouAtas = true;
+}
+/* Par "diferentes": cada documento guarda a lista (diferentes) dos IDs com quem NÃO é a mesma pessoa.
+   Só o par marcado deixa de ser sugerido. IDs iguais valem nos dois módulos (contador único). */
+const difPar = (a, b) => a.dif.has(b.id) || b.dif.has(a.id);
+async function gravarDif(ops){
+  if(_semEscola()) return;
+  const FV = firebase.firestore.FieldValue;
+  await DB.batchWrite(ops.map(o => ({ col:o.col, op:'set', id:o.id, data:{ diferentes: o.add ? FV.arrayUnion(o.add) : FV.arrayRemove(o.remove) } })));
 }
 /* Indicador no documento do aluno: quem tem verificadoManual:true é ignorado pela detecção. */
 async function marcarVerificado(col, ids){
@@ -365,11 +384,11 @@ async function fundirAtas(keep, gone, nome){
 
 /* ── Aba 2: Ano-Ativo ↔ Atas ── */
 const nomeAA = d => d.nomeOficial || d.nome || d.nomeCompleto || '';
+const mapAA = d => { const nome = nomeAA(d); return { id: String(d.alunoId || d._id).trim(), nome, nb: nrm(nome), ver: !!d.verificadoManual, dif: new Set(d.diferentes || []) }; };
+async function carregarAA(){ await carregarAtas(true); AAALL = (await DB.anoAtivoAlunos.list()).map(mapAA).filter(x => x.id); }
 async function carregarPend(){
-  await carregarAtas(true);
-  const aa = await DB.anoAtivoAlunos.list();
-  PARES2 = []; AAPEND = aa.filter(d => !d.verificadoManual).map(d => ({ id: String(d.alunoId || d._id).trim(), nome: nomeAA(d), nb: nrm(nomeAA(d)) }))
-    .filter(x => x.id && !ELO_AA.has(x.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  await carregarAA();
+  PARES2 = []; AAPEND = AAALL.filter(x => !x.ver && !ELO_AA.has(x.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   renderPend(); renderCross();
 }
 function renderPend(){
@@ -377,19 +396,19 @@ function renderPend(){
   const f = nrm($('filtroPend').value || '');
   const l = AAPEND.filter(a => !f || a.nb.includes(f) || a.id.toLowerCase().includes(f)).slice(0, 100);
   $('listaPend').innerHTML = !carregouAtas ? '' : l.length
-    ? l.map(a => `<div class="list-item${a.id === AA_SEL ? ' sel' : ''}" data-act="sel" data-a="${_escHtml(a.id)}">${_escHtml(a.nome)} <span class="badge small gray">${_escHtml(a.id)}</span></div>`).join('')
+    ? l.map(a => `<div class="list-item${a.id === AA_SEL ? ' sel' : ''}" data-act="sel" data-a="${_escHtml(a.id)}">${_escHtml(a.nome)} <span class="badge small neutral">${_escHtml(a.id)}</span></div>`).join('')
     : '<div class="aviso-warn">ℹ️ Nenhum aluno do Ano-Ativo pendente.</div>';
 }
 function candidatosDe(aa){
   const cut = (+$('cut').value || 85) / 100 - 0.05, idx = new Set();
   chaves(aa.nb).forEach(k => (ATAS_IDX.get(k) || []).forEach(i => idx.add(i)));
-  return [...idx].map(i => ATAS[i]).filter(a => !ELOS.get(a.id)?.anoAtivoId && !SKIP.has(aa.id + '|' + a.id))
+  return [...idx].map(i => ATAS[i]).filter(a => !ELOS.get(a.id)?.anoAtivoId && !difPar(aa, a))
     .map(a => ({ a, s: jw(aa.nb, a.nb) })).filter(x => x.s >= cut).sort((p, q) => q.s - p.s).slice(0, 8);
 }
 function cardCross(a, s){
   return `<div class="item subcard" data-b="${_escHtml(a.id)}"><div class="left">
     <div class="chips"><span class="badge small">${Math.round(s * 100)}%</span>${ELOS.get(a.id)?.dadosPessoais ? '<span class="badge small gray">tem dados pessoais do histórico</span>' : ''}</div>
-    <div><b>${_escHtml(a.nome)}</b> <span class="badge small gray">${_escHtml(a.id)}</span></div>
+    <div><b>${_escHtml(a.nome)}</b> <span class="badge small">${_escHtml(a.id)}</span></div>
     <div class="help" data-traj></div></div>
     <div class="right"><button class="btn secondary small" type="button" data-act="trajx" data-b="${_escHtml(a.id)}">Ver trajetória</button>
     <button class="btn primary small" type="button" data-act="vinc" data-b="${_escHtml(a.id)}">Vincular</button>
@@ -398,7 +417,7 @@ function cardCross(a, s){
 function renderPainel(){
   const aa = AAPEND.find(a => a.id === AA_SEL); if(!aa){ $('painelCross').innerHTML = ''; return; }
   const c = candidatosDe(aa);
-  $('painelCross').innerHTML = `<h3>${_escHtml(aa.nome)} <span class="badge small gray">${_escHtml(aa.id)}</span></h3>
+  $('painelCross').innerHTML = `<h3>${_escHtml(aa.nome)} <span class="badge small neutral">${_escHtml(aa.id)}</span></h3>
     ${c.length ? c.map(x => cardCross(x.a, x.s)).join('') : '<div class="aviso-warn">ℹ️ Nenhum aluno de Atas com nome parecido. Se você já sabe o ID em Atas, informe abaixo.</div>'}
     <div class="manual"><div class="field"><label for="idManual">ID do aluno em Atas</label><input class="input" id="idManual" placeholder="ALU-000000"/></div>
     <button class="btn secondary field-h" type="button" data-act="buscarId">Buscar</button>
@@ -452,8 +471,8 @@ function renderCross(){
   if(!PARES2.length){ $('listaCross').innerHTML = ''; return; }
   $('listaCross').innerHTML = (vis.length ? vis.slice(0, LIM).map(p => `<div class="item subcard" data-aa="${_escHtml(p.aa.id)}" data-b="${_escHtml(p.a.id)}"><div class="left">
       <div class="chips"><span class="badge small">${Math.round(p.score * 100)}%</span>${stBadge(p.st)}</div>
-      <div><b>${_escHtml(p.aa.nome)}</b> <span class="badge small gray">Ano-Ativo ${_escHtml(p.aa.id)}</span> <span class="help">${_escHtml(resumoAA(p.aa.id))}</span></div>
-      <div><b>${_escHtml(p.a.nome)}</b> <span class="badge small gray">Atas ${_escHtml(p.a.id)}</span> <span class="help">${_escHtml(resumo(p.a.id))}</span></div>
+      <div><b>${_escHtml(p.aa.nome)}</b> <span class="badge small neutral">Ano-Ativo ${_escHtml(p.aa.id)}</span> <span class="help">${_escHtml(resumoAA(p.aa.id))}</span></div>
+      <div><b>${_escHtml(p.a.nome)}</b> <span class="badge small">Atas ${_escHtml(p.a.id)}</span> <span class="help">${_escHtml(resumo(p.a.id))}</span></div>
       <div class="help">${_escHtml(p.m.join(' • '))}</div></div>
     <div class="right"><button class="btn primary small" type="button" data-act="vinc" data-b="${_escHtml(p.a.id)}">Vincular</button>
     <button class="btn neutral small" type="button" data-act="difx" data-b="${_escHtml(p.a.id)}">Não é o mesmo</button></div></div>`).join('')
@@ -501,9 +520,52 @@ async function desvincular(atasId, aaId){
   renderVinc();
 }
 
+/* ── Aba 4: verificados (desfazer marcação) ── */
+let VERIF = null;
+const colDe = mod => mod === 'atas' ? 'alunos-atas' : 'anoAtivoAlunos';
+async function carregarVerif(){ await carregarAA(); montarVerif(); }
+function montarVerif(){
+  const A = new Map(ATAS.map(o => [o.id, o])), B = new Map(AAALL.map(o => [o.id, o]));
+  const lado = id => A.has(id) ? { mod:'atas', o:A.get(id) } : B.has(id) ? { mod:'aa', o:B.get(id) } : { mod:null, id };
+  const vis = new Set(), L = [];
+  [...ATAS.map(o => ({ mod:'atas', o })), ...AAALL.map(o => ({ mod:'aa', o }))].forEach(x => {
+    x.o.dif.forEach(id => { const k = [x.o.id, id].sort().join('|'); if(vis.has(k)) return; vis.add(k); L.push({ tipo:'par', a:x, b:lado(id) }); });
+    if(x.o.ver) L.push({ tipo:'ver', a:x });
+  });
+  VERIF = L.sort((p, q) => String(p.a.o.nome).localeCompare(String(q.a.o.nome), 'pt-BR'));
+  renderVerif();
+}
+function renderVerif(){
+  $('statVerif').textContent = VERIF ? VERIF.length : '—';
+  if(!VERIF){ $('listaVerif').innerHTML = ''; return; }
+  const f = nrm($('filtroVerif').value || '');
+  const bate = l => !l.mod ? l.id.toLowerCase().includes(f) : nrm(l.o.nome).includes(f) || l.o.id.toLowerCase().includes(f);
+  const linha = l => l.mod ? `<div><b>${_escHtml(l.o.nome)}</b> <span class="badge small${l.mod === 'aa' ? ' neutral' : ''}">${l.mod === 'aa' ? 'Ano-Ativo' : 'Atas'} ${_escHtml(l.o.id)}</span></div>` : `<div class="help">${_escHtml(l.id)} (não existe mais)</div>`;
+  const l = VERIF.map((it, i) => ({ it, i })).filter(({ it }) => !f || bate(it.a) || (it.b && bate(it.b)));
+  $('listaVerif').innerHTML = l.length ? l.slice(0, 50).map(({ it, i }) => `<div class="item subcard" data-i="${i}"><div class="left">${linha(it.a)}${it.tipo === 'par' ? linha(it.b) : `<div class="help">${it.a.mod === 'aa' ? 'Marcado como sem equivalente em Atas' : 'Marcado antes do novo controle, sem par registrado'}</div>`}</div>
+    <div class="right"><button class="btn secondary small" type="button" data-act="liberar">Voltar a analisar</button></div></div>`).join('')
+    + (l.length > 50 ? `<div class="help mt-12">Mostrando 50 de ${l.length}. Use o filtro para achar os demais.</div>` : '')
+    : '<div class="aviso-warn">ℹ️ Nenhum aluno verificado.</div>';
+}
+async function liberar(it){
+  if(it.tipo === 'par'){
+    const ops = [];
+    if(it.a.mod) ops.push({ col:colDe(it.a.mod), id:it.a.o.id, remove:it.b.mod ? it.b.o.id : it.b.id });
+    if(it.b.mod) ops.push({ col:colDe(it.b.mod), id:it.b.o.id, remove:it.a.o.id });
+    await gravarDif(ops);
+    it.a.o.dif.delete(it.b.mod ? it.b.o.id : it.b.id); if(it.b.mod) it.b.o.dif.delete(it.a.o.id);
+  } else {
+    await DB.batchWrite([{ col:colDe(it.a.mod), op:'set', id:it.a.o.id, data:{ verificadoManual: Identidade.campoRemover() } }]);
+    it.a.o.ver = false;
+    if(it.a.mod === 'aa' && !ELO_AA.has(it.a.o.id) && !AAPEND.includes(it.a.o)){ AAPEND.push(it.a.o); AAPEND.sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR')); }
+  }
+  montarVerif(); if(carregouAtas) montarSugs(); renderPend();
+}
+
 /* ── Eventos ── */
 function aba(x){
-  $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross'; $('abaVinc').hidden = x !== 'vinc';
+  $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross'; $('abaVinc').hidden = x !== 'vinc'; $('abaVerif').hidden = x !== 'verif';
+  $('tab4').className = 'btn ' + (x === 'verif' ? 'primary' : 'secondary');
   $('tab3').className = 'btn ' + (x === 'vinc' ? 'primary' : 'secondary');
   $('tab1').className = 'btn ' + (x === 'atas' ? 'primary' : 'secondary'); $('tab2').className = 'btn ' + (x === 'cross' ? 'primary' : 'secondary');
 }
@@ -520,6 +582,12 @@ document.addEventListener('click', async ev => {
   try{
     if(act === 'aba') return aba(b.dataset.a);
     if(act === 'carAtas') return comLoading('Carregando alunos de Atas…', async () => { await carregarAtas(true); $('btnTraj').disabled = false; montarSugs(); });
+    if(act === 'carVerif') return comLoading('Carregando verificados…', carregarVerif);
+    if(act === 'liberar'){
+      const it = VERIF[+card.dataset.i], nm = l => l.mod ? l.o.nome + ' (' + l.o.id + ')' : l.id;
+      if(!await _confirmModal({ titulo:'Voltar a analisar?', corpo: it.tipo === 'par' ? `${_escHtml(nm(it.a))}\n≠\n${_escHtml(nm(it.b))}\n\nEste par volta a poder ser sugerido.` : `${_escHtml(nm(it.a))}\n\nEste aluno volta a ser analisado.`, textoConfirmar:'Voltar a analisar' })) return;
+      setMsg('Atualizando…', 'loading'); await liberar(it); setMsg('Marcação removida.', 'ok'); return;
+    }
     if(act === 'carVinc') return comLoading('Carregando vínculos…', carregarVinculos);
     if(act === 'desvincular'){
       const aid = card.dataset.a, aaid = card.dataset.aa, v = VINC.find(x => x.atasId === aid);
@@ -538,10 +606,10 @@ document.addEventListener('click', async ev => {
     if(act === 'corrigir' || act === 'dif'){
       const s = SUGS.find(x => chave(x.a.id, x.b.id) === card.dataset.k); if(!s) return;
       if(act === 'dif'){
-        if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(s.a.nome)} (${_escHtml(s.a.id)})\n≠\n${_escHtml(s.b.nome)} (${_escHtml(s.b.id)})\n\nOs dois ficam marcados como verificados e deixam de aparecer nas sugestões.` })) return;
-        await marcarVerificado('alunos-atas', [s.a.id, s.b.id]);
-        [s.a, s.b].forEach(x => { const r = ATAS.find(y => y.id === x.id); if(r) r.ver = true; });
-        SUGS = SUGS.filter(x => !x.a.ver && !x.b.ver); return renderAtas();
+        if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(s.a.nome)} (${_escHtml(s.a.id)})\n≠\n${_escHtml(s.b.nome)} (${_escHtml(s.b.id)})\n\nOs dois deixam de ser sugeridos entre si. Cada um continua sendo comparado com os demais.` })) return;
+        await gravarDif([{ col:'alunos-atas', id:s.a.id, add:s.b.id }, { col:'alunos-atas', id:s.b.id, add:s.a.id }]);
+        s.a.dif.add(s.b.id); s.b.dif.add(s.a.id);
+        SUGS = SUGS.filter(x => !difPar(x.a, x.b)); return renderAtas();
       }
       const nome = [s.a.nome, s.b.nome][+card.querySelector('[data-nome]').value];
       const perde = ELOS.get(s.b.id)?.dadosPessoais ? `\n\n⚠️ Os dados pessoais guardados para ${_escHtml(s.b.id)} serão descartados.` : '';
@@ -550,7 +618,13 @@ document.addEventListener('click', async ev => {
       await fundirAtas(s.a.id, s.b.id, nome); setMsg('Alunos unidos.', 'ok'); return;
     }
     if(act === 'trajx'){ setMsg('Lendo matrículas…', 'loading'); await trajetoriaCross(b.dataset.b, card.querySelector('[data-traj]')); return _toastLimpar(); }
-    if(act === 'difx'){ const aid = card.dataset.aa || AA_SEL; SKIP.add(aid + '|' + b.dataset.b); PARES2 = PARES2.filter(p => !(p.aa.id === aid && p.a.id === b.dataset.b)); renderCross(); return renderPainel(); }
+    if(act === 'difx'){
+      const aid = card.dataset.aa || AA_SEL, tid = b.dataset.b, aa = AAALL.find(x => x.id === aid), at = ATAS.find(x => x.id === tid);
+      if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(aa?.nome || aid)} (${_escHtml(aid)})\n≠\n${_escHtml(at?.nome || tid)} (${_escHtml(tid)})\n\nEste par deixa de ser sugerido.` })) return;
+      await gravarDif([{ col:'anoAtivoAlunos', id:aid, add:tid }, { col:'alunos-atas', id:tid, add:aid }]);
+      aa?.dif.add(tid); at?.dif.add(aid);
+      PARES2 = PARES2.filter(p => !(p.aa.id === aid && p.a.id === tid)); renderCross(); return renderPainel();
+    }
     if(act === 'semAtas'){
       if(!await _confirmModal({ titulo:'Marcar como verificado?', corpo:'Este aluno do Ano-Ativo não tem equivalente em Atas. Ele deixa de aparecer nesta lista.' })) return;
       await marcarVerificado('anoAtivoAlunos', [AA_SEL]); AAPEND = AAPEND.filter(a => a.id !== AA_SEL); PARES2 = PARES2.filter(p => p.aa.id !== AA_SEL); AA_SEL = null; renderPend(); renderCross(); return renderPainel();
@@ -580,7 +654,7 @@ async function init(){
     $('avisoSemEscola').hidden = !_semEscola();
     $('cut').addEventListener('input', () => { $('cutVal').textContent = $('cut').value; if(carregouAtas){ montarSugs(); renderPainel(); PARES2 = []; $('btnTraj2').disabled = true; renderCross(); } });
     $('mostrarInc').addEventListener('change', renderAtas); $('mostrarInc2').addEventListener('change', renderCross);
-    $('filtroPend').addEventListener('input', renderPend); $('filtroVinc').addEventListener('input', renderVinc);
+    $('filtroPend').addEventListener('input', renderPend); $('filtroVinc').addEventListener('input', renderVinc); $('filtroVerif').addEventListener('input', renderVerif);
     aba('atas');
   } finally {
     try{ if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }catch(e){ console.warn('ajustarContraste:', e); }
