@@ -23,6 +23,13 @@
    `antes` e `depois` são gravados como TEXTO (JSON) de propósito: assim o
    Firestore não cria um índice para cada subcampo e não reclama de
    undefined, arrays aninhados etc.
+
+   Funções (window.Log):
+     registrar(e)        registro avulso; nunca lança erro. Dê `await` antes de recarregar/navegar.
+     registrarLista(e)   compara duas listas (ex.: alunos da turma) e grava 1 registro só com o que mudou.
+     noBatch(batch, e)   registro dentro de um batch (atômico com a alteração).
+     salvarDoc / excluirDoc   atalhos para um documento só.
+   Se `schoolId` não for informado, usa a escola ativa (Auth.getActiveSchoolId()).
    ════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
@@ -93,20 +100,28 @@
   }
 
   // Só o que mudou (nível dos campos do documento).
-  function _diff(antes, depois) {
+  function _diff(antes, depois, extra) {
     var a = _plano(antes || {}, 0) || {};
     var d = _plano(depois || {}, 0) || {};
     var chaves = {};
     Object.keys(a).concat(Object.keys(d)).forEach(function (k) { chaves[k] = 1; });
     var campos = [], ta = {}, td = {};
     Object.keys(chaves).forEach(function (k) {
-      if (IGNORAR[k]) return;
+      if (IGNORAR[k] || (extra && extra[k])) return;
       if (JSON.stringify(a[k]) === JSON.stringify(d[k])) return;
       campos.push(k);
       if (k in a) ta[k] = a[k];
       if (k in d) td[k] = d[k];
     });
     return { campos: campos, antes: ta, depois: td };
+  }
+
+  // Escola ativa da sessão (null para o marcador 'ADMIN', que não é uma escola).
+  function _escolaAtiva() {
+    try {
+      var id = global.Auth && global.Auth.getActiveSchoolId && global.Auth.getActiveSchoolId();
+      return (id && String(id).toUpperCase() !== 'ADMIN') ? String(id) : null;
+    } catch (_e) { return null; }
   }
 
   // Deduz escola/coleção/id pelo caminho do documento (schools/{escola}/{coleção}/{id}).
@@ -143,7 +158,7 @@
     var u = _usuario();
     return {
       acao: acao || null,
-      schoolId: e.schoolId ? String(e.schoolId) : null,
+      schoolId: e.schoolId ? String(e.schoolId) : _escolaAtiva(),
       colecao: e.colecao || null,
       docId: e.docId ? String(e.docId) : null,
       pagina: e.pagina || _pagina(),
@@ -228,12 +243,106 @@
     await b.commit();
   }
 
+  /* ── 4) Listas dentro de um documento (ex.: alunos de uma turma) ── */
+  // Compara duas listas e separa o que foi adicionado, removido e alterado.
+  //   opts.chaves     funções (item) => chave, tentadas em ordem (ex.: alunoId; depois o nome)
+  //   opts.ignorar    campos que não contam como alteração
+  //   opts.preenchidos campos que, ao passar de vazio para preenchido, não contam
+  //                   (ex.: 'alunoId' gerado no primeiro salvamento)
+  //   opts.rotuloItem função (item) => texto curto que identifica o item (ex.: o nome)
+  function compararLista(antes, depois, opts) {
+    opts = opts || {};
+    var chaves = (opts.chaves && opts.chaves.length) ? opts.chaves : [function (x) { return x && x.id; }];
+    var ign = {}, pre = {};
+    (opts.ignorar || []).forEach(function (k) { ign[k] = 1; });
+    (opts.preenchidos || []).forEach(function (k) { pre[k] = 1; });
+    var A = (antes || []).map(function (x) { return _plano(x, 0) || {}; });
+    var D = (depois || []).map(function (x) { return _plano(x, 0) || {}; });
+    var usado = A.map(function () { return false; });
+    var out = { adicionados: [], removidos: [], alterados: [] };
+
+    function vazia(k) { return k === undefined || k === null || String(k) === ''; }
+    function chaveDe(item) {
+      for (var c = 0; c < chaves.length; c++) {
+        var k = chaves[c](item);
+        if (!vazia(k)) return String(k);
+      }
+      return '';
+    }
+
+    D.forEach(function (d) {
+      var achou = -1;
+      for (var c = 0; c < chaves.length && achou < 0; c++) {
+        var kd = chaves[c](d);
+        if (vazia(kd)) continue;
+        for (var i = 0; i < A.length; i++) {
+          if (!usado[i] && String(chaves[c](A[i])) === String(kd)) { achou = i; break; }
+        }
+      }
+      if (achou < 0) { out.adicionados.push(d); return; }
+      usado[achou] = true;
+      var df = _diff(A[achou], d, ign);
+      df.campos = df.campos.filter(function (k) {
+        if (!pre[k]) return true;
+        var antesVal = A[achou][k];
+        var vazioAntes = antesVal === undefined || antesVal === null || antesVal === '';
+        if (vazioAntes) { delete df.antes[k]; delete df.depois[k]; return false; }
+        return true;
+      });
+      if (df.campos.length) {
+        out.alterados.push({
+          chave: chaveDe(d) || chaveDe(A[achou]),
+          rotulo: opts.rotuloItem ? opts.rotuloItem(d) : undefined,
+          campos: df.campos, antes: df.antes, depois: df.depois
+        });
+      }
+    });
+    A.forEach(function (a, i) { if (!usado[i]) out.removidos.push(a); });
+    return out;
+  }
+
+  // Grava UM registro para a mudança de uma lista (ex.: "Salvar" da turma).
+  // Sem diferenças → não grava nada. Aceita as mesmas opções de compararLista, mais:
+  //   campo ('alunos'), colecao, docId, resumo (texto inicial), schoolId, acao ('editar')
+  async function registrarLista(e) {
+    try {
+      e = e || {};
+      var campo = e.campo || 'itens';
+      var cmp = compararLista(e.antes, e.depois, e);
+      var na = cmp.adicionados.length, nr = cmp.removidos.length, nl = cmp.alterados.length;
+      if (!na && !nr && !nl) return false;
+      var partes = [];
+      if (na) partes.push(na + ' adicionado(s)');
+      if (nr) partes.push(nr + ' removido(s)');
+      if (nl) partes.push(nl + ' alterado(s)');
+      var a = {}, d = {}, antes = {}, depois = {};
+      if (nr) a.removidos = cmp.removidos;
+      if (na) d.adicionados = cmp.adicionados;
+      if (nl) {
+        a.alterados = cmp.alterados.map(function (x) { return { chave: x.chave, rotulo: x.rotulo, campos: x.antes }; });
+        d.alterados = cmp.alterados.map(function (x) { return { chave: x.chave, rotulo: x.rotulo, campos: x.depois }; });
+      }
+      antes[campo] = a; depois[campo] = d;
+      return await registrar({
+        acao: e.acao || 'editar',
+        schoolId: e.schoolId, colecao: e.colecao, docId: e.docId, pagina: e.pagina,
+        resumo: [e.resumo, partes.join(', ')].filter(Boolean).join(' — '),
+        antes: antes, depois: depois
+      });
+    } catch (err) {
+      console.error('[log] não foi possível registrar a lista:', err);
+      return false;
+    }
+  }
+
   global.Log = {
     COLECAO: COLECAO,
     RETENCAO_DIAS: RETENCAO_DIAS,
     montar: montar,
     noBatch: noBatch,
     registrar: registrar,
+    registrarLista: registrarLista,
+    compararLista: compararLista,
     salvarDoc: salvarDoc,
     excluirDoc: excluirDoc
   };
