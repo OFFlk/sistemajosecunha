@@ -449,6 +449,46 @@
     return { id: op.id, data: op.data };
   }
 
+  /**
+   * Monta as operações (pra DB.batchWrite) que aplicam UM nome oficial a um
+   * aluno de Atas em todo lugar: alunos-atas (nome + nomeBusca), nomeRaw de
+   * TODAS as matrículas dele, `nome` do aluno em cada turmas/{turmaId}.alunos[]
+   * e, se o elo for só de histórico (sem anoAtivoId), elo.nome. Elo vinculado ao
+   * Ano-Ativo NÃO é tocado: lá o nome é o do cadastro do Ano-Ativo.
+   * Regra do sistema: a matrícula tem sempre o nome do alunoId.
+   * Faz leituras (matrículas, turmas, elo) mas NÃO grava.
+   */
+  async function opsRenomearAtas(alunoId, nome) {
+    await _waitAuth();
+    const id = _str(alunoId), n = _str(nome);
+    if (!id) throw new Error('Identidade.opsRenomearAtas: alunoId obrigatório.');
+    if (!n)  throw new Error('Identidade.opsRenomearAtas: nome obrigatório.');
+    const existente = await buscarAtasPorId(id);
+    if (!existente) throw new Error(`Identidade.opsRenomearAtas: alunoId "${id}" não encontrado em alunos-atas.`);
+
+    const ops = [{ col: CHAVE_ATAS, op: 'set', id, data: { alunoId: id, nome: n, nomeBusca: _normNome(n), atualizadoEm: new Date().toISOString() } }];
+    const mats = await window.DB.matriculas.whereEquals('alunoId', id);
+    mats.forEach(m => ops.push({ col: 'matriculas', op: 'set', id: m._id, data: { nomeRaw: n } }));
+
+    for (const tid of new Set(mats.map(m => _str(m.turmaId)).filter(Boolean))) {
+      const t = await window.DB.turmas.get(tid);
+      if (!t || !Array.isArray(t.alunos) || !t.alunos.some(a => _str(a && a.alunoId) === id)) continue;
+      ops.push({ col: 'turmas', op: 'set', id: tid, data: { alunos: t.alunos.map(a => _str(a && a.alunoId) === id ? { ...a, nome: n } : a) } });
+    }
+
+    const elo = await buscarElo(id);
+    if (elo && !elo.anoAtivoId) ops.push(prepararElo({ atasId: id, nome: n }));
+    return ops;
+  }
+
+  /** Aplica opsRenomearAtas() num único batch atômico. */
+  async function renomearAtas(alunoId, nome) {
+    const ops = await opsRenomearAtas(alunoId, nome);
+    if (ops.length > 500) throw new Error('Identidade.renomearAtas: operações demais para um batch (' + ops.length + ').');
+    await window.DB.batchWrite(ops);
+    return { operacoes: ops.length };
+  }
+
   /* ────────────────────────────────────────────
      API pública
   ──────────────────────────────────────────── */
@@ -466,6 +506,8 @@
     removerAtas,
     recalcularUltimoAnoRegistro,
     recalcularUltimoAnoRegistroBatch,
+    opsRenomearAtas,    // monta as ops de renomeação (nome oficial em todo lugar)
+    renomearAtas,       // aplica em 1 batch atômico
 
     // Elo cross-módulo (`alunos`, ID `ELO|{atasId}`) — sem decisão de matching
     eloId,
