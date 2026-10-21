@@ -74,7 +74,10 @@
 
 /* ── Popovers: a caixa (.popover), o dropdown (.popover.menu), .menu-item e .pop-div são globais (guia 6-A); aqui só tamanho e posição ── */
 .pop-avancada { top: calc(100% + 6px); right: 0; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
-.pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
+.pop-avancada .check { display: flex; gap: 6px; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background .15s; }
+/* Hover dos campos com checkbox: mesmo preenchimento de marca (22%) do hover dos itens do dropdown de exportar.
+   Selects e input number ficam sem hover de propósito. */
+.pop-avancada .check:hover { background: color-mix(in srgb, var(--ui-brand) 22%, transparent); }
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
 .pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
@@ -116,6 +119,25 @@
 .item .meta.txt { display: block; }
 .item input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; }
 input[type="checkbox"] { accent-color: var(--ui-brand); }   /* D6: accent-color segue local */
+
+/* Checkbox solto sobre o card de destaque ("Não concluíram o ano").
+   O nativo some aqui: desmarcado é branco fixo (não acompanha o tema) e marcado fica --ui-brand, igual ao fundo do card.
+   Então a caixa é desenhada: fundo liso --ui-cell-bg (o mesmo dos campos do destaque, troca com o tema)
+   e a marca de seleção em --ui-brand-text. Só vale para .check direto de .field: os do popover (fundo --ui-surface) seguem nativos. */
+.card-destaque .field > .check > input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; flex: none;
+  display: inline-grid; place-content: center;
+  width: 18px; height: 18px; margin: 0; cursor: pointer;
+  background: var(--ui-cell-bg); border: 1.5px solid var(--ui-border); border-radius: 5px;
+}
+.card-destaque .field > .check > input[type="checkbox"]::before {
+  content: ""; width: 11px; height: 11px; background: var(--ui-brand-text);
+  clip-path: polygon(14% 44%, 0 62%, 40% 100%, 100% 20%, 84% 4%, 40% 66%);
+  transform: scale(0); transition: transform .1s;
+}
+.card-destaque .field > .check > input[type="checkbox"]:checked::before { transform: scale(1); }
+.card-destaque .field > .check > input[type="checkbox"]:focus-visible { outline: 2px solid var(--dest-fg); outline-offset: 2px; }
+.card-destaque .field > .check > input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 .separator-line { border: none; border-top: 1px solid var(--ui-border); margin: 8px 0; }
 .turma-chips     { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .turma-chips-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
