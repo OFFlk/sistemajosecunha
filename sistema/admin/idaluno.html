@@ -323,12 +323,13 @@ async function fundirAtas(keep, gone, nome){
   if(rk(eG) > rk(eK) || (eK?.anoAtivoId && eG?.anoAtivoId && eK.anoAtivoId !== eG.anoAtivoId)) throw new Error('Os vínculos mudaram desde o carregamento. Recarregue os alunos.');
 
   const ops = [], tcache = new Map();
+  mk.forEach(m => ops.push({ col:'matriculas', op:'set', id:m._id, data:{ nomeRaw:nome } }));   // a matrícula tem sempre o nome do alunoId
   for(const m of mg){
     const { _id, ...d } = m;
     if(_id.endsWith('|' + gone)){
       const nid = _id.slice(0, -gone.length) + keep;
-      ops.push({ col:'matriculas', op:'set', id:nid, data:{ ...d, id:nid, alunoId:keep } }, { col:'matriculas', op:'delete', id:_id });
-    } else ops.push({ col:'matriculas', op:'set', id:_id, data:{ alunoId:keep } });
+      ops.push({ col:'matriculas', op:'set', id:nid, data:{ ...d, id:nid, alunoId:keep, nomeRaw:nome } }, { col:'matriculas', op:'delete', id:_id });
+    } else ops.push({ col:'matriculas', op:'set', id:_id, data:{ alunoId:keep, nomeRaw:nome } });
     const tk = m.turmaId;
     if(!tcache.has(tk)){
       const id = m.turmaId, doc = id ? await DB.turmas.get(id) : null;
@@ -340,12 +341,18 @@ async function fundirAtas(keep, gone, nome){
     const al = Array.isArray(doc.alunos) ? doc.alunos : [];
     if(al.some(a => String(a.alunoId) === keep)) throw new Error('Os dois alunos aparecem na ata ' + id + '.');
     if(!al.some(a => String(a.alunoId) === gone)) throw new Error('Aluno ' + gone + ' não encontrado na ata ' + id + '.');
-    ops.push({ col:'turmas', op:'set', id, data:{ alunos: al.map(a => String(a.alunoId) === gone ? { ...a, alunoId: keep } : a) } });
+    ops.push({ col:'turmas', op:'set', id, data:{ alunos: al.map(a => String(a.alunoId) === gone ? { ...a, alunoId: keep, nome } : a) } });
+  }
+  for(const tk of new Set(mk.map(m => m.turmaId))){   // turmas só do aluno que fica: só o nome muda
+    if(!tk || tcache.has(tk)) continue;
+    const doc = await DB.turmas.get(tk);
+    if(doc && Array.isArray(doc.alunos)) ops.push({ col:'turmas', op:'set', id:tk, data:{ alunos: doc.alunos.map(a => String(a.alunoId) === keep ? { ...a, nome } : a) } });
   }
   const ano = anoMaisProximo([...mk, ...mg].map(m => m.anoLetivo), (await escola()).configAnoAtivo);
   ops.push({ col:'alunos-atas', op:'set', id:keep, data:{ alunoId:keep, nome, nomeBusca:nrm(nome), ultimoAnoRegistro:ano, atualizadoEm:new Date().toISOString() } },
            { col:'alunos-atas', op:'delete', id:gone });
   if(eG) ops.push({ col:'alunos', op:'delete', id:Identidade.eloId(gone) });
+  if(eK && !eK.anoAtivoId) ops.push(Identidade.prepararElo({ atasId:keep, nome }));   // elo só de histórico acompanha o nome
   if(ops.length > 500) throw new Error('Operação grande demais para um batch (' + ops.length + ').');
   await DB.batchWrite(ops);
 
