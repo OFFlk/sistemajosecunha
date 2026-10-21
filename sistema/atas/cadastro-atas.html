@@ -140,6 +140,7 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 .import-sel { margin-top:6px; }
 </style>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -1771,6 +1772,9 @@ async function _salvarNoBancoInterno(recarregar) {
 
   const schema = getSchemaAtivoParaTela();
 
+  // Log: como a lista de alunos estava no banco antes deste "Salvar" (só leitura em memória).
+  const _alunosAntesLog = Array.isArray(turmaAtual.alunos) ? turmaAtual.alunos : [];
+
   // Confirmação extra se a leva de alunos ficou vazia mas a turma já tinha
   // gente lançada antes — evita apagar tudo por engano.
   const tinhaAlunosAntes = Array.isArray(turmaAtual.alunos) && turmaAtual.alunos.length > 0;
@@ -1842,7 +1846,15 @@ async function _salvarNoBancoInterno(recarregar) {
   if (_renomeacoesPendentes.size) {
     setMsg('Atualizando nome do aluno…', 'loading');
     for (const [id, nome] of [..._renomeacoesPendentes]) {
-      try { await window.Identidade.renomearAtas(id, nome); _renomeacoesPendentes.delete(id); }
+      try {
+        await window.Identidade.renomearAtas(id, nome); _renomeacoesPendentes.delete(id);
+        const antigo = _alunosAntesLog.find(a => String(a?.alunoId || '').trim() === String(id));
+        if (window.Log) await Log.registrar({
+          acao: 'editar', colecao: 'alunos-atas', docId: id,
+          resumo: 'Correção de nome (vale para todas as matrículas e turmas)',
+          antes: { nome: antigo ? antigo.nome : null }, depois: { nome },
+        });
+      }
       catch (e) { console.error('[renomear]', e); renomeios.erros.push(`${nome}: ${e.message || e}`); }
     }
   }
@@ -1853,6 +1865,20 @@ async function _salvarNoBancoInterno(recarregar) {
   // pela edição da ata.
   let resultadoScans = null;
   if (window.uploadScansQueue) resultadoScans = await window.uploadScansQueue();
+
+  // ── Log (log.js): 1 registro por "Salvar no banco", só com o que mudou na lista de alunos.
+  // Tem que ser aguardado: logo abaixo a página pode recarregar e cancelar uma gravação pendente.
+  if (window.Log) {
+    const parcial = (falhasIds.length || exclusoes.erros.length) ? ' — com falhas parciais (vínculos/matrículas/exclusões)' : '';
+    await Log.registrarLista({
+      campo: 'alunos', colecao: 'turmas', docId: turmaIdAtual,
+      resumo: `Turma ${turmaAtual.nome || turmaIdAtual}${turmaAtual.anoLetivo ? ' (' + turmaAtual.anoLetivo + ')' : ''}${parcial}`,
+      antes: _alunosAntesLog, depois: turmaObj.alunos,
+      chaves: [a => a?.alunoId, a => String(a?.nome || '').trim().toLowerCase()],
+      preenchidos: ['alunoId'], ignorar: ['alunoIdVinculado'],
+      rotuloItem: a => a?.nome,
+    });
+  }
 
   turmaAtual = turmaObj; // reflete localmente sem precisar recarregar a página
   const idx = TURMAS_CACHE_ATAS.findIndex(t => t.turmaId === turmaIdAtual);
