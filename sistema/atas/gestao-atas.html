@@ -101,6 +101,20 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
 @media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
+
+/* ── Consistência (órfãos e divergências): layout local; cores só por .badge / --ui-* ── */
+.con-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.con-barra .con-ano { width:130px; }
+.con-barra .con-busca { flex:1; min-width:200px; }
+.con-area[hidden] { display:none; }
+.con-lista { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+.con-item { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.con-left { flex:1; min-width:240px; }
+.con-tit { font-size:14px; font-weight:800; margin-bottom:6px; word-break:break-word; }
+.con-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.con-det { margin-top:6px; word-break:break-word; }
+.con-right { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.con-pag { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -152,6 +166,60 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
       <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
       <div class="row-btns">
         <button class="btn primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONSISTÊNCIA ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secConsist', event)">
+      <h3>🔍 Consistência</h3>
+      <button type="button" class="sec-toggle" id="togSecConsist" aria-expanded="true" aria-controls="secConsist" aria-label="Recolher ou expandir">▼</button>
+    </div>
+    <div class="sec-body" id="secConsist">
+      <div class="muted">Procura matrículas, cadastros e elos que ficaram soltos ou divergentes dentro do módulo de atas. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede a sua confirmação.</div>
+      <div class="con-barra">
+        <input type="text" class="input con-ano" id="conAno" list="conAnosLista" inputmode="numeric" maxlength="4" placeholder="Ano (ex.: 1999)" autocomplete="off">
+        <datalist id="conAnosLista"></datalist>
+        <button class="btn primary field-h" id="btnConVerificar" onclick="conVerificar(false)">🔍 Verificar o ano</button>
+        <button class="btn secondary field-h" id="btnConGlobal" onclick="conVerificar(true)">🌐 Verificação global</button>
+      </div>
+      <div class="muted mt-8">Por ano, lê as turmas e as matrículas do ano, os cadastros desses alunos e as matrículas deles em outros anos. A verificação global lê tudo (turmas, matrículas, cadastros e elos) e é a única que acha cadastros sem matrícula e elos sem cadastro.</div>
+
+      <div class="con-area mt-14" id="conArea" hidden>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-num" id="conStat_A1">0</div><div class="stat-lbl">A1 · Matrícula sem turma</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A2">0</div><div class="stat-lbl">A2 · Matrícula fora da turma</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A3">0</div><div class="stat-lbl">A3 · Aluno sem cadastro</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A4">0</div><div class="stat-lbl">A4 · Na turma, sem matrícula</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A5">0</div><div class="stat-lbl">A5 · Cadastro sem matrícula</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A6">0</div><div class="stat-lbl">A6 · Elo sem cadastro</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A7">0</div><div class="stat-lbl">A7 · Nome divergente</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A8">0</div><div class="stat-lbl">A8 · Último ano desatualizado</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A9">0</div><div class="stat-lbl">A9 · ID repetido na turma</div></div>
+        </div>
+        <div class="con-barra">
+          <select class="input" id="conTipo" onchange="conFiltroMudou()" aria-label="Filtrar por tipo">
+            <option value="">Todos os tipos</option>
+            <option value="A1">A1 · Matrícula sem turma</option>
+            <option value="A2">A2 · Matrícula fora da turma</option>
+            <option value="A3">A3 · Aluno sem cadastro</option>
+            <option value="A4">A4 · Na turma, sem matrícula</option>
+            <option value="A5">A5 · Cadastro sem matrícula</option>
+            <option value="A6">A6 · Elo sem cadastro</option>
+            <option value="A7">A7 · Nome divergente</option>
+            <option value="A8">A8 · Último ano desatualizado</option>
+            <option value="A9">A9 · ID repetido na turma</option>
+          </select>
+          <input type="text" class="input con-busca" id="conBusca" oninput="conFiltroMudou()" placeholder="Filtrar por nome, ID do aluno ou turma" autocomplete="off">
+          <span class="badge small" id="conEscopo"></span>
+        </div>
+        <div class="con-lista" id="conLista"></div>
+        <div class="con-pag" id="conPag" hidden>
+          <button class="btn neutral small" id="btnConAnt" onclick="conPag(-1)">← Anterior</button>
+          <span class="badge small" id="conPagInfo"></span>
+          <button class="btn neutral small" id="btnConProx" onclick="conPag(1)">Próxima →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -532,6 +600,7 @@ function _anosDasTurmas(turmas) {
 }
 
 function _renderIndiceAnos() {
+  try { _conPopularAnos(); } catch (_) {}   // lista de anos da seção Consistência
   const box = document.getElementById('indiceAnosBox');
   const info = document.getElementById('indiceAnosInfo');
   if (!box || !info) return;
@@ -1412,6 +1481,546 @@ function cancelarMerge() {
   document.getElementById('mergeListaSchemas').innerHTML='';
   document.getElementById('mergeSchemasWrap').style.display='none';
 }
+
+/* =============================================
+   CONSISTÊNCIA — órfãos e divergências do módulo de atas (A1…A9)
+   Nada é corrigido sozinho: cada correção relê o banco, confere se o estado
+   ainda é o do relatório, mostra o que vai mudar, pede confirmação e grava
+   num DB.batchWrite atômico (ou numa função de Identidade que já faz isso).
+============================================= */
+const CON_TIPOS = {
+  A1: { rot:'Matrícula sem turma',          chip:'bad'     },
+  A2: { rot:'Matrícula fora da turma',      chip:'bad'     },
+  A3: { rot:'Aluno sem cadastro',           chip:'bad'     },
+  A4: { rot:'Na turma, sem matrícula',      chip:'gray'    },
+  A5: { rot:'Cadastro sem matrícula',       chip:'neutral' },
+  A6: { rot:'Elo sem cadastro',             chip:'neutral' },
+  A7: { rot:'Nome divergente',              chip:'neutral' },
+  A8: { rot:'Último ano desatualizado',     chip:'neutral' },
+  A9: { rot:'ID repetido na turma',         chip:'gray'    },
+};
+const CON_PAG = 50;
+let _con = { itens: [], uid: 0, pag: 1, escopo: '', rodou: false };
+let _conOcupado = false;
+let _conAnoAtivo;                 // undefined = ainda não lido; null = escola sem ano ativo
+
+/* ── utilitários ── */
+function _cs(v) { return (v == null ? '' : String(v)).trim(); }
+function _cnorm(s) { return window.Identidade && Identidade.normNome ? Identidade.normNome(s) : _cs(s).toLowerCase(); }
+
+// Mesma regra de Identidade._anoMaisProximo (privada lá): mais próximo ANTERIOR OU IGUAL ao ano ativo.
+function _conAnoMaisProximo(anos, ativo) {
+  const validos = (anos || []).map(Number).filter(Number.isFinite);
+  if (!validos.length) return null;
+  const a = Number(ativo);
+  const ant = Number.isFinite(a) ? validos.filter(x => x <= a) : [];
+  if (ant.length) return Math.max(...ant);
+  if (!Number.isFinite(a)) return Math.max(...validos);
+  return validos.reduce((m, x) => Math.abs(x - a) < Math.abs(m - a) ? x : m);
+}
+// Mesma regra de Identidade._melhorNome (privada lá): maior nome, com bônus para acento.
+function _conMelhorNome(lista) {
+  const pt = s => s.length + (/[\u00C0-\u00FF]/.test(s) ? 10 : 0);
+  return (lista || []).map(_cs).filter(Boolean).reduce((a, b) => (!a || pt(b) > pt(a)) ? b : a, '');
+}
+async function _conCfgAno() {
+  if (_conAnoAtivo !== undefined) return _conAnoAtivo;
+  const esc = await window.DB.escola.get();          // se falhar, propaga: não calcular com ano ativo errado
+  _conAnoAtivo = (esc && esc.configAnoAtivo != null) ? esc.configAnoAtivo : null;
+  return _conAnoAtivo;
+}
+function _conDedup(...arrs) {
+  const m = new Map();
+  arrs.forEach(a => (a || []).forEach(d => m.set(d._id, d)));
+  return [...m.values()];
+}
+// Leituras pontuais (1 por ID). Erro de leitura NÃO vira "não existe": propaga.
+async function _conGetMuitos(colecao, ids) {
+  const lista = [...ids], out = new Map();
+  for (let i = 0; i < lista.length; i += 15) {
+    const parte = lista.slice(i, i + 15);
+    const rs = await Promise.all(parte.map(id => window.DB[colecao].get(id)));
+    parte.forEach((id, k) => out.set(id, rs[k]));
+  }
+  return out;
+}
+function _conTxtElo(elo) {
+  if (!elo) return '';
+  const p = [elo.anoAtivoId ? 'vinculado ao Ano-Ativo (' + elo.anoAtivoId + ')' : 'só de histórico'];
+  if (elo.dadosPessoais) p.push('com dados pessoais');
+  return p.join(' · ');
+}
+function _conAvisoElo(elo) {
+  if (!elo) return '';
+  const l = ['', 'O elo deste aluno também será apagado (' + _conTxtElo(elo) + ').'];
+  if (elo.anoAtivoId) l.push('⚠️ O vínculo com o aluno do Ano-Ativo ' + elo.anoAtivoId + ' será perdido.');
+  if (elo.dadosPessoais) l.push('⚠️ Os dados pessoais guardados no elo serão apagados.');
+  return l.join('\n');
+}
+
+/* ── leitura dos dados ── */
+async function _conLerAno(ano) {
+  const n = Number(ano), s = String(ano);
+  // O tipo do ano varia entre coleções (e entre importações): busca número e texto.
+  const [t1, t2, m1, m2] = await Promise.all([
+    window.DB.turmas.whereEquals('anoLetivo', n),     window.DB.turmas.whereEquals('anoLetivo', s),
+    window.DB.matriculas.whereEquals('anoLetivo', n), window.DB.matriculas.whereEquals('anoLetivo', s),
+  ]);
+  const turmas = _conDedup(t1, t2), mats = _conDedup(m1, m2);
+  const turmaMap = new Map(turmas.map(t => [t._id, t]));
+
+  // turmas citadas por matrículas do ano que não vieram na consulta (ano diferente, ou realmente inexistentes)
+  const faltam = new Set(mats.map(m => _cs(m.turmaId)).filter(id => id && !turmaMap.has(id)));
+  (await _conGetMuitos('turmas', faltam)).forEach((d, id) => { if (d) turmaMap.set(id, d); });
+
+  const ids = new Set();
+  mats.forEach(m => { const id = _cs(m.alunoId); if (id) ids.add(id); });
+  turmas.forEach(t => (t.alunos || []).forEach(a => { const id = _cs(a && a.alunoId); if (id) ids.add(id); }));
+
+  const atasMap = new Map();
+  (await window.DB['alunos-atas'].whereIn('alunoId', [...ids])).forEach(a => atasMap.set(a._id, a));
+  // quem a consulta por campo não achou, confirma pelo ID do documento antes de acusar
+  const naoAchados = [...ids].filter(id => !atasMap.has(id));
+  (await _conGetMuitos('alunos-atas', naoAchados)).forEach((d, id) => { if (d) atasMap.set(id, d); });
+
+  const matsAlunos = await window.DB.matriculas.whereIn('alunoId', [...ids]);
+  return { global: false, turmas, mats, turmaMap, atasMap, matsAlunos, anoAtivo: await _conCfgAno() };
+}
+
+async function _conLerTudo() {
+  const [turmas, mats, atas, elos] = await Promise.all([
+    window.DB.turmas.list(), window.DB.matriculas.list(), window.DB['alunos-atas'].list(), window.DB.alunos.list(),
+  ]);
+  return {
+    global: true, turmas, mats,
+    turmaMap: new Map(turmas.map(t => [t._id, t])),
+    atas, atasMap: new Map(atas.map(a => [a._id, a])),
+    elos: elos.filter(e => _cs(e.atasId)),
+    matsAlunos: mats, anoAtivo: await _conCfgAno(),
+  };
+}
+
+/* ── análise: devolve a lista de ocorrências (sem uid) ── */
+async function _conAnalisar(ctx) {
+  const itens = [];
+  const matIds = new Set(ctx.mats.map(m => m._id));
+  const idxCache = new Map();
+  function idxDe(tid) {                                       // alunoId → [itens do array alunos[] da turma]
+    if (idxCache.has(tid)) return idxCache.get(tid);
+    const por = new Map(), t = ctx.turmaMap.get(tid);
+    ((t && t.alunos) || []).forEach(a => {
+      const id = _cs(a && a.alunoId); if (!id) return;
+      if (!por.has(id)) por.set(id, []);
+      por.get(id).push(a);
+    });
+    idxCache.set(tid, por);
+    return por;
+  }
+
+  // A1 / A2 — matrícula sem turma / fora da turma
+  for (const m of ctx.mats) {
+    const alunoId = _cs(m.alunoId), turmaId = _cs(m.turmaId);
+    const base = { alunoId, nome: _cs(m.nomeRaw), turmaId, ano: _cs(m.anoLetivo), matId: m._id };
+    if (!ctx.turmaMap.has(turmaId)) {
+      itens.push({ tipo: 'A1', ...base, detalhe: ['A turma ' + (turmaId || '(vazia)') + ' não existe.'] });
+      continue;
+    }
+    if (!alunoId) continue;
+    const por = idxDe(turmaId);
+    if (!por.has(alunoId)) {
+      const nm = _cnorm(m.nomeRaw);
+      const prov = [...por.entries()].filter(([id, arr]) => id !== alunoId && arr.some(a => _cnorm(a.nome) === nm)).map(([id]) => id);
+      itens.push({ tipo: 'A2', ...base, detalhe: [
+        'A turma existe, mas não lista este aluno.',
+        prov.length ? 'Provável ID atual deste aluno na turma: ' + prov.join(', ') + '.' : '',
+      ] });
+    }
+  }
+
+  // A3 — matrícula cujo aluno não existe em alunos-atas (1 item por aluno)
+  const semCad = new Map();
+  for (const m of ctx.mats) {
+    const id = _cs(m.alunoId);
+    if (!id || ctx.atasMap.has(id)) continue;
+    if (!semCad.has(id)) semCad.set(id, []);
+    semCad.get(id).push(m);
+  }
+  for (const [id, ms] of semCad) {
+    itens.push({ tipo: 'A3', alunoId: id, nome: _conMelhorNome(ms.map(m => m.nomeRaw)),
+      ano: [...new Set(ms.map(m => _cs(m.anoLetivo)))].join(', '), turmaId: _cs(ms[0].turmaId), matIds: ms.map(m => m._id),
+      detalhe: ['Não existe cadastro em alunos-atas · ' + ms.length + ' matrícula(s) neste escopo.'] });
+  }
+
+  // A4 — aluno na turma sem matrícula (só relatório)
+  const cand = [];
+  for (const t of ctx.turmas) {
+    for (const [id, arr] of idxDe(t._id)) {
+      const matId = idMatFrom(t._id, id);
+      if (!matIds.has(matId)) cand.push({ t, id, arr, matId });
+    }
+  }
+  let a4 = cand;
+  if (!ctx.global && cand.length) {          // por ano, a matrícula pode existir com outro anoLetivo: confirma pelo ID
+    const got = await _conGetMuitos('matriculas', new Set(cand.map(c => c.matId)));
+    a4 = cand.filter(c => got.get(c.matId) == null);
+  }
+  a4.forEach(c => itens.push({ tipo: 'A4', alunoId: c.id, nome: _cs(c.arr[0].nome), turmaId: c.t._id, ano: _cs(c.t.anoLetivo),
+    detalhe: ['A turma lista o aluno, mas não existe o documento ' + c.matId + '.'] }));
+
+  // A9 — mesmo alunoId duas vezes em turmas.alunos[] (só relatório)
+  for (const t of ctx.turmas) {
+    for (const [id, arr] of idxDe(t._id)) {
+      if (arr.length > 1) itens.push({ tipo: 'A9', alunoId: id, nome: _cs(arr[0].nome), turmaId: t._id, ano: _cs(t.anoLetivo),
+        detalhe: ['O ID aparece ' + arr.length + ' vezes na turma' + (new Set(arr.map(a => _cs(a.nome))).size > 1 ? ' (com nomes diferentes: ' + [...new Set(arr.map(a => _cs(a.nome)))].join(' / ') + ')' : '') + '.'] });
+    }
+  }
+
+  // A7 — nome da matrícula / da turma diferente do nome do cadastro
+  const nomesPor = new Map();
+  const reg = (id, onde, turmaId, valor) => { id = _cs(id); if (!id) return; if (!nomesPor.has(id)) nomesPor.set(id, []); nomesPor.get(id).push({ onde, turmaId: _cs(turmaId), valor: _cs(valor) }); };
+  ctx.mats.forEach(m => reg(m.alunoId, 'matrícula', m.turmaId, m.nomeRaw));
+  ctx.turmas.forEach(t => { for (const [id, arr] of idxDe(t._id)) arr.forEach(a => reg(id, 'turma', t._id, a.nome)); });
+  for (const [id, lst] of nomesPor) {
+    const at = ctx.atasMap.get(id); if (!at) continue;
+    const ref = _cs(at.nome); if (!ref) continue;
+    const div = lst.filter(x => x.valor !== ref);
+    if (!div.length) continue;
+    const grupos = new Map();
+    div.forEach(x => { const k = x.onde + '|' + x.valor; grupos.set(k, (grupos.get(k) || { ...x, n: 0 })); grupos.get(k).n++; });
+    const linhas = [...grupos.values()].slice(0, 4).map(g => g.onde + ': "' + g.valor + '"' + (g.n > 1 ? ' (' + g.n + 'x)' : ''));
+    if (grupos.size > 4) linhas.push('… e mais ' + (grupos.size - 4) + ' variação(ões)');
+    itens.push({ tipo: 'A7', alunoId: id, nome: ref, ano: [...new Set(div.map(x => x.turmaId).map(tid => { const t = ctx.turmaMap.get(tid); return t ? _cs(t.anoLetivo) : ''; }).filter(Boolean))].join(', '),
+      detalhe: ['Nome no cadastro: "' + ref + '"', ...linhas] });
+  }
+
+  // A8 — ultimoAnoRegistro diferente do calculado a partir das matrículas
+  const anosPor = new Map();
+  ctx.matsAlunos.forEach(m => {
+    const id = _cs(m.alunoId), ano = Number(m.anoLetivo);
+    if (!id || !Number.isFinite(ano)) return;
+    if (!anosPor.has(id)) anosPor.set(id, []);
+    anosPor.get(id).push(ano);
+  });
+  for (const [id, anos] of anosPor) {
+    const at = ctx.atasMap.get(id); if (!at) continue;
+    const esperado = _conAnoMaisProximo(anos, ctx.anoAtivo);
+    const atual = (at.ultimoAnoRegistro == null || at.ultimoAnoRegistro === '') ? null : Number(at.ultimoAnoRegistro);
+    if (esperado !== atual) itens.push({ tipo: 'A8', alunoId: id, nome: _cs(at.nome), ano: '',
+      detalhe: ['Gravado: ' + (atual == null ? '—' : atual) + ' · pelas matrículas: ' + esperado + ' (ano ativo: ' + (ctx.anoAtivo == null ? '—' : ctx.anoAtivo) + ').'] });
+  }
+
+  // A5 / A6 — só na verificação global
+  if (ctx.global) {
+    const comMat = new Set(ctx.mats.map(m => _cs(m.alunoId)));
+    const eloPor = new Map(ctx.elos.map(e => [_cs(e.atasId), e]));
+    for (const a of ctx.atas) {
+      if (comMat.has(a._id)) continue;
+      const elo = eloPor.get(a._id);
+      itens.push({ tipo: 'A5', alunoId: a._id, nome: _cs(a.nome), ano: a.ultimoAnoRegistro == null ? '' : _cs(a.ultimoAnoRegistro),
+        detalhe: [elo ? 'Elo: ' + _conTxtElo(elo) + '.' : 'Sem elo.'].concat(elo && elo.anoAtivoId ? ['⚠️ Apagar este cadastro desfaz o vínculo com o Ano-Ativo.'] : [], elo && elo.dadosPessoais ? ['⚠️ O elo guarda dados pessoais que seriam apagados.'] : []) });
+    }
+    for (const e of ctx.elos) {
+      const aid = _cs(e.atasId);
+      if (ctx.atasMap.has(aid)) continue;
+      itens.push({ tipo: 'A6', alunoId: aid, nome: _cs(e.nome), ano: '', eloId: e._id,
+        detalhe: ['O cadastro ' + aid + ' não existe em alunos-atas. Elo: ' + _conTxtElo(e) + '.'].concat(e.anoAtivoId ? ['⚠️ Apagar o elo desfaz o vínculo com o Ano-Ativo.'] : []) });
+    }
+  }
+  return itens;
+}
+
+/* ── verificação ── */
+async function conVerificar(global) {
+  if (!IS_ADMIN || _conOcupado) return;
+  let ano = '';
+  if (global) {
+    const sim = await _confirmModal({
+      titulo: 'Verificação global',
+      corpo: 'Vai ler TODAS as turmas, TODAS as matrículas, TODOS os cadastros (alunos-atas) e TODOS os elos (alunos).\nPode gastar muitas leituras do banco. Nada é alterado.',
+      textoConfirmar: 'Verificar tudo',
+    });
+    if (!sim) return;
+  } else {
+    ano = _cs(document.getElementById('conAno').value);
+    if (!/^\d{4}$/.test(ano)) { setMsg('Informe o ano com 4 dígitos (ex.: 1999).', 'warn'); return; }
+  }
+  _conOcupado = true;
+  const b1 = document.getElementById('btnConVerificar'), b2 = document.getElementById('btnConGlobal');
+  b1.disabled = b2.disabled = true;
+  setMsg(global ? 'Verificando tudo…' : 'Verificando ' + ano + '…', 'loading');
+  try {
+    await _authPronto();
+    const ctx = global ? await _conLerTudo() : await _conLerAno(ano);
+    const itens = await _conAnalisar(ctx);
+    _con.itens = itens.map(i => ({ ...i, uid: ++_con.uid }));
+    _con.pag = 1; _con.escopo = global ? 'Global' : 'Ano ' + ano; _con.rodou = true;
+    _conRender();
+    setMsg(itens.length ? itens.length + ' ocorrência(s) encontrada(s).' : 'Nenhuma inconsistência encontrada.', itens.length ? 'warn' : 'ok');
+  } catch (e) {
+    console.error('[consistencia] verificar:', e);
+    setMsg('Não foi possível concluir a verificação: ' + (e && e.message || 'erro'), 'err');
+  } finally {
+    _conOcupado = false; b1.disabled = b2.disabled = false;
+  }
+}
+
+/* ── lista, filtros, paginação ── */
+function _conPopularAnos() {
+  const dl = document.getElementById('conAnosLista');
+  if (!dl) return;
+  dl.innerHTML = (_indiceAnos || []).map(a => '<option value="' + _escHtml(a) + '"></option>').join('');
+}
+function _conFiltrados() {
+  const tipo = document.getElementById('conTipo').value;
+  const q = _cnorm(document.getElementById('conBusca').value);
+  return _con.itens.filter(i => {
+    if (tipo && i.tipo !== tipo) return false;
+    if (!q) return true;
+    return _cnorm([i.nome, i.alunoId, i.turmaId].join(' ')).includes(q);
+  });
+}
+function conFiltroMudou() { _con.pag = 1; _conRender(); }
+function conPag(d) { _con.pag += d; _conRender(); }
+
+function _conItemHtml(i) {
+  const t = CON_TIPOS[i.tipo];
+  const chips = ['<span class="badge small ' + t.chip + '">' + i.tipo + ' · ' + _escHtml(t.rot) + '</span>'];
+  if (i.ano) chips.push('<span class="badge small">' + _escHtml(i.ano) + '</span>');
+  if (i.turmaId) chips.push('<span class="badge small gray">' + _escHtml(i.turmaId) + '</span>');
+  if (i.alunoId) chips.push('<span class="badge small gray">' + _escHtml(i.alunoId) + '</span>');
+  const det = (i.detalhe || []).filter(Boolean).map(l => '<div class="muted con-det">' + _escHtml(l) + '</div>').join('');
+  const b = (acao, cls, txt) => '<button type="button" class="btn ' + cls + ' small" onclick="conAcao(' + i.uid + ',\'' + acao + '\',this)">' + txt + '</button>';
+  const botoes = {
+    A1: [b('apagarMat', 'danger', '🗑 Apagar matrícula')],
+    A2: [b('apagarMat', 'danger', '🗑 Apagar matrícula')],
+    A3: [b('recriar', 'secondary', '♻️ Recriar cadastro'), b('apagarMats', 'danger', '🗑 Apagar matrículas')],
+    A5: [b('apagarAluno', 'danger', '🗑 Apagar cadastro')],
+    A6: [b('apagarElo', 'danger', '🗑 Apagar elo')],
+    A7: [b('renomear', 'secondary', '✏️ Usar nome do cadastro')],
+    A8: [b('ano', 'secondary', '🔄 Atualizar ano')],
+  }[i.tipo] || ['<span class="badge small gray">só relatório</span>'];
+  return '<div class="con-item subcard">' +
+    '<div class="con-left"><div class="con-tit">' + _escHtml(i.nome || '(sem nome)') + '</div><div class="con-chips">' + chips.join('') + '</div>' + det + '</div>' +
+    '<div class="con-right">' + botoes.join('') + '</div></div>';
+}
+
+function _conRender() {
+  const area = document.getElementById('conArea');
+  area.hidden = !_con.rodou;
+  if (!_con.rodou) return;
+  Object.keys(CON_TIPOS).forEach(t => { document.getElementById('conStat_' + t).textContent = _con.itens.filter(i => i.tipo === t).length; });
+  document.getElementById('conEscopo').textContent = 'Escopo: ' + _con.escopo;
+  const fil = _conFiltrados();
+  const paginas = Math.max(1, Math.ceil(fil.length / CON_PAG));
+  _con.pag = Math.min(Math.max(1, _con.pag), paginas);
+  const fatia = fil.slice((_con.pag - 1) * CON_PAG, _con.pag * CON_PAG);
+  const lista = document.getElementById('conLista');
+  lista.innerHTML = fatia.length ? fatia.map(_conItemHtml).join('')
+    : '<div class="muted">' + (_con.itens.length ? 'Nenhum item com esse filtro.' : 'Nenhuma inconsistência encontrada neste escopo.') + '</div>';
+  const pag = document.getElementById('conPag');
+  pag.hidden = fil.length <= CON_PAG;
+  document.getElementById('conPagInfo').textContent = 'Página ' + _con.pag + ' de ' + paginas;
+  document.getElementById('btnConAnt').disabled = _con.pag <= 1;
+  document.getElementById('btnConProx').disabled = _con.pag >= paginas;
+}
+function _conRemover(uid) { _con.itens = _con.itens.filter(i => i.uid !== uid); _conRender(); }
+function _conAjusteStat(delta) {
+  const el = document.getElementById('statAlunosDB'), n = Number(el && el.textContent);
+  if (el && Number.isFinite(n)) el.textContent = Math.max(0, n + delta);
+}
+function _conMudou() { setMsg('O estado do banco mudou desde a verificação. Rode a verificação de novo.', 'warn'); }
+function _conConfirmar(titulo, linhas, textoConfirmar, perigo) {
+  return _confirmModal({ titulo, corpo: linhas.map(_escHtml).join('\n'), corDestaque: perigo ? 'danger' : undefined, textoConfirmar });
+}
+
+/* ── correções ── */
+async function conAcao(uid, acao, btn) {
+  if (!IS_ADMIN || _conOcupado) return;
+  const it = _con.itens.find(x => x.uid === uid);
+  if (!it) return;
+  const fn = { apagarMat: _conApagarMat, recriar: _conRecriar, apagarMats: _conApagarMatsAluno, apagarAluno: _conApagarAluno,
+               apagarElo: _conApagarElo, renomear: _conRenomear, ano: _conAtualizarAno }[acao];
+  if (!fn) return;
+  _conOcupado = true; if (btn) btn.disabled = true;
+  try { await fn(it); }
+  catch (e) { console.error('[consistencia] ' + acao + ':', e); setMsg('Não foi possível concluir: ' + (e && e.message || 'erro'), 'err'); }
+  finally { _conOcupado = false; if (btn) btn.disabled = false; }
+}
+
+// Estado do aluno depois de apagar certas matrículas: fica vazio (apaga cadastro + elo) ou sobra algo (recalcula ultimoAnoRegistro).
+async function _conEstadoAposApagar(alunoId, apagando) {
+  const [atas, mats, elo] = await Promise.all([
+    window.DB['alunos-atas'].get(alunoId), window.DB.matriculas.whereEquals('alunoId', alunoId), Identidade.buscarElo(alunoId),
+  ]);
+  const restam = mats.filter(m => !apagando.has(m._id));
+  const r = { atas, elo, restam, ops: [], vazio: !restam.length, resumo: '' };
+  if (r.vazio) {
+    if (atas) r.ops.push({ col: 'alunos-atas', op: 'delete', id: alunoId });
+    if (elo)  r.ops.push({ col: 'alunos', op: 'delete', id: Identidade.eloId(alunoId) });
+    r.resumo = 'O aluno fica sem nenhuma matrícula: o cadastro (alunos-atas) será apagado junto.' + _conAvisoElo(elo);
+  } else {
+    const novo = _conAnoMaisProximo(restam.map(m => m.anoLetivo), await _conCfgAno());
+    if (atas) r.ops.push({ col: 'alunos-atas', op: 'set', id: alunoId, data: { alunoId, ultimoAnoRegistro: novo, atualizadoEm: new Date().toISOString() } });
+    r.resumo = 'O aluno continua com ' + restam.length + ' matrícula(s); último ano registrado: ' +
+      (atas && atas.ultimoAnoRegistro != null && atas.ultimoAnoRegistro !== '' ? atas.ultimoAnoRegistro : '—') + ' → ' + (novo == null ? '—' : novo) + '.';
+  }
+  return r;
+}
+
+// A1 e A2
+async function _conApagarMat(it) {
+  const m = await window.DB.matriculas.get(it.matId);
+  if (!m) { _conRemover(it.uid); setMsg('Essa matrícula já não existe.', 'warn'); return; }
+  const t = await window.DB.turmas.get(it.turmaId);
+  const naTurma = !!(t && Array.isArray(t.alunos) && t.alunos.some(a => _cs(a && a.alunoId) === it.alunoId));
+  if ((it.tipo === 'A1' && t) || (it.tipo === 'A2' && (!t || naTurma))) { _conMudou(); return; }
+  const est = await _conEstadoAposApagar(it.alunoId, new Set([it.matId]));
+  const ok = await _conConfirmar('Apagar matrícula?', [
+    'Aluno: ' + (it.nome || '—') + ' (' + it.alunoId + ')',
+    'Turma: ' + it.turmaId + ' · ano ' + (it.ano || '—'),
+    it.tipo === 'A1' ? 'A turma não existe mais.' : 'A turma existe, mas não lista este aluno.',
+    '',
+    est.resumo,
+    '', 'Não dá para desfazer.',
+  ], 'Apagar matrícula', true);
+  if (!ok) return;
+  await window.DB.batchWrite([{ col: 'matriculas', op: 'delete', id: it.matId }, ...est.ops]);
+  if (est.vazio && est.atas) _conAjusteStat(-1);
+  _conRemover(it.uid);
+  setMsg('Matrícula apagada.', 'ok');
+}
+
+// A3 — recriar o cadastro a partir das matrículas
+async function _conRecriar(it) {
+  if (await window.DB['alunos-atas'].get(it.alunoId)) { _conRemover(it.uid); setMsg('O cadastro já existe.', 'warn'); return; }
+  const mats = await window.DB.matriculas.whereEquals('alunoId', it.alunoId);
+  if (!mats.length) { _conRemover(it.uid); setMsg('Esse aluno já não tem matrículas.', 'warn'); return; }
+  const nomes = [...new Set(mats.map(m => _cs(m.nomeRaw)).filter(Boolean))];
+  const nome = _conMelhorNome(nomes);
+  if (!nome) { setMsg('As matrículas não têm nome (nomeRaw) para recriar o cadastro.', 'warn'); return; }
+  const ultimo = _conAnoMaisProximo(mats.map(m => m.anoLetivo), await _conCfgAno());
+  const agora = new Date().toISOString();
+  const dados = Identidade.normalizarAtas({ alunoId: it.alunoId, nome, ultimoAnoRegistro: ultimo, criadoEm: agora, atualizadoEm: agora });
+  const linhas = ['Cadastro a recriar: ' + it.alunoId, 'Nome: ' + nome, 'Matrículas: ' + mats.length + ' · último ano registrado: ' + (ultimo == null ? '—' : ultimo)];
+  if (nomes.length > 1) linhas.push('', 'As matrículas têm ' + nomes.length + ' grafias do nome (' + nomes.join(' / ') + '). Será usada a mais completa; as demais aparecem como "nome divergente" na próxima verificação.');
+  const ok = await _conConfirmar('Recriar cadastro?', linhas, 'Recriar cadastro', false);
+  if (!ok) return;
+  await window.DB.batchWrite([{ col: 'alunos-atas', op: 'set', id: it.alunoId, data: dados }]);
+  _conAjusteStat(1);
+  _conRemover(it.uid);
+  setMsg('Cadastro recriado.', 'ok');
+}
+
+// A3 — apagar todas as matrículas do aluno sem cadastro
+async function _conApagarMatsAluno(it) {
+  if (await window.DB['alunos-atas'].get(it.alunoId)) { _conMudou(); return; }
+  const mats = await window.DB.matriculas.whereEquals('alunoId', it.alunoId);
+  if (!mats.length) { _conRemover(it.uid); setMsg('Esse aluno já não tem matrículas.', 'warn'); return; }
+  const elo = await Identidade.buscarElo(it.alunoId);
+  const ops = mats.map(m => ({ col: 'matriculas', op: 'delete', id: m._id }));
+  if (elo) ops.push({ col: 'alunos', op: 'delete', id: Identidade.eloId(it.alunoId) });
+  if (ops.length > 500) { setMsg('Matrículas demais para um único lote (' + ops.length + ').', 'warn'); return; }
+  const ok = await _conConfirmar('Apagar as matrículas deste aluno?', [
+    'Aluno: ' + (it.nome || '—') + ' (' + it.alunoId + ') — sem cadastro em alunos-atas.',
+    'Serão apagadas ' + mats.length + ' matrícula(s), de todos os anos.',
+    'O nome continua listado nas turmas (aparecerá como "na turma, sem matrícula").' + _conAvisoElo(elo),
+    '', 'Não dá para desfazer.',
+  ], 'Apagar matrículas', true);
+  if (!ok) return;
+  await window.DB.batchWrite(ops);
+  _conRemover(it.uid);
+  setMsg('Matrículas apagadas.', 'ok');
+}
+
+// A5 — cadastro sem nenhuma matrícula
+async function _conApagarAluno(it) {
+  const [at, mats, elo] = await Promise.all([window.DB['alunos-atas'].get(it.alunoId), window.DB.matriculas.whereEquals('alunoId', it.alunoId), Identidade.buscarElo(it.alunoId)]);
+  if (!at) { _conRemover(it.uid); setMsg('Esse cadastro já não existe.', 'warn'); return; }
+  if (mats.length) { _conMudou(); return; }
+  const ops = [{ col: 'alunos-atas', op: 'delete', id: it.alunoId }];
+  if (elo) ops.push({ col: 'alunos', op: 'delete', id: Identidade.eloId(it.alunoId) });
+  const ok = await _conConfirmar('Apagar cadastro sem matrícula?', [
+    'Aluno: ' + (_cs(at.nome) || '—') + ' (' + it.alunoId + ')',
+    'Não tem nenhuma matrícula.' + _conAvisoElo(elo),
+    '', 'Não dá para desfazer.',
+  ], 'Apagar cadastro', true);
+  if (!ok) return;
+  await window.DB.batchWrite(ops);
+  _conAjusteStat(-1);
+  _conRemover(it.uid);
+  setMsg('Cadastro apagado.', 'ok');
+}
+
+// A6 — elo apontando para cadastro inexistente
+async function _conApagarElo(it) {
+  const [at, elo] = await Promise.all([window.DB['alunos-atas'].get(it.alunoId), window.DB.alunos.get(it.eloId)]);
+  if (!elo) { _conRemover(it.uid); setMsg('Esse elo já não existe.', 'warn'); return; }
+  if (at) { _conMudou(); return; }
+  const n = Identidade.normalizarElo(elo);
+  const aviso = [];
+  if (n.anoAtivoId) aviso.push('⚠️ O vínculo com o aluno do Ano-Ativo ' + n.anoAtivoId + ' será perdido.');
+  if (n.dadosPessoais) aviso.push('⚠️ Os dados pessoais guardados no elo serão apagados.');
+  const ok = await _conConfirmar('Apagar elo sem cadastro?', [
+    'Elo: ' + it.eloId + (n.nome ? ' — ' + n.nome : ''),
+    'O cadastro ' + it.alunoId + ' não existe em alunos-atas. Elo: ' + _conTxtElo(n) + '.',
+    ...aviso, '', 'Não dá para desfazer.',
+  ], 'Apagar elo', true);
+  if (!ok) return;
+  await window.DB.batchWrite([{ col: 'alunos', op: 'delete', id: it.eloId }]);
+  _conRemover(it.uid);
+  setMsg('Elo apagado.', 'ok');
+}
+
+// A7 — nome divergente
+async function _conDivergencias(alunoId) {
+  const at = await window.DB['alunos-atas'].get(alunoId);
+  if (!at) return { at: null, ref: '', div: [] };
+  const ref = _cs(at.nome);
+  const mats = await window.DB.matriculas.whereEquals('alunoId', alunoId);
+  const div = [];
+  mats.forEach(m => { if (_cs(m.nomeRaw) !== ref) div.push({ onde: 'matrícula', turmaId: _cs(m.turmaId), valor: _cs(m.nomeRaw) }); });
+  const ts = await _conGetMuitos('turmas', new Set(mats.map(m => _cs(m.turmaId)).filter(Boolean)));
+  ts.forEach((t, tid) => ((t && t.alunos) || []).forEach(a => { if (_cs(a && a.alunoId) === alunoId && _cs(a.nome) !== ref) div.push({ onde: 'turma', turmaId: tid, valor: _cs(a.nome) }); }));
+  return { at, ref, div };
+}
+async function _conRenomear(it) {
+  const { at, ref, div } = await _conDivergencias(it.alunoId);
+  if (!at) { _conRemover(it.uid); setMsg('Esse cadastro já não existe.', 'warn'); return; }
+  if (!ref) { setMsg('O cadastro está sem nome; corrija-o antes (idaluno).', 'warn'); return; }
+  if (!div.length) { _conRemover(it.uid); setMsg('Os nomes já estão iguais.', 'ok'); return; }
+  const linhas = div.slice(0, 8).map(x => '• ' + x.onde + ' (' + x.turmaId + '): "' + x.valor + '"');
+  if (div.length > 8) linhas.push('… e mais ' + (div.length - 8));
+  const ok = await _conConfirmar('Usar o nome do cadastro?', [
+    'Aluno: ' + it.alunoId, 'Nome no cadastro: "' + ref + '"', '', 'Divergentes agora:', ...linhas, '',
+    'Todas as matrículas e as listas das turmas deste aluno (de todos os anos) passarão a usar o nome do cadastro.',
+  ], 'Aplicar nome', false);
+  if (!ok) return;
+  const r = await Identidade.renomearAtas(it.alunoId, ref);
+  _conRemover(it.uid);
+  setMsg('Nome aplicado (' + r.operacoes + ' registro(s)).', 'ok');
+}
+
+// A8 — ultimoAnoRegistro
+async function _conAtualizarAno(it) {
+  const [at, mats] = await Promise.all([window.DB['alunos-atas'].get(it.alunoId), window.DB.matriculas.whereEquals('alunoId', it.alunoId)]);
+  if (!at) { _conRemover(it.uid); setMsg('Esse cadastro já não existe.', 'warn'); return; }
+  const cfg = await _conCfgAno();
+  const anos = mats.map(m => Number(m.anoLetivo)).filter(Number.isFinite);
+  if (!anos.length) { _conMudou(); return; }
+  const esperado = _conAnoMaisProximo(anos, cfg);
+  const atual = (at.ultimoAnoRegistro == null || at.ultimoAnoRegistro === '') ? null : Number(at.ultimoAnoRegistro);
+  if (esperado === atual) { _conRemover(it.uid); setMsg('O ano já está correto.', 'ok'); return; }
+  const ok = await _conConfirmar('Atualizar último ano registrado?', [
+    'Aluno: ' + (_cs(at.nome) || '—') + ' (' + it.alunoId + ')',
+    'Último ano registrado: ' + (atual == null ? '—' : atual) + ' → ' + esperado,
+    'Calculado a partir de ' + anos.length + ' matrícula(s), com o ano ativo ' + (cfg == null ? '—' : cfg) + '.',
+  ], 'Atualizar', false);
+  if (!ok) return;
+  await Identidade.recalcularUltimoAnoRegistroBatch([it.alunoId], cfg);
+  _conRemover(it.uid);
+  setMsg('Ano atualizado.', 'ok');
+}
+/* FIM CONSISTÊNCIA */
 </script>
 
 </body>
