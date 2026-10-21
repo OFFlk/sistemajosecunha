@@ -18,6 +18,7 @@
 <script src="../loading-overlay.js?v=7"></script>
 <script src="../auth.firebase.js?v=7"></script>
 <script src="../db.firebase.js?v=7"></script>
+<script src="../log.js?v=7"></script>
 <script src="../matricula-utils.js?v=7"></script>
 <script src="../identidade-aluno.js?v=7"></script>
 <script src="../theme-colors.js?v=7"></script>
@@ -1388,13 +1389,14 @@ function normSerie(s){
   try{
     setMsg("Salvando…", "loading");
     const existente = !!ID.anoAtivo;          // CPF/Nome achou aluno do ano-ativo → rematrícula
-    let alunoId, alunoDoc;
+    let alunoId, alunoDoc, alunoOriginal = null;
 
     if(existente){
       alunoId = ID.anoAtivo.alunoId || ID.anoAtivo._id;
       const original = await window.DB.anoAtivoAlunos.get(alunoId);   // dado fresco (1 leitura)
       if(!original) throw _falha(`O cadastro do aluno (${alunoId}) não existe mais. Use "Refazer identificação".`);
-      alunoDoc = { ...original, ...dadosAluno, alunoId, cpfNum: cpfDigits };   // preserva o resto (foto etc.)
+      alunoDoc = { ...original, ...dadosAluno, alunoId, cpfNum: cpfDigits };
+      alunoOriginal = original;   // só para o log (já estava em memória)   // preserva o resto (foto etc.)
     } else {
       // Guardas finais (o CPF pode ter sido usado por outra pessoa depois da identificação)
       const aa = await window.DB.anoAtivoAlunos.whereEquals('cpfNum', cpfDigits, { limit: 1 });
@@ -1482,6 +1484,20 @@ function normSerie(s){
       ops.push(window.Identidade.prepararElo(lim));
     }
     await window.DB.batchWrite(ops);
+
+    // ── Log: 1 registro por ação (contadores, cópia de busca e elo não entram) ──
+    if(window.Log){
+      const _tLog = getTurmas().find(x => (x.turmaId || x.id) === tid);
+      const _baseLog = `${alunoDoc.nome || alunoDoc.nomeOficial || alunoId} — turma ${(_tLog && (_tLog.nome || _tLog.turmaId)) || tid}, ${ano}`;
+      if(!existente){
+        await Log.registrar({ acao: 'criar', colecao: 'anoAtivoAlunos', docId: alunoId, depois: alunoDoc,
+          resumo: `Cadastro de aluno novo + matrícula (${matriculaId}) — ${_baseLog}` });
+      } else {
+        const _mudouPessoal = Log.montar({ acao: 'editar', antes: alunoOriginal, depois: alunoDoc });   // null = dados pessoais iguais
+        await Log.registrar({ acao: 'criar', colecao: 'anoAtivoMatriculas', docId: matriculaId, depois: novaMatricula,
+          resumo: `Rematrícula — ${_baseLog}` + (_mudouPessoal ? ` (dados pessoais atualizados: ${_mudouPessoal.campos.join(', ')})` : '') });
+      }
+    }
 
     // ── Pós-gravação: documentos e foto (falha aqui NÃO desfaz o cadastro, mas é avisada) ──
     const avisos = [];
@@ -1598,6 +1614,7 @@ function normSerie(s){
 
       // modelo (Regular/Integral) vive na matrícula aberta; update só desse campo não toca na foto
       const matId = window._modoEdicaoMatId;
+      let _matLog = null, _updLog = {};   // só para o log
       const todasMats = await window.DB.anoAtivoMatriculas.whereEquals('alunoId', alunoId);   // só as deste aluno
       if(matId){
         const mat = todasMats.find(m => m._id === matId) || await window.DB.anoAtivoMatriculas.get(matId);
@@ -1607,6 +1624,7 @@ function normSerie(s){
         const serieNova = (document.getElementById('serieAluno')?.value || '').trim();
         if(mat && serieNova && normSerie(serieNova) !== String(mat.serie || '')) upd.serie = normSerie(serieNova);   // série não faz parte do matriculaId
         if(mat && !anoEhAtivoEd && situacaoEd && situacaoEd !== String(mat.situacao || '').toUpperCase()) upd.situacao = situacaoEd;   // ano que não é o ativo
+        _matLog = mat; _updLog = upd;
         if(Object.keys(upd).length) ops.push({ col:'anoAtivoMatriculas', op:'update', id: matId, data: upd });
         // trocou Regular↔Integral numa matrícula ATIVA: ajusta o contador da turma
         if(mat && upd.modelo !== undefined && (mat.status || 'ATIVO').toUpperCase() === 'ATIVO' && isAnoAtivo(mat.anoLetivo)){
@@ -1619,6 +1637,19 @@ function normSerie(s){
         ops.push(window.Identidade.prepararElo({ atasId: elo.atasId, ...(mudouNome ? { nome } : {}), ...(mudouCpf ? { cpf: cpfNum } : {}) }));
       }
       await window.DB.batchWrite(ops);
+
+      // ── Log: 1 registro (aluno; mudanças de modelo/série/situação da matrícula entram como matricula_*) ──
+      if(window.Log){
+        const _gravado = { alunoId, ...dadosComp, nome, cpf: formatCPF(cpfNum), cpfNum };
+        const _antesLog = { ...original }, _depoisLog = { ...original, ..._gravado };
+        // campo que não existia e foi gravado vazio não é alteração de verdade
+        Object.keys(_gravado).forEach(k => { if(original[k] === undefined && (_gravado[k] === '' || _gravado[k] == null)) delete _depoisLog[k]; });
+        ['modelo', 'serie', 'situacao'].forEach(k => {
+          if(_updLog[k] !== undefined){ _antesLog['matricula_' + k] = (_matLog && _matLog[k]) ?? null; _depoisLog['matricula_' + k] = _updLog[k]; }
+        });
+        await Log.registrar({ acao: 'editar', colecao: 'anoAtivoAlunos', docId: alunoId, antes: _antesLog, depois: _depoisLog,
+          resumo: `Aluno ${nome}` + (matId ? ` — matrícula ${matId}` : '') });
+      }
 
       // Foto e documentos só mudam no banco de imagens agora, junto com o salvamento (cancelar não altera nada)
       if(window.aplicarFotoEdicao) await window.aplicarFotoEdicao();
@@ -2000,6 +2031,13 @@ function normSerie(s){
               [_opContadorTurma(mat.turmaId, -1, -dI), _opContadorTurma(t.turmaId, 1, dI)].forEach(o => { if(o) opsTroca.push(o); });
             }
             await window.DB.batchWrite(opsTroca);
+            if(window.Log){
+              const _tOrig = getTurmas().find(x => (x.turmaId || x.id) === mat.turmaId);
+              await Log.registrar({ acao: 'editar', colecao: 'anoAtivoMatriculas', docId: novoId,
+                resumo: `Trocou de turma: ${(_tOrig && (_tOrig.nome || _tOrig.turmaId)) || mat.turmaId} → ${t.nome || t.turmaId} (${mat.anoLetivo}) — ${aluno.nome || editId}`,
+                antes:  { matriculaId: mat._id, turmaId: mat.turmaId, serie: mat.serie ?? null },
+                depois: { matriculaId: novoId,  turmaId: t.turmaId,  serie: nova.serie } });
+            }
             _fecharTrocar();
             _toastSucesso('✅ Aluno trocado de turma. Redirecionando…');
             setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
@@ -2063,6 +2101,9 @@ function normSerie(s){
                 if(cEnc) opsEnc.push(cEnc);
               }
               await window.DB.batchWrite(opsEnc);
+              if(window.Log) await Log.registrar({ acao: 'editar', colecao: 'anoAtivoMatriculas', docId: matAluno._id,
+                resumo: `Encerrou matrícula (${rotulo || situacaoEscolhida}) — ${nomeAluno}`,
+                antes: matAluno, depois: matriculaAtualizada });
 
               _toastSucesso('✅ Matrícula encerrada. Redirecionando…');
               setTimeout(() => { location.href = 'pesquisa-ano-ativo.html'; }, 2000);
