@@ -47,6 +47,7 @@
     <div class="barra">
       <button class="btn primary" id="tab1" type="button" data-act="aba" data-a="atas">1) Duplicatas em Atas</button>
       <button class="btn secondary" id="tab2" type="button" data-act="aba" data-a="cross">2) Ano-Ativo ↔ Atas</button>
+      <button class="btn secondary" id="tab3" type="button" data-act="aba" data-a="vinc">3) Vínculos</button>
       <div class="field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
         <input id="cut" type="range" min="70" max="95" value="85"/></div>
     </div>
@@ -85,6 +86,16 @@
     <div class="barra"><div class="field"><label for="filtroPend">Filtrar por nome</label><input class="input" id="filtroPend" placeholder="Nome ou ID"/></div></div>
     <div class="list rolagem" id="listaPend"></div>
     <div id="painelCross" class="mt-12"></div>
+  </div>
+
+  <div class="card" id="abaVinc" hidden>
+    <div class="aviso-warn">ℹ️ Desfazer um vínculo apaga só o elo em <b>alunos</b>: os cadastros de Atas e do Ano-Ativo continuam existindo. Os dados pessoais que o histórico guardava antes do vínculo não voltam.</div>
+    <div class="barra">
+      <button class="btn secondary" type="button" data-act="carVinc">🔄 Carregar vínculos</button>
+      <div class="field"><label for="filtroVinc">Filtrar por nome ou ID</label><input class="input" id="filtroVinc" placeholder="Nome ou ID"/></div>
+    </div>
+    <div class="stats-row"><div class="stat-box"><div class="stat-num" id="statVinc">—</div><div class="stat-lbl">Vínculos</div></div></div>
+    <div id="listaVinc"></div>
   </div>
 </div>
 
@@ -271,13 +282,13 @@ function renderAtas(){
   $('statOk').textContent = carregouAtas ? SUGS.filter(s => s.st === 'ok').length : '—';
   if(!carregouAtas){ $('listaAtas').innerHTML = ''; return; }
   if(!vis.length){ $('listaAtas').innerHTML = '<div class="aviso-warn">ℹ️ Nenhuma sugestão com esta similaridade.</div>'; return; }
-  const bloco = (x, i) => `<div><b>${_escHtml(x.nome)}</b> <span class="badge small gray">${_escHtml(x.id)}</span>${ELOS.get(x.id)?.anoAtivoId ? ' <span class="badge small neutral">vinculado ao Ano-Ativo</span>' : ''} <span class="help">${_escHtml(resumo(x.id))}</span></div>`;
+  const bloco = (x, lv) => `<div><b>${_escHtml(x.nome)}</b> <span class="badge small${lv}">${_escHtml(x.id)}</span>${ELOS.get(x.id)?.anoAtivoId ? ' <span class="badge small gray">vinculado ao Ano-Ativo</span>' : ''} <span class="help">${_escHtml(resumo(x.id))}</span></div>`;
   $('listaAtas').innerHTML = vis.slice(0, LIM).map(s => {
     const k = chave(s.a.id, s.b.id), mb = melhorNome(s.a.nome, s.b.nome);
     return `<div class="item subcard" data-k="${_escHtml(k)}">
       <div class="left">
         <div class="chips"><span class="badge small">${Math.round(s.score * 100)}%</span>${stBadge(s.st)}<span class="badge small gray">mantém ${_escHtml(s.a.id)}</span></div>
-        ${bloco(s.a)}${bloco(s.b)}
+        ${bloco(s.a, '')}${bloco(s.b, ' neutral')}
         <div class="help">${_escHtml(s.m.join(' • '))}</div>
         <div class="field"><label>Nome oficial após corrigir</label><select data-nome>
           <option value="0"${mb === 0 ? ' selected' : ''}>${_escHtml(s.a.nome)}</option><option value="1"${mb === 1 ? ' selected' : ''}>${_escHtml(s.b.nome)}</option></select></div>
@@ -455,9 +466,38 @@ async function analisarCross(){
   }catch(e){ console.error('analisarCross:', e); setMsg('Não foi possível ler as matrículas.', 'err'); }
 }
 
+/* ── Aba 3: vínculos (desfazer = apagar o elo em alunos) ── */
+let VINC = null;
+async function carregarVinculos(){
+  const elos = await DB.alunos.list();
+  VINC = elos.map(e => Identidade.normalizarElo(e)).filter(e => e.atasId && e.anoAtivoId)
+    .sort((a, b) => String(a.nome || a.atasId).localeCompare(String(b.nome || b.atasId), 'pt-BR'));
+  renderVinc();
+}
+function renderVinc(){
+  $('statVinc').textContent = VINC ? VINC.length : '—';
+  if(!VINC){ $('listaVinc').innerHTML = ''; return; }
+  const f = nrm($('filtroVinc').value || '');
+  const l = VINC.filter(e => !f || nrm(e.nome || '').includes(f) || e.atasId.toLowerCase().includes(f) || e.anoAtivoId.toLowerCase().includes(f));
+  $('listaVinc').innerHTML = l.length ? l.slice(0, 50).map(e => `<div class="item subcard" data-a="${_escHtml(e.atasId)}" data-aa="${_escHtml(e.anoAtivoId)}">
+      <div class="left"><div><b>${_escHtml(e.nome || e.atasId)}</b></div>
+      <div class="chips"><span class="badge small">Atas ${_escHtml(e.atasId)}</span><span class="badge small neutral">Ano-Ativo ${_escHtml(e.anoAtivoId)}</span></div></div>
+      <div class="right"><button class="btn danger small" type="button" data-act="desvincular">Desfazer vínculo</button></div></div>`).join('')
+    + (l.length > 50 ? `<div class="help mt-12">Mostrando 50 de ${l.length}. Use o filtro para achar os demais.</div>` : '')
+    : '<div class="aviso-warn">ℹ️ Nenhum vínculo encontrado.</div>';
+}
+async function desvincular(atasId, aaId){
+  const e = await Identidade.buscarElo(atasId);
+  if(!e || e.anoAtivoId !== aaId) throw new Error('O vínculo mudou desde o carregamento. Recarregue os vínculos.');
+  await DB.batchWrite([{ col:'alunos', op:'delete', id:Identidade.eloId(atasId) }]);
+  VINC = VINC.filter(x => x.atasId !== atasId); ELOS.delete(atasId); ELO_AA.delete(aaId);
+  renderVinc();
+}
+
 /* ── Eventos ── */
 function aba(x){
-  $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross';
+  $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross'; $('abaVinc').hidden = x !== 'vinc';
+  $('tab3').className = 'btn ' + (x === 'vinc' ? 'primary' : 'secondary');
   $('tab1').className = 'btn ' + (x === 'atas' ? 'primary' : 'secondary'); $('tab2').className = 'btn ' + (x === 'cross' ? 'primary' : 'secondary');
 }
 async function comLoading(msg, fn){
@@ -473,6 +513,13 @@ document.addEventListener('click', async ev => {
   try{
     if(act === 'aba') return aba(b.dataset.a);
     if(act === 'carAtas') return comLoading('Carregando alunos de Atas…', async () => { await carregarAtas(true); $('btnTraj').disabled = false; montarSugs(); });
+    if(act === 'carVinc') return comLoading('Carregando vínculos…', carregarVinculos);
+    if(act === 'desvincular'){
+      const aid = card.dataset.a, aaid = card.dataset.aa, v = VINC.find(x => x.atasId === aid);
+      if(!await _confirmModal({ titulo:'Desfazer vínculo?', corpo:`<strong>${_escHtml(v?.nome || aid)}</strong>\nAtas ${_escHtml(aid)} ✕ Ano-Ativo ${_escHtml(aaid)}\n\nO aluno do Ano-Ativo volta a ficar sem vínculo. Os dados pessoais que o histórico guardava antes do vínculo não são restaurados.`, corDestaque:'danger', textoConfirmar:'Desfazer vínculo' })) return;
+      setMsg('Desfazendo vínculo…', 'loading');
+      await desvincular(aid, aaid); setMsg('Vínculo desfeito.', 'ok'); return;
+    }
     if(act === 'carPend') return comLoading('Carregando pendentes…', async () => { await carregarPend(); $('btnComp').disabled = false; $('btnTraj2').disabled = true; });
     if(act === 'buscarComp'){ buscarCompativeis(); $('btnTraj2').disabled = !PARES2.length; if(!PARES2.length) setMsg('Nenhum par compatível por nome.', 'warn'); return; }
     if(act === 'analCross') return analisarCross();
@@ -526,7 +573,7 @@ async function init(){
     $('avisoSemEscola').hidden = !_semEscola();
     $('cut').addEventListener('input', () => { $('cutVal').textContent = $('cut').value; if(carregouAtas){ montarSugs(); renderPainel(); PARES2 = []; $('btnTraj2').disabled = true; renderCross(); } });
     $('mostrarInc').addEventListener('change', renderAtas); $('mostrarInc2').addEventListener('change', renderCross);
-    $('filtroPend').addEventListener('input', renderPend);
+    $('filtroPend').addEventListener('input', renderPend); $('filtroVinc').addEventListener('input', renderVinc);
     aba('atas');
   } finally {
     try{ if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }catch(e){ console.warn('ajustarContraste:', e); }
