@@ -19,6 +19,7 @@
 <!-- Scripts globais -->
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
 
@@ -754,6 +755,9 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
     try{
       // só o status: regravar a turma inteira (cache da página) sobrescreveria qtdAlunos/qtdIntegral com o valor de quando a página abriu
       await window.DB.anoAtivoTurmas.save({ _id: t._id || t.turmaId, status: vaiInativar ? "INATIVA" : "ATIVA" });
+      if(window.Log) await Log.registrar({ acao: "editar", colecao: "anoAtivoTurmas", docId: t._id || t.turmaId,
+        resumo: (vaiInativar ? "Inativou" : "Reativou") + " turma " + (t.nome || t.turmaId) + " (" + (t.anoLetivo || "?") + ")",
+        antes: t, depois: { status: vaiInativar ? "INATIVA" : "ATIVA" }, parcial: true });   // await antes do reload
     }catch(e){
       console.warn("[toggleStatusTurma]", e);
       setMsg("Erro ao alterar o status da turma.", "err");
@@ -850,11 +854,12 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
     if(btn) btn.disabled = true;
     setMsg("Salvando…", "loading");
     try{
-      let payload, anoDaTurma;
+      let payload, anoDaTurma, originalLog = null;   // originalLog: só para o log (já lido, sem leitura extra)
       if(ehEdicao){
         // get() lê direto o documento (o list() tem cache de 30s no db.firebase.js).
         const original = await window.DB.anoAtivoTurmas.get(editingTurmaId);
         if(!original) throw Object.assign(new Error("turma inexistente"), { userMsg: "Essa turma não existe mais no banco — recarregue a página." });
+        originalLog = original;
         // Só nome, turno e professor mudam; ID, ano, séries, status e criadoEm ficam como estão.
         // Grava só estes campos (o save é merge): não regrava qtdAlunos/qtdIntegral, que mudam com cadastros e transferências de alunos.
         payload = { _id: editingTurmaId, nome, turno: $("turno")?.value || original.turno, professor: professor || "" };
@@ -873,6 +878,13 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
         anoDaTurma = ano;
       }
       await window.DB.anoAtivoTurmas.save(payload);
+      // Log: 1 registro por "Salvar" (a config de ano ativo, gravada abaixo, é consequência e não entra). await antes do reload.
+      if(window.Log){
+        if(ehEdicao) await Log.registrar({ acao: "editar", colecao: "anoAtivoTurmas", docId: editingTurmaId,
+          resumo: "Turma " + nome + " (" + (anoDaTurma || "?") + ")", antes: originalLog, depois: payload, parcial: true });
+        else await Log.registrar({ acao: "criar", colecao: "anoAtivoTurmas", docId: payload.turmaId, depois: payload,
+          resumo: "Turma " + nome + " (" + anoDaTurma + ") — " + payload.turno + ", " + payload.series.join(" + ") });
+      }
       await garantirAnoAtivoConfig(parseInt(anoDaTurma, 10));
     }catch(e){
       console.warn("[salvarTurma]", e);
