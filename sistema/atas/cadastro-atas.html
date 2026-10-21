@@ -1870,9 +1870,13 @@ async function _salvarNoBancoInterno(recarregar) {
   // Tem que ser aguardado: logo abaixo a página pode recarregar e cancelar uma gravação pendente.
   if (window.Log) {
     const parcial = (falhasIds.length || exclusoes.erros.length) ? ' — com falhas parciais (vínculos/matrículas/exclusões)' : '';
+    // O que foi apagado DE FATO do banco nas exclusões marcadas (a lista de alunos da turma só perde o item).
+    const apagou = exclusoes.matriculas
+      ? ` — apagou do banco ${exclusoes.matriculas} matrícula(s)` + (exclusoes.alunosApagados ? ` e o cadastro/vínculo de ${exclusoes.alunosApagados} aluno(s) (era a única matrícula em Atas)` : '')
+      : '';
     await Log.registrarLista({
       campo: 'alunos', colecao: 'turmas', docId: turmaIdAtual,
-      resumo: `Turma ${turmaAtual.nome || turmaIdAtual}${turmaAtual.anoLetivo ? ' (' + turmaAtual.anoLetivo + ')' : ''}${parcial}`,
+      resumo: `Turma ${turmaAtual.nome || turmaIdAtual}${turmaAtual.anoLetivo ? ' (' + turmaAtual.anoLetivo + ')' : ''}${apagou}${parcial}`,
       antes: _alunosAntesLog, depois: turmaObj.alunos,
       chaves: [a => a?.alunoId, a => String(a?.nome || '').trim().toLowerCase()],
       preenchidos: ['alunoId'], ignorar: ['alunoIdVinculado'],
