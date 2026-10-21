@@ -411,6 +411,9 @@ function renderFormularioDinamico() {
   // sozinho no fim da grade de notas, vermelho, pra não ser clicado por engano.
   html += `
     <div class="field wrap-excluir" id="wrapExcluirAluno" style="display:none;">
+      <button type="button" id="btnDesvincular" class="btn secondary" onclick="desvincularAlunoEmEdicao()" hidden>
+        🔓 Desvincular do ID
+      </button>
       <button type="button" id="btnExcluirAluno" class="btn danger" onclick="excluirAlunoEmEdicao()">
         🗑️ Excluir aluno desta turma
       </button>
@@ -698,6 +701,38 @@ async function excluirAlunoEmEdicao() {
   _toastAviso(`🗑️ ${nome} será excluído ao salvar no banco.`);
 }
 
+/* Desvincular: a matrícula em edição deixa o alunoId atual e ganha um novo (contador atômico) ao
+   salvar. A matrícula velha é apagada pelo mesmo mecanismo das exclusões; as outras matrículas
+   do alunoId antigo não mudam. O nome novo é obrigatório: o ID novo já nasce com nome. */
+async function desvincularAlunoEmEdicao() {
+  const antigo = _alunoEmEdicao;
+  const idAntigo = String(antigo?.alunoId || "").trim();
+  const nomeEl = $("nome");
+  if (!antigo || !idAntigo || !nomeEl) return;
+
+  const novoNome = await _confirmModal({
+    titulo: "🔓 Desvincular do ID?",
+    corpo: `Esta matrícula (<strong>${_escHtml(antigo.nome || "")}</strong>, ${_escHtml(idAntigo)}) passa a ter um ID NOVO quando você salvar no banco. As notas ficam como estão e as outras matrículas de ${_escHtml(idAntigo)} não mudam.\n\nSe esta for a ÚNICA matrícula de ${_escHtml(idAntigo)}, o cadastro e o vínculo (elo) dele serão apagados.`,
+    pedirTexto: "Novo nome",
+    textoConfirmar: "Desvincular",
+  });
+  if (!novoNome) return;
+
+  const nomeForm = nomeEl.value;
+  _limparVinculoCandidato();
+  nomeEl.value = novoNome;
+  _alunoEmEdicao = { ...antigo, alunoId: "" };
+  await adicionarAluno();                 // devolve a linha à tabela (valida série, nome repetido etc.)
+  if (_alunoEmEdicao) {                   // não passou na validação: nada foi marcado
+    _alunoEmEdicao = antigo;
+    nomeEl.value = nomeForm;
+    return;
+  }
+  _exclusoesPendentes.set(idAntigo, antigo.nome || idAntigo);
+  _renomeacoesPendentes.delete(idAntigo);
+  _toastAviso(`🔓 ${novoNome} receberá um ID novo ao salvar no banco.`);
+}
+
 /**
  * Aplica as exclusões marcadas (chamada por _salvarNoBancoInterno DEPOIS de
  * salvar a turma e as matrículas). Para cada aluno: apaga a matrícula; depois,
@@ -763,6 +798,7 @@ function ordenarAlunos() {
 ========================= */
 let _alunoCandidatoSelecionado = null; // { alunoId, nome, ultimoAnoRegistro } | null
 let _exclusoesPendentes = new Map(); // alunoId → nome: exclusões marcadas, aplicadas só em "Salvar no banco"
+let _renomeacoesPendentes = new Map(); // alunoId → novo nome oficial: aplicadas só em "Salvar no banco" (Identidade.renomearAtas)
 let _alunoEmEdicao = null; // cópia do aluno que foi retirado da lista pra edição (via "Editar") | null
 
 function _limparVinculoCandidato() {
@@ -894,6 +930,25 @@ async function adicionarAluno() {
     if (!okDup) return;
   }
 
+  // Aluno já salvo (tem alunoId): trocar o vínculo ou o nome só vai ao banco em "Salvar no banco".
+  const idAntigo = String(_alunoEmEdicao?.alunoId || "").trim();
+  let renomear = false;
+  if (_alunoCandidatoSelecionado) {
+    const idNovo = _alunoCandidatoSelecionado.alunoId;
+    if (idNovo !== idAntigo && alunos.some(a => String(a.alunoId || a.alunoIdVinculado || "").trim() === idNovo)) {
+      _toastErro("⚠️ Esse aluno já está nesta turma: não dá para ter duas matrículas dele na mesma turma.");
+      return;
+    }
+  } else if (idAntigo && nomeEl.value.trim() !== String(_alunoEmEdicao.nome || "").trim()) {
+    const okRen = await _confirmModal({
+      titulo: "✏️ Corrigir o nome do aluno?",
+      corpo: `O nome de <strong>${_escHtml(_alunoEmEdicao.nome)}</strong> (${_escHtml(idAntigo)}) passa a ser <strong>${_escHtml(nomeEl.value.trim())}</strong> em TODAS as matrículas e turmas desse aluno, quando você salvar no banco.\n\nPara mudar só esta matrícula, use "Desvincular do ID".`,
+      textoConfirmar: "Corrigir nome",
+    });
+    if (!okRen) return;
+    renomear = true;
+  }
+
   const aluno = { nome: nomeEl.value.trim() };
 
   if (schema.serieAtiva) {
@@ -916,10 +971,17 @@ async function adicionarAluno() {
   // pra esse aluno, só confirma o vínculo (vincularAtasExplicito()).
   if (_alunoCandidatoSelecionado) {
     aluno.alunoIdVinculado = _alunoCandidatoSelecionado.alunoId;
+    // Trocou o vínculo de um aluno já salvo: a matrícula do ID antigo é apagada ao salvar
+    // (e o ID antigo, se ficar sem matrículas). A nova nasce com o ID e o nome do escolhido.
+    if (idAntigo && idAntigo !== _alunoCandidatoSelecionado.alunoId) {
+      _exclusoesPendentes.set(idAntigo, String(_alunoEmEdicao.nome || "") || idAntigo);
+      _renomeacoesPendentes.delete(idAntigo);
+    }
   } else if (_alunoEmEdicao && _alunoEmEdicao.alunoId) {
     // Estava editando um aluno já salvo: mantém o alunoId dele. Antes o "Editar"
     // + "Atualizar" recriava o aluno sem alunoId e ele virava "novo" no save.
     aluno.alunoId = _alunoEmEdicao.alunoId;
+    if (renomear) _renomeacoesPendentes.set(aluno.alunoId, aluno.nome);
   }
 
   alunos.push(aluno);
@@ -1012,6 +1074,8 @@ function editarAluno(i) {
   _alunoEmEdicao = { ...a };
   const wrapExcluir = $("wrapExcluirAluno");
   if (wrapExcluir) wrapExcluir.style.display = "flex";
+  const btnDesv = $("btnDesvincular");
+  if (btnDesv) btnDesv.hidden = !String(a.alunoId || "").trim();   // só quem já tem alunoId salvo pode ser desvinculado
 
   alunos.splice(i, 1);
   _dirty = true;
@@ -1356,6 +1420,7 @@ async function selecionarTurma(turmaId) {
   if (window.scansResetar) window.scansResetar();
   _alunoEmEdicao = null;
   _exclusoesPendentes.clear();
+  _renomeacoesPendentes.clear();
   _alunoCandidatoSelecionado = null;
   _dirty = false;
   _destravarImport();
@@ -1477,6 +1542,7 @@ async function descartarAlteracoes() {
   if (!ok) return;
   if (window.scansLimparFila) window.scansLimparFila();
   _exclusoesPendentes.clear();
+  _renomeacoesPendentes.clear();
   _recarregarAlunosDaTurma();
   limparCamposAluno();
   _dirty = false;
@@ -1604,7 +1670,7 @@ function _escHtml(s){
 // corDestaque: 'danger' = ação destrutiva (título e botão vermelhos); 'ok' = contraponto positivo (verde);
 // qualquer outro = cor de marca.
 // digitar (opcional): exige digitar o texto para habilitar o botão (troca o prompt()).
-function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar }){
+function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancelar, digitar, pedirTexto }){
   return new Promise((resolve) => {
     const perigo = corDestaque === 'danger';
     const positivo = corDestaque === 'ok';
@@ -1615,10 +1681,10 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       `<div class="cm-box" role="${perigo ? 'alertdialog' : 'dialog'}" aria-modal="true">`+
         `<h3 class="cm-titulo${variante}">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
         `<p class="cm-corpo">${corpo || ''}</p>`+
-        (digitar ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar)}">` : '')+
+        (digitar || pedirTexto ? `<input type="text" class="cm-input" id="_confirmModalInput" autocomplete="off" placeholder="${_escHtml(digitar || pedirTexto)}">` : '')+
         `<div class="cm-acoes">`+
           `<button type="button" class="btn secondary" id="_confirmModalCancelar">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
-          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
+          `<button type="button" class="cm-ok${variante}" id="_confirmModalOk"${digitar || pedirTexto ? ' disabled' : ''}>${_escHtml(textoConfirmar || 'Continuar')}</button>`+
         `</div>`+
       `</div>`;
     document.body.appendChild(backdrop);
@@ -1629,10 +1695,10 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     // Esc em CAPTURA + stopPropagation: com um modal da página aberto por baixo, o Esc fecha só este
     function onKey(ev){ if(ev.key === 'Escape'){ ev.stopPropagation(); fechar(false); } }
     document.addEventListener('keydown', onKey, true);
-    ok.addEventListener('click', () => fechar(true));
+    ok.addEventListener('click', () => fechar(pedirTexto && input ? input.value.trim() : true));   // com pedirTexto resolve o texto digitado (ou false ao cancelar)
     cancelar.addEventListener('click', () => fechar(false));
     backdrop.addEventListener('click', (ev) => { if(ev.target === backdrop) fechar(false); });
-    if(input) input.addEventListener('input', () => { ok.disabled = (input.value !== digitar); });
+    if(input) input.addEventListener('input', () => { ok.disabled = pedirTexto ? !input.value.trim() : (input.value !== digitar); });
     cancelar.focus();   // lado seguro numa ação destrutiva
   });
 }
@@ -1768,6 +1834,16 @@ async function _salvarNoBancoInterno(recarregar) {
     catch (e) { console.error('[exclusões]', e); exclusoes.erros.push(e.message || String(e)); }
   }
 
+  // ── Correção de nome de aluno já salvo (nome oficial em todas as matrículas/turmas) ──
+  const renomeios = { erros: [] };
+  if (_renomeacoesPendentes.size) {
+    setMsg('Atualizando nome do aluno…', 'loading');
+    for (const [id, nome] of [..._renomeacoesPendentes]) {
+      try { await window.Identidade.renomearAtas(id, nome); _renomeacoesPendentes.delete(id); }
+      catch (e) { console.error('[renomear]', e); renomeios.erros.push(`${nome}: ${e.message || e}`); }
+    }
+  }
+
   // ── Scans: dispara upload da fila (a turma já existe desde antes) ──
   // O toast FINAL é montado aqui: senão o "salvo" apagaria na hora um erro de
   // upload. Scan que falhou não fica na fila — o aviso manda enviar depois
@@ -1792,6 +1868,7 @@ async function _salvarNoBancoInterno(recarregar) {
   const falhas = [];
   if (falhasIds.length) falhas.push(`vínculos/matrículas (${falhasIds.join('; ')})`);
   if (exclusoes.erros.length) falhas.push(`exclusão de aluno(s) (${exclusoes.erros.join('; ')})`);
+  if (renomeios.erros.length) falhas.push(`correção de nome (${renomeios.erros.join('; ')}) — salve de novo para tentar outra vez`);
   if (resultadoScans && resultadoScans.erros.length) {
     falhas.push(`${resultadoScans.erros.length} scan(s) não enviado(s) — envie depois pela edição da ata (${resultadoScans.erros.join(' | ')})`);
   }
