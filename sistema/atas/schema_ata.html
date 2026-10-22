@@ -18,6 +18,7 @@
 <script src="../auth.firebase.js"></script>
 <script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../theme-colors.js"></script>
 
 <!-- Fonte -->
@@ -655,9 +656,12 @@ async function salvarConfig() {
   const colunasFinais = CONFIG.colunas.filter(c => !REMOVER.has(c.key));
   if (!colunasFinais.length) { setMsg("O schema precisa ter ao menos uma matéria.", "err"); return; }
 
+  const antesLog = SAVED[CONFIG.id] || null;   // log: como o schema estava no último salvamento (já em memória)
   try {
     CONFIG = await saveSchema({ ...CONFIG, colunas: colunasFinais });
   } catch (e) { return falhaGravar(e, "salvar o schema"); }
+  // Log (log.js): 1 registro por "Salvar configuração". Sem diferenças, não grava nada.
+  if (window.Log && antesLog) await Log.registrar({ acao: "editar", colecao: "atasSchemas", docId: CONFIG.id, resumo: `Schema "${CONFIG.nome}"`, antes: antesLog, depois: CONFIG });
   REMOVER.clear();
 
   const idx = SCHEMAS.findIndex(s => s.id === CONFIG.id);
@@ -681,6 +685,7 @@ async function novoSchema() {
 
   let salvo;
   try { salvo = await saveSchema(def); } catch (e) { return falhaGravar(e, "criar o schema"); }
+  if (window.Log) await Log.registrar({ acao: "criar", colecao: "atasSchemas", docId: salvo.id, resumo: `Schema criado: "${salvo.nome}"`, depois: salvo });
   SCHEMAS.push(salvo); marcarSalvo(salvo);
   CONFIG = salvo; // só passa a exibir/editar o novo — não vira o padrão
   REMOVER.clear();
@@ -698,6 +703,7 @@ async function duplicarSchema() {
   const copy = { ...CONFIG, id: uid(), nome: nome.trim(), colunas: CONFIG.colunas.filter(c => !REMOVER.has(c.key)) };   // a cópia não leva as matérias marcadas
   let salvo;
   try { salvo = await saveSchema(copy); } catch (e) { return falhaGravar(e, "duplicar o schema"); }
+  if (window.Log) await Log.registrar({ acao: "criar", colecao: "atasSchemas", docId: salvo.id, resumo: `Schema duplicado: "${salvo.nome}" (cópia de "${CONFIG.nome}")`, depois: salvo });
   SCHEMAS.push(salvo); marcarSalvo(salvo);
   CONFIG = salvo; // só passa a exibir/editar a cópia — não vira o padrão
   REMOVER.clear();
@@ -715,6 +721,7 @@ async function excluirSchema() {
   if (!(await _confirmModal({ titulo: "Excluir schema", corpo: `Excluir o schema "${_escHtml(CONFIG.nome)}"?\n\nTurmas já salvas não são afetadas.`, corDestaque: "danger", textoConfirmar: "Excluir" }))) return;
 
   try { await removeSchema(CONFIG.id); } catch (e) { return falhaGravar(e, "excluir o schema"); }
+  if (window.Log) await Log.registrar({ acao: "excluir", colecao: "atasSchemas", docId: CONFIG.id, resumo: `Schema excluído: "${CONFIG.nome}"`, antes: CONFIG });
   SCHEMAS = SCHEMAS.filter(s => s.id !== CONFIG.id);
 
   // Volta a visualização pro schema padrão (não muda quem é o padrão em si)
