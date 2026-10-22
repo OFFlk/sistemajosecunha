@@ -39,13 +39,12 @@
 :root { --pop-bg: var(--card-bg); --pop-border: var(--card-border); }
 
 /* Sem overflow:hidden nos cards com ⓘ (cortaria o balão). */
-.config-card, .status-card { overflow: visible; }
+.config-card { overflow: visible; }
 
-/* Cards extras (Ano letivo ativo e Status do banco): usam o mesmo grid dos cards de cima
+/* Cards extras (Ano letivo ativo): usam o mesmo grid dos cards de cima
    e ocupam todas as colunas dele, então ficam com a largura exata do grid. */
 .grid-extras { grid-auto-rows: auto; row-gap: 18px; }
-.grid-extras > .config-card,
-.grid-extras > .status-card { grid-column: 1 / -1; }
+.grid-extras > .config-card { grid-column: 1 / -1; }
 
 /* ── Card de destaque (guia 1.3b) ── */
 .config-card.card-destaque {
@@ -170,12 +169,6 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
       </div>
     </div>
 
-    <!-- Status do banco -->
-    <div class="status-card">
-      <h3>📊 Status do banco <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Estes números só mostram os dados do domínio <code id="origin"></code>.</span></span></h3>
-      <div id="dbMeta" class="meta-line">Carregando…</div>
-    </div>
-
   </div>
 </div>
 
@@ -183,7 +176,7 @@ html[data-theme="dark"] .config-card.card-destaque { background: var(--btn-home-
 <script src="../header-logic.js"></script>
 
 <!-- 2. Script específico da página -->
-<!-- Script Backup visibilidade + Ano Ativo + Status -->
+<!-- Script Backup visibilidade + Ano Ativo -->
 <script>
 (function(){
   // Backup visível só para ADMIN global
@@ -331,70 +324,9 @@ async function initAnoAtivo(){
   });
 }
 
-// ── Status do banco ───────────────────────────────────────────────────
-// Lê as coleções REAIS da escola ativa (schools/{id}/{coleção}), a mesma lista
-// das Rules e do db.firebase.js. Notas trimestrais ficam de fora de propósito
-// (módulo próprio e coleção grande: cada visita ao hub pagaria a leitura toda).
-function normNome(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' '); }
-function contarAlunosUnicosEmTurmas(turmas){ const set=new Set(); for(const t of(Array.isArray(turmas)?turmas:[])){ if(!Array.isArray(t?.alunos)) continue; for(const al of t.alunos){ const id=String(al?.alunoId||'').trim(); if(id) set.add('id:'+id); else{ const n=normNome(al?.nome); if(n) set.add('nome:'+n); } } } return set.size; }
-
-const STATUS_COLS = ['turmas','alunos-atas','matriculas','atas','atasSchemas',
-                     'anoAtivoTurmas','anoAtivoAlunos','anoAtivoMatriculas','funcionarios','alunos'];
-
-function _escolaAtiva(){
-  let id = '';
-  try{ if(window.Auth && typeof Auth.getActiveSchoolId === 'function') id = Auth.getActiveSchoolId(); }catch(_){}
-  if(!id){ try{ id = (Auth.getSession()||{}).schoolId || ''; }catch(_){} }
-  return String(id||'').trim();
-}
-
-// Espera o Auth de verdade (Auth.db + login do Firebase) — só ter a sessão local
-// não basta: ler o Firestore antes disso falha na primeira carga da página.
-function _authPronto(){
-  return new Promise(res=>{
-    let feito=false; const ok=()=>{ if(!feito){ feito=true; res(); } };
-    if(window.Auth && typeof Auth.onReady==='function'){ Auth.onReady(ok); return; }
-    if(window.Auth && Auth.getSession && Auth.getSession()) return ok();
-    document.addEventListener('auth:ready',ok,{once:true});
-  });
-}
-
-async function renderMeta(tentativa){
-  tentativa = tentativa || 0;
-  const metaEl=document.getElementById('dbMeta');
-  const originEl=document.getElementById('origin'); if(originEl) originEl.textContent=location.origin;
-  try{
-    await _authPronto();
-    const sid=_escolaAtiva();
-    // Admin global sem escola escolhida: 'ADMIN' é um marcador, não uma escola — não há o que contar.
-    if(!sid || sid.toUpperCase()==='ADMIN'){
-      metaEl.innerHTML='<div class="meta-line">Selecione uma escola no seletor do header para ver os números.</div>';
-      return;
-    }
-    const base = window.Auth.db.collection('schools').doc(sid);
-    const res = await Promise.allSettled(STATUS_COLS.map(c => base.collection(c).get()));
-    // Se NENHUMA coleção respondeu, não é "uma coleção negada": é falha geral.
-    if(res.every(r => r.status==='rejected')) throw res[0].reason;
-    const docs = {}, n = {};
-    STATUS_COLS.forEach((c,i)=>{
-      if(res[i].status==='fulfilled'){ docs[c]=res[i].value.docs.map(d=>d.data()); n[c]=docs[c].length; }
-      else{ console.warn('[admin] status: falha ao ler', c, res[i].reason); n[c]='—'; }
-    });
-    metaEl.innerHTML=`
-      <div class="meta-line"><b>Ano ativo —</b> Turmas: ${n.anoAtivoTurmas} &nbsp;•&nbsp; Alunos: ${n.anoAtivoAlunos} &nbsp;•&nbsp; Matrículas: ${n.anoAtivoMatriculas}</div>
-      <div class="meta-line"><b>Atas (histórico) —</b> Turmas: ${n.turmas} &nbsp;•&nbsp; Alunos nas turmas: ${docs.turmas?contarAlunosUnicosEmTurmas(docs.turmas):'—'} &nbsp;•&nbsp; Alunos no catálogo: ${n['alunos-atas']} &nbsp;•&nbsp; Matrículas: ${n.matriculas} &nbsp;•&nbsp; Atas: ${n.atas} &nbsp;•&nbsp; Schemas de ata: ${n.atasSchemas}</div>
-      <div class="meta-line"><b>Outros —</b> Funcionários: ${n.funcionarios} &nbsp;•&nbsp; Vínculos entre módulos: ${n.alunos}</div>
-    `;
-  }catch(e){
-    console.error('[admin] renderMeta falhou (tentativa '+(tentativa+1)+'):', e);
-    if(tentativa < 2){ setTimeout(() => renderMeta(tentativa+1), 1200); return; } // Auth/rede ainda assentando
-    metaEl.innerHTML='<div class="meta-line">⚠️ Não foi possível ler o Firestore: '+escapeHtml(e && (e.code || e.message) || e)+'</div>';
-  }
-}
-
 document.addEventListener('DOMContentLoaded', async function(){
   try{
-    await Promise.all([renderMeta(), initAnoAtivo()]);
+    await initAnoAtivo();
   } finally {
     ajustarDestaque();
     try{ Loading.esconder(); }catch(_){}
