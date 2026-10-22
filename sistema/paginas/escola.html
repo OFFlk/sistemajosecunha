@@ -17,6 +17,7 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../theme-colors.js"></script>
 
 <!-- Fonte -->
@@ -329,6 +330,7 @@ function _lbKey(e) { if (e.key === 'Escape') fecharLightbox(); }
 <!-- Lógica específica desta página -->
 <script>
 let escudoBase64 = null;
+let escolaOriginalLog = null;   // só para o log: dados da escola como estavam no banco (lidos no init, sem leitura extra)
 
 // schoolId e chave da escola gerenciados por Auth.getActiveSchoolId() via auth.firebase.js
 
@@ -383,6 +385,28 @@ async function salvarDados() {
   setMsg('Salvando…', 'loading');
   try {
     await DB.escola.save(dadosEscola);
+    // Log: 1 registro por "Salvar". Só os 6 campos do formulário (sem os aliases municipio/UF/codigoInep) e o escudo
+    // (imagem em base64, grande demais para o log) entra só como marcador. await antes de qualquer navegação.
+    if(window.Log){
+      const o = escolaOriginalLog || {};
+      const marca = v => v ? '[imagem]' : null;
+      const escudoMudou = (o.escudo || null) !== (dadosEscola.escudo || null);
+      const antesLog = {
+        nome: o.nome || '', endereco: o.endereco || '',
+        cidade: o.cidade || o.municipio || '',
+        uf: (o.uf || o.UF || o.estado || '').toString().toUpperCase().slice(0,2),
+        inep: (o.inep || o.codigoInep || '').toString().replace(/\D+/g,'').slice(0,8),
+        escudo: marca(o.escudo)
+      };
+      const depoisLog = {
+        nome: dadosEscola.nome, endereco: dadosEscola.endereco, cidade, uf, inep,
+        escudo: escudoMudou ? (dadosEscola.escudo ? '[imagem nova]' : null) : marca(dadosEscola.escudo)
+      };
+      await Log.registrar({ acao: 'editar', colecao: 'schools', docId: (Auth.getActiveSchoolId && Auth.getActiveSchoolId()) || null,
+        resumo: `Dados da escola — ${dadosEscola.nome}` + (escolaOriginalLog ? '' : ' (dados anteriores não carregados)'),
+        antes: antesLog, depois: depoisLog });
+    }
+    escolaOriginalLog = { ...(escolaOriginalLog || {}), ...dadosEscola };   // o próximo Salvar compara com o que acabou de ser gravado
     // Mantém também no localStorage como cache local (usado por historico_auto)
     try {
       const key = Auth.getActiveSchoolId
@@ -464,6 +488,7 @@ async function init() {
     try {
       const escola = await DB.escola.get();
       if (escola && Object.keys(escola).length) {
+        escolaOriginalLog = escola;
         preencherFormEscola(escola);
       }
     } catch(e) {
