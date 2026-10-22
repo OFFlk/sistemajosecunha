@@ -15,6 +15,7 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js?v=8"></script>
+<script src="../log.js?v=8"></script>
 <script src="../theme-colors.js?v=8"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
@@ -1905,6 +1906,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     btn.textContent = '⏳ Excluindo...';
     let avisoCloud = '';
     let funcionarioRemovido = false;
+    let pessoaLog = null;   // só para o log (lida abaixo, sem leitura extra)
 
     try{
       // Quantas matrículas a pessoa tem? (só as dela: query pontual)
@@ -1914,6 +1916,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       if(!outras.length){
         // Último ano: a pessoa some junto. Primeiro a mídia no Cloudinary (melhor esforço: se falhar, avisa mas segue).
         const pessoa = await window.DB.funcionarios.get(funcId);
+        pessoaLog = pessoa;
         try{
           const resp = await fetch(`/api/drive-delete-pasta-funcionario?funcionarioId=${encodeURIComponent(funcId)}`, { method:'DELETE' });
           const data = await resp.json();
@@ -1939,6 +1942,17 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       } else {
         // A pessoa continua cadastrada em outros anos: só a matrícula sai (foto e documentos ficam)
         await window.DB.batchWrite([{ col:'funcionariosMatriculas', op:'delete', id:matId }]);
+      }
+
+      // Log: 1 registro por exclusão, depois do commit e antes do redirect. A mídia no Cloudinary não é logada (só o aviso, se falhou).
+      if(window.Log){
+        const matExcluida = mats.find(m => m._id === matId) || null;   // já lida acima (query pontual)
+        const avisoLog = avisoCloud ? ' (atenção: a exclusão dos documentos no Cloudinary não foi confirmada)' : '';
+        if(funcionarioRemovido) await Log.registrar({ acao: 'excluir', colecao: 'funcionarios', docId: funcId,
+          resumo: `Excluiu funcionário ${nome} — última matrícula (${ano}); foto e documentos apagados` + avisoLog,
+          antes: { ...(pessoaLog || {}), _matricula: matExcluida } });
+        else await Log.registrar({ acao: 'excluir', colecao: 'funcionariosMatriculas', docId: matId,
+          resumo: `Excluiu matrícula ${ano} de ${nome} (o funcionário continua cadastrado em outros anos)`, antes: matExcluida || {} });
       }
 
       const oque = funcionarioRemovido ? 'Funcionário excluído' : `Matrícula de ${ano} excluída (o funcionário continua cadastrado em outros anos)`;
@@ -2059,11 +2073,13 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
     const cpf = stripNum(document.getElementById('cpf').value);
     const funcaoRaw = document.getElementById('funcao').value;
     let funcao = funcaoRaw;
+    let funcaoNovaLog = null;   // só para o log: função nova cadastrada neste Salvar
     if(funcaoRaw === 'OUTRO'){
       const f = document.getElementById('funcaoOutro').value.trim();
       funcao = normUpper(f);
       if(!_funcoesExtras.includes(funcao)){
         _funcoesExtras.push(funcao);
+        funcaoNovaLog = funcao;
         await salvarFuncoesExtras();
         popularFuncaoSelect();
       }
@@ -2143,6 +2159,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       const emEdicao = !!_editandoId;
       const pessoaIdent = window._identFunc ? window._identFunc.estado().pessoa : null;   // achada pelo CPF (outro ano)
       let funcId, matId, novaPessoa = false, fotoAtual = null, mats = [];
+      let matOriginalLog = null, pessoaFrescaLog = null;   // só para o log (já lidos abaixo, sem leitura extra)
 
       if(emEdicao){
         funcId = _editandoFuncId; matId = _editandoId;
@@ -2151,6 +2168,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
         const fresca = await window.DB.funcionarios.get(funcId);          // dado fresco (1 leitura)
         if(!fresca) throw _falha('O cadastro deste funcionário não existe mais. Use "Refazer identificação".');
         fotoAtual = { fotoUrl: fresca.fotoUrl ?? null, fotoFileId: fresca.fotoFileId ?? null };
+        pessoaFrescaLog = fresca;
       } else {
         // Guarda final: o CPF pode ter sido cadastrado por outra pessoa depois da identificação
         const ja = await window.DB.funcionarios.whereEquals('cpfNum', cpf, { limit: 1 });
@@ -2166,6 +2184,7 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       if(emEdicao){
         const original = mats.find(m => m._id === matId);
         if(!original) throw _falha('A matrícula em edição não existe mais.');
+        matOriginalLog = original;
         if(stripNum(original.cpfNum || original.cpf || '') !== cpf){        // CPF alterado: precisa continuar único
           const outro = (await window.DB.funcionarios.whereEquals('cpfNum', cpf, { limit: 1 })).filter(p => p._id !== funcId);
           if(outro.length) throw _falha(`O CPF ${identidade.cpf} já pertence a ${outro[0].nome || outro[0]._id}.`);
@@ -2175,6 +2194,26 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
       const anoExiste = !!(await window.DB.funcionariosAnos.get(String(ano)));   // 1 leitura: o doc do ano só é criado se ainda não existe
       const ops = montarOpsGravacao({ funcId, matId, ano, novaPessoa, emEdicao, identidade, perfil, doAno, mats, anoExiste, fotoAtual, agora });
       await window.DB.batchWrite(ops);                                       // pessoa + matrícula (+ ano, + cópias) — tudo ou nada
+
+      // Log: 1 registro por "Salvar". Documento principal = a matrícula (traz identidade + perfil + dados do ano).
+      // Cópias de identidade nas outras matrículas, doc do ano, contador de ID, funções extras e foto não entram.
+      if(window.Log){
+        const matGravada = (ops.find(o => o.col === 'funcionariosMatriculas' && o.id === matId) || {}).data || {};
+        const nomeLog = identidade.nome || funcId;
+        const extraFuncao = funcaoNovaLog ? ` (nova função cadastrada: ${funcaoNovaLog})` : '';
+        if(emEdicao){
+          await Log.registrar({ acao: 'editar', colecao: 'funcionariosMatriculas', docId: matId, antes: matOriginalLog, depois: matGravada, parcial: true,
+            resumo: `Funcionário ${nomeLog} — matrícula ${ano}` + extraFuncao });
+        } else {
+          let resumoLog;
+          if(novaPessoa) resumoLog = `Cadastro de funcionário novo — ${nomeLog}, ${ano} (${funcId})`;
+          else {
+            const mudouIdent = pessoaFrescaLog ? Log.montar({ acao: 'editar', antes: pessoaFrescaLog, depois: identidade, parcial: true }) : null;   // null = dados pessoais iguais
+            resumoLog = `Nova matrícula ${ano} de funcionário já cadastrado — ${nomeLog}` + (mudouIdent ? ` (dados pessoais atualizados: ${mudouIdent.campos.join(', ')})` : '');
+          }
+          await Log.registrar({ acao: 'criar', colecao: 'funcionariosMatriculas', docId: matId, depois: matGravada, resumo: resumoLog + extraFuncao });
+        }
+      }
 
       // Trava os IDs só depois do save confirmar: um segundo clique em "Salvar" vira edição desta matrícula
       // (sem isso geraria outro funcId e duplicaria o cadastro).
