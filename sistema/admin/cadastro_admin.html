@@ -14,6 +14,7 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../theme-colors.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/base.css">
@@ -383,11 +384,37 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
     }
   }
 
+  // ===== Log de gravações (log.js) =====
+  // Cópia enxuta dos usuários já lidos na tela (serve de "antes" nas exclusões/aprovações, sem leitura extra).
+  // Nunca guarda senha nem dados sensíveis.
+  var _usuariosPorUid = {};
+  function _usuarioLog(u){
+    return { uid: u.uid, name: u.name || '', email: u.email || '', role: u.role || '', schoolId: u.schoolId || '' };
+  }
+  function _lembrarUsuarios(lista){
+    (lista || []).forEach(function(u){ if(u && u.uid) _usuariosPorUid[u.uid] = _usuarioLog(u); });
+  }
+  // schoolId do registro: a escola do usuário-alvo; o marcador ADMIN fica de fora (o log.js usa o padrão).
+  function _schoolLog(sid){
+    sid = String(sid || '').trim();
+    return (!sid || sid.toUpperCase() === 'ADMIN') ? undefined : sid;
+  }
+  async function _logUsuarioExcluido(uid, nome, rotulo, schoolIdFallback){
+    if(!window.Log) return;
+    var u = _usuariosPorUid[uid] || { uid: uid, name: nome || '', schoolId: schoolIdFallback || '' };
+    await Log.registrar({
+      acao: 'excluir', colecao: 'users', docId: uid, schoolId: _schoolLog(u.schoolId),
+      resumo: rotulo + ' — ' + (u.name || nome || uid) + (u.email ? ' (' + u.email + ')' : '') + ' — ' + nivelDe(u) + ', ' + escolaNome(u.schoolId),
+      antes: u
+    });
+  }
+
   async function deleteUserById(uid, name){
     var ok = await _confirmModal({ titulo: 'Excluir usuário', corpo: _escHtml('Excluir o usuário "' + name + '"? Esta ação não pode ser desfeita.'), corDestaque: 'danger', textoConfirmar: 'Excluir' });
     if(!ok) return false;
     setMsg('Excluindo usuário…', 'loading');
     await Auth.deleteUser(uid);
+    await _logUsuarioExcluido(uid, name, 'Excluiu usuário');
     return true;
   }
 
@@ -415,13 +442,18 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
     if(!ok) return false;
     setMsg('Enviando solicitação…', 'loading');
     var session = Auth.getSession();
-    await Auth.db.collection('schools').doc(schoolId).collection('changeRequests').add({
+    var _reqRef = await Auth.db.collection('schools').doc(schoolId).collection('changeRequests').add({
       schoolId:    schoolId,
       requestedBy: session && session.uid,
       requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
       status:      'pending',
       type:        'delete_user',
       changes:     { targetUid: uid, targetName: name || '' }
+    });
+    if(window.Log) await Log.registrar({
+      acao: 'criar', colecao: 'changeRequests', docId: _reqRef && _reqRef.id, schoolId: _schoolLog(schoolId),
+      resumo: 'Solicitou exclusão do usuário ' + (name || uid) + ' — escola ' + escolaNome(schoolId),
+      depois: { type: 'delete_user', status: 'pending', schoolId: schoolId, changes: { targetUid: uid, targetName: name || '' } }
     });
     return true;
   }
@@ -471,7 +503,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
         return (t && !byUid[t]) || (r.requestedBy && !byUid[r.requestedBy]);
       });
       if(faltam){
-        try{ (await Auth.listUsers()).forEach(function(u){ byUid[u.uid] = u; }); }
+        try{ (await Auth.listUsers()).forEach(function(u){ byUid[u.uid] = u; _usuariosPorUid[u.uid] = _usuarioLog(u); }); }
         catch(e){ console.error('listUsers (exclusões):', e); }
       }
       function alvo(r){ return byUid[r.changes && r.changes.targetUid] || null; }
@@ -503,11 +535,17 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
               if(!okDel){ btn.disabled=false; return; }
               setMsg('Excluindo usuário…', 'loading');
               await Auth.deleteUser(targetUid);
+              await _logUsuarioExcluido(targetUid, req.changes.targetName, 'Aprovou exclusão de usuário', req.schoolId);
               await clearDuplicateDeleteRequests(targetUid, req._ref);
               setMsg('Usuário excluído e solicitação(ões) encerrada(s).', 'ok');
             } else {
               setMsg('Reprovando solicitação…', 'loading');
               await clearDuplicateDeleteRequests(req.changes && req.changes.targetUid, req._ref);
+              if(window.Log) await Log.registrar({
+                acao: 'excluir', colecao: 'changeRequests', docId: req._id, schoolId: _schoolLog(req.schoolId),
+                resumo: 'Reprovou solicitação de exclusão — ' + ((req.changes && (req.changes.targetName || req.changes.targetUid)) || '?') + ', escola ' + escolaNome(req.schoolId) + ' (usuário mantido)',
+                antes: { type: req.type, status: req.status, schoolId: req.schoolId, requestedBy: req.requestedBy || '', changes: req.changes || {} }
+              });
               setMsg('Solicitação(ões) reprovada(s) — usuário mantido.', 'ok');
             }
             await refresh();
@@ -541,6 +579,7 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       // escola específica no cabeçalho; senão busca todo mundo.
       var allUsers  = queryScope ? await Auth.listUsers(queryScope) : await Auth.listUsers();
       var filtered  = allUsers;
+      _lembrarUsuarios(allUsers);
 
       var pending = filtered.filter(function(u){ return String(u.role||'').trim().toLowerCase() === 'pending'; });
       var users   = filtered.filter(function(u){ var r=String(u.role||'').trim().toLowerCase(); return r!=='pending'&&r!=='admin'; });
@@ -575,8 +614,15 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
           b.addEventListener('click', async function(){
             var uid=b.dataset.uid, act=b.dataset.act; b.disabled=true;
             try{
-              if(act==='approve'){ setMsg('Aprovando usuário…', 'loading'); await Auth.approveUser(uid); setMsg('Usuário aprovado com sucesso!', 'ok'); }
-              else { setMsg('Removendo solicitação…', 'loading'); await Auth.deleteUser(uid); setMsg('Solicitação reprovada e removida.', 'ok'); }
+              if(act==='approve'){ setMsg('Aprovando usuário…', 'loading'); await Auth.approveUser(uid);
+                if(window.Log){
+                  var _uAp = _usuariosPorUid[uid] || { uid: uid };
+                  await Log.registrar({ acao: 'editar', colecao: 'users', docId: uid, schoolId: _schoolLog(_uAp.schoolId),
+                    resumo: 'Aprovou cadastro — ' + (_uAp.name || uid) + (_uAp.email ? ' (' + _uAp.email + ')' : '') + ' — escola ' + escolaNome(_uAp.schoolId),
+                    antes: _uAp, depois: { role: 'user' }, parcial: true });
+                }
+                setMsg('Usuário aprovado com sucesso!', 'ok'); }
+              else { setMsg('Removendo solicitação…', 'loading'); await Auth.deleteUser(uid); await _logUsuarioExcluido(uid, '', 'Reprovou cadastro pendente'); setMsg('Solicitação reprovada e removida.', 'ok'); }
               await refresh();
             }catch(err){ console.error('solicitação pendente:', err); setMsg(String(err&&err.message||err||'Erro'),'err'); b.disabled=false; }
           });
@@ -649,6 +695,11 @@ footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top:
       el('btnCreateAdmin').disabled=true; el('btnCreateAdmin').textContent='Criando...'; setMsg('Criando admin…', 'loading');
       var res = await Auth.createUser({name:name,email:email,password:password,role:'admin',schoolId:schoolId});
       if(res&&res.ok===false) throw new Error(res.message||'Erro ao criar admin.');
+      if(window.Log) await Log.registrar({
+        acao: 'criar', colecao: 'users', docId: (res && res.uid) || undefined, schoolId: _schoolLog(schoolId),
+        resumo: 'Criou admin ' + name + ' (' + email + ') — escola ' + escolaNome(schoolId),
+        depois: { name: name, email: email, role: 'admin', schoolId: schoolId }   // nunca a senha
+      });
       el('aName').value=''; el('aEmail').value=''; el('aPass').value=''; el('aSchool').selectedIndex=0;
       setMsg('Admin criado com sucesso!', 'ok');
       await refresh();
