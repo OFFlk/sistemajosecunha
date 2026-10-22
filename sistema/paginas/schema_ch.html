@@ -15,6 +15,7 @@
 <!-- página exclusiva de admin (gestor da escola ou admin global: ambos têm role=admin) -->
 <script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../theme-colors.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 
@@ -460,7 +461,12 @@ async function chAcoesRegra(act,id){
     cp.id=`ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; cp.nome=(cp.nome||'')+' (cópia)';
     chState.rules.splice(i+1,0,cp); chRenderTabela();
     setMsg('Duplicando…', 'loading');
-    if(await chPersistRule(cp)) setMsg('Regra duplicada.', 'ok');   // falha: chPersistRule já troca o azul por erro
+    const okDup = await chPersistRule(cp);   // falha: chPersistRule já troca o azul por erro
+    if(okDup){
+      if(window.Log) await Log.registrar({ acao: 'criar', colecao: 'schemas', docId: chDocId(cp), depois: cp,
+        resumo: `Duplicou regra de CH "${chState.rules[i].nome}" → "${cp.nome}"` });
+      setMsg('Regra duplicada.', 'ok');
+    }
     return;
   }
   if(act==='del'){
@@ -478,6 +484,9 @@ async function chAcoesRegra(act,id){
     try{
       // pelo ID do documento (o save é upsert por _id, então não existem cópias)
       await DB.schemas.remove(chDocId(regra));
+      // Log: 1 registro com a cópia da regra apagada (já em memória, sem leitura extra)
+      if(window.Log) await Log.registrar({ acao: 'excluir', colecao: 'schemas', docId: chDocId(regra), antes: regra,
+        resumo: `Excluiu regra de CH "${regra.nome}" (anos ${(regra.anos||[]).join(', ')}${(regra.series||[]).length ? ' — séries ' + regra.series.join(', ') : ''})` });
       setMsg('Regra excluída.', 'ok');
     }catch(e){
       console.error('chAcoesRegra del Firestore:', e);
@@ -633,6 +642,7 @@ async function chSalvarRegra(){
   }
   // ao editar, parte da regra antiga (preserva _id e demais campos) — recriar o objeto perdia o _id
   const anterior = (chState.rules||[]).find(r => r.id === chState.editingId) || {};
+  const antesLog = chState.editingId && anterior.id ? JSON.parse(JSON.stringify(anterior)) : null;   // só para o log (já em memória; cópia antes de qualquer alteração)
   const rule=chNormalizeRuleShape({
     ...anterior,
     id: chState.editingId || `ch_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
@@ -646,6 +656,12 @@ async function chSalvarRegra(){
   setMsg('Salvando…', 'loading');
   chRenderTabela(); chLimparEditor();
   const salvou = await chPersistRule(rule);   // falha: chPersistRule já troca o azul por erro
+  // Log: 1 registro por "Salvar" (só se gravou). Documento inteiro nos dois lados (a regra é gravada por inteiro).
+  if(salvou && window.Log){
+    const quando = `anos ${(rule.anos||[]).join(', ')}` + ((rule.series||[]).length ? ` — séries ${rule.series.join(', ')}` : '');
+    await Log.registrar({ acao: antesLog ? 'editar' : 'criar', colecao: 'schemas', docId: chDocId(rule),
+      resumo: `Regra de CH "${rule.nome}" (${quando})`, antes: antesLog || undefined, depois: rule });
+  }
   if(salvou) setMsg('Regra de CH salva.', 'ok');
 }
 function chInitUI(){
