@@ -15,6 +15,7 @@
 <!-- página exclusiva de admin (gestor da escola ou admin global: ambos têm role=admin) -->
 <script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -667,6 +668,18 @@ async function salvarDadosPessoais(){
     }
     const dadosPessoais = dpParaArmazenar({ ...pf, rgCnTipo: rgCnTipoVal, nascimentoEstrangeiro: (state.edits.pessoais||{}).nascimentoEstrangeiro || '0' });
     await Identidade.salvarElo({ atasId, nome, cpf: cpfDig, dadosPessoais }); // sem anoAtivoId → não marca vinculadoEm
+    // Log: 1 registro por "Salvar dados pessoais" (doc do elo em `alunos`). O `antes` é o elo que a página acabou de ler
+    // (reconferência acima), sem leitura extra. Os dados pessoais entram "achatados" (dadosPessoais.cpf, ...) para os Detalhes
+    // mostrarem só o campo que mudou. A exportação do histórico NÃO entra: já tem o próprio histórico (`exportacoes`).
+    if(window.Log){
+      const dpAntes = (elo && elo.dadosPessoais) || {};
+      const antesLog = { nome: (elo && elo.nome) || '', cpf: (elo && elo.cpf) || '' };
+      const depoisLog = { nome, cpf: cpfDig };
+      Object.keys(dadosPessoais).forEach(k => { antesLog['dadosPessoais.' + k] = dpAntes[k] ?? ''; depoisLog['dadosPessoais.' + k] = dadosPessoais[k]; });
+      await Log.registrar({ acao: elo ? 'editar' : 'criar', colecao: 'alunos', docId: (elo && (elo._id || elo.id)) || ('ELO|' + atasId),
+        resumo: `Dados pessoais (sem cadastro no Ano-Ativo) — ${nome} (${atasId})`,
+        antes: elo ? antesLog : undefined, depois: depoisLog });
+    }
     state.selected.enrich = { ...(state.selected.enrich||{}), ...pf };
     _cacheAluno.delete(atasId);   // a próxima seleção deste aluno relê os dados pessoais já salvos
     setMsg('Dados pessoais salvos.', 'ok');
