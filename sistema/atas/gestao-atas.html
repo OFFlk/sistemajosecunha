@@ -16,7 +16,6 @@
 
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
-<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js?v=2"></script>
 
@@ -185,7 +184,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
         <button class="btn primary field-h" id="btnConVerificar" onclick="conVerificar(false)">🔍 Verificar o ano</button>
         <button class="btn secondary field-h" id="btnConGlobal" onclick="conVerificar(true)">🌐 Verificação global</button>
       </div>
-      <div class="muted mt-8">Por ano, lê as turmas e as matrículas do ano, os cadastros desses alunos e as matrículas deles em outros anos. A verificação global lê tudo (turmas, matrículas, cadastros e elos) e é a única que acha cadastros sem matrícula e elos sem cadastro.</div>
+      <div class="muted mt-8">Por ano, lê as turmas e as matrículas do ano, os cadastros desses alunos e as matrículas deles em outros anos. A verificação global lê tudo (turmas, matrículas, cadastros e elos) e é a única que acha cadastros sem matrícula (A5), elos sem cadastro em Atas (A6) e elos sem vínculo, sem dados e sem CPF (A10). Elo vinculado ao Ano-Ativo, ou só de histórico com dados pessoais, cujo cadastro existe, é normal e não aparece.</div>
 
       <div class="con-area mt-14" id="conArea" hidden>
         <div class="stats-row">
@@ -198,6 +197,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
           <div class="stat-box"><div class="stat-num" id="conStat_A7">0</div><div class="stat-lbl">A7 · Nome divergente</div></div>
           <div class="stat-box"><div class="stat-num" id="conStat_A8">0</div><div class="stat-lbl">A8 · Último ano desatualizado</div></div>
           <div class="stat-box"><div class="stat-num" id="conStat_A9">0</div><div class="stat-lbl">A9 · ID repetido na turma</div></div>
+          <div class="stat-box"><div class="stat-num" id="conStat_A10">0</div><div class="stat-lbl">A10 · Elo sem vínculo e sem dados</div></div>
         </div>
         <div class="con-barra">
           <select class="input" id="conTipo" onchange="conFiltroMudou()" aria-label="Filtrar por tipo">
@@ -211,6 +211,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
             <option value="A7">A7 · Nome divergente</option>
             <option value="A8">A8 · Último ano desatualizado</option>
             <option value="A9">A9 · ID repetido na turma</option>
+            <option value="A10">A10 · Elo sem vínculo e sem dados</option>
           </select>
           <input type="text" class="input con-busca" id="conBusca" oninput="conFiltroMudou()" placeholder="Filtrar por nome, ID do aluno ou turma" autocomplete="off">
           <span class="badge small" id="conEscopo"></span>
@@ -689,11 +690,6 @@ async function reconstruirIndiceAnos() {
   try {
     await Auth.db.collection('schools').doc(schoolId)
       .set({ atasIndice: { anos: novos, atualizadoEm: new Date().toISOString() } }, { merge: true });
-    if (window.Log) await Log.registrar({
-      acao: 'editar', colecao: 'schools', docId: schoolId,
-      resumo: `Índice de anos reconstruído (${novos.length} ano(s))` + (adicionados.length ? ` — adicionou ${adicionados.join(', ')}` : '') + (removidos.length ? ` — removeu ${removidos.join(', ')}` : ''),
-      antes: { atasIndiceAnos: atual }, depois: { atasIndiceAnos: novos },
-    });
     _indiceAnos = novos;
     _indiceAtualizadoEm = new Date().toISOString();
     _renderIndiceAnos();
@@ -949,9 +945,22 @@ async function apagarSelecionadas() {
   const turmas  = lerTurmasDB();
   const aApagar = indices.map(i => turmas[i]).filter(Boolean);
   const nomes   = aApagar.map(t => t.aba || t.id || t._id || t.turmaId || '?');
+
+  // Impacto ANTES de confirmar: quem fica sem nenhuma matrícula (identidade + elo vão junto,
+  // inclusive o vínculo com o Ano-Ativo) e quem só terá o último ano recalculado.
+  setMsg('Calculando o impacto…','loading');
+  let impacto;
+  try {
+    impacto = await _impactoApagarTurmas(aApagar);
+  } catch (e) {
+    console.error('[apagar] impacto:', e);
+    setMsg('Não foi possível calcular o impacto da exclusão; nada foi apagado. ' + (e && e.message || ''), 'err');
+    return;
+  }
+  _toastLimpar();
   const confirmou = await _confirmModal({
     titulo: '🗑️ Apagar turma(s)?',
-    corpo: `Apagar ${aApagar.length} turma(s)?\n\n${nomes.join('\n')}\n\nEsta ação não pode ser desfeita.`,
+    corpo: _corpoApagarTurmas(nomes, impacto),
     corDestaque: 'danger',
     textoConfirmar: 'Sim, apagar'
   });
@@ -968,7 +977,6 @@ async function apagarSelecionadas() {
   //    do caminho esperado (precisou de fallback, ou falhou de fato). O caso
   //    normal (tentativa 1 funcionou) não gera linha nenhuma — só conta.
   let removidosOk = 0;
-  const _removidasLog = [];   // log: turmas que de fato foram removidas
   const avisos = [];
   if (window.DB && window.DB.turmas) {
     for (const t of aApagar) {
@@ -982,7 +990,6 @@ async function apagarSelecionadas() {
         try {
           await window.DB.turmas.remove(docIdPrimario);
           removido = true; removidosOk++;
-          _removidasLog.push({ id: docIdPrimario, nome: nomeTurma, ano: t.anoLetivo ?? null, turno: t.turno ?? null, qtdAlunos: (t.alunos || []).length });
         } catch(e) {
           avisos.push(`⚠️ "${nomeTurma}": Firestore (turmaId) falhou — ${e.message}`);
         }
@@ -994,13 +1001,11 @@ async function apagarSelecionadas() {
 
       // Também remove atas e matrículas associadas
       if (docIdPrimario && window.DB.atas && window.DB.matriculas) {
-        try {
-          const ataId = idAtaFrom(docIdPrimario);
-          await window.DB.atas.remove(ataId).catch(()=>{});
-          await window.DB.matriculas.removeWhere('turmaId', docIdPrimario).catch(()=>{});
-        } catch(e) {
-          avisos.push(`⚠️ "${nomeTurma}": erro ao limpar atas/matrículas — ${e.message}`);
-        }
+        const ataId = idAtaFrom(docIdPrimario);
+        try { await window.DB.atas.remove(ataId); }
+        catch(e) { avisos.push(`⚠️ "${nomeTurma}": não foi possível remover a ata — ${e.message}`); }
+        try { await window.DB.matriculas.removeWhere('turmaId', docIdPrimario); }
+        catch(e) { avisos.push(`⚠️ "${nomeTurma}": não foi possível remover as matrículas — ${e.message}`); }
       }
 
       // Limpa os scans da turma no Cloudinary (arquivos + pasta).
@@ -1032,31 +1037,33 @@ async function apagarSelecionadas() {
   setMsg('Verificando identidades órfãs…','loading');
   let apagados = 0, gcErro = '';
   try {
-    const idsAfetados = aApagar.flatMap(t => (t.alunos || []).map(a => a.alunoId));
-    apagados = await limparAlunosSemMatricula(idsAfetados);
+    apagados = await limparAlunosSemMatricula(impacto.candidatos);
   } catch(e) {
     gcErro = e.message;
     console.warn('[apagar] Erro ao limpar identidades:', e);
   }
 
-  // Log (log.js): 1 registro por "Apagar selecionadas", com lista enxuta das turmas (a cópia completa está no backup).
-  if (window.Log && removidosOk > 0) {
-    const nomesOk = _removidasLog.map(t => t.nome);
-    await Log.registrar({
-      acao: 'excluir', colecao: 'turmas', docId: _removidasLog.length === 1 ? _removidasLog[0].id : null,
-      resumo: `Excluiu ${removidosOk} turma(s): ${nomesOk.slice(0, 5).join(', ')}${nomesOk.length > 5 ? '…' : ''} — com as atas e as matrículas`
-        + (apagados ? ` — apagou também ${apagados} cadastro(s) de aluno sem matrícula (identidade + vínculo)` : '')
-        + (removidosOk < aApagar.length ? ` — ${aApagar.length - removidosOk} não removida(s)` : ''),
-      antes: { turmas: _removidasLog.slice(0, 150), _totalTurmas: removidosOk },
-    });
+  // 4. Quem continua em outras turmas: a turma apagada pode ter sido a do último ano registrado.
+  let recalculados = 0, recErro = '';
+  if (_gcSobreviventes.length && window.Identidade?.recalcularUltimoAnoRegistroBatch) {
+    try {
+      const esc = window.DB?.escola ? await window.DB.escola.get() : null;
+      await window.Identidade.recalcularUltimoAnoRegistroBatch(_gcSobreviventes, esc?.configAnoAtivo ?? null);
+      recalculados = _gcSobreviventes.length;
+    } catch(e) {
+      recErro = e.message;
+      console.warn('[apagar] Erro ao recalcular ultimoAnoRegistro:', e);
+    }
   }
 
   // Um toast final só, na cor do resultado (verde / amarelo / vermelho)
   const partes = [`${removidosOk}/${aApagar.length} turma(s) removida(s)`];
   if (apagados > 0) partes.push(`${apagados} aluno(s) sem matrícula removido(s) (identidade + elo)`);
+  if (recalculados > 0) partes.push(`último ano registrado recalculado para ${recalculados} aluno(s)`);
   const ressalvas = [];
   if (problemas) ressalvas.push(`${problemas} aviso(s) — veja o console`);
   if (gcErro) ressalvas.push('falha ao limpar identidades');
+  if (recErro) ressalvas.push('falha ao recalcular o último ano registrado');
   if (_gcAviso) ressalvas.push(_gcAviso);
   const textoFinal = partes.join(' · ') + (ressalvas.length ? ' — ' + ressalvas.join('; ') : '') + '.';
   if (removidosOk === 0)                          setMsg('Nenhuma turma foi removida — veja o console. ' + textoFinal, 'err');
@@ -1068,6 +1075,46 @@ async function apagarSelecionadas() {
   document.getElementById('chkTodas').checked = false;
   if (btnAp) btnAp.textContent = '\u{1F5D1} Apagar selecionadas';
   onCheckTurma();
+}
+
+/**
+ * Impacto de apagar estas turmas, calculado ANTES de apagar (só leitura).
+ * Candidatos = alunos listados em turma.alunos[] + alunos das matrículas da turma
+ * (uma matrícula "fora da turma" também deixa o aluno sem matrícula quando a turma some).
+ *   orfaos        → ficam sem nenhuma matrícula (identidade + elo serão apagados)
+ *   sobreviventes → continuam em outras turmas (último ano será recalculado)
+ *   elos          → elo de cada órfão (pra avisar de vínculo com o Ano-Ativo / dados pessoais)
+ */
+async function _impactoApagarTurmas(aApagar) {
+  const turmaIds = new Set(aApagar.map(t => String(t.turmaId || t.id || '').trim()).filter(Boolean));
+  const cand = new Set();
+  aApagar.forEach(t => (t.alunos || []).forEach(a => { const id = String((a && a.alunoId) || '').trim(); if (id) cand.add(id); }));
+  for (const tid of turmaIds) {
+    (await window.DB.matriculas.whereEquals('turmaId', tid)).forEach(m => { const id = String(m.alunoId || '').trim(); if (id) cand.add(id); });
+  }
+  const candidatos = [...cand];
+  const todas = candidatos.length ? await window.DB.matriculas.whereIn('alunoId', candidatos) : [];
+  const comMat = new Set(todas.filter(m => !turmaIds.has(String(m.turmaId || '').trim())).map(m => String(m.alunoId || '').trim()));
+  const orfaos = candidatos.filter(id => !comMat.has(id));
+  const sobreviventes = candidatos.filter(id => comMat.has(id));
+  const elos = (orfaos.length && window.Identidade && window.Identidade.buscarEloPorAtasIds)
+    ? await window.Identidade.buscarEloPorAtasIds(orfaos) : [];
+  return { candidatos, orfaos, sobreviventes, elos };
+}
+function _corpoApagarTurmas(nomes, imp) {
+  const L = [`Apagar ${nomes.length} turma(s)?`, '', ...nomes.map(_escHtml), ''];
+  if (imp.orfaos.length) {
+    L.push(`${imp.orfaos.length} aluno(s) ficam sem nenhuma matrícula: a identidade e o elo deles serão apagados junto.`);
+    const comVinc = imp.elos.filter(e => e.anoAtivoId);
+    const comDados = imp.elos.filter(e => e.dadosPessoais);
+    if (comVinc.length) L.push(`⚠️ ${comVinc.length} deles ${comVinc.length === 1 ? 'está vinculado' : 'estão vinculados'} ao Ano-Ativo e o vínculo será perdido: ${comVinc.slice(0, 5).map(e => _escHtml(e.nome || e.atasId)).join(', ')}${comVinc.length > 5 ? '…' : ''}.`);
+    if (comDados.length) L.push(`⚠️ ${comDados.length} elo(s) guardam dados pessoais, que serão apagados.`);
+  } else {
+    L.push('Nenhum aluno fica sem matrícula.');
+  }
+  if (imp.sobreviventes.length) L.push(`${imp.sobreviventes.length} aluno(s) continuam em outras turmas: o último ano registrado deles será recalculado.`);
+  L.push('', 'Esta ação não pode ser desfeita.');
+  return L.join('\n');
 }
 
 /**
@@ -1088,7 +1135,9 @@ async function apagarSelecionadas() {
  * @returns {Promise<number>} quantidade de alunos removidos
  */
 let _gcAviso = ''; // ressalva do GC, lida por apagarSelecionadas() pro toast final
+let _gcSobreviventes = []; // candidatos que AINDA têm matrícula (lido por apagarSelecionadas() pra recalcular o último ano)
 async function limparAlunosSemMatricula(alunoIds) {
+  _gcSobreviventes = [];
   if (!window.DB || !window.DB['alunos-atas'] || !window.DB.matriculas) return 0;
 
   const candidatos = [...new Set([...alunoIds].map(i => String(i || '').trim()).filter(Boolean))];
@@ -1106,6 +1155,7 @@ async function limparAlunosSemMatricula(alunoIds) {
     return 0;
   }
 
+  _gcSobreviventes = candidatos.filter(id => comMatricula.has(id));
   const orfaos = candidatos.filter(id => !comMatricula.has(id));
   if (!orfaos.length) return 0;
 
@@ -1452,8 +1502,6 @@ async function aplicarMerge() {
     const turmasFinais=[...lerTurmasDB().map(t=>modificadas.get(t.id||t.turmaId)?.nova||t),...paraAdicionar];
     try { await salvarTurmasDB(turmasFinais); }
     catch(e) {
-      // Log: a gravação é em lotes, então parte das turmas pode ter sido gravada antes do erro.
-      if (window.Log) await Log.registrar({ acao: 'restaurar', colecao: 'turmas', resumo: 'Importação (merge de JSON) COM FALHA: ' + e.message });
       setMsg('Falha ao gravar turmas: '+e.message+' — recarregue a página antes de tentar de novo.','err');
       return;
     }
@@ -1489,16 +1537,6 @@ async function aplicarMerge() {
     schemasParaSalvar.forEach(s=>console.log(`[merge]  ✔ schema ${s.nome||s.titulo||s._id||s.id}`));
   }
 
-  // Log (log.js): 1 registro por "Aplicar merge" (a cópia dos dados está no próprio arquivo importado).
-  if (window.Log) {
-    const nomeDe = t => t.aba || t.nome || t.id || t.turmaId || '?';
-    const nomes = [...paraAdicionar.map(nomeDe), ...[...modificadas.values()].map(m => nomeDe(m.nova))];
-    await Log.registrar({
-      acao: 'restaurar', colecao: 'turmas',
-      resumo: `Importação (merge de JSON) — ${resumo.join(' · ')}` + (nomes.length ? ` — ${nomes.slice(0, 6).join(', ')}${nomes.length > 6 ? '…' : ''}` : ''),
-    });
-  }
-
   cancelarMerge();
   // Verde se tudo gravou; amarelo se algum schema falhou (parcial).
   setMsg('Merge aplicado: '+resumo.join(' · ')+'.', falhasSchemas ? 'warn' : 'ok');
@@ -1530,6 +1568,7 @@ const CON_TIPOS = {
   A7: { rot:'Nome divergente',              chip:'neutral' },
   A8: { rot:'Último ano desatualizado',     chip:'neutral' },
   A9: { rot:'ID repetido na turma',         chip:'gray'    },
+  A10:{ rot:'Elo sem vínculo e sem dados',  chip:'neutral' },
 };
 const CON_PAG = 50;
 let _con = { itens: [], uid: 0, pag: 1, escopo: '', rodou: false };
@@ -1575,6 +1614,10 @@ async function _conGetMuitos(colecao, ids) {
     parte.forEach((id, k) => out.set(id, rs[k]));
   }
   return out;
+}
+// "tem dados" = dadosPessoais é um objeto com pelo menos um campo (histórico de verdade)
+function _conEloTemDados(e) {
+  return !!(e && e.dadosPessoais && typeof e.dadosPessoais === 'object' && Object.keys(e.dadosPessoais).length > 0);
 }
 function _conTxtElo(elo) {
   if (!elo) return '';
@@ -1752,10 +1795,24 @@ async function _conAnalisar(ctx) {
         detalhe: [elo ? 'Elo: ' + _conTxtElo(elo) + '.' : 'Sem elo.'].concat(elo && elo.anoAtivoId ? ['⚠️ Apagar este cadastro desfaz o vínculo com o Ano-Ativo.'] : [], elo && elo.dadosPessoais ? ['⚠️ O elo guarda dados pessoais que seriam apagados.'] : []) });
     }
     for (const e of ctx.elos) {
-      const aid = _cs(e.atasId);
-      if (ctx.atasMap.has(aid)) continue;
-      itens.push({ tipo: 'A6', alunoId: aid, nome: _cs(e.nome), ano: '', eloId: e._id,
-        detalhe: ['O cadastro ' + aid + ' não existe em alunos-atas. Elo: ' + _conTxtElo(e) + '.'].concat(e.anoAtivoId ? ['⚠️ Apagar o elo desfaz o vínculo com o Ano-Ativo.'] : []) });
+      const aid = _cs(e.atasId), temDados = _conEloTemDados(e);
+      if (!ctx.atasMap.has(aid)) {
+        // A6 — o cadastro em Atas não existe mais (ex.: apagado "por fora"): o elo ficou solto
+        const det = [];
+        if (_cs(e.anoAtivoId)) det.push('Continua vinculado ao Ano-Ativo ' + _cs(e.anoAtivoId) + ', mas o cadastro ' + aid + ' não existe mais em alunos-atas.');
+        else if (temDados) det.push('É um elo de histórico com dados pessoais, mas o cadastro ' + aid + ' não existe mais em alunos-atas.');
+        else det.push('O cadastro ' + aid + ' não existe mais em alunos-atas e o elo não guarda vínculo nem dados.');
+        if (_cs(e.anoAtivoId)) det.push('⚠️ Apagar o elo desfaz o vínculo com o Ano-Ativo.');
+        if (temDados) det.push('⚠️ Apagar o elo apaga os dados pessoais guardados nele.');
+        itens.push({ tipo: 'A6', alunoId: aid, nome: _cs(e.nome), ano: '', eloId: e._id, detalhe: det });
+        continue;
+      }
+      // A10 — o cadastro existe, mas o elo não liga a nada e não guarda nada.
+      // (Normais, não listados: elo com anoAtivoId; elo só de histórico com dadosPessoais; elo com CPF.)
+      if (!_cs(e.anoAtivoId) && !temDados && !_cs(e.cpf)) {
+        itens.push({ tipo: 'A10', alunoId: aid, nome: _cs(e.nome), ano: '', eloId: e._id,
+          detalhe: ['O elo não está vinculado ao Ano-Ativo e não guarda dados pessoais nem CPF. O cadastro ' + aid + ' existe e não é afetado.'] });
+      }
     }
   }
   return itens;
@@ -1828,6 +1885,7 @@ function _conItemHtml(i) {
     A3: [b('recriar', 'secondary', '♻️ Recriar cadastro'), b('apagarMats', 'danger', '🗑 Apagar matrículas')],
     A5: [b('apagarAluno', 'danger', '🗑 Apagar cadastro')],
     A6: [b('apagarElo', 'danger', '🗑 Apagar elo')],
+    A10: [b('apagarEloVazio', 'danger', '🗑 Apagar elo vazio')],
     A7: [b('renomear', 'secondary', '✏️ Usar nome do cadastro')],
     A8: [b('ano', 'secondary', '🔄 Atualizar ano')],
   }[i.tipo] || ['<span class="badge small gray">só relatório</span>'];
@@ -1871,7 +1929,7 @@ async function conAcao(uid, acao, btn) {
   const it = _con.itens.find(x => x.uid === uid);
   if (!it) return;
   const fn = { apagarMat: _conApagarMat, recriar: _conRecriar, apagarMats: _conApagarMatsAluno, apagarAluno: _conApagarAluno,
-               apagarElo: _conApagarElo, renomear: _conRenomear, ano: _conAtualizarAno }[acao];
+               apagarElo: _conApagarElo, apagarEloVazio: _conApagarEloVazio, renomear: _conRenomear, ano: _conAtualizarAno }[acao];
   if (!fn) return;
   _conOcupado = true; if (btn) btn.disabled = true;
   try { await fn(it); }
@@ -1917,15 +1975,6 @@ async function _conApagarMat(it) {
   ], 'Apagar matrícula', true);
   if (!ok) return;
   await window.DB.batchWrite([{ col: 'matriculas', op: 'delete', id: it.matId }, ...est.ops]);
-  if (window.Log) {
-    const junto = est.vazio ? [est.atas && 'cadastro', est.elo && 'vínculo (elo)'].filter(Boolean) : [];
-    await Log.registrar({
-      acao: 'excluir', colecao: 'matriculas', docId: it.matId,
-      resumo: `Apagou a matrícula de ${it.nome || '—'} (${it.alunoId}) na turma ${it.turmaId} — ${it.tipo === 'A1' ? 'a turma não existe mais' : 'a turma existe, mas não lista o aluno'}`
-        + (est.vazio ? ` — o aluno ficou sem matrícula${junto.length ? ' e ' + junto.join(' + ') + ' foram apagados junto' : ''}` : ` — restam ${est.restam.length} matrícula(s); último ano recalculado`),
-      antes: m,
-    });
-  }
   if (est.vazio && est.atas) _conAjusteStat(-1);
   _conRemover(it.uid);
   setMsg('Matrícula apagada.', 'ok');
@@ -1947,8 +1996,6 @@ async function _conRecriar(it) {
   const ok = await _conConfirmar('Recriar cadastro?', linhas, 'Recriar cadastro', false);
   if (!ok) return;
   await window.DB.batchWrite([{ col: 'alunos-atas', op: 'set', id: it.alunoId, data: dados }]);
-  if (window.Log) await Log.registrar({ acao: 'criar', colecao: 'alunos-atas', docId: it.alunoId,
-    resumo: `Recriou o cadastro de ${nome} (${it.alunoId}) a partir de ${mats.length} matrícula(s)`, depois: dados });
   _conAjusteStat(1);
   _conRemover(it.uid);
   setMsg('Cadastro recriado.', 'ok');
@@ -1971,9 +2018,6 @@ async function _conApagarMatsAluno(it) {
   ], 'Apagar matrículas', true);
   if (!ok) return;
   await window.DB.batchWrite(ops);
-  if (window.Log) await Log.registrar({ acao: 'excluir', colecao: 'matriculas',
-    resumo: `Apagou ${mats.length} matrícula(s) de ${it.nome || '—'} (${it.alunoId}), aluno sem cadastro` + (elo ? ' — e o vínculo (elo)' : ''),
-    antes: { matriculas: mats.slice(0, 150).map(m => ({ id: m._id, turmaId: m.turmaId, ano: m.anoLetivo, serie: m.serie })), _totalMatriculas: mats.length } });
   _conRemover(it.uid);
   setMsg('Matrículas apagadas.', 'ok');
 }
@@ -1992,8 +2036,6 @@ async function _conApagarAluno(it) {
   ], 'Apagar cadastro', true);
   if (!ok) return;
   await window.DB.batchWrite(ops);
-  if (window.Log) await Log.registrar({ acao: 'excluir', colecao: 'alunos-atas', docId: it.alunoId,
-    resumo: `Apagou o cadastro sem matrícula de ${_cs(at.nome) || '—'} (${it.alunoId})` + (elo ? ' — e o vínculo (elo)' : ''), antes: at });
   _conAjusteStat(-1);
   _conRemover(it.uid);
   setMsg('Cadastro apagado.', 'ok');
@@ -2015,9 +2057,23 @@ async function _conApagarElo(it) {
   ], 'Apagar elo', true);
   if (!ok) return;
   await window.DB.batchWrite([{ col: 'alunos', op: 'delete', id: it.eloId }]);
-  if (window.Log) await Log.registrar({ acao: 'excluir', colecao: 'alunos', docId: it.eloId,
-    resumo: `Apagou o vínculo (elo) ${it.eloId}${n.nome ? ' — ' + n.nome : ''}, sem cadastro em alunos-atas` + (n.anoAtivoId ? ` — perdeu o vínculo com o aluno do Ano-Ativo ${n.anoAtivoId}` : ''),
-    antes: elo });
+  _conRemover(it.uid);
+  setMsg('Elo apagado.', 'ok');
+}
+
+// A10 — elo sem vínculo, sem dados pessoais e sem CPF (o cadastro em Atas permanece)
+async function _conApagarEloVazio(it) {
+  const [at, elo] = await Promise.all([window.DB['alunos-atas'].get(it.alunoId), window.DB.alunos.get(it.eloId)]);
+  if (!elo) { _conRemover(it.uid); setMsg('Esse elo já não existe.', 'warn'); return; }
+  if (!at || _cs(elo.anoAtivoId) || _conEloTemDados(elo) || _cs(elo.cpf)) { _conMudou(); return; }
+  const ok = await _conConfirmar('Apagar elo vazio?', [
+    'Elo: ' + it.eloId + (_cs(elo.nome) ? ' — ' + _cs(elo.nome) : ''),
+    'Sem vínculo com o Ano-Ativo, sem dados pessoais e sem CPF.',
+    'O cadastro ' + it.alunoId + ' (alunos-atas) permanece.',
+    '', 'Não dá para desfazer.',
+  ], 'Apagar elo', true);
+  if (!ok) return;
+  await window.DB.batchWrite([{ col: 'alunos', op: 'delete', id: it.eloId }]);
   _conRemover(it.uid);
   setMsg('Elo apagado.', 'ok');
 }
@@ -2047,9 +2103,6 @@ async function _conRenomear(it) {
   ], 'Aplicar nome', false);
   if (!ok) return;
   const r = await Identidade.renomearAtas(it.alunoId, ref);
-  if (window.Log) await Log.registrar({ acao: 'editar', colecao: 'alunos-atas', docId: it.alunoId,
-    resumo: `Aplicou o nome do cadastro "${ref}" em ${div.length} divergência(s) (matrículas e listas das turmas)`,
-    antes: { nomesDivergentes: div.slice(0, 50).map(x => `${x.onde} ${x.turmaId}: ${x.valor}`) }, depois: { nome: ref } });
   _conRemover(it.uid);
   setMsg('Nome aplicado (' + r.operacoes + ' registro(s)).', 'ok');
 }
@@ -2071,9 +2124,6 @@ async function _conAtualizarAno(it) {
   ], 'Atualizar', false);
   if (!ok) return;
   await Identidade.recalcularUltimoAnoRegistroBatch([it.alunoId], cfg);
-  if (window.Log) await Log.registrar({ acao: 'editar', colecao: 'alunos-atas', docId: it.alunoId,
-    resumo: `Atualizou o último ano registrado de ${_cs(at.nome) || '—'} (${it.alunoId}): ${atual == null ? '—' : atual} → ${esperado}`,
-    antes: { ultimoAnoRegistro: atual }, depois: { ultimoAnoRegistro: esperado } });
   _conRemover(it.uid);
   setMsg('Ano atualizado.', 'ok');
 }
