@@ -140,7 +140,6 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 .import-sel { margin-top:6px; }
 </style>
 <script src="../db.firebase.js"></script>
-<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -975,6 +974,8 @@ async function adicionarAluno() {
   // pra esse aluno, só confirma o vínculo (vincularAtasExplicito()).
   if (_alunoCandidatoSelecionado) {
     aluno.alunoIdVinculado = _alunoCandidatoSelecionado.alunoId;
+    // O nome é o do cadastro escolhido (o campo já está travado nele); garantia extra.
+    if (String(_alunoCandidatoSelecionado.nome || "").trim()) aluno.nome = String(_alunoCandidatoSelecionado.nome).trim();
     // Trocou o vínculo de um aluno já salvo: a matrícula do ID antigo é apagada ao salvar
     // (e o ID antigo, se ficar sem matrículas). A nova nasce com o ID e o nome do escolhido.
     if (idAntigo && idAntigo !== _alunoCandidatoSelecionado.alunoId) {
@@ -1171,14 +1172,20 @@ async function garantirIdsESistemaParaTurma(turmaObj){
     });
 
     // 1a) confirma vínculos explícitos (poucos por turma — já é decisão
-    // humana tomada na tela, então um a um está OK, sem lote)
+    // humana tomada na tela, então um a um está OK, sem lote).
+    // O NOME É O DO CADASTRO (alunos-atas), lido do banco: quem vincula a um ID
+    // existente assume o nome dele (turma e matrícula usam esse nome) e o
+    // cadastro NÃO é alterado. Mudar o nome de um ID é só pelo fluxo de renomear.
     for (const idx of idxVinculados) {
       const al = turmaObj.alunos[idx];
       try {
-        const { alunoId } = await window.Identidade.vincularAtasExplicito(al.alunoIdVinculado, { nome: al.nome });
-        al.alunoId = alunoId;
+        const idVinc = String(al.alunoIdVinculado || "").trim();
+        const cadastro = await window.Identidade.buscarAtasPorId(idVinc);
+        if (!cadastro) throw new Error(`alunoId "${idVinc}" não encontrado em alunos-atas.`);
+        al.alunoId = idVinc;
+        if (String(cadastro.nome || "").trim()) al.nome = String(cadastro.nome).trim();
       } catch(e) {
-        console.warn('[garantirIds] vincularAtasExplicito erro:', e);
+        console.warn('[garantirIds] vínculo com cadastro existente erro:', e);
         falhas.push(`vínculo de "${al.nome}"`);
       } finally {
         delete al.alunoIdVinculado; // não persiste esse campo transitório na turma
@@ -1198,6 +1205,8 @@ async function garantirIdsESistemaParaTurma(turmaObj){
         const resultados = await window.Identidade.criarAtasBatch(lista);
         idxNovos.forEach((idx, i) => {
           turmaObj.alunos[idx].alunoId = resultados[i]?.alunoId || "";
+          const nomeCad = String(resultados[i]?.aluno?.nome || "").trim();
+          if (nomeCad) turmaObj.alunos[idx].nome = nomeCad;   // nome do ID recém-criado
         });
       } catch(e) {
         console.warn('[garantirIds] criarAtasBatch erro:', e);
@@ -1772,9 +1781,6 @@ async function _salvarNoBancoInterno(recarregar) {
 
   const schema = getSchemaAtivoParaTela();
 
-  // Log: como a lista de alunos estava no banco antes deste "Salvar" (só leitura em memória).
-  const _alunosAntesLog = Array.isArray(turmaAtual.alunos) ? turmaAtual.alunos : [];
-
   // Confirmação extra se a leva de alunos ficou vazia mas a turma já tinha
   // gente lançada antes — evita apagar tudo por engano.
   const tinhaAlunosAntes = Array.isArray(turmaAtual.alunos) && turmaAtual.alunos.length > 0;
@@ -1846,15 +1852,7 @@ async function _salvarNoBancoInterno(recarregar) {
   if (_renomeacoesPendentes.size) {
     setMsg('Atualizando nome do aluno…', 'loading');
     for (const [id, nome] of [..._renomeacoesPendentes]) {
-      try {
-        await window.Identidade.renomearAtas(id, nome); _renomeacoesPendentes.delete(id);
-        const antigo = _alunosAntesLog.find(a => String(a?.alunoId || '').trim() === String(id));
-        if (window.Log) await Log.registrar({
-          acao: 'editar', colecao: 'alunos-atas', docId: id,
-          resumo: 'Correção de nome (vale para todas as matrículas e turmas)',
-          antes: { nome: antigo ? antigo.nome : null }, depois: { nome },
-        });
-      }
+      try { await window.Identidade.renomearAtas(id, nome); _renomeacoesPendentes.delete(id); }
       catch (e) { console.error('[renomear]', e); renomeios.erros.push(`${nome}: ${e.message || e}`); }
     }
   }
@@ -1865,24 +1863,6 @@ async function _salvarNoBancoInterno(recarregar) {
   // pela edição da ata.
   let resultadoScans = null;
   if (window.uploadScansQueue) resultadoScans = await window.uploadScansQueue();
-
-  // ── Log (log.js): 1 registro por "Salvar no banco", só com o que mudou na lista de alunos.
-  // Tem que ser aguardado: logo abaixo a página pode recarregar e cancelar uma gravação pendente.
-  if (window.Log) {
-    const parcial = (falhasIds.length || exclusoes.erros.length) ? ' — com falhas parciais (vínculos/matrículas/exclusões)' : '';
-    // O que foi apagado DE FATO do banco nas exclusões marcadas (a lista de alunos da turma só perde o item).
-    const apagou = exclusoes.matriculas
-      ? ` — apagou do banco ${exclusoes.matriculas} matrícula(s)` + (exclusoes.alunosApagados ? ` e o cadastro/vínculo de ${exclusoes.alunosApagados} aluno(s) (era a única matrícula em Atas)` : '')
-      : '';
-    await Log.registrarLista({
-      campo: 'alunos', colecao: 'turmas', docId: turmaIdAtual,
-      resumo: `Turma ${turmaAtual.nome || turmaIdAtual}${turmaAtual.anoLetivo ? ' (' + turmaAtual.anoLetivo + ')' : ''}${apagou}${parcial}`,
-      antes: _alunosAntesLog, depois: turmaObj.alunos,
-      chaves: [a => a?.alunoId, a => String(a?.nome || '').trim().toLowerCase()],
-      preenchidos: ['alunoId'], ignorar: ['alunoIdVinculado'],
-      rotuloItem: a => a?.nome,
-    });
-  }
 
   turmaAtual = turmaObj; // reflete localmente sem precisar recarregar a página
   const idx = TURMAS_CACHE_ATAS.findIndex(t => t.turmaId === turmaIdAtual);
@@ -2511,6 +2491,17 @@ function _importConfirmarImportacao() {
         const c = al._candidatos[Number(sel.value)];
         if (c) alunoFinal.alunoIdVinculado = c.alunoId;
       }
+    }
+
+    // Vinculado a um ID existente: o nome é o do CADASTRO, nunca o da planilha
+    // (a planilha só serviu para achar o candidato).
+    if (alunoFinal.alunoIdVinculado) {
+      const candVinc = (al._candidatos || []).find(c => c.alunoId === alunoFinal.alunoIdVinculado)
+                    || (al._candidato && al._candidato.alunoId === alunoFinal.alunoIdVinculado ? al._candidato : null);
+      if (candVinc && String(candVinc.nome || "").trim()) alunoFinal.nome = String(candVinc.nome).trim();
+      // Mesma regra do cadastro manual: não dá para ter duas matrículas do mesmo ID na mesma turma.
+      const idVinc = alunoFinal.alunoIdVinculado;
+      if (alunos.some(a => String(a.alunoId || a.alunoIdVinculado || "").trim() === idVinc)) { ignorados++; continue; }
     }
 
     alunos.push(alunoFinal);
