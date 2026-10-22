@@ -22,6 +22,7 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <style>
 /* Página: Escolas (Admin) — só layout e componentes próprios.
    Aparência de card, destaque, campo, botão, chip, tabela, tooltip, aviso, toast e modal vem do components.css. */
@@ -307,6 +308,7 @@
 
   let idDirty   = false;
   let editingId = null;
+  const _escolasLog = {};   // só para o log: sid → { name, displayName } como estão no banco (preenchido em fetchSchools, sem leitura extra)
 
   // Contador de caracteres do displayName
   $display.addEventListener('input', () => {
@@ -334,6 +336,7 @@
       // nunca deve aparecer em listas/selects de escolas.
       .filter(s => String(s.schoolId||'').trim().toUpperCase() !== 'ADMIN');
     list.forEach(s => { _schoolNames[String(s.schoolId).trim()] = s.displayName || s.name || s.nome || s.schoolId; });
+    list.forEach(s => { _escolasLog[String(s.schoolId).trim()] = { name: String(s.name || s.nome || '').trim(), displayName: String(s.displayName || '').trim() }; });
     return list;
   }
 
@@ -493,7 +496,11 @@
           try{
             const r = await garantirSchemaPadrao(sid);
             if(r === 'existia') setMsg('A escola '+sid+' já tem o schema padrão de Atas — nada foi alterado.', 'warn');
-            else setMsg('Schema padrão de Atas criado para '+sid+'.', 'ok');
+            else {
+              if(window.Log) await Log.registrar({ acao: 'criar', schoolId: sid, colecao: 'atasSchemas', docId: ATAS_SCHEMA_PADRAO_ID,
+                resumo: 'Schema padrão de Atas criado para a escola ' + sid, depois: { nome: 'Padrão', version: 1 } });
+              setMsg('Schema padrão de Atas criado para '+sid+'.', 'ok');
+            }
           }catch(e){
             console.error('[admin_escolas] schema padrão:', e);
             setMsg('Falha ao criar o schema padrão: '+(e.message||e), 'err');
@@ -510,6 +517,9 @@
           setMsg('Excluindo escola…', 'loading');
           try{
             await Auth.deleteSchool(sid);
+            // Log: 1 registro com o que a página sabia da escola (a lista já estava em memória)
+            if(window.Log) await Log.registrar({ acao: 'excluir', schoolId: sid, colecao: 'schools', docId: sid,
+              resumo: `Excluiu escola "${(_escolasLog[sid] || {}).name || sid}" (${sid})`, antes: { schoolId: sid, ...(_escolasLog[sid] || {}) } });
             setMsg('Escola '+sid+' excluída.', 'ok');
             await renderSchoolRows();
           }catch(e){
@@ -614,6 +624,15 @@
         try{ await garantirSchemaPadrao(sid); }
         catch(e){ schemaOk = false; console.error('[admin_escolas] garantirSchemaPadrao:', e); }
       }
+      // Log: 1 registro por "Salvar" (só ADMIN global chega aqui). O schema padrão criado junto entra no resumo, não vira 2º registro.
+      if(window.Log){
+        const antesEsc = _escolasLog[sid] || {};
+        await Log.registrar({ acao: criando ? 'criar' : 'editar', schoolId: sid, colecao: 'schools', docId: sid,
+          resumo: `${criando ? 'Cadastro de escola' : 'Escola atualizada'} "${nm}" (${sid})`
+            + (criando ? (schemaOk ? ' — schema padrão de Atas criado' : ' — schema padrão de Atas NÃO criado') : ''),
+          antes: criando ? undefined : { name: antesEsc.name || '', displayName: antesEsc.displayName || '' },
+          depois: criando ? { name: nm, schoolId: sid, displayName: disp } : { name: nm, displayName: disp } });
+      }
       if(schemaOk) setMsg(criando ? 'Escola cadastrada!' : 'Escola atualizada!', 'ok');
       else setMsg('Escola cadastrada, mas o schema padrão de Atas NÃO foi criado. Use o botão "Schema padrão" na lista.', 'err');
       editingId = null; idDirty = false;
@@ -716,6 +735,14 @@
             resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
             resolvedBy: session?.email || session?.uid || ''
           });
+          // Log: 1 registro da alteração na escola (a solicitação guarda a própria decisão: status, resolvedBy, resolvedAt)
+          if(window.Log && Object.keys(update).length){
+            const antesSch = _escolasLog[String(req.schoolId || '').trim()] || {};
+            const antesLog = {}; Object.keys(update).forEach(k => { antesLog[k] = antesSch[k] || ''; });
+            await Log.registrar({ acao: 'editar', schoolId: req.schoolId, colecao: 'schools', docId: req.schoolId,
+              resumo: `Aprovou solicitação de alteração — escola "${antesSch.name || req.schoolId}" (solicitado por ${quem(req) || '—'})`,
+              antes: antesLog, depois: update });
+          }
           setMsg('Solicitação aprovada e escola atualizada.', 'ok');
           await renderSchoolRows();
           await refreshApprovals();
