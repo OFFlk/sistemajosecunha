@@ -19,6 +19,7 @@
 
 <!-- Scripts globais -->
 <script src="/auth.firebase.js"></script>
+<script src="/log.js"></script>
 <script src="/theme-colors.js"></script>
 
 <!-- Fonte -->
@@ -385,6 +386,13 @@ function secHeaderClick(id, ev){
     }
   }
 
+  // Log: 1 registro por ação do usuário sobre o PRÓPRIO cadastro (users/{uid}).
+  // Nunca guarda senha nem a imagem da foto (a foto entra só como marcador).
+  async function _logPerfil(u, resumo, antes, depois){
+    if(!window.Log) return;
+    await Log.registrar({ acao: 'editar', colecao: 'users', docId: u.uid, resumo, antes, depois });
+  }
+
   async function compressImage(file, maxSize, quality){
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -474,7 +482,10 @@ function secHeaderClick(id, ev){
     try{
       const base64 = await compressImage(file, 160, 0.82);
       bar.style.width = '50%';
+      const tinhaFoto = !$('btnRemoveAvatar').hidden;     // só para o log: o botão "Remover" só aparece quando há foto salva
       await Auth.updateProfile({ photoURL: base64 });     // Firestore + sessão em cache
+      await _logPerfil(u, tinhaFoto ? 'Trocou a própria foto de perfil' : 'Colocou a própria foto de perfil',
+        { foto: tinhaFoto ? '[imagem]' : null }, { foto: '[imagem nova]' });
       bar.style.width = '100%';
       montarAnel(base64);
       $('btnRemoveAvatar').hidden = false;
@@ -501,6 +512,7 @@ function secHeaderClick(id, ev){
     this.disabled = true;
     try{
       await Auth.updateProfile({ photoURL: null });
+      await _logPerfil(getFirebaseUser(), 'Removeu a própria foto de perfil', { foto: '[imagem]' }, { foto: null });
       montarAnel(null);
       this.hidden = true;
       setMsg('Foto removida.','ok');
@@ -525,6 +537,7 @@ function secHeaderClick(id, ev){
     try{
       await Auth.updateProfile({ name });                  // Firestore (fonte do nome) + sessão
       await u.updateProfile({ displayName: name });        // Firebase Auth
+      await _logPerfil(u, 'Alterou o próprio nome', { name: atual }, { name });
       setMsg('Nome atualizado!','ok');
       await _atualizarSessao();            // antes o chip do header ficava com o nome antigo
     } catch(e){
@@ -552,6 +565,8 @@ function secHeaderClick(id, ev){
     try{
       await reauth(pass);
       await u.verifyBeforeUpdateEmail(email);
+      await _logPerfil(u, 'Solicitou troca do próprio e-mail: ' + (u.email || '—') + ' → ' + email + ' (vale só após confirmar o link enviado)',
+        {}, { emailSolicitado: email });
       setMsg('Link de verificação enviado para '+email+'. Após confirmar, o email será atualizado.','ok');
       $('reauthPassEmail').value = '';
       $('inputEmail').value = u.email || '';
@@ -583,6 +598,7 @@ function secHeaderClick(id, ev){
     try{
       await reauth(current);
       await u.updatePassword(newPass);
+      await _logPerfil(u, 'Alterou a própria senha', {}, { senhaAlteradaEm: new Date().toISOString() });   // nunca a senha
       setMsg('Senha alterada com sucesso!','ok');
       $('reauthPassCurrent').value = '';
       $('inputPassNew').value = '';
