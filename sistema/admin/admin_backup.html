@@ -176,6 +176,8 @@
   /* ── Card de registro de alterações (layout; a aparência vem do global) ── */
   .log-linha { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .log-linha .field { flex: 1 1 260px; min-width: 0; max-width: 420px; }
+  .log-linha .field.sm { flex: 0 1 170px; }
+  .log-linha [hidden] { display: none !important; }
   #modalLogs .modal { --modal-w: 1000px; --modal-h: 85vh; }
   .log-scroll { overflow-x: auto; }
   .log-scroll table { width: 100%; min-width: 760px; }
@@ -252,13 +254,39 @@
   </div>
 
   <div class="card" id="cardLogs">
-    <div class="card-title">📜 Registro de alterações <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Mostra quem criou, editou ou excluiu dados, e quando. Os registros só são lidos quando você aperta Consultar (cada leitura conta na cota do Firestore): aparecem os 50 mais recentes, e Carregar mais traz os anteriores. Registros com mais de <span id="logRetDias">365</span> dias são apagados automaticamente.</span></span></div>
+    <div class="card-title">📜 Registro de alterações <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Mostra quem criou, editou ou excluiu dados, e quando. Os registros só são lidos quando você aperta Consultar (cada leitura conta na cota do Firestore). Escolha um período curto e, se souber, a ação ou quem fez: o filtro é feito no banco, então só os registros que combinam são lidos. Aparecem 25 por vez, e Carregar mais traz os anteriores. Repetir a mesma consulta usa o que já foi carregado (botão Atualizar para ler de novo). Registros com mais de <span id="logRetDias">365</span> dias são apagados automaticamente.</span></span></div>
     <div class="log-linha">
       <div class="field">
         <label for="logsEscola">Escola</label>
         <select id="logsEscola">
           <option value="__todas__">Todas as escolas</option>
         </select>
+      </div>
+      <div class="field sm">
+        <label for="logsPeriodo">Período</label>
+        <select id="logsPeriodo" onchange="logsPeriodoMudou()">
+          <option value="hora">Última hora</option>
+          <option value="hoje" selected>Hoje</option>
+          <option value="ontem">Ontem</option>
+          <option value="3dias">Últimos 3 dias</option>
+          <option value="datas">Escolher datas…</option>
+        </select>
+      </div>
+      <div class="field sm" id="logsDeWrap" hidden>
+        <label for="logsDe">De</label>
+        <input type="date" id="logsDe">
+      </div>
+      <div class="field sm" id="logsAteWrap" hidden>
+        <label for="logsAte">Até</label>
+        <input type="date" id="logsAte">
+      </div>
+      <div class="field sm">
+        <label for="logsAcao">Ação</label>
+        <select id="logsAcao"><option value="">Todas</option></select>
+      </div>
+      <div class="field">
+        <label for="logsQuem">Quem (e-mail)</label>
+        <input type="text" id="logsQuem" placeholder="e-mail exato (opcional)" autocomplete="off" onkeydown="if(event.key==='Enter'){ consultarLogs(); }">
       </div>
       <button class="btn primary field-h" id="btnConsultarLogs" onclick="consultarLogs()" type="button">Consultar</button>
     </div>
@@ -278,6 +306,7 @@
     <div class="modal-body" id="logsCorpo"></div>
     <div class="modal-foot">
       <span class="help log-rodape" id="logsRodape" aria-live="polite"></span>
+      <button class="btn quiet" id="btnAtualizarLogs" type="button" onclick="atualizarLogs()" hidden>Atualizar</button>
       <button class="btn secondary" id="btnMaisLogs" type="button" onclick="carregarMaisLogs()" hidden>Carregar mais</button>
       <button class="btn cancel" type="button" onclick="fecharLogs()">Fechar</button>
     </div>
@@ -604,11 +633,14 @@
 
   /* ══════════════════════════════════════════
      REGISTRO DE ALTERAÇÕES — consulta sob demanda
-     Nada é lido no boot: só ao apertar "Consultar", e só da opção
-     escolhida no select (uma escola ou todas), 50 por vez.
+     Nada é lido no boot: só ao apertar "Consultar". Os filtros (escola,
+     período, ação, quem) são aplicados NO BANCO: só o que combina é lido,
+     25 por vez. A mesma consulta repetida usa o cache da sessão.
   ══════════════════════════════════════════ */
   const LOGS_TODAS  = '__todas__';
-  const LOGS_PAGINA = 50;
+  const LOGS_PAGINA = 25;
+  const LOGS_MAX_DIAS = 31;     // limite do período "Escolher datas"
+  const LOGS_CACHE_MAX = 10;    // consultas guardadas na sessão
   // Mapa único ação → rótulo e cor do chip (guia, seção 6).
   // ⚠️ Cores PROVISÓRIAS: aguardam o mapa definido pelo usuário.
   const LOG_ACAO = {
@@ -618,7 +650,21 @@
     restaurar: { rot: 'Restaurou', cls: 'ok' },
     limpeza:   { rot: 'Limpeza',   cls: 'bad' },
   };
-  let _logsEstado = null;   // { alvo, rotulo, rotulos, ultimoDoc, total, mapa }
+  let _logsEstado = null;   // consulta aberta: { chave, f, p, titulo, rotulos, ultimoDoc, total, mapa, html, fim, quando }
+  const _logsCache = new Map();   // chave da consulta → estado (só desta sessão da página)
+
+  // Select de ações a partir do mapa único acima
+  (function _logPopularAcoes(){
+    try{
+      const sel = document.getElementById('logsAcao');
+      if (!sel) return;
+      Object.keys(LOG_ACAO).forEach(k => {
+        const o = document.createElement('option');
+        o.value = k; o.textContent = LOG_ACAO[k].rot;
+        sel.appendChild(o);
+      });
+    }catch(e){ console.error('[admin_backup] select de ações do log:', e); }
+  })();
 
   // Preenche o select do card com as escolas que a página já carregou
   // (copia as opções do select de escopo: 0 leituras extras).
@@ -693,6 +739,7 @@
     document.getElementById('modalLogsTitulo').textContent = titulo;
     document.getElementById('logsRodape').textContent = '';
     document.getElementById('btnMaisLogs').hidden = true;
+    document.getElementById('btnAtualizarLogs').hidden = true;
     b.onclick = (ev) => { if (ev.target === b) fecharLogs(); };
     b.style.display = 'flex';
     b.classList.add('open');
@@ -707,55 +754,127 @@
     document.getElementById('logsCorpo').innerHTML = '';
   }
 
-  async function consultarLogs(){
+  // ── Período ─────────────────────────────────────────────
+  function _logsParseData(v){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  }
+  // Devolve { desde, ate (exclusivo ou null), rotulo } ou { erro }
+  function _logsPeriodo(per, de, ate){
+    const agora = new Date();
+    const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    const add = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    const fmt = d => d.toLocaleDateString('pt-BR');
+    if (per === 'hora')  return { desde: new Date(agora.getTime() - 3600000), ate: null, rotulo: 'última hora' };
+    if (per === 'hoje')  return { desde: hoje, ate: null, rotulo: 'hoje' };
+    if (per === 'ontem') return { desde: add(hoje, -1), ate: hoje, rotulo: 'ontem' };
+    if (per === '3dias') return { desde: add(hoje, -2), ate: null, rotulo: 'últimos 3 dias' };
+    const ini = _logsParseData(de);
+    const fim = _logsParseData(ate) || ini;
+    if (!ini) return { erro: 'Escolha a data inicial.' };
+    if (fim < ini) return { erro: 'A data final é anterior à inicial.' };
+    if (Math.round((fim - ini) / 86400000) + 1 > LOGS_MAX_DIAS) return { erro: 'Escolha no máximo ' + LOGS_MAX_DIAS + ' dias por consulta.' };
+    return { desde: ini, ate: add(fim, 1), rotulo: ini.getTime() === fim.getTime() ? fmt(ini) : fmt(ini) + ' a ' + fmt(fim) };
+  }
+  function logsPeriodoMudou(){
+    const datas = document.getElementById('logsPeriodo').value === 'datas';
+    document.getElementById('logsDeWrap').hidden = !datas;
+    document.getElementById('logsAteWrap').hidden = !datas;
+  }
+
+  // ── Consulta ────────────────────────────────────────────
+  function _logsLerFiltros(){
+    const g = id => document.getElementById(id);
+    const sel = g('logsEscola');
+    return {
+      alvo: sel.value || LOGS_TODAS,
+      rotuloEscola: (sel.selectedOptions[0] && sel.selectedOptions[0].textContent.trim()) || sel.value,
+      rotulos: new Map(Array.from(sel.options).map(o => [o.value, o.textContent.trim()])),
+      per: g('logsPeriodo').value || 'hoje',
+      de: g('logsDe').value, ate: g('logsAte').value,
+      acao: g('logsAcao').value,
+      quem: g('logsQuem').value.trim().toLowerCase()
+    };
+  }
+  function consultarLogs(){ return _logsIniciar(_logsLerFiltros(), false); }
+  function atualizarLogs(){ return _logsEstado ? _logsIniciar(_logsEstado.f, true) : null; }   // relê o que está aberto
+  function carregarMaisLogs(){ return _logsBuscar(false); }
+
+  async function _logsIniciar(f, forcar){
     if (!window.Auth || !Auth.db){ setMsg('O banco ainda não está pronto. Tente de novo em instantes.', 'warn'); return; }
-    const sel = document.getElementById('logsEscola');
-    const alvo = sel.value || LOGS_TODAS;
-    const rotulo = (sel.selectedOptions[0] && sel.selectedOptions[0].textContent.trim()) || alvo;
-    const rotulos = new Map(Array.from(sel.options).map(o => [o.value, o.textContent.trim()]));
-    _logsEstado = { alvo, rotulo, rotulos, ultimoDoc: null, total: 0, mapa: new Map() };
-    _logsAbrirModal('Registro de alterações — ' + rotulo);
+    const p = _logsPeriodo(f.per, f.de, f.ate);
+    if (p.erro){ setMsg(p.erro, 'warn'); return; }
+    const chave = [f.alvo, f.per === 'datas' ? f.de + '..' + (f.ate || f.de) : f.per, f.acao, f.quem].join('|');
+    let st = forcar ? null : _logsCache.get(chave);
+    const doCache = !!st;
+    if (!st) st = { chave, f, p, titulo: 'Registro de alterações — ' + f.rotuloEscola + ' · ' + p.rotulo,
+                    rotulos: f.rotulos, ultimoDoc: null, total: 0, mapa: new Map(), html: '', fim: false, quando: new Date() };
+    _logsEstado = st;
+    _logsAbrirModal(st.titulo);
+    if (doCache){ _logsRender(st); return; }          // mesma consulta: 0 leituras
     document.getElementById('logsCorpo').innerHTML = '<div class="aviso-warn">⏳ Carregando registros…</div>';
     await _logsBuscar(true);
   }
-  function carregarMaisLogs(){ return _logsBuscar(false); }
+
+  function _logsRodape(st){
+    const hora = st.quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('logsRodape').textContent = st.total ? st.total + ' registro(s) carregado(s) · consulta das ' + hora : '';
+    document.getElementById('btnMaisLogs').hidden = st.fim;
+    document.getElementById('btnAtualizarLogs').hidden = false;
+  }
+  function _logsRender(st){
+    const corpo = document.getElementById('logsCorpo');
+    const mostrarEscola = st.f.alvo === LOGS_TODAS;
+    corpo.innerHTML = !st.total
+      ? '<div class="aviso-warn">ℹ️ Nenhum registro encontrado para ' + _escHtml(st.f.rotuloEscola) + ' (' + _escHtml(st.p.rotulo) + ') com esses filtros. Tente um período maior ou menos filtros.</div>'
+      : '<div class="log-scroll"><table><thead><tr><th>Quando</th><th>Quem</th>' + (mostrarEscola ? '<th>Escola</th>' : '') + '<th>Ação</th><th>Registro</th><th>Detalhes</th></tr></thead><tbody id="logsTbody">' + st.html + '</tbody></table></div>';
+    _logsRodape(st);
+  }
 
   async function _logsBuscar(primeira){
     const st = _logsEstado;
     if (!st) return;
-    const corpo = document.getElementById('logsCorpo');
     const btnMais = document.getElementById('btnMaisLogs');
     btnMais.disabled = true;
     try{
+      const TS = firebase.firestore.Timestamp;
       let q = Auth.db.collection((window.Log && Log.COLECAO) || 'logs');
-      if (st.alvo !== LOGS_TODAS) q = q.where('schoolId', '==', st.alvo);
+      if (st.f.alvo !== LOGS_TODAS) q = q.where('schoolId', '==', st.f.alvo);
+      if (st.f.acao) q = q.where('acao', '==', st.f.acao);
+      if (st.f.quem) q = q.where('email', '==', st.f.quem);
+      q = q.where('criadoEm', '>=', TS.fromDate(st.p.desde));
+      if (st.p.ate) q = q.where('criadoEm', '<', TS.fromDate(st.p.ate));
       q = q.orderBy('criadoEm', 'desc');
       if (st.ultimoDoc) q = q.startAfter(st.ultimoDoc);
       const snap = await q.limit(LOGS_PAGINA).get();
-      if (_logsEstado !== st) return;                      // o modal foi fechado enquanto carregava
+      if (_logsEstado !== st) return;                      // o modal foi fechado ou refeito enquanto carregava
 
-      const mostrarEscola = st.alvo === LOGS_TODAS;
+      const mostrarEscola = st.f.alvo === LOGS_TODAS;
       const linhas = snap.docs.map(doc => { const d = doc.data(); st.mapa.set(doc.id, d); return _logLinha(doc.id, d, mostrarEscola, st); }).join('');
-      if (primeira){
-        corpo.innerHTML = snap.empty
-          ? `<div class="aviso-warn">ℹ️ Nenhum registro encontrado para ${_escHtml(st.rotulo)}.</div>`
-          : `<div class="log-scroll"><table><thead><tr><th>Quando</th><th>Quem</th>${mostrarEscola ? '<th>Escola</th>' : ''}<th>Ação</th><th>Registro</th><th>Detalhes</th></tr></thead><tbody id="logsTbody">${linhas}</tbody></table></div>`;
-      } else if (linhas){
-        document.getElementById('logsTbody').insertAdjacentHTML('beforeend', linhas);
-      }
-      if (snap.docs.length) st.ultimoDoc = snap.docs[snap.docs.length - 1];
+      st.html += linhas;
       st.total += snap.size;
-      document.getElementById('logsRodape').textContent = st.total ? `${st.total} registro(s) carregado(s)` : '';
-      btnMais.hidden = snap.size < LOGS_PAGINA;
+      st.fim = snap.size < LOGS_PAGINA;
+      if (snap.docs.length) st.ultimoDoc = snap.docs[snap.docs.length - 1];
+      if (primeira){
+        _logsCache.set(st.chave, st);                      // guarda só consultas que deram certo
+        if (_logsCache.size > LOGS_CACHE_MAX) _logsCache.delete(_logsCache.keys().next().value);
+        _logsRender(st);
+      } else {
+        if (linhas) document.getElementById('logsTbody').insertAdjacentHTML('beforeend', linhas);
+        _logsRodape(st);
+      }
     } catch(e){
       console.error('[admin_backup] consulta de logs falhou:', e);
       if (_logsEstado !== st) return;
       const semIndice = e && e.code === 'failed-precondition';
       const semAcesso = e && e.code === 'permission-denied';
-      const msg = semIndice ? 'Falta criar um índice no Firestore para esta consulta. O link para criá-lo está no console do navegador.'
+      const msg = semIndice ? 'Falta criar um índice no Firestore para esta combinação de filtros. O link para criá-lo está no console do navegador (F12).'
                 : semAcesso ? 'Sem permissão para ler os registros (regras do Firestore).'
                 : 'Não foi possível carregar os registros.';
-      if (primeira) corpo.innerHTML = `<div class="aviso-warn">⚠️ ${_escHtml(msg)}</div>`;
+      if (primeira){
+        document.getElementById('logsCorpo').innerHTML = '<div class="aviso-warn">⚠️ ' + _escHtml(msg) + '</div>';
+        document.getElementById('btnAtualizarLogs').hidden = false;
+      }
       setMsg(msg, 'err');
     } finally {
       btnMais.disabled = false;
