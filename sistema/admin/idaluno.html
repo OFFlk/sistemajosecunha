@@ -93,9 +93,14 @@
     <div class="aviso-warn">ℹ️ Desfazer um vínculo apaga só o elo em <b>alunos</b>: os cadastros de Atas e do Ano-Ativo continuam existindo. Os dados pessoais que o histórico guardava antes do vínculo não voltam.</div>
     <div class="barra">
       <button class="btn secondary" type="button" data-act="carVinc">🔄 Carregar vínculos</button>
+      <button class="btn secondary" type="button" id="btnConfVinc" data-act="confVinc" disabled>🔍 Conferir se os alunos existem</button>
       <div class="field"><label for="filtroVinc">Filtrar por nome ou ID</label><input class="input" id="filtroVinc" placeholder="Nome ou ID"/></div>
     </div>
-    <div class="stats-row"><div class="stat-box"><div class="stat-num" id="statVinc">—</div><div class="stat-lbl">Vínculos</div></div></div>
+    <div class="help">Conferir lê todos os alunos de Atas e do Ano-Ativo (1 leitura por documento) e marca os vínculos que apontam para um aluno que não existe mais. Eles aparecem primeiro na lista.</div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statVinc">—</div><div class="stat-lbl">Vínculos</div></div>
+      <div class="stat-box"><div class="stat-num" id="statVincOrf">—</div><div class="stat-lbl">Apontam para aluno inexistente</div></div>
+    </div>
     <div id="listaVinc"></div>
   </div>
 
@@ -493,21 +498,49 @@ async function analisarCross(){
 }
 
 /* ── Aba 3: vínculos (desfazer = apagar o elo em alunos) ── */
-let VINC = null;
+let VINC = null, VINC_CONF = false;
+const ordNomeVinc = (a, b) => String(a.nome || a.atasId).localeCompare(String(b.nome || b.atasId), 'pt-BR');
+const vincOrfao = e => !!(e.orfao && (e.orfao.atas || e.orfao.aa));
 async function carregarVinculos(){
   const elos = await DB.alunos.list();
-  VINC = elos.map(e => Identidade.normalizarElo(e)).filter(e => e.atasId && e.anoAtivoId)
-    .sort((a, b) => String(a.nome || a.atasId).localeCompare(String(b.nome || b.atasId), 'pt-BR'));
+  VINC = elos.map(e => Identidade.normalizarElo(e)).filter(e => e.atasId && e.anoAtivoId).sort(ordNomeVinc);
+  VINC_CONF = false;                       // a conferência de existência vale para esta carga; recarregar zera
+  $('btnConfVinc').disabled = false;
   renderVinc();
+}
+/* Elo vinculado cujo aluno de Atas e/ou do Ano-Ativo foi apagado "por fora": o elo fica apontando para nada.
+   Leitura sob demanda (botão), porque lê as duas coleções inteiras. O reparo é o "Desfazer vínculo" que já existe. */
+async function conferirVinculos(){
+  if(!VINC) return;
+  const [atas, aas] = await Promise.all([DB['alunos-atas'].list(), DB.anoAtivoAlunos.list()]);
+  const ids = docs => { const s = new Set(); docs.forEach(d => { s.add(String(d._id).trim()); if(d.alunoId) s.add(String(d.alunoId).trim()); }); return s; };
+  const sa = ids(atas), sx = ids(aas);
+  VINC.forEach(e => { e.orfao = { atas: !sa.has(e.atasId), aa: !sx.has(e.anoAtivoId) }; });
+  VINC.sort((a, b) => (vincOrfao(b) - vincOrfao(a)) || ordNomeVinc(a, b));   // órfãos primeiro (a lista mostra só 50)
+  VINC_CONF = true;
+  renderVinc();
+  const n = VINC.filter(vincOrfao).length;
+  setMsg(n ? n + ' vínculo(s) apontam para aluno que não existe mais.' : 'Todos os vínculos apontam para alunos que existem.', n ? 'warn' : 'ok');
+}
+function corpoDesvincular(v, aid, aaid){
+  const o = v && v.orfao;
+  const sem = [];
+  if(o && o.atas) sem.push(`O aluno de Atas ${_escHtml(aid)} não existe mais.`);
+  if(o && o.aa) sem.push(`O aluno do Ano-Ativo ${_escHtml(aaid)} não existe mais.`);
+  const efeito = o && o.aa
+    ? 'O elo será apagado. Os dados pessoais que o histórico guardava antes do vínculo não são restaurados.'
+    : 'O aluno do Ano-Ativo volta a ficar sem vínculo. Os dados pessoais que o histórico guardava antes do vínculo não são restaurados.';
+  return `<strong>${_escHtml(v?.nome || aid)}</strong>\nAtas ${_escHtml(aid)} ✕ Ano-Ativo ${_escHtml(aaid)}\n\n` + (sem.length ? '⚠️ ' + sem.join(' ') + '\n\n' : '') + efeito;
 }
 function renderVinc(){
   $('statVinc').textContent = VINC ? VINC.length : '—';
+  $('statVincOrf').textContent = VINC && VINC_CONF ? VINC.filter(vincOrfao).length : '—';
   if(!VINC){ $('listaVinc').innerHTML = ''; return; }
   const f = nrm($('filtroVinc').value || '');
   const l = VINC.filter(e => !f || nrm(e.nome || '').includes(f) || e.atasId.toLowerCase().includes(f) || e.anoAtivoId.toLowerCase().includes(f));
   $('listaVinc').innerHTML = l.length ? l.slice(0, 50).map(e => `<div class="item subcard" data-a="${_escHtml(e.atasId)}" data-aa="${_escHtml(e.anoAtivoId)}">
       <div class="left"><div><b>${_escHtml(e.nome || e.atasId)}</b></div>
-      <div class="chips"><span class="badge small">Atas ${_escHtml(e.atasId)}</span><span class="badge small neutral">Ano-Ativo ${_escHtml(e.anoAtivoId)}</span></div></div>
+      <div class="chips"><span class="badge small${e.orfao?.atas ? ' bad' : ''}">Atas ${_escHtml(e.atasId)}${e.orfao?.atas ? ' · não existe mais' : ''}</span><span class="badge small ${e.orfao?.aa ? 'bad' : 'neutral'}">Ano-Ativo ${_escHtml(e.anoAtivoId)}${e.orfao?.aa ? ' · não existe mais' : ''}</span></div></div>
       <div class="right"><button class="btn danger small" type="button" data-act="desvincular">Desfazer vínculo</button></div></div>`).join('')
     + (l.length > 50 ? `<div class="help mt-12">Mostrando 50 de ${l.length}. Use o filtro para achar os demais.</div>` : '')
     : '<div class="aviso-warn">ℹ️ Nenhum vínculo encontrado.</div>';
@@ -589,9 +622,10 @@ document.addEventListener('click', async ev => {
       setMsg('Atualizando…', 'loading'); await liberar(it); setMsg('Marcação removida.', 'ok'); return;
     }
     if(act === 'carVinc') return comLoading('Carregando vínculos…', carregarVinculos);
+    if(act === 'confVinc') return comLoading('Conferindo alunos de Atas e do Ano-Ativo…', conferirVinculos);
     if(act === 'desvincular'){
       const aid = card.dataset.a, aaid = card.dataset.aa, v = VINC.find(x => x.atasId === aid);
-      if(!await _confirmModal({ titulo:'Desfazer vínculo?', corpo:`<strong>${_escHtml(v?.nome || aid)}</strong>\nAtas ${_escHtml(aid)} ✕ Ano-Ativo ${_escHtml(aaid)}\n\nO aluno do Ano-Ativo volta a ficar sem vínculo. Os dados pessoais que o histórico guardava antes do vínculo não são restaurados.`, corDestaque:'danger', textoConfirmar:'Desfazer vínculo' })) return;
+      if(!await _confirmModal({ titulo:'Desfazer vínculo?', corpo: corpoDesvincular(v, aid, aaid), corDestaque:'danger', textoConfirmar:'Desfazer vínculo' })) return;
       setMsg('Desfazendo vínculo…', 'loading');
       await desvincular(aid, aaid); setMsg('Vínculo desfeito.', 'ok'); return;
     }
