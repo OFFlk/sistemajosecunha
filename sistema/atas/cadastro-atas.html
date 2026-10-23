@@ -678,6 +678,45 @@ async function limparAlunosSemMatricula(alunoIds) {
   return out;
 }
 
+/* Aviso do que acontece com o cadastro e o elo quando uma matrícula sai (só leitura: nenhuma regra muda).
+   Lê as outras matrículas do aluno e o elo. Se a leitura falhar, devolve { ok:false } e os modais
+   ficam com o texto genérico de sempre. */
+const _eloTemDadosPessoais = e => !!(e && e.dadosPessoais && typeof e.dadosPessoais === 'object' && Object.keys(e.dadosPessoais).length > 0);
+async function _impactoAluno(alunoId) {
+  const id = String(alunoId || '').trim();
+  if (!id || !turmaIdAtual || !window.DB?.matriculas || !window.Identidade?.buscarElo) return { ok: false };
+  try {
+    const [mats, elo] = await Promise.all([
+      window.DB.matriculas.whereEquals('alunoId', id),
+      window.Identidade.buscarElo(id),
+    ]);
+    const daqui = idMatriculaFrom(turmaIdAtual, id);
+    return { ok: true, id, outras: mats.filter(m => m._id !== daqui).length, elo };
+  } catch (e) {
+    console.warn('[impacto] não foi possível ler matrículas/elo de', id, e.message);
+    return { ok: false };
+  }
+}
+function _textoImpactoAluno(imp) {
+  if (!imp || !imp.ok) return '';
+  if (imp.outras > 0) {
+    return `\n\nEle tem ${imp.outras} matrícula(s) em outra(s) turma(s): só a matrícula daqui é removida; o cadastro e o vínculo (elo) continuam.`;
+  }
+  let t = `\n\nEsta é a ÚNICA matrícula de ${_escHtml(imp.id)} em Atas: o cadastro dele será apagado ao salvar` + (imp.elo ? ', junto com o elo.' : '.');
+  if (imp.elo && imp.elo.anoAtivoId) t += `\n⚠️ Ele está vinculado ao aluno ${_escHtml(imp.elo.anoAtivoId)} do Ano-Ativo: esse vínculo será perdido.`;
+  if (_eloTemDadosPessoais(imp.elo)) t += '\n⚠️ O elo guarda dados pessoais do histórico, que também serão apagados.';
+  return t;
+}
+// Trocar o vínculo marca o ID antigo para exclusão sem passar por modal: avisa por toast, sem travar nada.
+async function _avisarImpactoIdAntigo(idAntigo) {
+  const imp = await _impactoAluno(idAntigo);
+  if (!imp.ok || imp.outras > 0) return;           // continua em outra turma: nada será apagado
+  let m = `⚠️ ${imp.id} ficará sem matrículas e será apagado ao salvar` + (imp.elo ? ' (junto com o elo).' : '.');
+  if (imp.elo && imp.elo.anoAtivoId) m += ` O vínculo com o Ano-Ativo (${imp.elo.anoAtivoId}) será perdido.`;
+  if (_eloTemDadosPessoais(imp.elo)) m += ' O elo guarda dados pessoais.';
+  _toastAviso(m);
+}
+
 /* ✅ Excluir aluno desta turma — só MARCA a exclusão. Nada é apagado no banco
    antes de "Salvar no banco" (matrícula, e — se era a última — aluno + elo);
    "Descartar alterações" ou trocar de turma sem salvar desfaz. Só fica
@@ -686,9 +725,11 @@ async function excluirAlunoEmEdicao() {
   if (!_alunoEmEdicao) return;
 
   const nome = _alunoEmEdicao.nome || "este aluno";
+  const impacto = _textoImpactoAluno(await _impactoAluno(_alunoEmEdicao.alunoId));
   const ok = await _confirmModal({
     titulo: "🗑️ Excluir aluno desta turma?",
-    corpo: `${_escHtml(nome)} sai desta turma quando você clicar em "Salvar no banco" — até lá nada é apagado.\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado nesse momento. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida.`,
+    corpo: `${_escHtml(nome)} sai desta turma quando você clicar em "Salvar no banco" — até lá nada é apagado.` +
+      (impacto || `\n\nSe essa for a ÚNICA matrícula do aluno em Atas, o cadastro dele (ID e vínculo/elo) também será apagado nesse momento. Se ele tiver matrícula em outra turma, só a matrícula daqui é removida.`),
     corDestaque: "danger",
     textoConfirmar: "Sim, excluir",
   });
@@ -713,9 +754,11 @@ async function desvincularAlunoEmEdicao() {
   const nomeEl = $("nome");
   if (!antigo || !idAntigo || !nomeEl) return;
 
+  const impacto = _textoImpactoAluno(await _impactoAluno(idAntigo));
   const novoNome = await _confirmModal({
     titulo: "🔓 Desvincular do ID?",
-    corpo: `Esta matrícula (<strong>${_escHtml(antigo.nome || "")}</strong>, ${_escHtml(idAntigo)}) passa a ter um ID NOVO quando você salvar no banco. As notas ficam como estão e as outras matrículas de ${_escHtml(idAntigo)} não mudam.\n\nSe esta for a ÚNICA matrícula de ${_escHtml(idAntigo)}, o cadastro e o vínculo (elo) dele serão apagados.`,
+    corpo: `Esta matrícula (<strong>${_escHtml(antigo.nome || "")}</strong>, ${_escHtml(idAntigo)}) passa a ter um ID NOVO quando você salvar no banco. As notas ficam como estão e as outras matrículas de ${_escHtml(idAntigo)} não mudam.` +
+      (impacto || `\n\nSe esta for a ÚNICA matrícula de ${_escHtml(idAntigo)}, o cadastro e o vínculo (elo) dele serão apagados.`),
     pedirTexto: "Novo nome",
     textoConfirmar: "Desvincular",
   });
@@ -981,6 +1024,7 @@ async function adicionarAluno() {
     if (idAntigo && idAntigo !== _alunoCandidatoSelecionado.alunoId) {
       _exclusoesPendentes.set(idAntigo, String(_alunoEmEdicao.nome || "") || idAntigo);
       _renomeacoesPendentes.delete(idAntigo);
+      _avisarImpactoIdAntigo(idAntigo).catch(() => {});   // só avisa (toast); não espera nem altera nada
     }
   } else if (_alunoEmEdicao && _alunoEmEdicao.alunoId) {
     // Estava editando um aluno já salvo: mantém o alunoId dele. Antes o "Editar"
