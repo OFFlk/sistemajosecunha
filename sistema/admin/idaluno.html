@@ -9,6 +9,7 @@
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
 <script src="../db.firebase.js"></script>
+<script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
 <script src="../theme-colors.js"></script>
 
@@ -267,15 +268,24 @@ async function carregarAtas(forcar){
 /* Par "diferentes": cada documento guarda a lista (diferentes) dos IDs com quem NÃO é a mesma pessoa.
    Só o par marcado deixa de ser sugerido. IDs iguais valem nos dois módulos (contador único). */
 const difPar = (a, b) => a.dif.has(b.id) || b.dif.has(a.id);
-async function gravarDif(ops){
+async function gravarDif(ops, resumoLog){
   if(_semEscola()) return;
   const FV = firebase.firestore.FieldValue;
   await DB.batchWrite(ops.map(o => ({ col:o.col, op:'set', id:o.id, data:{ diferentes: o.add ? FV.arrayUnion(o.add) : FV.arrayRemove(o.remove) } })));
+  // Log: 1 registro por clique (o par grava 2 documentos, mas é uma decisão só). Mostra o par "A ≠ B".
+  if(window.Log && resumoLog){
+    const pares = [...new Set(ops.map(o => [o.id, o.add || o.remove].sort().join(' ≠ ')))];
+    const adicionou = ops.some(o => o.add);
+    await Log.registrar({ acao:'editar', colecao:[...new Set(ops.map(o => o.col))].join(' + '), resumo:resumoLog,
+      antes: adicionou ? {} : { diferentes: pares }, depois: adicionou ? { diferentes: pares } : {} });
+  }
 }
 /* Indicador no documento do aluno: quem tem verificadoManual:true é ignorado pela detecção. */
-async function marcarVerificado(col, ids){
+async function marcarVerificado(col, ids, resumoLog){
   if(_semEscola()) return;
   await DB.batchWrite(ids.map(id => ({ col, op:'set', id, data:{ verificadoManual:true } })));
+  if(window.Log && resumoLog) await Log.registrar({ acao:'editar', colecao:col, docId: ids.length === 1 ? ids[0] : undefined, resumo:resumoLog,
+    antes:{ verificadoManual:false }, depois:{ verificadoManual:true } });
 }
 
 /* ── Aba 1: duplicatas dentro de Atas ── */
@@ -380,6 +390,18 @@ async function fundirAtas(keep, gone, nome){
   if(ops.length > 500) throw new Error('Operação grande demais para um batch (' + ops.length + ').');
   await DB.batchWrite(ops);
 
+  // Log: 1 registro. O ID absorvido (gone) deixa de existir: guarda o que dá para reconstruir (nome, elo com os dados pessoais
+  // descartados e as matrículas movidas). Lido ANTES de atualizar a memória abaixo.
+  if(window.Log){
+    const kA = ATAS.find(a => a.id === keep) || {}, gA = ATAS.find(a => a.id === gone) || {};
+    await Log.registrar({ acao:'excluir', colecao:'alunos-atas', docId:gone,
+      resumo: `Corrigiu aluno duplicado — manteve ${keep}, absorveu ${gone}; nome oficial "${nome}" — ${mg.length} matrícula(s) movida(s) em ${tcache.size} ata(s)`
+        + (eG && eG.dadosPessoais ? ' (dados pessoais do ID absorvido descartados)' : ''),
+      antes: { id:gone, nome:gA.nome || '', fundidoEm:keep, nomeMantido:kA.nome || '', nomeOficial:nome,
+               matriculasMovidas: mg.slice(0, 200).map(m => ({ id:m._id, turmaId:m.turmaId, anoLetivo:m.anoLetivo })),
+               elo: eG || null } });
+  }
+
   // memória
   const k = ATAS.find(a => a.id === keep); if(k){ k.nome = nome; k.nb = nrm(nome); }
   ATAS = ATAS.filter(a => a.id !== gone); ATAS_IDX = indexar(ATAS); ELOS.delete(gone);
@@ -451,6 +473,18 @@ async function vincular(aaId, atasId){
   ['nis', 'nascimentoEstrangeiro'].forEach(k => { if(dp[k] !== undefined && dp[k] !== '' && (aa[k] === undefined || aa[k] === '')) mig[k] = dp[k]; });
   if(Object.keys(mig).length) ops.push({ col:'anoAtivoAlunos', op:'set', id:aaId, data:mig });
   await DB.batchWrite(ops);
+  // Log: 1 registro no elo (`alunos`). Os dados pessoais do histórico são apagados do elo: ficam no `antes` (só admin lê).
+  if(window.Log){
+    const antesLog = { anoAtivoId: eA?.anoAtivoId || '', nome: eA?.nome || '', cpf: eA?.cpf || '', dadosPessoais: eA?.dadosPessoais || null };
+    const depoisLog = { anoAtivoId: aaId, nome: at.nome, cpf: cpf.length === 11 ? cpf : (eA?.cpf || ''), dadosPessoais: null };
+    if(Object.keys(mig).length) depoisLog._migradoParaAnoAtivo = mig;
+    await Log.registrar({ acao: eA ? 'editar' : 'criar', colecao:'alunos', docId:Identidade.eloId(atasId),
+      resumo: `Vinculou Ano-Ativo ${aaId} (${nomeAA(aa)}) ao aluno de Atas ${atasId} (${at.nome})`
+        + (eA?.dadosPessoais ? ' — dados pessoais do histórico apagados do elo' : '')
+        + (Object.keys(mig).length ? ` — migrou ${Object.keys(mig).join(', ')} para o Ano-Ativo` : ''),
+      antes: eA ? antesLog : undefined,
+      depois: eA ? depoisLog : { atasId, anoAtivoId: aaId, nome: at.nome, ...(cpf.length === 11 ? { cpf } : {}) } });
+  }
   ELOS.set(atasId, { atasId, anoAtivoId: aaId, nome: at.nome }); ELO_AA.set(aaId, ELOS.get(atasId));
   AAPEND = AAPEND.filter(a => a.id !== aaId); PARES2 = PARES2.filter(p => p.aa.id !== aaId && p.a.id !== atasId); AA_SEL = null; renderPend(); renderCross(); renderPainel();
 }
@@ -549,6 +583,8 @@ async function desvincular(atasId, aaId){
   const e = await Identidade.buscarElo(atasId);
   if(!e || e.anoAtivoId !== aaId) throw new Error('O vínculo mudou desde o carregamento. Recarregue os vínculos.');
   await DB.batchWrite([{ col:'alunos', op:'delete', id:Identidade.eloId(atasId) }]);
+  if(window.Log) await Log.registrar({ acao:'excluir', colecao:'alunos', docId:Identidade.eloId(atasId),
+    resumo: `Desfez vínculo — Atas ${atasId} (${e.nome || '—'}) ↔ Ano-Ativo ${aaId}`, antes: e });   // `e` = elo lido acima
   VINC = VINC.filter(x => x.atasId !== atasId); ELOS.delete(atasId); ELO_AA.delete(aaId);
   renderVinc();
 }
@@ -585,10 +621,14 @@ async function liberar(it){
     const ops = [];
     if(it.a.mod) ops.push({ col:colDe(it.a.mod), id:it.a.o.id, remove:it.b.mod ? it.b.o.id : it.b.id });
     if(it.b.mod) ops.push({ col:colDe(it.b.mod), id:it.b.o.id, remove:it.a.o.id });
-    await gravarDif(ops);
+    const rot = l => l.mod ? `${l.o.nome} (${l.o.id})` : l.id;
+    await gravarDif(ops, `Voltou a analisar par marcado como diferente — ${rot(it.a)} ≠ ${rot(it.b)}`);
     it.a.o.dif.delete(it.b.mod ? it.b.o.id : it.b.id); if(it.b.mod) it.b.o.dif.delete(it.a.o.id);
   } else {
     await DB.batchWrite([{ col:colDe(it.a.mod), op:'set', id:it.a.o.id, data:{ verificadoManual: Identidade.campoRemover() } }]);
+    if(window.Log) await Log.registrar({ acao:'editar', colecao:colDe(it.a.mod), docId:it.a.o.id,
+      resumo: `Voltou a analisar aluno verificado — ${it.a.o.nome || ''} (${it.a.o.id})`,
+      antes:{ verificadoManual:true }, depois:{ verificadoManual:false } });
     it.a.o.ver = false;
     if(it.a.mod === 'aa' && !ELO_AA.has(it.a.o.id) && !AAPEND.includes(it.a.o)){ AAPEND.push(it.a.o); AAPEND.sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR')); }
   }
@@ -641,7 +681,8 @@ document.addEventListener('click', async ev => {
       const s = SUGS.find(x => chave(x.a.id, x.b.id) === card.dataset.k); if(!s) return;
       if(act === 'dif'){
         if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(s.a.nome)} (${_escHtml(s.a.id)})\n≠\n${_escHtml(s.b.nome)} (${_escHtml(s.b.id)})\n\nOs dois deixam de ser sugeridos entre si. Cada um continua sendo comparado com os demais.` })) return;
-        await gravarDif([{ col:'alunos-atas', id:s.a.id, add:s.b.id }, { col:'alunos-atas', id:s.b.id, add:s.a.id }]);
+        await gravarDif([{ col:'alunos-atas', id:s.a.id, add:s.b.id }, { col:'alunos-atas', id:s.b.id, add:s.a.id }],
+          `Marcou como pessoas diferentes — ${s.a.nome} (${s.a.id}) ≠ ${s.b.nome} (${s.b.id})`);
         s.a.dif.add(s.b.id); s.b.dif.add(s.a.id);
         SUGS = SUGS.filter(x => !difPar(x.a, x.b)); return renderAtas();
       }
@@ -655,13 +696,14 @@ document.addEventListener('click', async ev => {
     if(act === 'difx'){
       const aid = card.dataset.aa || AA_SEL, tid = b.dataset.b, aa = AAALL.find(x => x.id === aid), at = ATAS.find(x => x.id === tid);
       if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(aa?.nome || aid)} (${_escHtml(aid)})\n≠\n${_escHtml(at?.nome || tid)} (${_escHtml(tid)})\n\nEste par deixa de ser sugerido.` })) return;
-      await gravarDif([{ col:'anoAtivoAlunos', id:aid, add:tid }, { col:'alunos-atas', id:tid, add:aid }]);
+      await gravarDif([{ col:'anoAtivoAlunos', id:aid, add:tid }, { col:'alunos-atas', id:tid, add:aid }],
+        `Marcou como pessoas diferentes — ${aa?.nome || aid} (${aid}, Ano-Ativo) ≠ ${at?.nome || tid} (${tid}, Atas)`);
       aa?.dif.add(tid); at?.dif.add(aid);
       PARES2 = PARES2.filter(p => !(p.aa.id === aid && p.a.id === tid)); renderCross(); return renderPainel();
     }
     if(act === 'semAtas'){
       if(!await _confirmModal({ titulo:'Marcar como verificado?', corpo:'Este aluno do Ano-Ativo não tem equivalente em Atas. Ele deixa de aparecer nesta lista.' })) return;
-      await marcarVerificado('anoAtivoAlunos', [AA_SEL]); AAPEND = AAPEND.filter(a => a.id !== AA_SEL); PARES2 = PARES2.filter(p => p.aa.id !== AA_SEL); AA_SEL = null; renderPend(); renderCross(); return renderPainel();
+      await marcarVerificado('anoAtivoAlunos', [AA_SEL], `Marcou como verificado (sem equivalente em Atas) — ${(AAPEND.find(a => a.id === AA_SEL) || {}).nome || AA_SEL} (${AA_SEL})`); AAPEND = AAPEND.filter(a => a.id !== AA_SEL); PARES2 = PARES2.filter(p => p.aa.id !== AA_SEL); AA_SEL = null; renderPend(); renderCross(); return renderPainel();
     }
     if(act === 'vinc'){
       const at = ATAS.find(a => a.id === b.dataset.b) || { id: b.dataset.b, nome: card.querySelector('b').textContent }, aa = AAPEND.find(a => a.id === (card.dataset.aa || AA_SEL));
