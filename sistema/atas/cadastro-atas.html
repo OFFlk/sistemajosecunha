@@ -1546,6 +1546,29 @@ async function selecionarTurmaPorId(turmaId, travarSelects = false) {
   }
 }
 
+/**
+ * Deep-link ?turma=ID&aluno=ALU-xxxxxx (vem do A4 da Gestão de Atas: aluno listado na turma, sem matrícula).
+ * Depois de abrir a turma, carrega esse aluno no formulário — com o nome do CADASTRO (alunos-atas),
+ * não o da linha da turma. O usuário confere, clica em "Adicionar / Atualizar" e em "Salvar no banco":
+ * o salvamento regrava a matrícula de todo aluno da turma, então a que faltava volta.
+ * Custo: 1 leitura (o cadastro). Se o nome do cadastro for diferente do da turma, o "Atualizar" abre
+ * o modal "Corrigir o nome do aluno?" (o mesmo fluxo de renomear de sempre).
+ */
+async function _abrirAlunoDoDeepLink(alunoId) {
+  const id = String(alunoId || "").trim();
+  if (!id || !turmaAtual) return;
+  const idx = alunos.findIndex(a => String(a.alunoId || a.alunoIdVinculado || "").trim() === id);
+  if (idx < 0) { _toastAviso(`⚠️ ${id} não está na lista desta turma.`); return; }
+  let nomeCad = "";
+  try {
+    const cad = await window.Identidade.buscarAtasPorId(id);
+    nomeCad = String((cad && cad.nome) || "").trim();
+  } catch (e) { console.warn('[deep-link aluno] cadastro não lido:', e.message); }
+  editarAluno(idx);
+  if (nomeCad && $("nome")) $("nome").value = nomeCad;
+  _toastAviso(`ℹ️ ${nomeCad || alunos[idx]?.nome || id} carregado no formulário. Clique em "Adicionar / Atualizar" e depois em "Salvar no banco" para regravar a matrícula.`);
+}
+
 /* =========================
    Alterações não salvas — trava de troca de turma, "Descartar" e trava do
    import. Tudo em memória: nenhuma leitura/escrita extra no Firestore.
@@ -2606,7 +2629,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // deep-link opcional: ?turma=ID
       const turmaParam = getQueryParam("turma");
-      if (turmaParam) await selecionarTurmaPorId(turmaParam, /* travarSelects */ true);
+      if (turmaParam) {
+        await selecionarTurmaPorId(turmaParam, /* travarSelects */ true);
+        const alunoParam = getQueryParam("aluno");           // opcional: ?turma=ID&aluno=ALU-xxxxxx
+        if (alunoParam) await _abrirAlunoDoDeepLink(alunoParam);
+      }
 
     } catch(e) {
       console.error('[DOMContentLoaded]', e);
