@@ -3136,6 +3136,19 @@ function normSerie(s){
       _cacheCpf.set(d, r);
       return r;
     }
+    /* Conformidade: achar um elo (vínculo Atas ↔ Ano-Ativo) pelo CPF mostra um aviso amarelo.
+       A página NÃO confere se os IDs do elo ainda existem (isso é da Gestão de Atas): só pede a revisão.
+       A busca por NOME não avisa: ela nasce de alunos-atas, então o aluno de Atas existe. */
+    function _avisarRevisaoElo(r){
+      const elo = r && r.elo;
+      if(!elo) return;
+      if(r.tipo === 'historico' && elo.anoAtivoId){
+        _toastAviso(`⚠️ O vínculo deste CPF com o Ano-Ativo (${elo.anoAtivoId}) aponta para um aluno que não existe mais. O cadastro é válido, mas peça uma revisão em Gestão de Atas.`);
+      } else {
+        _toastAviso(`⚠️ Este CPF está ligado a um aluno do histórico (Atas ${elo.atasId || '—'}). O cadastro é válido, mas peça uma revisão em Gestão de Atas.`);
+      }
+    }
+
     // CPF que não pode ser usado por este cadastro (pertence a OUTRA pessoa)
     async function conflitoCpf(d){
       const r = await lookupCpf(d);
@@ -3184,6 +3197,7 @@ function normSerie(s){
           else if(r.tipo === 'historico') resolverAtas({ atasId:r.elo.atasId, nome:r.elo.nome, elo:r.elo });
           else resolverNovo(`CPF ${formatCPF(d)} não encontrado. Preencha os dados do aluno.`);
           if(r.tipo !== 'anoAtivo') setCpfMsg('ok', 'CPF válido');
+          _avisarRevisaoElo(r);      // só quando a busca por CPF achou um elo
         } else {
           const c = await conflitoCpf(d);
           if(tk !== _tick) return;
