@@ -1886,8 +1886,8 @@ function _conItemHtml(i) {
     A5: [b('apagarAluno', 'danger', '🗑 Apagar cadastro')],
     A6: [b('apagarElo', 'danger', '🗑 Apagar elo')],
     A10: [b('apagarEloVazio', 'danger', '🗑 Apagar elo vazio')],
-    // A4: abre a turma no cadastro-atas com o aluno já no formulário; salvar regrava a matrícula que falta
-    A4: ['<a class="btn secondary small" target="_blank" rel="noopener" href="cadastro-atas.html?turma=' + encodeURIComponent(i.turmaId) + '&aluno=' + encodeURIComponent(i.alunoId) + '">↗ Abrir na turma</a>'],
+    // A4: abre a turma (numa janela) no cadastro-atas com o aluno já no formulário; salvar regrava a matrícula que falta
+    A4: [b('abrirTurma', 'secondary', '↗ Abrir na turma')],
     A7: [b('renomear', 'secondary', '✏️ Usar nome do cadastro')],
     A8: [b('ano', 'secondary', '🔄 Atualizar ano')],
   }[i.tipo] || ['<span class="badge small gray">só relatório</span>'];
@@ -1931,7 +1931,7 @@ async function conAcao(uid, acao, btn) {
   const it = _con.itens.find(x => x.uid === uid);
   if (!it) return;
   const fn = { apagarMat: _conApagarMat, recriar: _conRecriar, apagarMats: _conApagarMatsAluno, apagarAluno: _conApagarAluno,
-               apagarElo: _conApagarElo, apagarEloVazio: _conApagarEloVazio, renomear: _conRenomear, ano: _conAtualizarAno }[acao];
+               apagarElo: _conApagarElo, apagarEloVazio: _conApagarEloVazio, renomear: _conRenomear, ano: _conAtualizarAno, abrirTurma: _conAbrirTurma }[acao];
   if (!fn) return;
   _conOcupado = true; if (btn) btn.disabled = true;
   try { await fn(it); }
@@ -2062,6 +2062,32 @@ async function _conApagarElo(it) {
   _conRemover(it.uid);
   setMsg('Elo apagado.', 'ok');
 }
+
+// A4 — abre a turma no cadastro-atas, numa JANELA (window.open), com o aluno já no formulário.
+// A janela fica ligada a esta página (window.opener): ao salvar sem falhas ela avisa por postMessage e o
+// item sai da lista daqui, sem reler o banco. O nome da janela é fixo: clicar noutro A4 reaproveita a mesma.
+async function _conAbrirTurma(it) {
+  const url = 'cadastro-atas.html?turma=' + encodeURIComponent(it.turmaId) + '&aluno=' + encodeURIComponent(it.alunoId);
+  const w = window.open(url, 'cadastroAtasConsistencia', 'popup=yes,width=1280,height=860');
+  if (!w) { setMsg('O navegador bloqueou a janela. Libere pop-ups para este site e tente de novo.', 'warn'); return; }
+  w.focus();
+}
+// Resposta do cadastro-atas: a turma foi salva sem falhas e as matrículas de todos os alunos dela foram regravadas.
+function _conTurmaRegravada(turmaId, alunoIds) {
+  if (!_con.rodou) return;
+  const antes = _con.itens.length;
+  _con.itens = _con.itens.filter(i => !(i.tipo === 'A4' && i.turmaId === turmaId && alunoIds.has(i.alunoId)));
+  const n = antes - _con.itens.length;
+  if (!n) return;
+  _conRender();
+  setMsg(n + ' aluno(s) com matrícula regravada: saíram do A4.', 'ok');
+}
+window.addEventListener('message', ev => {
+  if (ev.origin !== window.location.origin) return;                 // só a nossa própria origem
+  const d = ev.data;
+  if (!d || d.tipo !== 'cadastro-atas:turma-regravada' || !d.turmaId || !Array.isArray(d.alunoIds)) return;
+  _conTurmaRegravada(String(d.turmaId), new Set(d.alunoIds.map(String)));
+});
 
 // A10 — elo sem vínculo, sem dados pessoais e sem CPF (o cadastro em Atas permanece)
 async function _conApagarEloVazio(it) {

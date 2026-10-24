@@ -844,6 +844,7 @@ function ordenarAlunos() {
 ========================= */
 let _alunoCandidatoSelecionado = null; // { alunoId, nome, ultimoAnoRegistro } | null
 let _exclusoesPendentes = new Map(); // alunoId → nome: exclusões marcadas, aplicadas só em "Salvar no banco"
+let _deepLinkAluno = "", _deepLinkTurma = "";   // ?aluno=ALU-… (vem do A4 da Gestão de Atas): depois de salvar essa turma, volta para a janela de origem
 let _renomeacoesPendentes = new Map(); // alunoId → novo nome oficial: aplicadas só em "Salvar no banco" (Identidade.renomearAtas)
 let _alunoEmEdicao = null; // cópia do aluno que foi retirado da lista pra edição (via "Editar") | null
 
@@ -1546,6 +1547,22 @@ async function selecionarTurmaPorId(turmaId, travarSelects = false) {
   }
 }
 
+/* Janela aberta pela Gestão de Atas (window.open): depois de um salvamento sem falhas, avisa a janela de
+   origem — por postMessage, só em memória, ZERO leituras — para ela tirar da lista de Consistência os
+   alunos que acabaram de ter a matrícula regravada. O salvamento regrava a de todos os alunos da turma. */
+const _gestaoAberta = () => !!(window.opener && !window.opener.closed);
+function _notificarGestaoTurmaRegravada(turmaObj) {
+  try {
+    if (!_gestaoAberta()) return;
+    const alunoIds = (turmaObj.alunos || []).map(a => String(a.alunoId || "").trim()).filter(Boolean);
+    window.opener.postMessage({ tipo: "cadastro-atas:turma-regravada", turmaId: turmaObj.turmaId, alunoIds }, window.location.origin);
+  } catch (_) { /* a janela de origem pode ter navegado: sem problema */ }
+}
+// Tira ?aluno= da URL (sem criar entrada no histórico) para que um reload não recarregue o aluno no formulário.
+function _removerParamAluno() {
+  try { const u = new URL(window.location.href); u.searchParams.delete("aluno"); window.history.replaceState(null, "", u); } catch (_) {}
+}
+
 /**
  * Deep-link ?turma=ID&aluno=ALU-xxxxxx (vem do A4 da Gestão de Atas: aluno listado na turma, sem matrícula).
  * Depois de abrir a turma, carrega esse aluno no formulário — com o nome do CADASTRO (alunos-atas),
@@ -1960,10 +1977,19 @@ async function _salvarNoBancoInterno(recarregar) {
   if (resultadoScans && resultadoScans.removidos) extras.push(`${resultadoScans.removidos} scan(s) excluído(s).`);
   if (exclusoes.matriculas) extras.push(`${exclusoes.matriculas} aluno(s) excluído(s) da turma.`);
   const msgSalvo = ['Alunos e notas salvos.', ...extras].join(' ');
+
+  if (!falhas.length) _notificarGestaoTurmaRegravada(turmaObj);
+  // Veio do A4 (janela aberta pela Gestão de Atas) e o salvamento foi o normal: depois de salvar, volta para lá.
+  if (!falhas.length && recarregar && _deepLinkAluno && _deepLinkTurma === turmaIdAtual && _gestaoAberta()) {
+    setMsg(`${msgSalvo} Matrícula regravada. Fechando esta janela…`, 'ok');
+    setTimeout(() => { try { window.close(); } catch (_) {} }, 1800);
+    return true;
+  }
   // Hard refresh (padrão do sistema, igual ao cadastro-aluno-ativo): só quando TUDO deu certo.
   // Com falha parcial a página fica como está, pra você ver o erro e tentar de novo.
   if (!falhas.length && recarregar) {
     try { sessionStorage.setItem('atas:toast', JSON.stringify({ msg: msgSalvo, kind: 'ok' })); } catch(_) {}
+    _removerParamAluno();
     _recarregandoPosSalvar = true;
     window.location.reload();
     return true;
@@ -2632,7 +2658,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (turmaParam) {
         await selecionarTurmaPorId(turmaParam, /* travarSelects */ true);
         const alunoParam = getQueryParam("aluno");           // opcional: ?turma=ID&aluno=ALU-xxxxxx
-        if (alunoParam) await _abrirAlunoDoDeepLink(alunoParam);
+        if (alunoParam) { _deepLinkAluno = String(alunoParam).trim(); _deepLinkTurma = turmaIdAtual || ""; await _abrirAlunoDoDeepLink(alunoParam); }
       }
 
     } catch(e) {
