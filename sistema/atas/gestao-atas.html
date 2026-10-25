@@ -104,7 +104,9 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 
 /* ── Consistência (órfãos e divergências): layout local; cores só por .badge / --ui-* ── */
 .con-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-.con-barra .con-ano { width:130px; }
+.con-barra .con-ano { width:150px; }
+.apagar-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.apagar-barra .apagar-ano { width:170px; }
 .con-barra .con-busca { flex:1; min-width:200px; }
 .con-area[hidden] { display:none; }
 .con-lista { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
@@ -156,7 +158,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
       <h3>📅 Índice de anos
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
-          <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta o filtro de ano da pesquisa de atas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
+          <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta os filtros de ano da pesquisa de atas e dos cards Consistência e Apagar turmas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
         </span>
       </h3>
       <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-controls="secIndice" aria-label="Recolher ou expandir">▼</button>
@@ -179,8 +181,9 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
     <div class="sec-body" id="secConsist">
       <div class="muted">Procura matrículas, cadastros e elos que ficaram soltos ou divergentes dentro do módulo de atas. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede a sua confirmação.</div>
       <div class="con-barra">
-        <input type="text" class="input con-ano" id="conAno" list="conAnosLista" inputmode="numeric" maxlength="4" placeholder="Ano (ex.: 1999)" autocomplete="off">
-        <datalist id="conAnosLista"></datalist>
+        <select class="input con-ano" id="conAno" aria-label="Ano letivo">
+          <option value="" disabled hidden selected>Selecione o ano…</option>
+        </select>
         <button class="btn primary field-h" id="btnConVerificar" onclick="conVerificar(false)">🔍 Verificar o ano</button>
         <button class="btn secondary field-h" id="btnConGlobal" onclick="conVerificar(true)">🌐 Verificação global</button>
       </div>
@@ -279,8 +282,12 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
       <button type="button" class="sec-toggle" id="togSecApagar" aria-expanded="true" aria-controls="secApagar" aria-label="Recolher ou expandir">▼</button>
     </div>
     <div class="sec-body" id="secApagar">
-      <div class="row-btns mt-0">
-        <button class="btn primary" id="btnCarregarTurmas" onclick="abrirModalTurmas()">🔎 Carregar turmas</button>
+      <div class="muted">Escolha um ano para ler só as turmas dele (menos leituras no banco) ou deixe em "Todos os anos" para listar todas.</div>
+      <div class="apagar-barra mt-8">
+        <select class="input apagar-ano" id="apagarAno" aria-label="Filtrar por ano letivo">
+          <option value="">Todos os anos</option>
+        </select>
+        <button class="btn primary field-h" id="btnCarregarTurmas" onclick="abrirModalTurmas()">🔎 Carregar turmas</button>
       </div>
     </div>
   </div>
@@ -291,7 +298,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 <div class="modal-backdrop" id="turModal" role="dialog" aria-modal="true" onclick="if(event.target===this)turFecharModal()">
   <div class="modal scroll-body tur-modal">
     <div class="modal-head">
-      <div><h3>Apagar turmas</h3><div class="muted" id="turCont"></div></div>
+      <div><h3 id="turTitulo">Apagar turmas</h3><div class="muted" id="turCont"></div></div>
       <div class="row-btns">
         <button class="btn danger" id="btnApagarSel" onclick="apagarSelecionadas()" disabled>🗑 Apagar selecionadas</button>
         <button class="btn outline" onclick="turFecharModal()">Fechar</button>
@@ -576,7 +583,10 @@ async function carregarDados() {
   const ok = await _garantirTurmas(true);
   if (!ok) { setMsg('Não foi possível carregar as turmas. Verifique a conexão e tente de novo.', 'warn'); return; }
   atualizarStats();                 // inclui a contagem de identidades
-  if (document.getElementById('turModal').classList.contains('open')) renderTabelaTurmas();
+  if (document.getElementById('turModal').classList.contains('open')) {
+    if (_turmasModalAno === '') _turmasModal = lerTurmasDB().slice();   // modo "todos" acompanha a releitura; por ano mantém o que foi carregado
+    renderTabelaTurmas();
+  }
   carregarIndiceAnos();
   setMsg('Dados carregados.', 'ok');
 }
@@ -602,7 +612,7 @@ function _anosDasTurmas(turmas) {
 }
 
 function _renderIndiceAnos() {
-  try { _conPopularAnos(); } catch (_) {}   // lista de anos da seção Consistência
+  try { _conPopularAnos(); _apagarPopularAnos(); } catch (_) {}   // selects de ano (Consistência e Apagar turmas)
   const box = document.getElementById('indiceAnosBox');
   const info = document.getElementById('indiceAnosInfo');
   if (!box || !info) return;
@@ -832,11 +842,32 @@ function _hoje() { return new Date().toISOString().slice(0,10); }
 /* =============================================
    TABELA DE TURMAS
 ============================================= */
+// Turmas listadas no modal "Apagar turmas": todas, ou só as do ano escolhido (consulta por ano, sem baixar o resto).
+// Lista separada de _mem.turmasDB, que continua significando "todas as turmas" (stats, backup, índice).
+let _turmasModal = [];
+let _turmasModalAno = '';   // '' = todos os anos
+
+// anoLetivo pode estar gravado como número OU texto: duas consultas em paralelo, juntadas sem repetir
+// (cada turma tem o ano de um tipo só → mesmas leituras de uma consulta única). Mesmo padrão da pesquisa.
+async function _lerTurmasDoAno(ano) {
+  const [porNum, porTxt] = await Promise.all([
+    window.DB.turmas.whereEquals('anoLetivo', Number(ano)),
+    window.DB.turmas.whereEquals('anoLetivo', String(ano))
+  ]);
+  const vistos = new Set();
+  return [...porNum, ...porTxt].filter(t => {
+    const k = String(t._id || t.turmaId || t.id || '');
+    if (!k) return true;
+    if (vistos.has(k)) return false;
+    vistos.add(k); return true;
+  });
+}
+
 function renderTabelaTurmas() {
-  const turmas = lerTurmasDB();
+  const turmas = _turmasModal;
   const tbody  = document.getElementById('tbodyTurmas');
   if (!turmas.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted vazio">Nenhuma turma no banco.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="muted vazio">${_turmasModalAno ? 'Nenhuma turma encontrada em ' + _escHtml(_turmasModalAno) + '.' : 'Nenhuma turma no banco.'}</td></tr>`;
     onCheckTurma();
     return;
   }
@@ -896,10 +927,23 @@ async function abrirModalTurmas() {
   const btn = document.getElementById('btnCarregarTurmas');
   if (btn) { btn.disabled = true; btn.textContent = 'Carregando…'; }
   try {
-    if (!(await _garantirTurmas(true))) { setMsg('Não foi possível carregar as turmas. Verifique a conexão e tente de novo.', 'err'); return; }
+    const ano = document.getElementById('apagarAno').value.trim();
+    if (ano) {
+      await _authPronto();
+      if (!window.DB || !window.DB.turmas) throw new Error('DB indisponível');
+      _turmasModal = await _lerTurmasDoAno(ano);
+    } else {
+      if (!(await _garantirTurmas(true))) { setMsg('Não foi possível carregar as turmas. Verifique a conexão e tente de novo.', 'err'); return; }
+      _turmasModal = lerTurmasDB().slice();
+    }
+    _turmasModalAno = ano;
+    document.getElementById('turTitulo').textContent = ano ? 'Apagar turmas — ' + ano : 'Apagar turmas';
     renderTabelaTurmas();
     turAjustarModal();
     document.getElementById('turModal').classList.add('open');
+  } catch (e) {
+    console.warn('[abrirModalTurmas]', e);
+    setMsg('Não foi possível carregar as turmas. Verifique a conexão e tente de novo.', 'err');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔎 Carregar turmas'; }
   }
@@ -942,7 +986,7 @@ async function apagarSelecionadas() {
   const checks  = [...document.querySelectorAll('.chk-turma:checked')];
   if (!checks.length) return;
   const indices = checks.map(c => Number(c.dataset.idx));
-  const turmas  = lerTurmasDB();
+  const turmas  = _turmasModal;
   const aApagar = indices.map(i => turmas[i]).filter(Boolean);
   const nomes   = aApagar.map(t => t.aba || t.id || t._id || t.turmaId || '?');
 
@@ -1027,8 +1071,9 @@ async function apagarSelecionadas() {
   }
 
   // 2. Atualiza o estado em memória diretamente (sem reenviar ao Firestore)
-  const novas = turmas.filter((_,i) => !indices.includes(i));
-  _mem[dbKey('turmasDB')] = novas;
+  const _idsApagados = new Set(aApagar.map(t => String(t.turmaId || t.id || t._id || '')).filter(Boolean));
+  _turmasModal = turmas.filter((_,i) => !indices.includes(i));
+  if (_turmasCarregadas) _mem[dbKey('turmasDB')] = lerTurmasDB().filter(t => !_idsApagados.has(String(t.turmaId || t.id || t._id || '')));
   avisos.forEach(a => console.log('[apagar]', a));
   // ℹ️ = só informativo; ⚠️/❌ = problema de verdade.
   const problemas = avisos.filter(a => a.startsWith('⚠️') || a.startsWith('❌')).length;
@@ -1831,7 +1876,7 @@ async function conVerificar(global) {
     if (!sim) return;
   } else {
     ano = _cs(document.getElementById('conAno').value);
-    if (!/^\d{4}$/.test(ano)) { setMsg('Informe o ano com 4 dígitos (ex.: 1999).', 'warn'); return; }
+    if (!/^\d{4}$/.test(ano)) { setMsg('Selecione o ano que deseja verificar.', 'warn'); return; }
   }
   _conOcupado = true;
   const b1 = document.getElementById('btnConVerificar'), b2 = document.getElementById('btnConGlobal');
@@ -1854,10 +1899,29 @@ async function conVerificar(global) {
 }
 
 /* ── lista, filtros, paginação ── */
+// Anos dos selects: índice (1 leitura do doc da escola). Índice vazio/ilegível → lista fixa, igual à pesquisa.
+const ANO_MIN_ATAS = 2000;
+function _anosParaSelect() {
+  if (_indiceAnos && _indiceAnos.length) return _indiceAnos.slice();
+  const anos = [];
+  for (let a = new Date().getFullYear() + 1; a >= ANO_MIN_ATAS; a--) anos.push(String(a));
+  return anos;
+}
 function _conPopularAnos() {
-  const dl = document.getElementById('conAnosLista');
-  if (!dl) return;
-  dl.innerHTML = (_indiceAnos || []).map(a => '<option value="' + _escHtml(a) + '"></option>').join('');
+  const sel = document.getElementById('conAno');
+  if (!sel) return;
+  const atual = sel.value, anos = _anosParaSelect();
+  sel.innerHTML = '<option value="" disabled hidden>Selecione o ano…</option>' +
+    anos.map(a => '<option value="' + _escHtml(a) + '">' + _escHtml(a) + '</option>').join('');
+  sel.value = anos.includes(atual) ? atual : '';
+}
+function _apagarPopularAnos() {
+  const sel = document.getElementById('apagarAno');
+  if (!sel) return;
+  const atual = sel.value, anos = _anosParaSelect();
+  sel.innerHTML = '<option value="">Todos os anos</option>' +
+    anos.map(a => '<option value="' + _escHtml(a) + '">' + _escHtml(a) + '</option>').join('');
+  sel.value = anos.includes(atual) ? atual : '';
 }
 function _conFiltrados() {
   const tipo = document.getElementById('conTipo').value;
