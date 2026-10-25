@@ -8,6 +8,8 @@
 
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
+<!-- página exclusiva de ADMIN (guia RBAC, padrão 1) -->
+<script>window.Auth && Auth.requireRole('admin');</script>
 <script src="../db.firebase.js"></script>
 <script src="../log.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -56,7 +58,7 @@
   </div>
 
   <div class="card" id="abaAtas">
-    <div class="aviso-warn">ℹ️ Nada é lido do banco até você apertar <b>Carregar</b>. A análise de trajetória lê só as matrículas dos alunos com nome parecido.</div>
+    <h3 class="section-title">Duplicatas em Atas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Nada é lido do banco até você apertar <b>Carregar</b>. A análise de trajetória lê só as matrículas dos alunos com nome parecido.</span></span></h3>
     <div class="barra">
       <button class="btn secondary" type="button" data-act="carAtas">🔄 Carregar alunos de Atas</button>
       <button class="btn primary" type="button" id="btnTraj" data-act="traj1" disabled>🧭 Analisar trajetória</button>
@@ -71,7 +73,7 @@
   </div>
 
   <div class="card" id="abaCross" hidden>
-    <div class="aviso-warn">ℹ️ Alunos do Ano-Ativo sem vínculo com Atas. Os dois IDs continuam existindo; o vínculo é gravado em <b>alunos</b>. "Buscar compatíveis" não lê nada do banco; a análise de trajetória lê só as matrículas dos pares encontrados.</div>
+    <h3 class="section-title">Ano-Ativo ↔ Atas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Lista os alunos do Ano-Ativo sem vínculo com Atas. Os dois IDs continuam existindo; o vínculo é gravado em <b>alunos</b>. “Buscar compatíveis” não lê nada do banco; a análise de trajetória lê só as matrículas dos pares encontrados.</span></span></h3>
     <div class="barra">
       <button class="btn secondary" type="button" data-act="carPend">🔄 Carregar pendentes do Ano-Ativo</button>
       <button class="btn secondary" type="button" id="btnComp" data-act="buscarComp" disabled>🔎 Buscar compatíveis</button>
@@ -86,18 +88,18 @@
     <div id="listaCross"></div>
     <h3 class="mt-12">Busca manual</h3>
     <div class="barra"><div class="field"><label for="filtroPend">Filtrar por nome</label><input class="input" id="filtroPend" placeholder="Nome ou ID"/></div></div>
-    <div class="list rolagem" id="listaPend"></div>
+    <div id="avisoPend"></div>
+    <div class="list rolagem" id="listaPend" hidden></div>
     <div id="painelCross" class="mt-12"></div>
   </div>
 
   <div class="card" id="abaVinc" hidden>
-    <div class="aviso-warn">ℹ️ Desfazer um vínculo apaga só o elo em <b>alunos</b>: os cadastros de Atas e do Ano-Ativo continuam existindo. Os dados pessoais que o histórico guardava antes do vínculo não voltam.</div>
+    <h3 class="section-title">Vínculos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Desfazer um vínculo apaga só o elo em <b>alunos</b>: os cadastros de Atas e do Ano-Ativo continuam existindo. Os dados pessoais que o histórico guardava antes do vínculo não voltam.<br><br>“Conferir” lê todos os alunos de Atas e do Ano-Ativo (1 leitura por documento) e marca os vínculos que apontam para um aluno que não existe mais. Eles aparecem primeiro na lista.</span></span></h3>
     <div class="barra">
       <button class="btn secondary" type="button" data-act="carVinc">🔄 Carregar vínculos</button>
       <button class="btn secondary" type="button" id="btnConfVinc" data-act="confVinc" disabled>🔍 Conferir se os alunos existem</button>
       <div class="field"><label for="filtroVinc">Filtrar por nome ou ID</label><input class="input" id="filtroVinc" placeholder="Nome ou ID"/></div>
     </div>
-    <div class="help">Conferir lê todos os alunos de Atas e do Ano-Ativo (1 leitura por documento) e marca os vínculos que apontam para um aluno que não existe mais. Eles aparecem primeiro na lista.</div>
     <div class="stats-row">
       <div class="stat-box"><div class="stat-num" id="statVinc">—</div><div class="stat-lbl">Vínculos</div></div>
       <div class="stat-box"><div class="stat-num" id="statVincOrf">—</div><div class="stat-lbl">Apontam para aluno inexistente</div></div>
@@ -106,7 +108,7 @@
   </div>
 
   <div class="card" id="abaVerif" hidden>
-    <div class="aviso-warn">ℹ️ Pares marcados como "são diferentes" e alunos marcados como verificados. "Voltar a analisar" faz o par (ou o aluno) voltar a ser sugerido.</div>
+    <h3 class="section-title">Verificados <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Pares marcados como “são diferentes” e alunos marcados como verificados. “Voltar a analisar” faz o par (ou o aluno) voltar a ser sugerido.</span></span></h3>
     <div class="barra">
       <button class="btn secondary" type="button" data-act="carVerif">🔄 Carregar verificados</button>
       <div class="field"><label for="filtroVerif">Filtrar por nome ou ID</label><input class="input" id="filtroVerif" placeholder="Nome ou ID"/></div>
@@ -160,8 +162,18 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
   });
 }
 
-function _semEscola(){ const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : ''; return !sid || String(sid).trim().toUpperCase() === 'ADMIN'; }
-function _authPronto(){ return new Promise(r => { if(window.Auth && Auth.getSession && Auth.getSession()) return r(); if(window.Auth && Auth.onReady) Auth.onReady(r); else r(); }); }
+function _semEscola(){
+  if(window.Auth && typeof Auth.semEscola === 'function') return Auth.semEscola();   // guia 18.3
+  const sid = (window.Auth && Auth.getActiveSchoolId) ? Auth.getActiveSchoolId() : '';
+  return !sid || String(sid).trim().toUpperCase() === 'ADMIN';
+}
+/* Guia 18.1: espera o Firebase carregar (Auth.pronto). O limite de tempo evita loading infinito.
+   O antigo _authPronto resolvia na hora quando havia sessão em cache, e o overlay sumia quase de imediato. */
+function _authPronto(ms){
+  const legado = () => new Promise(r => { if(window.Auth && Auth.getSession && Auth.getSession()) return r(); if(window.Auth && Auth.onReady) Auth.onReady(r); else r(); });
+  const p = (window.Auth && typeof Auth.pronto === 'function') ? Auth.pronto() : legado();
+  return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Tempo esgotado ao iniciar a sessão.')), ms || 15000))]);
+}
 
 /* ── Estado ── */
 let ATAS = [], ATAS_IDX = new Map(), ELOS = new Map(), ELO_AA = new Map(), carregouAtas = false;
@@ -422,9 +434,11 @@ function renderPend(){
   $('statPend').textContent = carregouAtas ? AAPEND.length : '—';
   const f = nrm($('filtroPend').value || '');
   const l = AAPEND.filter(a => !f || a.nb.includes(f) || a.id.toLowerCase().includes(f)).slice(0, 100);
-  $('listaPend').innerHTML = !carregouAtas ? '' : l.length
-    ? l.map(a => `<div class="list-item${a.id === AA_SEL ? ' sel' : ''}" data-act="sel" data-a="${_escHtml(a.id)}">${_escHtml(a.nome)} <span class="badge small neutral">${_escHtml(a.id)}</span></div>`).join('')
-    : '<div class="aviso-warn">ℹ️ Nenhum aluno do Ano-Ativo pendente.</div>';
+  // .aviso-warn não vai dentro do .list (contêiner com borda): fica como irmão (guia 7.2)
+  const lista = $('listaPend');
+  lista.hidden = !(carregouAtas && l.length);
+  lista.innerHTML = lista.hidden ? '' : l.map(a => `<div class="list-item${a.id === AA_SEL ? ' sel' : ''}" data-act="sel" data-a="${_escHtml(a.id)}">${_escHtml(a.nome)} <span class="badge small neutral">${_escHtml(a.id)}</span></div>`).join('');
+  $('avisoPend').innerHTML = carregouAtas && !l.length ? '<div class="aviso-warn">ℹ️ Nenhum aluno do Ano-Ativo pendente.</div>' : '';
 }
 function candidatosDe(aa){
   const cut = (+$('cut').value || 85) / 100 - 0.05, idx = new Set();
@@ -681,10 +695,11 @@ document.addEventListener('click', async ev => {
       const s = SUGS.find(x => chave(x.a.id, x.b.id) === card.dataset.k); if(!s) return;
       if(act === 'dif'){
         if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(s.a.nome)} (${_escHtml(s.a.id)})\n≠\n${_escHtml(s.b.nome)} (${_escHtml(s.b.id)})\n\nOs dois deixam de ser sugeridos entre si. Cada um continua sendo comparado com os demais.` })) return;
+        setMsg('Salvando…', 'loading');
         await gravarDif([{ col:'alunos-atas', id:s.a.id, add:s.b.id }, { col:'alunos-atas', id:s.b.id, add:s.a.id }],
           `Marcou como pessoas diferentes — ${s.a.nome} (${s.a.id}) ≠ ${s.b.nome} (${s.b.id})`);
         s.a.dif.add(s.b.id); s.b.dif.add(s.a.id);
-        SUGS = SUGS.filter(x => !difPar(x.a, x.b)); return renderAtas();
+        SUGS = SUGS.filter(x => !difPar(x.a, x.b)); renderAtas(); setMsg('Marcados como pessoas diferentes.', 'ok'); return;
       }
       const nome = [s.a.nome, s.b.nome][+card.querySelector('[data-nome]').value];
       const perde = ELOS.get(s.b.id)?.dadosPessoais ? `\n\n⚠️ Os dados pessoais guardados para ${_escHtml(s.b.id)} serão descartados.` : '';
@@ -696,14 +711,16 @@ document.addEventListener('click', async ev => {
     if(act === 'difx'){
       const aid = card.dataset.aa || AA_SEL, tid = b.dataset.b, aa = AAALL.find(x => x.id === aid), at = ATAS.find(x => x.id === tid);
       if(!await _confirmModal({ titulo:'Marcar como pessoas diferentes?', corpo:`${_escHtml(aa?.nome || aid)} (${_escHtml(aid)})\n≠\n${_escHtml(at?.nome || tid)} (${_escHtml(tid)})\n\nEste par deixa de ser sugerido.` })) return;
+      setMsg('Salvando…', 'loading');
       await gravarDif([{ col:'anoAtivoAlunos', id:aid, add:tid }, { col:'alunos-atas', id:tid, add:aid }],
         `Marcou como pessoas diferentes — ${aa?.nome || aid} (${aid}, Ano-Ativo) ≠ ${at?.nome || tid} (${tid}, Atas)`);
       aa?.dif.add(tid); at?.dif.add(aid);
-      PARES2 = PARES2.filter(p => !(p.aa.id === aid && p.a.id === tid)); renderCross(); return renderPainel();
+      PARES2 = PARES2.filter(p => !(p.aa.id === aid && p.a.id === tid)); renderCross(); renderPainel(); setMsg('Marcados como pessoas diferentes.', 'ok'); return;
     }
     if(act === 'semAtas'){
       if(!await _confirmModal({ titulo:'Marcar como verificado?', corpo:'Este aluno do Ano-Ativo não tem equivalente em Atas. Ele deixa de aparecer nesta lista.' })) return;
-      await marcarVerificado('anoAtivoAlunos', [AA_SEL], `Marcou como verificado (sem equivalente em Atas) — ${(AAPEND.find(a => a.id === AA_SEL) || {}).nome || AA_SEL} (${AA_SEL})`); AAPEND = AAPEND.filter(a => a.id !== AA_SEL); PARES2 = PARES2.filter(p => p.aa.id !== AA_SEL); AA_SEL = null; renderPend(); renderCross(); return renderPainel();
+      setMsg('Salvando…', 'loading');
+      await marcarVerificado('anoAtivoAlunos', [AA_SEL], `Marcou como verificado (sem equivalente em Atas) — ${(AAPEND.find(a => a.id === AA_SEL) || {}).nome || AA_SEL} (${AA_SEL})`); AAPEND = AAPEND.filter(a => a.id !== AA_SEL); PARES2 = PARES2.filter(p => p.aa.id !== AA_SEL); AA_SEL = null; renderPend(); renderCross(); renderPainel(); setMsg('Marcado como verificado.', 'ok'); return;
     }
     if(act === 'vinc'){
       const at = ATAS.find(a => a.id === b.dataset.b) || { id: b.dataset.b, nome: card.querySelector('b').textContent }, aa = AAPEND.find(a => a.id === (card.dataset.aa || AA_SEL));
@@ -714,11 +731,13 @@ document.addEventListener('click', async ev => {
     }
     if(act === 'buscarId'){
       const id = ($('idManual').value || '').trim().toUpperCase(); if(!id) return;
+      setMsg('Buscando…', 'loading');
       const at = await Identidade.buscarAtasPorId(id), aa = AAPEND.find(a => a.id === AA_SEL);
       if(!at){ $('manualRes').innerHTML = ''; return setMsg('ID não encontrado em Atas.', 'warn'); }
       if(!ELOS.has(id) && ELOS.size === 0) await carregarAtas(true);
       if(ELOS.get(id)?.anoAtivoId){ $('manualRes').innerHTML = ''; return setMsg('Esse aluno de Atas já está vinculado a outro aluno do Ano-Ativo.', 'warn'); }
       $('manualRes').innerHTML = cardCross({ id, nome: at.nome }, jw(aa.nb, nrm(at.nome)));
+      _toastLimpar();
     }
   }catch(e){ console.error('acao ' + act + ':', e); setMsg(e.message || 'Não foi possível concluir a ação.', 'err'); }
 });
