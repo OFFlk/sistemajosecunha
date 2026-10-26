@@ -482,7 +482,7 @@ function reconstruirAuxiliares(turmas) {
     const ataId = idAtaFrom(turmaId);
     // _id explícito garante que saveAll use o ID correto no Firestore
     atas.push({ _id:ataId, id:ataId, turmaId, anoLetivo:t.anoLetivo||'', turno:t.turno||'',
-      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'',
+      seriesTurma:t.seriesTurma||[], serieTexto:t.serieTexto||'', modalidade:t.modalidade||'regular',
       origemArquivo:t.origemArquivo||'', aba:t.aba||'',
       schemaId:t.schemaId||'', schemaSnapshot:t.schemaSnapshot||null, criadoEm:t.criadoEm||'' });
     for (const a of (t.alunos || [])) {
@@ -1368,8 +1368,8 @@ async function _analisarMerge(turmasEntrada, schemasEntrada) {
       if (!diff) iguais.push(t); else divergentes.push({entrada:t, atual, diff});
       continue;
     }
-    const chave=`${t.anoLetivo||''}|${t.serieTexto||''}`;
-    const parecidas=turmasAtuais.filter(x=>`${x.anoLetivo||''}|${x.serieTexto||''}`===chave&&chave!=='|');
+    const chave=`${t.anoLetivo||''}|${t.serieTexto||''}|${t.modalidade||'regular'}`;
+    const parecidas=turmasAtuais.filter(x=>`${x.anoLetivo||''}|${x.serieTexto||''}|${x.modalidade||'regular'}`===chave&&chave!=='||regular');
     if (parecidas.length) suspeitas.push({nova:t,parecidaCom:parecidas}); else novas.push(t);
   }
 

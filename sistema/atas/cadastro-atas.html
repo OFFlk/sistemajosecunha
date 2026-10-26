@@ -540,6 +540,18 @@ const SERIES_REAIS = [
 function _ehSerieMulti(s) { return /multi\s*s?seriad/.test(normalizarSerieChave(s)); }
 function _turmaEhMultisseriada() { return (seriesTurma || []).some(_ehSerieMulti); }
 
+// Aceleração: o aluno cursa todas as séries da turma no mesmo ano. Flag vem de cadastro-turmas.html (modalidade).
+function _turmaEhAceleracao() { return !!turmaAtual && turmaAtual.modalidade === "aceleracao"; }
+// Rótulo da série do aluno numa turma de aceleração, no formato da planilha: "3º e 4º".
+function _rotuloAceleracao() {
+  const nums = [...new Set((seriesTurma || [])
+    .map(s => { const m = String(s).match(/(\d+)/); return m ? Number(m[1]) : null; })
+    .filter(n => n !== null))].sort((a, b) => a - b);
+  if (nums.length < 2) return "";
+  const txt = nums.map(n => n + "º");
+  return txt.length === 2 ? txt.join(" e ") : txt.slice(0, -1).join(", ") + " e " + txt[txt.length - 1];
+}
+
 function formatarListaBonita(arr) {
   if (!arr || arr.length === 0) return "";
   if (arr.length === 1) return arr[0];
@@ -563,7 +575,8 @@ function atualizarSelectSerieAluno() {
 
   // Turma multisseriada: o aluno pode ser de qualquer série real; senão, só das séries da turma.
   const listaTurma = dedupSeries(seriesTurma);
-  const listaUnica = listaTurma.some(_ehSerieMulti) ? SERIES_REAIS.slice() : listaTurma;
+  let listaUnica = listaTurma.some(_ehSerieMulti) ? SERIES_REAIS.slice() : listaTurma;
+  if (_turmaEhAceleracao() && _rotuloAceleracao()) listaUnica = [_rotuloAceleracao()];
 
   selAluno.innerHTML = listaUnica.map(s => `<option value="${s}">${s}</option>`).join("");
 
@@ -1278,6 +1291,7 @@ async function garantirIdsESistemaParaTurma(turmaObj){
     turno:         String(turmaObj?.turno||"").trim(),
     seriesTurma:   Array.isArray(turmaObj?.seriesTurma) ? turmaObj.seriesTurma : [],
     serieTexto:    String(turmaObj?.serieTexto||"").trim(),
+    modalidade:    String(turmaObj?.modalidade||"regular").trim(),
     origemArquivo: String(turmaObj?.origemArquivo||"").trim(),
     aba:           String(turmaObj?.aba||"").trim(),
     schemaId:      String(turmaObj?.schemaId||"").trim(),
@@ -2114,17 +2128,22 @@ function _categoriaResultado(resultado) {
   return 'LIVRE';
 }
 
+// Devolve { tipo, ini, fim }. Série comum: ini === fim. Aceleração ("3º e 4º"): ini=3, fim=4.
+// tipo = null quando o texto tem mais de um número e nenhuma palavra (série/ano/EM): não dá pra comparar vocabulário.
 function _parseSerieCanonica(serieDisplay) {
   const s = normalizarTxt(serieDisplay);
   if (!s) return null;
-  if (/ALFABETIZ/.test(s)) return { tipo:'ALFA', num:0 };
+  if (/ALFABETIZ/.test(s)) return { tipo:'ALFA', ini:0, fim:0 };
   const mEixo = s.match(/EIXO\s*(\d+)/);
-  if (mEixo) return { tipo:'EIXO', num:Number(mEixo[1]) };
+  if (mEixo) return { tipo:'EIXO', ini:Number(mEixo[1]), fim:Number(mEixo[1]) };
   const nums = [...s.matchAll(/(\d+)/g)].map(m=>Number(m[1]));
   if (!nums.length) return null;
-  const num = Math.max(...nums);
-  const tipo = /\bEM\b/.test(s) ? 'EM' : (/S[EÉ]RIE/.test(s) ? 'SERIE' : 'ANO');
-  return { tipo, num };
+  const ini = Math.min(...nums), fim = Math.max(...nums);
+  const tipo = /\bEM\b/.test(s) ? 'EM'
+             : /S[EÉ]RIE/.test(s) ? 'SERIE'
+             : /\bANO\b/.test(s) ? 'ANO'
+             : (nums.length > 1 ? null : 'ANO');
+  return { tipo, ini, fim };
 }
 
 function avaliarTrajetoria(ultimo, novo) {
@@ -2154,15 +2173,27 @@ function avaliarTrajetoria(ultimo, novo) {
   if (!serieUltima || !serieNova) {
     return { status:'amarelo', motivo:`não foi possível interpretar a série de um dos registros para comparação${sufixoGap}` };
   }
-  if (serieUltima.tipo !== serieNova.tipo) {
+  if (serieUltima.tipo && serieNova.tipo && serieUltima.tipo !== serieNova.tipo) {
     return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})${sufixoGap}` };
   }
-  const numEsperado = categoria === 'AVANCA' ? serieUltima.num + 1 : serieUltima.num;
-  if (serieNova.num !== numEsperado) {
-    if (categoria === 'MANTEM' && serieNova.num === serieUltima.num + 1) {
-      return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) foi reprovado/mantido, mas a série avançou mesmo assim (prática comum em anos anteriores) — confira se é o mesmo aluno${sufixoGap}` };
+  const tipoTxt = serieNova.tipo || serieUltima.tipo || '';
+  const fmt = (x) => x.ini === x.fim ? `${x.ini}` : `${x.ini} e ${x.fim}`;
+  if (categoria === 'AVANCA') {
+    // Aprovado em [a,b] (b = a em série comum): o próximo registro começa em b+1.
+    const esperado = serieUltima.fim + 1;
+    if (serieNova.ini !== esperado) {
+      return { status:'amarelo', motivo:`série esperada era ${esperado}${tipoTxt?` (${tipoTxt})`:''}, mas veio ${fmt(serieNova)}${sufixoGap}` };
     }
-    return { status:'amarelo', motivo:`série esperada era ${numEsperado} (${serieUltima.tipo}), mas veio ${serieNova.num}${sufixoGap}` };
+  } else {
+    // Reprovado/mantido em [a,b]: o próximo registro pode começar em qualquer série de a a b
+    // (ex.: reprovou em "3º e 4º" → "3º e 4º", "4º e 5º", 3ª única ou 4ª única).
+    if (serieNova.ini < serieUltima.ini || serieNova.ini > serieUltima.fim) {
+      if (serieNova.ini === serieUltima.fim + 1) {
+        return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) foi reprovado/mantido, mas a série avançou mesmo assim (prática comum em anos anteriores) — confira se é o mesmo aluno${sufixoGap}` };
+      }
+      const esperadoTxt = serieUltima.ini === serieUltima.fim ? `${serieUltima.ini}` : `uma entre ${serieUltima.ini} e ${serieUltima.fim}`;
+      return { status:'amarelo', motivo:`série esperada era ${esperadoTxt}${tipoTxt?` (${tipoTxt})`:''}, mas veio ${fmt(serieNova)}${sufixoGap}` };
+    }
   }
   if (gapIncomum) {
     return { status:'amarelo', motivo:`intervalo de ${gap} ano(s) entre ${ultimo.anoLetivo} e ${novo.anoLetivo} é incomum, mas série e situação são coerentes com progressão normal — confira se é o mesmo aluno` };
@@ -2296,6 +2327,7 @@ function _importExtrairLinhas(matriz, rHead, colMap, schema) {
 
     const aluno = { nome };
     if (cSerie!==undefined && schema.serieAtiva) aluno.serie = formatarSerieBonita(row[cSerie]);
+    if (schema.serieAtiva && !aluno.serie && _turmaEhAceleracao() && _rotuloAceleracao()) aluno.serie = _rotuloAceleracao();
     if (cResultado!==undefined && schema.resultadoAtivo) {
       const rraw = normalizarTxt(row[cResultado]);
       aluno.resultado = validosResultado.includes(rraw) ? rraw : 'Não informado';

@@ -154,6 +154,11 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
           <button class="btn secondary" id="btnClearSeries" type="button">Limpar séries</button>
         </div>
         <div id="chipsSeries" class="chips chips-series"></div>
+        <label class="lbl" style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
+          <input type="checkbox" id="aceleracao" style="width:auto;margin:0;">
+          Turma de aceleração
+        </label>
+        <div class="help">Marque quando o aluno cursa as séries da turma no mesmo ano (ex.: 3ª e 4ª série em um único ano). Exige 2 ou mais séries e não vale para "Multisseriada". Pode ser alterado depois de criada.</div>
         <div id="avisoAnoSerieBloqueado" class="aviso-warn mt-12" hidden>
           🔒 O ano letivo e as séries não podem ser alterados depois que a turma é criada (fazem parte do ID). Turno e nome continuam editáveis.
         </div>
@@ -536,6 +541,12 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     }
     sel.value = "";
   }
+  // Aceleração exige 2+ séries reais (Multisseriada não conta).
+  function validarAceleracao(series){
+    const lista = series || [];
+    const reais = lista.filter(x => !/multi\s*s?seriad/i.test(String(x)));
+    return reais.length >= 2 && reais.length === lista.length;
+  }
   function normalizeSerie(s){
     return String(s||"").trim();
   }
@@ -690,7 +701,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       linha2.className = "row item-linha-badges";
       linha2.innerHTML =
         `<span class="badge small">Ano: ${_escHtml(t.anoLetivo||"—")}</span>`+
-        seriesBadges;
+        seriesBadges+
+        (t.modalidade === "aceleracao" ? `<span class="badge small neutral">Aceleração</span>` : "");
 
       // Linha 3 — quantidade de alunos + toggle "Detalhes" (Schema + ID,
       // ocultos por padrão; raramente precisados no dia a dia).
@@ -745,6 +757,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     if($("turno")) $("turno").value = t.turno || "MATUTINO";
 
     seriesSel = (Array.isArray(t.series) ? t.series : []).map(normalizeSerie).filter(Boolean);
+    if($("aceleracao")) $("aceleracao").checked = (t.modalidade === "aceleracao");
 
     if($("nomeTurma")){
       // Nome personalizado (diferente do automático) não pode ser sobrescrito ao trocar o turno.
@@ -767,6 +780,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     editingTurmaId = null;
     seriesSel = [];
     nomeManual = false;
+    if($("aceleracao")) $("aceleracao").checked = false;
 
     if($("anoSelect")) $("anoSelect").value = "";
     buildAnoInput();
@@ -814,7 +828,10 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       const docOriginal = getTurmas().find(t => t && t.turmaId === editingTurmaId);
       if(!docOriginal){ setMsg("Não foi possível localizar a turma original — recarregue a página.", "err"); return; }
       docOriginalLog = docOriginal;   // log: como a turma estava antes (já em memória, sem leitura extra)
+      const aceleracaoEd = !!$("aceleracao")?.checked;
+      if(aceleracaoEd && !validarAceleracao(docOriginal.series)){ setMsg("Aceleração exige 2 ou mais séries (sem Multisseriada). Esta turma não atende.", "err"); return; }
       payload = {
+        modalidade: aceleracaoEd ? "aceleracao" : "regular",
         _id: editingTurmaId,
         id: editingTurmaId,
         turmaId: editingTurmaId,
@@ -825,6 +842,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     } else {
       // CRIAÇÃO
       if(!seriesSel.length){ setMsg("Selecione pelo menos 1 série para cadastrar a turma.", "err"); return; }
+      const aceleracao = !!$("aceleracao")?.checked;
+      if(aceleracao && !validarAceleracao(seriesSel)){ setMsg("Aceleração exige 2 ou mais séries (sem Multisseriada).", "err"); return; }
       ano = parseInt($("anoSelect")?.value || String(getAnoDefault()), 10);
       if(isNaN(ano)){ setMsg("Informe um ano letivo válido.", "err"); return; }
 
@@ -848,6 +867,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         nome,
         anoLetivo: ano,
         series: [...seriesSel],
+        modalidade: aceleracao ? "aceleracao" : "regular",
         turno,
         criadoEm: now,
         atualizadoEm: now,
