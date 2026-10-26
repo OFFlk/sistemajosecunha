@@ -2571,9 +2571,16 @@ function _importRenderLinhaRevisao(al, i) {
     </select>`;
   } else if (al._indicador === 'multiplos') {
     badge = `🟡 Nome bate com ${al._candidatos.length} candidatos do catálogo ao mesmo tempo — qual é?`;
-    const opts = al._candidatos.map((c,ci) => `<option value="${ci}">${_escHtml(c.nome)} (${_escHtml(c.alunoId)}, ${Math.round(c.score*100)}%)</option>`).join('');
+    // Pré-seleciona o candidato de nome 100% idêntico, desde que seja o único. Com 2+ idênticos
+    // (homônimos) ou nenhum, continua em "aluno novo" e a escolha fica com o usuário.
+    const idxExatos = al._candidatos.map((c,ci) => c.score >= SIMILARIDADE_AUTO ? ci : -1).filter(ci => ci >= 0);
+    const idxPre = idxExatos.length === 1 ? idxExatos[0] : -1;
+    if (idxPre >= 0 && al._candidatos[idxPre].traj && al._candidatos[idxPre].traj.status !== 'verde') {
+      badge += `<br>⚠️ O candidato de nome idêntico tem um alerta de trajetória: ${_escHtml(al._candidatos[idxPre].traj.motivo)}`;
+    }
+    const opts = al._candidatos.map((c,ci) => `<option value="${ci}"${ci === idxPre ? ' selected' : ''}>${_escHtml(c.nome)} (${_escHtml(c.alunoId)}, ${Math.round(c.score*100)}%)</option>`).join('');
     extra = `<select id="_impSel_${i}" class="input import-sel">
-      <option value="novo" selected>Nenhum, é aluno novo</option>
+      <option value="novo"${idxPre < 0 ? ' selected' : ''}>Nenhum, é aluno novo</option>
       ${opts}
     </select>`;
   }

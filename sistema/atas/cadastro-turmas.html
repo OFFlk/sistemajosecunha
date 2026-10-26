@@ -150,15 +150,18 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
         </label>
         <div class="row serie-linha">
           <select id="serieSelect" class="input"></select>
-          <button class="btn outline field-h" id="btnAddSerie" type="button">Adicionar</button>
+          <button class="btn outline" id="btnAddSerie" type="button">Adicionar</button>
           <button class="btn secondary" id="btnClearSeries" type="button">Limpar séries</button>
         </div>
         <div id="chipsSeries" class="chips chips-series"></div>
         <label class="lbl" style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">
           <input type="checkbox" id="aceleracao" style="width:auto;margin:0;">
           Turma de aceleração
+          <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+            i
+            <span class="info-tip-bubble wide">Marque quando o aluno cursa as séries da turma no mesmo ano (ex.: 3ª e 4ª série em um único ano). Exige 2 ou mais séries e não vale para "Multisseriada". Pode ser alterado depois de criada.</span>
+          </span>
         </label>
-        <div class="help">Marque quando o aluno cursa as séries da turma no mesmo ano (ex.: 3ª e 4ª série em um único ano). Exige 2 ou mais séries e não vale para "Multisseriada". Pode ser alterado depois de criada.</div>
         <div id="avisoAnoSerieBloqueado" class="aviso-warn mt-12" hidden>
           🔒 O ano letivo e as séries não podem ser alterados depois que a turma é criada (fazem parte do ID). Turno e nome continuam editáveis.
         </div>
