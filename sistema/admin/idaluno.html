@@ -36,9 +36,22 @@
   .manual{display:flex;gap:8px;align-items:flex-end;margin-top:14px}
   .manual .field{flex:1;min-width:0}
   .mt-12{margin-top:12px}
+  /* Abas em formato de stepper (receita do cadastro-aluno-ativo, 4 colunas iguais de margem a margem) */
+  .sim-field{width:240px;flex-shrink:0}
+  .abas-stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+  .aba-step{display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer;padding:8px 18px 8px 10px;border-radius:12px;transition:background .15s}
+  .aba-step>div:last-child{min-width:0}
+  .aba-step:hover{background:var(--dest-btn-hover)}
+  .aba-step.active,.aba-step.active:hover{background:var(--bg)}
+  .aba-step-num{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;border:2px solid var(--dest-btn-bd);background:var(--dest-panel-bg);color:var(--dest-fg);transition:all .25s}
+  .aba-step.active .aba-step-num{background:var(--ui-brand);border-color:var(--ui-brand);color:var(--ui-brand-fg)}
+  .aba-step-label{font-size:11px;font-weight:700;color:var(--dest-fg);opacity:.75;text-transform:uppercase;letter-spacing:.05em}
+  .aba-step-title{font-size:14px;font-weight:800;color:var(--dest-fg)}
+  .aba-step.active .aba-step-label{color:var(--ui-muted);opacity:1}
+  .aba-step.active .aba-step-title{color:var(--ui-text)}
   /* slider sobre o card de destaque: o accent-color de marca some contra o fundo de marca */
   .card-destaque input[type="range"]{accent-color:var(--dest-fg)}
-  @media (max-width:700px){.item{flex-direction:column}.container{padding:24px 16px}}
+  @media (max-width:700px){.item{flex-direction:column}.container{padding:24px 16px}.abas-stepper{grid-template-columns:1fr 1fr}.sim-field{width:100%}}
 </style>
 <title>Verificação de Alunos</title>
 </head>
@@ -47,18 +60,43 @@
 
 <div class="container">
   <div class="card card-destaque">
-    <h2 class="section-title">Verificação e vínculo de alunos</h2>
-    <div class="aviso-warn" id="avisoSemEscola" hidden>ℹ️ Escolha uma escola no topo da página para verificar alunos.</div>
-    <div class="barra">
-      <button class="btn primary field-h" id="tab1" type="button" data-act="aba" data-a="atas">1) Duplicatas em Atas</button>
-      <button class="btn secondary field-h" id="tab2" type="button" data-act="aba" data-a="cross">2) Ano-Ativo ↔ Atas</button>
-      <button class="btn secondary field-h" id="tab3" type="button" data-act="aba" data-a="vinc">3) Vínculos</button>
-      <button class="btn secondary field-h" id="tab4" type="button" data-act="aba" data-a="verif">4) Verificados</button>
-      <div class="field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
+    <div class="card-head">
+      <h2 class="section-title">Verificação e vínculo de alunos</h2>
+      <div class="field sim-field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
         <input id="cut" type="range" min="70" max="95" value="85"/></div>
     </div>
+    <div class="aviso-warn" id="avisoSemEscola" hidden>ℹ️ Escolha uma escola no topo da página para verificar alunos.</div>
+    <div class="abas-stepper" id="abasStepper">
+      <div class="aba-step active" id="tab1" data-act="aba" data-a="atas">
+        <div class="aba-step-num">1</div>
+        <div>
+          <div class="aba-step-label">Aba 1 de 4</div>
+          <div class="aba-step-title">Duplicatas em Atas</div>
+        </div>
+      </div>
+      <div class="aba-step" id="tab2" data-act="aba" data-a="cross">
+        <div class="aba-step-num">2</div>
+        <div>
+          <div class="aba-step-label">Aba 2 de 4</div>
+          <div class="aba-step-title">Ano-Ativo ↔ Atas</div>
+        </div>
+      </div>
+      <div class="aba-step" id="tab3" data-act="aba" data-a="vinc">
+        <div class="aba-step-num">3</div>
+        <div>
+          <div class="aba-step-label">Aba 3 de 4</div>
+          <div class="aba-step-title">Vínculos</div>
+        </div>
+      </div>
+      <div class="aba-step" id="tab4" data-act="aba" data-a="verif">
+        <div class="aba-step-num">4</div>
+        <div>
+          <div class="aba-step-label">Aba 4 de 4</div>
+          <div class="aba-step-title">Verificados</div>
+        </div>
+      </div>
+    </div>
   </div>
-
   <div class="card" id="abaAtas">
     <h3 class="section-title">Duplicatas em Atas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Nada é lido do banco até você apertar <b>Carregar</b>. A análise de trajetória lê só as matrículas dos alunos com nome parecido.</span></span></h3>
     <div class="barra">
@@ -653,10 +691,9 @@ async function liberar(it){
 
 /* ── Eventos ── */
 function aba(x){
-  $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross'; $('abaVinc').hidden = x !== 'vinc'; $('abaVerif').hidden = x !== 'verif';
-  $('tab4').className = 'btn field-h ' + (x === 'verif' ? 'primary' : 'secondary');
-  $('tab3').className = 'btn field-h ' + (x === 'vinc' ? 'primary' : 'secondary');
-  $('tab1').className = 'btn field-h ' + (x === 'atas' ? 'primary' : 'secondary'); $('tab2').className = 'btn field-h ' + (x === 'cross' ? 'primary' : 'secondary');
+  const painel = { atas:'abaAtas', cross:'abaCross', vinc:'abaVinc', verif:'abaVerif' };
+  const passo  = { atas:'tab1', cross:'tab2', vinc:'tab3', verif:'tab4' };
+  Object.keys(painel).forEach(k => { $(painel[k]).hidden = k !== x; $(passo[k]).classList.toggle('active', k === x); });
 }
 async function comLoading(msg, fn){
   if(_semEscola()) return;
