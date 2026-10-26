@@ -374,6 +374,28 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
     catch(e){ console.warn("[cadastro-turma-ativa] garantirAnoAtivoConfig:", e); }
   }
 
+  // Índice de anos (schools/{escola}.anoAtivoIndice.anos): alimenta os selects de ano da Gestão do Ano Ativo
+  // (espelho do atasIndice). Só ACRESCENTA se o índice já existir (criado em "Reconstruir índice"): criar aqui deixaria
+  // um índice com 1 ano só, escondendo os outros dos filtros. Falha não desfaz a turma já salva.
+  async function registrarAnoNoIndice(ano){
+    try{
+      const schoolId = window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId();
+      if(!window.Auth || !Auth.db || !schoolId || String(schoolId).toUpperCase() === "ADMIN") return { ok:false, motivo:"nenhuma escola ativa" };
+      const FV = (typeof firebase !== "undefined" && firebase.firestore) ? firebase.firestore.FieldValue : null;
+      if(!FV) return { ok:false, motivo:"SDK do Firestore indisponível" };
+      const ref = Auth.db.collection("schools").doc(schoolId);
+      const snap = await ref.get();
+      const anos = snap.exists ? ((snap.data().anoAtivoIndice || {}).anos) : null;
+      if(!Array.isArray(anos) || !anos.length) return { ok:true, pulado:true };        // índice ainda não criado
+      if(anos.map(String).includes(String(ano))) return { ok:true, pulado:true };      // ano já está lá
+      await ref.set({ anoAtivoIndice: { anos: FV.arrayUnion(String(ano)) } }, { merge:true });
+      return { ok:true };
+    }catch(e){
+      console.warn("[cadastro-turma-ativa] registrarAnoNoIndice:", e);
+      return { ok:false, motivo:(e && (e.code || e.message)) || "erro desconhecido" };
+    }
+  }
+
   // ---------- UI builders ----------
 
   // Card ESQUERDO (form): input number, preenchido com o ano ativo/da turma sendo editada
@@ -853,6 +875,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
     const btn = $("btnSalvar");
     if(btn) btn.disabled = true;
     setMsg("Salvando…", "loading");
+    let indiceRes = null;   // resultado do registro do ano no índice (só em turma nova); lido depois do try
     try{
       let payload, anoDaTurma, originalLog = null;   // originalLog: só para o log (já lido, sem leitura extra)
       if(ehEdicao){
@@ -885,6 +908,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
         else await Log.registrar({ acao: "criar", colecao: "anoAtivoTurmas", docId: payload.turmaId, depois: payload,
           resumo: "Turma " + nome + " (" + anoDaTurma + ") — " + payload.turno + ", " + payload.series.join(" + ") });
       }
+      if(!ehEdicao) indiceRes = await registrarAnoNoIndice(anoDaTurma);   // edição não muda o ano
       await garantirAnoAtivoConfig(parseInt(anoDaTurma, 10));
     }catch(e){
       console.warn("[salvarTurma]", e);
@@ -892,7 +916,8 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
       if(btn) btn.disabled = false;
       return;
     }
-    guardarMsgPosReload("Turma salva!", "ok");
+    if(indiceRes && !indiceRes.ok) guardarMsgPosReload("Turma salva, mas não foi possível atualizar o índice de anos (" + indiceRes.motivo + "). Use \"Reconstruir índice\" na Gestão do Ano Ativo.", "warn");
+    else guardarMsgPosReload("Turma salva!", "ok");
     window.location.reload();
   }
 

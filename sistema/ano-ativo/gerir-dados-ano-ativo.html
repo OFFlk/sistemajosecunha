@@ -101,7 +101,11 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 /* ── Consistência (matrículas sem turma/aluno, alunos sem matrícula): layout local; cor só por .badge / --ui-* ── */
 .cons-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-.cons-barra .cons-ano { width:130px; }
+.cons-barra .cons-ano { width:150px; }
+.row-btns .ano-sel { width:190px; }
+/* índice de anos (espelho do card de Gestão de Atas) */
+.chips-anos { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+.aviso-linha { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 .cons-barra .cons-busca { flex:1; min-width:200px; }
 .cons-area[hidden] { display:none; }
 .cons-lista { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
@@ -139,10 +143,25 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     <div class="console" id="logGeral" style="display:none;"></div>
   </div>
 
+  <!-- ── ÍNDICE DE ANOS (espelho do atasIndice) ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secIndice', event)">
+      <h3>📅 Índice de anos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Lista dos anos letivos das turmas do ano ativo, guardada no documento da escola (campo <b>anoAtivoIndice</b>). Ela alimenta os filtros de ano desta página — assim nenhum card precisa ler as turmas só para montar o filtro (1 leitura para tudo). O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas e também remove anos que não têm mais turma. Enquanto o índice estiver vazio, os filtros usam uma lista fixa de anos.</span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-controls="secIndice" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secIndice">
+      <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
+      <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
+      <div class="row-btns">
+        <button class="btn primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secPesquisa', event)">
-      <h3>🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo; o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
+      <h3>🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo (a lista vem do índice de anos das escolas escolhidas); o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
       <button type="button" class="sec-toggle" id="togSecPesquisa" aria-expanded="true" aria-controls="secPesquisa" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secPesquisa">
@@ -157,7 +176,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <div class="psq-chips" id="psqChips"></div>
       </div>
       <div class="row-btns">
-        <input type="number" id="psqAno" class="input cresce" min="2000" max="2100" placeholder="Digite o ano letivo (vazio = ano ativo de cada escola)">
+        <select id="psqAno" class="input cresce" aria-label="Ano letivo"><option value="">Ano ativo (padrão)</option></select>
         <button class="btn primary field-h" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
@@ -218,14 +237,15 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secGerarAta', event)">
-      <h3>📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Informe o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
+      <h3>📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Escolha o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
       <button type="button" class="sec-toggle" id="togSecGerarAta" aria-expanded="true" aria-controls="secGerarAta" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secGerarAta">
       <div class="row-btns mt-0">
-        <input type="number" id="gaAno" class="input cresce" min="2000" max="2100"
-          placeholder="Ano letivo da turma (ex.: 2025 — não pode ser o ano ativo)"
+        <select id="gaAno" class="input cresce" aria-label="Ano letivo da turma"
           onchange="document.getElementById('gaForm').style.display='none'; gaResetPlano();">
+          <option value="" disabled hidden selected>Ano letivo da turma (não pode ser o ano ativo)</option>
+        </select>
         <button class="btn secondary" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
       </div>
 
@@ -250,12 +270,14 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <!-- ── MIGRAÇÃO: dados de busca nas matrículas ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secMigracao', event)">
-      <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Lê todos os alunos e todas as matrículas uma única vez (1 leitura por documento). <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
+      <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Sem ano escolhido, lê todos os alunos e todas as matrículas (1 leitura por documento); com um ano, lê só as matrículas dele e os alunos dessas matrículas. <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
       <button type="button" class="sec-toggle" id="togSecMigracao" aria-expanded="true" aria-controls="secMigracao" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secMigracao">
+      <div class="muted">Escolha um ano para ler só as matrículas dele e os alunos dessas matrículas (menos leituras no banco), ou deixe em "Todos os anos".</div>
       <div class="row-btns">
-        <button class="btn secondary" id="btnMgAnalisar" onclick="migracaoAnalisar()">🔍 Analisar</button>
+        <select id="mgAno" class="input ano-sel" aria-label="Ano letivo" onchange="mgResetAno()"><option value="">Todos os anos</option></select>
+        <button class="btn secondary field-h" id="btnMgAnalisar" onclick="migracaoAnalisar()">🔍 Analisar</button>
       </div>
       <div id="mgPreview" class="mt-14" style="display:none;"></div>
       <div class="row-btns mt-14" id="mgAplicarWrap" style="display:none;">
@@ -268,12 +290,16 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <!-- ── CONTADORES DAS TURMAS ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secContadores', event)">
-      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Lê as turmas e as matrículas ativas do ano (1 leitura por matrícula). Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
+      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Escolha o ano antes de verificar: lê só as turmas e as matrículas ativas desse ano (1 leitura por documento). Os contadores só existem para o ano ativo; outro ano é recusado. Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
       <button type="button" class="sec-toggle" id="togSecContadores" aria-expanded="true" aria-controls="secContadores" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secContadores">
+      <div class="muted">Escolha o ano antes de verificar: só as turmas e as matrículas ativas dele são lidas. Os contadores só existem para o ano ativo.</div>
       <div class="row-btns">
-        <button class="btn secondary" id="btnCtVerificar" onclick="contadoresVerificar()">🔍 Verificar</button>
+        <select id="ctAno" class="input ano-sel" aria-label="Ano letivo" onchange="ctResetAno()">
+          <option value="" disabled hidden selected>Selecione o ano…</option>
+        </select>
+        <button class="btn secondary field-h" id="btnCtVerificar" onclick="contadoresVerificar()">🔍 Verificar</button>
       </div>
       <div id="ctPreview" class="mt-14" style="display:none;"></div>
       <div class="row-btns mt-14" id="ctAplicarWrap" style="display:none;">
@@ -295,7 +321,9 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     <div class="sec-body" id="secConsist">
       <div class="muted">Procura matrículas que ficaram soltas (sem turma ou sem aluno), alunos sem nenhuma matrícula e matrículas com ID fora do padrão. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede confirmação. Dados de busca divergentes e contadores das turmas continuam nos dois cards acima.</div>
       <div class="cons-barra">
-        <input type="text" class="input cons-ano" id="consAno" inputmode="numeric" maxlength="4" placeholder="Ano (ex.: 2025)" autocomplete="off">
+        <select class="input cons-ano" id="consAno" aria-label="Ano letivo">
+          <option value="" disabled hidden selected>Selecione o ano…</option>
+        </select>
         <button class="btn primary field-h" id="btnConsVerificar" onclick="consVerificar(false)">🔍 Verificar o ano</button>
         <button class="btn secondary field-h" id="btnConsGlobal" onclick="consVerificar(true)">🌐 Verificação global</button>
       </div>
@@ -399,7 +427,7 @@ document.addEventListener('auth:ready', async function () {
       'btnBuscarAluno', 'btnExcluirAluno',
       'btnBuscarTurma', 'btnExcluirTurma',
       'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar', 'btnCtDuplicadas',
-      'btnConsVerificar', 'btnConsGlobal'
+      'btnConsVerificar', 'btnConsGlobal', 'btnReconstruirAnos'
     ].forEach(id => {
       const el = document.getElementById(id);
       if (el) { el.disabled = true; el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
@@ -417,12 +445,14 @@ document.addEventListener('auth:ready', async function () {
     window.duplicadasRemover        = () => {};
     window.consVerificar            = () => {};
     window.consAcao                 = () => {};
+    window.reconstruirIndiceAnos    = () => {};
   }
 
   try { if (window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste(); }
   catch (e) { console.warn('ajustarContraste:', e); }
   try {
     await Promise.all([
+      carregarIndiceAnos().catch(e => console.error('[carregarIndiceAnos]', e)),
       psqIniciar().catch(e => console.error('[psqIniciar]', e)),
       inicializar().catch(e => console.error('[inicializar]', e)),
     ]);
@@ -613,6 +643,191 @@ function _confirmModal({ titulo, corpo, corDestaque, textoConfirmar, textoCancel
 }
 
 /* =============================================
+   ÍNDICE DE ANOS  (schools/{escola}.anoAtivoIndice.anos)
+   Espelho do atasIndice (Gestão de Atas) para o módulo de ano ativo: 1 leitura do doc da escola
+   alimenta os selects de ano desta página, sem ler turmas/matrículas só para montar filtro.
+   O cadastro de turmas do ano ativo acrescenta (arrayUnion) o ano a cada turma salva; aqui é a
+   reconstrução manual, a partir das turmas (poucas: 1 leitura por turma).
+============================================= */
+const ANO_MIN_ATIVO = 2000;
+let _indiceAnos = null;          // null = não foi possível ler / sem escola; [] = vazio
+let _indiceAtualizadoEm = '';
+let _anoAtivoEscola = null;      // ano ativo (configAnoAtivo), vindo da mesma leitura do índice
+let _indiceSemEscola = false;
+
+// Doc da escola lido UMA vez no boot (índice + ano ativo + pesquisa compartilham a mesma leitura).
+let _escolaDocP = null;
+function escolaDocUmaVez() {
+  if (!_escolaDocP) _escolaDocP = window.DB.escola.get().catch(e => { _escolaDocP = null; throw e; });
+  return _escolaDocP;
+}
+function _anosDoIndice(doc) {
+  const lista = doc && doc.anoAtivoIndice && doc.anoAtivoIndice.anos;
+  if (!Array.isArray(lista)) return [];
+  return [...new Set(lista.map(String).filter(a => /^\d{4}$/.test(a)))].sort((x, y) => y.localeCompare(x));
+}
+function _anosFallback(maxAno) {
+  const out = [];
+  for (let a = maxAno; a >= ANO_MIN_ATIVO; a--) out.push(String(a));
+  return out;
+}
+// Anos dos selects: índice; vazio/ilegível → lista fixa (ano seguinte → 2000), igual à pesquisa de atas.
+function _anosDoSelect() {
+  if (_indiceAnos && _indiceAnos.length) return _indiceAnos.slice();
+  return _anosFallback(new Date().getFullYear() + 1);
+}
+function _popularSelectsAno() {
+  const anos = _anosDoSelect();
+  const ativo = _anoAtivoEscola ? String(_anoAtivoEscola) : '';
+  const ph = '<option value="" disabled hidden>Selecione o ano…</option>';
+  const fill = (id, cabeca, lista, rotulo) => {
+    const sel = document.getElementById(id);
+    if (!sel) return null;
+    const atual = sel.value;
+    sel.innerHTML = cabeca + lista.map(a => `<option value="${esc(a)}">${esc(rotulo ? rotulo(a) : a)}</option>`).join('');
+    sel.value = lista.includes(atual) ? atual : '';
+    return sel;
+  };
+  fill('consAno', ph, anos);
+  fill('mgAno', '<option value="">Todos os anos</option>', anos);
+  // Gerar ata: só anos que NÃO são o ano ativo (regra do próprio card)
+  const base = _anoAtivoEscola || new Date().getFullYear();
+  const paraAta = (_indiceAnos && _indiceAnos.length) ? anos.filter(a => a !== String(base)) : _anosFallback(base - 1);
+  fill('gaAno', '<option value="" disabled hidden>Ano letivo da turma (não pode ser o ano ativo)</option>', paraAta);
+  // Contadores: o ano ativo sempre aparece (mesmo fora do índice) e já vem escolhido
+  let paraCt = anos.slice();
+  if (ativo && !paraCt.includes(ativo)) paraCt = [ativo, ...paraCt].sort((x, y) => y.localeCompare(x));
+  const selCt = fill('ctAno', ph, paraCt, a => a === ativo ? a + ' (ano ativo)' : a);
+  if (selCt && !selCt.value && ativo) selCt.value = ativo;
+}
+
+function _renderIndiceAnos() {
+  try { _popularSelectsAno(); } catch (e) { console.warn('[_popularSelectsAno]', e); }
+  const box = document.getElementById('indiceAnosBox');
+  const info = document.getElementById('indiceAnosInfo');
+  if (!box || !info) return;
+  info.innerHTML = ''; info.style.display = 'none';
+  if (_indiceSemEscola) { box.innerHTML = '<span class="muted">Selecione uma escola no topo da página para ver o índice.</span>'; return; }
+  if (_indiceAnos === null) { box.innerHTML = '<span class="muted">Não foi possível ler o índice.</span>'; return; }
+  if (!_indiceAnos.length) { box.innerHTML = '<span class="muted">Índice vazio — os filtros usam a lista fixa de anos. Clique em "Reconstruir índice".</span>'; return; }
+  box.innerHTML = _indiceAnos.map(a => `<span class="badge neutral">${esc(a)}</span>`).join('');
+  const d = _indiceAtualizadoEm ? new Date(_indiceAtualizadoEm) : null;
+  if (d && !isNaN(d)) {
+    const data = d.toLocaleDateString('pt-BR');
+    const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    info.innerHTML = `<span>Última reconstrução:</span><span class="badge">📅 ${esc(data)}</span><span class="badge">🕐 ${esc(hora)}</span>`;
+    info.style.display = 'flex';
+  }
+}
+
+async function carregarIndiceAnos() {
+  await waitAuth();
+  if (Auth.semEscola()) { _indiceSemEscola = true; _indiceAnos = null; _renderIndiceAnos(); return; }
+  _indiceSemEscola = false;
+  try {
+    const doc = await escolaDocUmaVez();
+    _indiceAnos = _anosDoIndice(doc);
+    _indiceAtualizadoEm = (doc && doc.anoAtivoIndice && doc.anoAtivoIndice.atualizadoEm) || '';
+    _anoAtivoEscola = gaAnoAtivoDe(doc);
+  } catch (e) {
+    console.warn('[carregarIndiceAnos]', e);
+    _indiceAnos = null;
+  }
+  _renderIndiceAnos();
+}
+
+function _anosDasTurmas(turmas) {
+  const set = new Set(); let invalidas = 0;
+  for (const t of turmas) {
+    const a = String(t.anoLetivo ?? '').trim();
+    if (/^\d{4}$/.test(a)) set.add(a); else invalidas++;
+  }
+  return { anos: [...set].sort((x, y) => y.localeCompare(x)), invalidas };   // mais recente primeiro
+}
+
+async function reconstruirIndiceAnos() {
+  if (!IS_ADMIN) return;
+  const btn = document.getElementById('btnReconstruirAnos');
+  const schoolId = String((window.Auth && Auth.getActiveSchoolId && Auth.getActiveSchoolId()) || '').trim();
+  if (!schoolId || schoolId.toUpperCase() === 'ADMIN' || !window.Auth || !Auth.db) {
+    setMsg('Selecione uma escola antes de reconstruir o índice.', 'err');
+    return;
+  }
+  let turmas;
+  setMsg('Lendo as turmas…', 'loading');
+  try { turmas = await window.DB.anoAtivoTurmas.list(); }
+  catch (e) {
+    console.warn('[reconstruirIndiceAnos]', e);
+    setMsg('Não foi possível ler as turmas — o índice não foi alterado. Tente de novo.', 'warn');
+    return;
+  }
+  const t0 = document.getElementById('_toastGlobal');
+  if (t0 && t0.classList.contains('toast-loading')) t0.remove();   // não deixa o "carregando" atrás do modal
+
+  const { anos: novos, invalidas } = _anosDasTurmas(turmas);
+  const atual = _indiceAnos || [];
+  const adicionados = novos.filter(a => !atual.includes(a));
+  const removidos = atual.filter(a => !novos.includes(a));
+  if (_indiceAnos !== null && !adicionados.length && !removidos.length) {
+    setMsg('O índice já está atualizado — nada a gravar.', 'ok');
+    return;
+  }
+  const linhas = [`Turmas consideradas: ${turmas.length}`, `Anos encontrados: ${novos.length ? novos.join(', ') : 'nenhum'}`, ''];
+  if (!turmas.length) linhas.push('Nenhuma turma no banco: o índice ficará vazio e os filtros usarão a lista fixa de anos.');
+  if (_indiceAnos === null) linhas.push('Não foi possível ler o índice atual; ele será substituído por esta lista.');
+  if (adicionados.length) linhas.push(`Serão adicionados: ${adicionados.join(', ')}`);
+  if (removidos.length) linhas.push(`Serão removidos: ${removidos.join(', ')}`);
+  if (invalidas) linhas.push('', `${invalidas} turma(s) sem ano válido (4 dígitos) foram ignoradas.`);
+  const ok = await _confirmModal({ titulo: 'Reconstruir índice de anos?', corpo: linhas.map(esc).join('\n'), textoConfirmar: 'Reconstruir' });
+  if (!ok) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Gravando…'; }
+  try {
+    await Auth.db.collection('schools').doc(schoolId)
+      .set({ anoAtivoIndice: { anos: novos, atualizadoEm: new Date().toISOString() } }, { merge: true });
+    _indiceAnos = novos;
+    _indiceAtualizadoEm = new Date().toISOString();
+    _escolaDocP = null;                       // o doc em memória ficou velho
+    _renderIndiceAnos();
+    const prev = PSQ_IDX.get(schoolId);       // a pesquisa também usa o índice novo
+    PSQ_IDX.set(schoolId, { anos: novos, anoAtivo: prev ? prev.anoAtivo : null });
+    psqAtualizarAnos();
+    setMsg(`Índice reconstruído (${novos.length} ano(s)).`, 'ok');
+  } catch (e) {
+    console.warn('[reconstruirIndiceAnos]', e);
+    setMsg('Não foi possível gravar o índice. Tente novamente.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Reconstruir índice'; }
+  }
+}
+
+/* ── leituras por ano (anoLetivo pode estar como número OU texto: duas consultas, juntadas sem repetir) ── */
+async function _lerDocsDoAno(colecao, ano, opts) {
+  const [a, b] = await Promise.all([
+    window.DB[colecao].whereEquals('anoLetivo', Number(ano), opts),
+    window.DB[colecao].whereEquals('anoLetivo', String(ano), opts),
+  ]);
+  return _consDedup(a, b);
+}
+// Alunos citados por estas matrículas (por campo alunoId; quem não vier, confirma pelo ID do documento).
+async function _alunosDasMats(mats) {
+  const ids = [...new Set(mats.map(m => _consS(m.alunoId)).filter(Boolean))];
+  const mapa = _consIndexar(await window.DB.anoAtivoAlunos.whereIn('alunoId', ids), 'alunoId');
+  (await _consGetMuitos('anoAtivoAlunos', ids.filter(id => !mapa.has(id)))).forEach((d, id) => { if (d) mapa.set(id, d); });
+  return [...new Set(mapa.values())];
+}
+// Trocar o ano descarta o resultado anterior (não fica preview de um ano com o select em outro)
+function mgResetAno() {
+  _MG = null; clearLogEl('logMigracao');
+  document.getElementById('mgPreview').style.display = 'none';
+  document.getElementById('mgAplicarWrap').style.display = 'none';
+}
+function ctResetAno() {
+  _CT = null; clearLogEl('logContadores');
+  ['ctPreview', 'ctAplicarWrap', 'ctDupWrap'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+}
+
+/* =============================================
    MIGRAÇÃO: dados de busca nas matrículas
    (nome, sexo, nascDia/Mes/Ano + série/turno/modelo/status em maiúsculas)
 ============================================= */
@@ -667,9 +882,13 @@ function _mgCalcular(alunos, mats) {
 let _MG = null;   // { patches }
 async function migracaoAnalisar() {
   if (!IS_ADMIN || !escolaSelecionada()) return;
+  const anoMg = document.getElementById('mgAno').value.trim();
   const ok = await _confirmModal({
     titulo: 'Analisar matrículas',
-    corpo: 'Lê TODOS os alunos e TODAS as matrículas desta escola (1 leitura por documento).\n\nNada é gravado nesta etapa. Use uma vez, depois da atualização do sistema.',
+    corpo: (anoMg
+      ? 'Lê as matrículas de ' + esc(anoMg) + ' e os alunos dessas matrículas (1 leitura por documento).'
+      : 'Lê TODOS os alunos e TODAS as matrículas desta escola, de todos os anos (1 leitura por documento).') +
+      '\n\nNada é gravado nesta etapa. Use uma vez, depois da atualização do sistema.',
     textoConfirmar: 'Analisar',
   });
   if (!ok) return;
@@ -679,8 +898,14 @@ async function migracaoAnalisar() {
   document.getElementById('mgPreview').style.display = 'none';
   document.getElementById('mgAplicarWrap').style.display = 'none';
   try {
-    setMsg('Lendo alunos e matrículas…', 'loading');
-    const [alunos, mats] = await Promise.all([window.DB.anoAtivoAlunos.list(), window.DB.anoAtivoMatriculas.list()]);
+    setMsg(anoMg ? 'Lendo as matrículas de ' + anoMg + '…' : 'Lendo alunos e matrículas…', 'loading');
+    let alunos, mats;
+    if (anoMg) {
+      mats = await _lerDocsDoAno('anoAtivoMatriculas', anoMg);
+      alunos = await _alunosDasMats(mats);
+    } else {
+      [alunos, mats] = await Promise.all([window.DB.anoAtivoAlunos.list(), window.DB.anoAtivoMatriculas.list()]);
+    }
     const r = _mgCalcular(alunos, mats);
     _MG = { patches: r.patches };
     const nomes = { nome: 'nome', sexo: 'sexo', nascDia: 'dia de nascimento', nascMes: 'mês de nascimento', nascAno: 'ano de nascimento', serie: 'série', turno: 'turno', modelo: 'modelo', status: 'status' };
@@ -689,7 +914,7 @@ async function migracaoAnalisar() {
     const el = document.getElementById('mgPreview');
     el.innerHTML =
       `<div class="stats-row">` +
-      `<div class="stat-box"><div class="stat-num">${mats.length}</div><div class="stat-lbl">matrículas lidas</div></div>` +
+      `<div class="stat-box"><div class="stat-num">${mats.length}</div><div class="stat-lbl">matrículas lidas${anoMg ? ' (' + esc(anoMg) + ')' : ''}</div></div>` +
       `<div class="stat-box"><div class="stat-num">${r.patches.length}</div><div class="stat-lbl">precisam de ajuste</div></div>` +
       `<div class="stat-box"><div class="stat-num">${r.orfas}</div><div class="stat-lbl">sem aluno (órfãs)</div></div></div>` +
       (linhas ? `<div class="preview-scroll"><table><thead><tr><th>Campo</th><th>Matrículas a ajustar</th></tr></thead><tbody>${linhas}</tbody></table></div>`
@@ -766,9 +991,20 @@ function _ctCalcular(turmasAno, matsAtivas) {
 
 async function contadoresVerificar() {
   if (!IS_ADMIN || !escolaSelecionada()) return;
+  const anoSel = document.getElementById('ctAno').value.trim();
+  if (!/^\d{4}$/.test(anoSel)) { setMsg('Selecione o ano a verificar.', 'warn'); return; }
+  // Só o ano ativo tem contador (qtdAlunos/qtdIntegral): a pesquisa ignora o contador dos outros anos.
+  // Verificar outro ano contaria 0 matrículas ATIVAS e proporia gravar zero nas turmas.
+  let anoAtivoLido;
+  try { anoAtivoLido = gaAnoAtivoDe(await window.DB.escola.get()); }
+  catch (e) { setMsg('Não foi possível ler o ano ativo da escola. Tente de novo.', 'err'); return; }
+  if (anoSel !== String(anoAtivoLido)) {
+    setMsg(`Os contadores só existem para o ano ativo (${anoAtivoLido}). Selecione ${anoAtivoLido}.`, 'warn');
+    return;
+  }
   const ok = await _confirmModal({
     titulo: 'Verificar contadores',
-    corpo: 'Lê as turmas e as matrículas ATIVAS do ano ativo (1 leitura por matrícula ativa).\n\nCada aluno é contado uma vez, na matrícula ativa mais recente, igual à pesquisa. Duplicidades são listadas. Nada é gravado nesta etapa.',
+    corpo: 'Lê só as turmas de ' + anoAtivoLido + ' e as matrículas ATIVAS desse ano (1 leitura por documento).\n\nCada aluno é contado uma vez, na matrícula ativa mais recente, igual à pesquisa. Duplicidades são listadas. Nada é gravado nesta etapa.',
     textoConfirmar: 'Verificar',
   });
   if (!ok) return;
@@ -778,8 +1014,8 @@ async function contadoresVerificar() {
   ['ctPreview', 'ctAplicarWrap', 'ctDupWrap'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   try {
     setMsg('Conferindo contadores…', 'loading');
-    const ano = gaAnoAtivoDe(await window.DB.escola.get());
-    const turmas = (await window.DB.anoAtivoTurmas.list()).filter(t => String(t.anoLetivo).trim() === String(ano));
+    const ano = anoAtivoLido;
+    const turmas = await _lerDocsDoAno('anoAtivoTurmas', ano);   // só as turmas do ano (não baixa as dos outros anos)
     // anoLetivo pode estar como número ou texto: as duas consultas leem só matrículas ATIVAS do ano
     const lidas = (await Promise.all([ano, String(ano)].map(av =>
       window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, { and: [['status', 'ATIVO']] })))).flat();
@@ -1454,7 +1690,7 @@ async function gaCarregar() {
     }
     const anoSel = parseInt(document.getElementById('gaAno').value.trim(), 10);
     if (!(anoSel >= 2000 && anoSel <= 2100)) {
-      setMsg('Informe o ano letivo (ex.: 2025) para carregar as turmas.', 'warn');
+      setMsg('Selecione o ano letivo para carregar as turmas.', 'warn');
       return;
     }
     // só as turmas do ano informado (anoLetivo pode estar como texto ou número)
@@ -1768,6 +2004,43 @@ async function gaRegistrarAnoNoIndice(ano) {
 const PSQ = { sel: [], linhas: [], titulo: '', ocupado: false };
 const PSQ_META = new Map();    // schoolId → { anoAtivo, turmas }          (cache só em memória)
 const PSQ_DADOS = new Map();   // `${schoolId}|${ano}` → linhas já montadas
+// Índice de anos por escola (memória da página): schoolId → { anos, anoAtivo }. 1 leitura do doc da escola, reaproveitada
+// por psqLerEscola (que antes lia o mesmo doc de novo). Só guarda leitura que deu certo.
+const PSQ_IDX = new Map();
+async function psqIndiceEscola(id) {
+  if (PSQ_IDX.has(id)) return PSQ_IDX.get(id);
+  const snap = await Auth.db.collection('schools').doc(id).get();
+  const d = snap.exists ? snap.data() : null;
+  const info = { anos: _anosDoIndice(d), anoAtivo: psqAnoAtivoDe(d) };
+  PSQ_IDX.set(id, info);
+  return info;
+}
+function psqAlvoIds() {
+  const todas = psqGlobal() && document.getElementById('psqTodas').checked;
+  return (todas ? psqEscolas() : PSQ.sel).map(e => e.id);
+}
+// Monta o select de ano com a UNIÃO dos índices das escolas que serão pesquisadas.
+// Nenhuma escola com índice → lista fixa. Nenhuma escola escolhida → só "Ano ativo (padrão)".
+let _psqAnosSeq = 0;
+async function psqAtualizarAnos() {
+  const sel = document.getElementById('psqAno');
+  if (!sel) return;
+  const seq = ++_psqAnosSeq, ids = psqAlvoIds(), atual = sel.value;
+  const cabeca = '<option value="">Ano ativo (padrão)</option>';
+  if (!ids.length) { sel.innerHTML = cabeca; return; }
+  sel.disabled = true;
+  try {
+    const infos = await Promise.all(ids.map(id => psqIndiceEscola(id).catch(() => null)));
+    if (seq !== _psqAnosSeq) return;          // a seleção mudou enquanto lia: a chamada mais nova assume
+    const set = new Set();
+    infos.forEach(i => i && i.anos.forEach(a => set.add(a)));
+    const anos = set.size ? [...set].sort((x, y) => y.localeCompare(x)) : _anosFallback(new Date().getFullYear() + 1);
+    sel.innerHTML = cabeca + anos.map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('');
+    sel.value = anos.includes(atual) ? atual : '';
+  } finally {
+    if (seq === _psqAnosSeq) sel.disabled = false;
+  }
+}
 const PSQ_NEE = [['tea','TEA'],['altasHabilidades','Altas hab.'],['defFisica','Def. física'],['defIntelectual','Def. intelectual'],
   ['defVisual','Def. visual','defVisualTipo'],['defAuditiva','Def. auditiva','defAuditivaTipo'],['tdah','TDAH'],['tpac','TPAC'],
   ['dislexia','Dislexia'],['discalculia','Discalculia'],['disgrafia','Disgrafia'],['dislalia','Dislalia']];
@@ -1842,14 +2115,17 @@ async function psqIniciar() {
   const glob = psqGlobal();
   document.getElementById('psqMulti').style.display = glob ? '' : 'none';
   document.getElementById('psqFixa').style.display = glob ? 'none' : '';
-  if (glob) return psqRenderSel();
+  if (glob) { psqRenderSel(); return psqAtualizarAnos(); }
   const sid = Auth.getActiveSchoolId(), ses = (Auth.getSession && Auth.getSession()) || {};
   const e = psqEscolas().find(x => x.id === sid);
   PSQ.sel = [{ id: sid, nome: (e && e.nome) || ses.schoolName || sid }];
   document.getElementById('psqFixaNome').textContent = PSQ.sel[0].nome;
-  try {                                   // ano ativo da escola do header (1 leitura)
-    const ano = psqAnoAtivoDe(await window.DB.escola.get());
-    if (ano) document.getElementById('psqAno').value = ano;
+  try {                                   // doc da escola do header: ano ativo + índice (1 leitura, a mesma do card do índice)
+    const doc = await escolaDocUmaVez();
+    PSQ_IDX.set(sid, { anos: _anosDoIndice(doc), anoAtivo: psqAnoAtivoDe(doc) });
+    await psqAtualizarAnos();
+    const ano = PSQ_IDX.get(sid).anoAtivo, selAno = document.getElementById('psqAno');
+    if (ano && [...selAno.options].some(o => o.value === String(ano))) selAno.value = String(ano);
   } catch (err) { console.warn('[psq] ano ativo:', err); }
 }
 function psqRenderSel() {
@@ -1873,16 +2149,19 @@ function psqAdicionar() {
   if (!PSQ.sel.some(x => x.id === e.id)) PSQ.sel.push(e);
   sel.value = '';
   psqRenderSel(); psqRenderChips();
+  psqAtualizarAnos();
 }
 function psqRemover(id) {
   PSQ.sel = PSQ.sel.filter(e => e.id !== id);
   psqRenderSel(); psqRenderChips();
+  psqAtualizarAnos();
 }
 function psqTodasMudou() {
   const todas = document.getElementById('psqTodas').checked;
   document.getElementById('psqSel').disabled = todas;
   document.getElementById('psqBtnAdd').disabled = todas;
   document.getElementById('psqChips').classList.toggle('off', todas);   // chips ficam guardados, só ignorados
+  psqAtualizarAnos();
 }
 
 /* ── leitura (uma escola por vez) ── */
@@ -1920,8 +2199,8 @@ async function psqLerEscola(e, anoDigitado) {
   const ref = Auth.db.collection('schools').doc(e.id);
   let meta = PSQ_META.get(e.id);
   if (!meta) {
-    const [eDoc, tSnap] = await Promise.all([ref.get(), ref.collection('anoAtivoTurmas').get()]);
-    meta = { anoAtivo: psqAnoAtivoDe(eDoc.exists ? eDoc.data() : null), turmas: new Map(tSnap.docs.map(d => [d.id, d.data()])) };
+    const [info, tSnap] = await Promise.all([psqIndiceEscola(e.id), ref.collection('anoAtivoTurmas').get()]);   // doc da escola: lido uma vez só
+    meta = { anoAtivo: info.anoAtivo, turmas: new Map(tSnap.docs.map(d => [d.id, d.data()])) };
     PSQ_META.set(e.id, meta);
   }
   const anoAtivo = meta.anoAtivo;
@@ -2186,7 +2465,7 @@ async function consVerificar(global) {
     if (!sim) return;
   } else {
     ano = _consS(document.getElementById('consAno').value);
-    if (!/^\d{4}$/.test(ano)) { setMsg('Informe o ano com 4 dígitos (ex.: 2025).', 'warn'); return; }
+    if (!/^\d{4}$/.test(ano)) { setMsg('Selecione o ano que deseja verificar.', 'warn'); return; }
   }
   _consOcupado = true;
   const b1 = document.getElementById('btnConsVerificar'), b2 = document.getElementById('btnConsGlobal');
