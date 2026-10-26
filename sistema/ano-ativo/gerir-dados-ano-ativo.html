@@ -177,6 +177,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       </div>
       <div class="row-btns">
         <select id="psqAno" class="input cresce" aria-label="Ano letivo"><option value="">Ano ativo (padrão)</option></select>
+        <select id="psqTurmas" class="input cresce" aria-label="Status das turmas"><option value="" selected>Todas as turmas</option><option value="ATIVA">Somente turmas ativas</option><option value="INATIVA">Somente turmas inativas</option></select>
         <button class="btn primary field-h" id="psqBtnPesq" onclick="psqPesquisar()">🔎 Pesquisar</button>
       </div>
       <div class="console" id="logPsq" style="display:none;"></div>
@@ -207,6 +208,31 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       </div>
 
       <div class="console" id="logExcluirAluno" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ── EXCLUSÃO PONTUAL: MATRÍCULA ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secExcluirMatricula', event)">
+      <h3>🗑️ Excluir matrícula (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove só <b>uma matrícula</b> (<b>anoAtivoMatriculas</b>), sem apagar o aluno nem a turma. A busca mostra se a matrícula tem algum problema (turma inativa, turma ou aluno inexistente, ID fora do padrão). Se a matrícula estiver ativa no ano ativo, o contador da turma é reduzido; o avatar dela só é apagado se nenhuma outra matrícula o usar. O erro <b>B6</b> da Consistência abre esta busca já preenchida. <b>Ação irreversível.</b></span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecExcluirMatricula" aria-expanded="true" aria-controls="secExcluirMatricula" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secExcluirMatricula">
+      <div class="row-btns">
+        <input type="text" id="inpMatIdExcluir" class="input cresce" placeholder="matriculaId (ex.: MAT|turmaId|ALU-000123|2026)">
+        <button class="btn secondary field-h" id="btnBuscarMatricula" onclick="buscarMatriculaExcluir()">🔍 Buscar</button>
+      </div>
+
+      <div id="previewMatricula" class="mt-14" style="display:none;">
+        <div id="previewMatInfo"></div>
+        <div id="previewMatProblemas" class="mt-8"></div>
+        <div id="previewMatEfeitos" class="mt-8"></div>
+        <div class="row-btns mt-14">
+          <button class="btn danger" id="btnExcluirMatricula" onclick="executarExclusaoMatricula()">🗑️ Excluir definitivamente</button>
+        </div>
+      </div>
+
+      <div class="console" id="logExcluirMatricula" style="display:none;"></div>
     </div>
   </div>
 
@@ -319,7 +345,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <button type="button" class="sec-toggle" id="togSecConsist" aria-expanded="true" aria-controls="secConsist" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secConsist">
-      <div class="muted">Procura matrículas que ficaram soltas (sem turma ou sem aluno), alunos sem nenhuma matrícula e matrículas com ID fora do padrão. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede confirmação. Dados de busca divergentes e contadores das turmas continuam nos dois cards acima.</div>
+      <div class="muted">Procura matrículas que ficaram soltas (sem turma ou sem aluno), alunos sem nenhuma matrícula, matrículas com ID fora do padrão e matrículas dentro de turmas inativas. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede confirmação. Dados de busca divergentes e contadores das turmas continuam nos dois cards acima.</div>
       <div class="cons-barra">
         <select class="input cons-ano" id="consAno" aria-label="Ano letivo">
           <option value="" disabled hidden selected>Selecione o ano…</option>
@@ -335,6 +361,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
           <div class="stat-box"><div class="stat-num" id="consStat_B2">0</div><div class="stat-lbl">B2 · Matrícula sem aluno</div></div>
           <div class="stat-box"><div class="stat-num" id="consStat_B3">0</div><div class="stat-lbl">B3 · Aluno sem matrícula</div></div>
           <div class="stat-box"><div class="stat-num" id="consStat_B5">0</div><div class="stat-lbl">B5 · ID fora do padrão</div></div>
+          <div class="stat-box"><div class="stat-num" id="consStat_B6">0</div><div class="stat-lbl">B6 · Matrícula em turma inativa</div></div>
         </div>
         <div class="cons-barra">
           <select class="input" id="consTipo" onchange="consFiltroMudou()" aria-label="Filtrar por tipo">
@@ -343,6 +370,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
             <option value="B2">B2 · Matrícula sem aluno</option>
             <option value="B3">B3 · Aluno sem matrícula</option>
             <option value="B5">B5 · ID fora do padrão</option>
+            <option value="B6">B6 · Matrícula em turma inativa</option>
           </select>
           <input type="text" class="input cons-busca" id="consBusca" oninput="consFiltroMudou()" placeholder="Filtrar por nome, ID do aluno ou turma" autocomplete="off">
           <span class="badge small" id="consEscopo"></span>
@@ -425,6 +453,7 @@ document.addEventListener('auth:ready', async function () {
     [
       'btnExportJSON', 'lblImportJSON',
       'btnBuscarAluno', 'btnExcluirAluno',
+      'btnBuscarMatricula', 'btnExcluirMatricula',
       'btnBuscarTurma', 'btnExcluirTurma',
       'btnMgAnalisar', 'btnMgAplicar', 'btnCtVerificar', 'btnCtAplicar', 'btnCtDuplicadas',
       'btnConsVerificar', 'btnConsGlobal', 'btnReconstruirAnos'
@@ -436,6 +465,8 @@ document.addEventListener('auth:ready', async function () {
     window.importarJSON           = () => {};
     window.buscarAlunoExcluir       = () => {};
     window.executarExclusaoAluno    = () => {};
+    window.buscarMatriculaExcluir   = () => {};
+    window.executarExclusaoMatricula = () => {};
     window.buscarTurmaExcluir       = () => {};
     window.executarExclusaoTurma    = () => {};
     window.migracaoAnalisar         = () => {};
@@ -899,13 +930,17 @@ async function migracaoAnalisar() {
   document.getElementById('mgAplicarWrap').style.display = 'none';
   try {
     setMsg(anoMg ? 'Lendo as matrículas de ' + anoMg + '…' : 'Lendo alunos e matrículas…', 'loading');
-    let alunos, mats;
+    let alunos, mats, turmasMg;
     if (anoMg) {
       mats = await _lerDocsDoAno('anoAtivoMatriculas', anoMg);
       alunos = await _alunosDasMats(mats);
+      turmasMg = await _lerDocsDoAno('anoAtivoTurmas', anoMg);
     } else {
-      [alunos, mats] = await Promise.all([window.DB.anoAtivoAlunos.list(), window.DB.anoAtivoMatriculas.list()]);
+      [alunos, mats, turmasMg] = await Promise.all([window.DB.anoAtivoAlunos.list(), window.DB.anoAtivoMatriculas.list(), window.DB.anoAtivoTurmas.list()]);
     }
+    // só contagem (nada é gravado aqui): matrículas que ainda estão dentro de turmas inativas
+    const turmasInativasMg = new Set(turmasMg.filter(t => _consS(t.status).toUpperCase() === 'INATIVA').flatMap(t => [t._id, _consS(t.turmaId)]).filter(Boolean));
+    const emTurmaInativa = mats.filter(m => turmasInativasMg.has(_consS(m.turmaId))).length;
     const r = _mgCalcular(alunos, mats);
     _MG = { patches: r.patches };
     const nomes = { nome: 'nome', sexo: 'sexo', nascDia: 'dia de nascimento', nascMes: 'mês de nascimento', nascAno: 'ano de nascimento', serie: 'série', turno: 'turno', modelo: 'modelo', status: 'status' };
@@ -916,7 +951,9 @@ async function migracaoAnalisar() {
       `<div class="stats-row">` +
       `<div class="stat-box"><div class="stat-num">${mats.length}</div><div class="stat-lbl">matrículas lidas${anoMg ? ' (' + esc(anoMg) + ')' : ''}</div></div>` +
       `<div class="stat-box"><div class="stat-num">${r.patches.length}</div><div class="stat-lbl">precisam de ajuste</div></div>` +
-      `<div class="stat-box"><div class="stat-num">${r.orfas}</div><div class="stat-lbl">sem aluno (órfãs)</div></div></div>` +
+      `<div class="stat-box"><div class="stat-num">${r.orfas}</div><div class="stat-lbl">sem aluno (órfãs)</div></div>` +
+      `<div class="stat-box"><div class="stat-num">${emTurmaInativa}</div><div class="stat-lbl">em turma inativa</div></div></div>` +
+      (emTurmaInativa ? `<div class="aviso-warn mt-12 mb-0">⚠️ ${emTurmaInativa} matrícula(s) em turma(s) inativa(s). Elas não aparecem na pesquisa, mas continuam no banco. Veja quais são em <b>Consistência</b> (B6).</div>` : '') +
       (linhas ? `<div class="preview-scroll"><table><thead><tr><th>Campo</th><th>Matrículas a ajustar</th></tr></thead><tbody>${linhas}</tbody></table></div>`
               : `<div class="muted mt-8">✅ Nenhum ajuste necessário.</div>`) +
       (r.dataRuim.size ? `<div class="aviso-warn mt-12 mb-0">⚠️ ${r.dataRuim.size} aluno(s) com data de nascimento ilegível (ficam sem dia/mês/ano): ${ruins}${r.dataRuim.size > 10 ? '…' : ''}. Corrija no cadastro.</div>` : '') +
@@ -1428,6 +1465,150 @@ async function executarExclusaoAluno() {
 
   } catch (e) {
     logEl('❌ Erro durante a exclusão: ' + e.message, 'logExcluirAluno');
+    setMsg('Erro durante a exclusão: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
+  }
+}
+
+/* =============================================
+   EXCLUSÃO PONTUAL — MATRÍCULA
+============================================= */
+let _matParaExcluir = null; // { m, matId, turma, aluno, outras, contador }
+
+async function buscarMatriculaExcluir() {
+  if (!IS_ADMIN) return;
+  const matId = document.getElementById('inpMatIdExcluir').value.trim();
+  document.getElementById('previewMatricula').style.display = 'none';
+  clearLogEl('logExcluirMatricula');
+  _matParaExcluir = null;
+
+  if (!matId) { logEl('⚠️ Informe o matriculaId.', 'logExcluirMatricula'); setMsg('Informe o matriculaId.', 'warn'); return; }
+
+  const btn = document.getElementById('btnBuscarMatricula');
+  btn.disabled = true; btn.textContent = 'Buscando...';
+  try {
+    await waitAuth();
+    if (!escolaSelecionada()) return;
+
+    const m = await window.DB.anoAtivoMatriculas.get(matId);
+    if (!m) {
+      logEl(`❌ Nenhuma matrícula encontrada com id "${matId}" em anoAtivoMatriculas.`, 'logExcluirMatricula');
+      setMsg(`Nenhuma matrícula encontrada com id "${matId}".`, 'err');
+      return;
+    }
+    const alunoId = _consS(m.alunoId), turmaId = _consS(m.turmaId);
+    const [turma, aluno, outras] = await Promise.all([
+      turmaId ? window.DB.anoAtivoTurmas.get(turmaId) : null,
+      alunoId ? window.DB.anoAtivoAlunos.get(alunoId) : null,
+      alunoId ? window.DB.anoAtivoMatriculas.whereEquals('alunoId', alunoId) : [],
+    ]);
+    const demais = (outras || []).filter(x => x._id !== m._id);
+
+    // contador da turma: só quando a matrícula está ATIVA no ano ativo e a turma ainda existe (mesma regra de "Excluir aluno")
+    let contador = null;
+    if (turma && String(m.status || 'ATIVO').toUpperCase() === 'ATIVO') {
+      const anoAtivo = gaAnoAtivoDe(await window.DB.escola.get());
+      if (_consS(m.anoLetivo) === String(anoAtivo)) contador = { integral: _ehInt(m.modelo) };
+    }
+    _matParaExcluir = { m, matId: m._id, turma, aluno, demais, contador };
+
+    const info = document.getElementById('previewMatInfo');
+    info.className = 'migr-item warn';
+    info.innerHTML = `<span class="badge neutral">MATRÍCULA</span> <b>${esc((aluno && (aluno.nome || aluno.nomeOficial)) || _consS(m.nome) || alunoId || '(sem nome)')}</b>` +
+      ` <span class="muted">(${esc(alunoId || '—')})</span><br>` +
+      `<span class="muted">Ano ${esc(_consS(m.anoLetivo) || '?')} · Turma ${esc(turma ? (turma.nome || turmaId) : (turmaId || '—'))} · ${esc(m.status || 'ATIVO')}${m.situacao ? ' · ' + esc(m.situacao) : ''}</span><br>` +
+      `<span class="muted">${esc(m._id)}</span>`;
+
+    // problemas encontrados (mesmos critérios da Consistência)
+    const probs = [];
+    if (!turmaId || !turma) probs.push(['B1', 'A turma ' + (turmaId || '(vazia)') + ' não existe em anoAtivoTurmas.']);
+    else if (_consS(turma.status).toUpperCase() === 'INATIVA') probs.push(['B6', 'A turma ' + (turma.nome || turmaId) + ' está inativa e ainda tem esta matrícula.']);
+    if (alunoId && !aluno) probs.push(['B2', 'O aluno ' + alunoId + ' não existe em anoAtivoAlunos.']);
+    const esperado = 'MAT|' + turmaId + '|' + alunoId + '|' + _consS(m.anoLetivo);
+    if (!alunoId || !turmaId) probs.push(['B5', 'A matrícula está sem alunoId ou turmaId.']);
+    else if (m._id !== esperado) probs.push(['B5', 'ID fora do padrão. Esperado pelos campos: ' + esperado]);
+    document.getElementById('previewMatProblemas').innerHTML = probs.length
+      ? `<b class="prev-tit">Problemas encontrados:</b>` + probs.map(([t, d]) => `<div class="migr-item warn"><span class="badge bad">${t}</span> ${esc(d)}</div>`).join('')
+      : `<div class="migr-item ok"><span class="badge ok">✅</span> Nenhum problema detectado nesta matrícula.</div>`;
+
+    const ef = [`<div class="migr-item danger"><span class="badge bad">APAGAR</span> A matrícula ${esc(m._id)}</div>`];
+    if (contador) ef.push(`<div class="migr-item danger"><span class="badge bad">AJUSTAR</span> Contador da turma ${esc(turma.nome || turmaId)}: −1 aluno${contador.integral ? ' (e −1 integral)' : ''}</div>`);
+    if (m.fotoFileId) ef.push(`<div class="migr-item danger"><span class="badge bad">APAGAR</span> Avatar ${esc(m.fotoFileId)} (se nenhuma outra matrícula o usar)</div>`);
+    if (aluno && !demais.length) ef.push(`<div class="migr-item warn"><span class="badge neutral">AVISO</span> Esta é a única matrícula do aluno: o cadastro dele continua existindo, sem matrícula. Para apagá-lo também, use "Excluir aluno".</div>`);
+    else if (aluno) ef.push(`<div class="migr-item ok"><span class="badge ok">✅</span> O aluno e as outras ${demais.length} matrícula(s) dele não são alterados.</div>`);
+    document.getElementById('previewMatEfeitos').innerHTML = ef.join('');
+
+    document.getElementById('previewMatricula').style.display = 'block';
+    logEl('✅ Matrícula encontrada. Revise antes de excluir.', 'logExcluirMatricula');
+  } catch (e) {
+    logEl('❌ Erro ao buscar: ' + e.message, 'logExcluirMatricula');
+    setMsg('Erro ao buscar: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Buscar';
+  }
+}
+
+async function executarExclusaoMatricula() {
+  if (!IS_ADMIN || !_matParaExcluir) return;
+  const { m, matId, turma, aluno, contador } = _matParaExcluir;
+
+  const confirmou = await _confirmModal({
+    titulo: '⚠️ Excluir matrícula definitivamente',
+    corDestaque: 'danger',
+    corpo: `Excluir a matrícula "${esc(matId)}"?\n\n` +
+      `- Aluno: ${esc((aluno && aluno.nome) || m.nome || m.alunoId || '—')}\n` +
+      `- Turma: ${esc(turma ? (turma.nome || turma._id) : (m.turmaId || '—'))} · ano ${esc(m.anoLetivo || '?')}\n` +
+      (contador ? `- O contador da turma será reduzido em 1${contador.integral ? ' (e o de integral também)' : ''}\n` : '') +
+      `\nO aluno e a turma não são apagados.\nEsta ação NÃO PODE ser desfeita.`,
+    textoConfirmar: 'Sim, excluir',
+  });
+  if (!confirmou) return;
+
+  setMsg('Excluindo matrícula…', 'loading');
+  const btn = document.getElementById('btnExcluirMatricula');
+  btn.disabled = true; btn.textContent = 'Excluindo...';
+  clearLogEl('logExcluirMatricula');
+
+  try {
+    // relê antes de gravar: se mudou desde a busca, não apaga no escuro
+    const atual = await window.DB.anoAtivoMatriculas.get(matId);
+    if (!atual) { setMsg('Essa matrícula já não existe.', 'warn'); logEl('⚠️ Essa matrícula já não existe.', 'logExcluirMatricula'); return; }
+
+    const ops = [{ col: 'anoAtivoMatriculas', op: 'delete', id: matId }];
+    if (contador && turma) {
+      const t = await window.DB.anoAtivoTurmas.get(turma._id);   // só desconta se a turma ainda existe
+      if (t) {
+        const FV = window.Auth.firebase.firestore.FieldValue;
+        const data = { qtdAlunos: FV.increment(-1) };
+        if (contador.integral) data.qtdIntegral = FV.increment(-1);
+        ops.push({ col: 'anoAtivoTurmas', op: 'update', id: t._id, data });
+      }
+    }
+    logEl(`Excluindo matrícula ${matId}...`, 'logExcluirMatricula');
+    await window.DB.batchWrite(ops);
+    logEl('  ✅ Matrícula apagada.', 'logExcluirMatricula');
+
+    if (m.fotoFileId) {                    // só depois do Firestore: mídia órfã é pior que arquivo a mais
+      let emUso = !!(aluno && aluno.fotoFileId === m.fotoFileId);
+      if (!emUso) {
+        try { emUso = (await window.DB.anoAtivoMatriculas.whereEquals('fotoFileId', m.fotoFileId, { limit: 1 })).length > 0; }
+        catch (e) { emUso = true; logEl('  ⚠️ Não foi possível checar o uso do avatar ' + m.fotoFileId + '; mantido por segurança.', 'logExcluirMatricula'); }
+      }
+      if (!emUso) await _apagarArquivoRemoto(m.fotoFileId, 'image', 'Avatar (' + m.fotoFileId + ')', 'logExcluirMatricula');
+    }
+
+    logEl('', 'logExcluirMatricula');
+    logEl('🎉 Exclusão concluída.', 'logExcluirMatricula');
+    setMsg('Matrícula excluída com sucesso!', 'ok');
+    try { consMatriculaExcluida(matId); } catch (_) {}      // tira da lista de Consistência, sem reler nada
+
+    document.getElementById('previewMatricula').style.display = 'none';
+    document.getElementById('inpMatIdExcluir').value = '';
+    _matParaExcluir = null;
+    await inicializar();
+  } catch (e) {
+    logEl('❌ Erro durante a exclusão: ' + e.message, 'logExcluirMatricula');
     setMsg('Erro durante a exclusão: ' + e.message, 'err');
   } finally {
     btn.disabled = false; btn.textContent = '🗑️ Excluir definitivamente';
@@ -2180,9 +2361,10 @@ function psqLinha(esc_, ano, m, a, turmas) {
   a = a || {};
   const nee = PSQ_NEE.filter(x => a[x[0]]).map(x => (x[2] && a[x[2]]) || x[1]).join(', ');
   const t = turmas.get(m.turmaId);
+  const turmaInativa = !!t && String(t.status || '').trim().toUpperCase() === 'INATIVA';
   const nasc = String(a.dataNascimento || '').trim();
   return {
-    escola: esc_.nome, ano: String(ano), turma: (t && t.nome) || m.turmaId || '',
+    escola: esc_.nome, ano: String(ano), turma: ((t && t.nome) || m.turmaId || '') + (turmaInativa ? ' (inativa)' : ''), turmaInativa,
     serie: String(m.serie || '').toUpperCase(),
     nome: String(a.nome || '').trim() || `(sem cadastro) ${m.alunoId}`,
     cpf: String(a.cpf || '').trim(), dataNascimento: psqDataBR(nasc), idade: psqIdade(nasc),
@@ -2267,7 +2449,13 @@ async function psqPesquisar() {
       try {
         const r = await psqLerEscola(alvo[i], anoDig);
         if (r.aviso) falhas.push(`${alvo[i].nome}: ${r.aviso}`);
-        else { r.linhas.forEach(l => linhas.push(l)); anos.add(r.ano); logEl(`✅ ${alvo[i].nome}: ${r.linhas.length} aluno(s) (${r.ano})${r.cache ? ' — já carregado, sem nova leitura' : ''}.`, 'logPsq'); }
+        else {
+          // o filtro de turmas age sobre as linhas já lidas (o cache guarda todas, então trocar o filtro não relê o banco)
+          const fTurmas = document.getElementById('psqTurmas').value;
+          const doFiltro = r.linhas.filter(l => !fTurmas || (fTurmas === 'INATIVA' ? l.turmaInativa : !l.turmaInativa));
+          doFiltro.forEach(l => linhas.push(l)); anos.add(r.ano);
+          logEl(`✅ ${alvo[i].nome}: ${doFiltro.length} aluno(s) (${r.ano})${r.cache ? ' — já carregado, sem nova leitura' : ''}.`, 'logPsq');
+        }
       } catch (e) {
         console.error('[psq]', alvo[i].id, e);
         falhas.push(`${alvo[i].nome}: ${e.code || e.message || e}`);
@@ -2277,7 +2465,8 @@ async function psqPesquisar() {
     if (!linhas.length) return setMsg(falhas.length ? 'Nenhum aluno encontrado; veja o registro abaixo do card.' : 'Nenhum aluno encontrado.', 'warn');
     if (falhas.length) setMsg(`${falhas.length} escola(s) não puderam ser lidas (veja o registro).`, 'warn');
     PSQ.linhas = linhas.sort(psqCmp);
-    PSQ.titulo = `Alunos · ${alvo.length} escola(s) · ano ${Array.from(anos).sort().join(', ')}`;
+    const _fT = document.getElementById('psqTurmas').value;
+    PSQ.titulo = `Alunos · ${alvo.length} escola(s) · ano ${Array.from(anos).sort().join(', ')}` + (_fT === 'INATIVA' ? ' · turmas inativas' : _fT === 'ATIVA' ? ' · turmas ativas' : '');
     psqAbrirModal();
   } finally {
     PSQ.ocupado = false;
@@ -2355,7 +2544,7 @@ function psqPdf() {
 
 
 /* =============================================
-   CONSISTÊNCIA — matrículas soltas e alunos sem matrícula (B1, B2, B3, B5)
+   CONSISTÊNCIA — matrículas soltas, alunos sem matrícula e matrículas em turma inativa (B1, B2, B3, B5, B6)
    Nada é corrigido sozinho: cada correção relê o banco, confere se o estado ainda é
    o do relatório, mostra o que vai mudar, pede confirmação e grava num batchWrite atômico.
    (B4 "dados copiados divergentes" = card "Dados de busca nas matrículas";
@@ -2366,6 +2555,7 @@ const CONS_TIPOS = {
   B2: { rot: 'Matrícula sem aluno', chip: 'bad'  },
   B3: { rot: 'Aluno sem matrícula', chip: 'gray' },
   B5: { rot: 'ID fora do padrão',   chip: 'gray' },
+  B6: { rot: 'Matrícula em turma inativa', chip: 'bad' },
 };
 const CONS_PAG = 50;
 let _cons = { itens: [], uid: 0, pag: 1, escopo: '', rodou: false };
@@ -2432,6 +2622,10 @@ function _consAnalisar(ctx) {
     }
     if (alunoId && !ctx.alunoMap.has(alunoId)) {
       itens.push({ tipo: 'B2', ...base, detalhe: ['O aluno ' + alunoId + ' não existe em anoAtivoAlunos. Os dados pessoais não podem ser recriados a partir da matrícula.'] });
+    }
+    const tInat = turmaId && ctx.turmaMap.get(turmaId);
+    if (tInat && _consS(tInat.status).toUpperCase() === 'INATIVA') {
+      itens.push({ tipo: 'B6', ...base, detalhe: ['A turma ' + (_consS(tInat.nome) || turmaId) + ' está inativa e ainda tem esta matrícula (' + base.status + '). Ela some da pesquisa, mas os campos continuam no banco.'] });
     }
     const esperado = 'MAT|' + turmaId + '|' + alunoId + '|' + _consS(m.anoLetivo);
     if (!alunoId || !turmaId) {
@@ -2512,6 +2706,7 @@ function _consItemHtml(i) {
     B1: [b('apagarMat', 'danger', '🗑 Apagar matrícula')],
     B2: [b('apagarMat', 'danger', '🗑 Apagar matrícula')],
     B3: [b('abrirExcluir', 'secondary', '↗ Abrir em "Excluir aluno"')],
+    B6: [b('abrirExcluirMat', 'secondary', '↗ Abrir em "Excluir matrícula"')],
   }[i.tipo] || ['<span class="badge small gray">só relatório</span>'];
   return '<div class="cons-item subcard">' +
     '<div class="cons-left"><div class="cons-tit">' + esc(i.nome || '(sem nome)') + '</div><div class="cons-chips">' + chips.join('') + '</div>' + det + '</div>' +
@@ -2557,7 +2752,7 @@ async function consAcao(uid, acao, btn) {
   if (!IS_ADMIN || _consOcupado) return;
   const it = _cons.itens.find(x => x.uid === uid);
   if (!it) return;
-  const fn = { apagarMat: _consApagarMat, abrirExcluir: _consAbrirExcluir }[acao];
+  const fn = { apagarMat: _consApagarMat, abrirExcluir: _consAbrirExcluir, abrirExcluirMat: _consAbrirExcluirMat }[acao];
   if (!fn) return;
   _consOcupado = true; if (btn) btn.disabled = true;
   try { await fn(it); }
@@ -2621,6 +2816,22 @@ async function _consAbrirExcluir(it) {
   campo.value = it.alunoId;
   corpo.scrollIntoView({ behavior: 'smooth', block: 'start' });
   await buscarAlunoExcluir();
+}
+// B6 — abre o card "Excluir matrícula" já com a matrícula preenchida e buscada
+async function _consAbrirExcluirMat(it) {
+  const campo = document.getElementById('inpMatIdExcluir');
+  const corpo = document.getElementById('secExcluirMatricula');
+  if (!campo || !corpo) return;
+  if (corpo.classList.contains('collapsed')) toggleSec('secExcluirMatricula');
+  campo.value = it.matId;
+  corpo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  await buscarMatriculaExcluir();
+}
+// chamada pelo card "Excluir matrícula": sai da lista de Consistência na hora, sem reler o banco
+function consMatriculaExcluida(matId) {
+  const id = _consS(matId);
+  if (!id || !_cons.rodou) return;
+  _consRemoverMat(id);
 }
 /* FIM CONSISTÊNCIA */
 </script>
