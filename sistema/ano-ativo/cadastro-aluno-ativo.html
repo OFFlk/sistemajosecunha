@@ -1099,9 +1099,12 @@ function normSerie(s){
     const anoFiltro = String(anoLetivo?.value || getAnoAtivoDefault());
     const allTurmas = getTurmas();
     // Filtra por ano letivo (respeita o select de ano)
-    const turmas = anoFiltro
+    const turmaEdicao = String(window._turmaEdicaoId || "");
+    const turmas = (anoFiltro
       ? allTurmas.filter(t => String(t.anoLetivo||"") === anoFiltro)
-      : allTurmas;
+      : allTurmas
+    ).filter(t => (t.status || 'ATIVA').toString().toUpperCase() !== 'INATIVA'
+                  || (turmaEdicao && (t.turmaId||t.id) === turmaEdicao));   // turma inativa não aceita aluno novo (na edição, a própria turma do aluno continua listada, travada)
 
     turmaSelect.innerHTML = '<option value="" disabled hidden selected></option>';
     // ordenar por ano desc, depois nome
@@ -1273,6 +1276,8 @@ function normSerie(s){
     return setMsg("Selecione uma escola no topo da página antes de cadastrar.", "err");
   const turmaSel = getSelectedTurma();
   if(!turmaSel) return setMsg("Selecione uma turma.", "err");
+  if((turmaSel.status || 'ATIVA').toString().toUpperCase() === 'INATIVA')
+    return setMsg("Esta turma está inativa e não aceita novos alunos. Reative a turma em Cadastro de turmas ou escolha outra.", "err");
 
   const tid   = turmaSel.turmaId || turmaSel.id;
   const tnome = turmaSel.nome || tid;
@@ -1878,6 +1883,7 @@ function normSerie(s){
         }
 
         if(matAluno && matAluno.turmaId){
+          window._turmaEdicaoId = matAluno.turmaId;   // loadTurmaOptions mantém essa turma mesmo se estiver inativa
           // Preenche o ano letivo ANTES de mexer na turma: loadTurmaOptions()
           // filtra as turmas disponíveis pelo anoLetivo atual do formulário,
           // então se isso não rodar primeiro a turma do ano certo nem aparece

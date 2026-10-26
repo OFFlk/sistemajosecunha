@@ -772,7 +772,16 @@ function _dedupMats(arr){
   });
   return Array.from(seen.values());
 }
+// Turma inativada (cadastro-turma-ativa.html): os alunos dela não entram na pesquisa.
+// Não é o mesmo que aluno INATIVO (transferido, desistente, falecido, aprovado...) — esses continuam aparecendo.
+function _turmaEhInativa(t){
+  return !!t && (t.status || '').toString().trim().toUpperCase() === 'INATIVA';
+}
+function _idsTurmasInativas(){
+  return new Set(turmas.filter(_turmaEhInativa).map(t => (t.turmaId || t.id || '').toString().trim()).filter(Boolean));
+}
 function _normalizarMats(lista){
+  const _inativas = _idsTurmasInativas();
   return lista.map(m => ({
     ...m,
     turmaId:   (m.turmaId || m.turma || m.TURMAID || "").trim(),
@@ -780,7 +789,7 @@ function _normalizarMats(lista){
     anoLetivo: (m.anoLetivo || m.ano || m.ANO || "").toString().trim(),
     serie:     normSerie(m.serie || m.SERIE || ""),
     status:    (m.status || "ATIVO").toString().trim().toUpperCase()
-  }));
+  })).filter(m => !_inativas.has(m.turmaId));   // matrícula de turma inativa não entra em nenhuma lista/filtro
 }
 function _sincMats(){
   const mp = _matsPorAno.get(String(anoSelecionadoOuAtivo()).trim());
@@ -1059,7 +1068,8 @@ async function carregarDB(){
 
 
   const anosSet = new Set();
-  turmas.forEach(t => t.anoLetivo && anosSet.add(String(t.anoLetivo)));
+  // Ano só aparece se tiver ao menos uma turma ativa (turma inativa não conta); o ano ativo sempre fica
+  turmas.forEach(t => { if(t.anoLetivo && !_turmaEhInativa(t)) anosSet.add(String(t.anoLetivo)); });
   if(anoAtivo) anosSet.add(anoAtivo);
   const anos = Array.from(anosSet).filter(Boolean).sort((a,b)=>Number(a)-Number(b));
   selAno.innerHTML = "";
