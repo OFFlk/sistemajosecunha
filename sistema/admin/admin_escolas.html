@@ -68,8 +68,8 @@
             <input id="schoolName" autocomplete="off" placeholder="Ex.: Escola Municipal José Cunha"/>
           </div>
           <div class="field">
-            <label for="schoolId">schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é gerado automaticamente pela página, a partir do nome da escola, e não pode ser editado.</span></span></label>
-            <input id="schoolId" autocomplete="off" placeholder="Ex.: ESCOLA_JOSE_CUNHA" readonly/>
+            <label for="schoolId">schoolId <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">O ID é sugerido automaticamente a partir do nome da escola, mas você pode alterá-lo ao cadastrar (só letras, números, _ e -; não pode repetir um já existente). Depois que a escola é criada o ID fica travado, porque todos os dados dela ficam gravados sob esse ID.</span></span></label>
+            <input id="schoolId" autocomplete="off" spellcheck="false" maxlength="60" placeholder="Ex.: ESCOLA_JOSE_CUNHA"/>
           </div>
           <div class="field">
             <label for="displayName">Nome de exibição <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Nome de exibição é o nome que aparece no header, nos seletores de escola e em algumas exportações informais. Tudo que for formal usa o Nome da escola, descrito no campo anterior. Máximo de 20 caracteres.</span></span></label>
@@ -479,6 +479,7 @@
           idDirty         = true;
           $name.value     = btn.dataset.name;
           $id.value       = editingId;
+          $id.readOnly    = true;   // escola existente: trocar o ID orfanaria subcoleções e usuários
           $display.value  = btn.dataset.display || '';
           const len = $display.value.length;
           $counter.textContent = len+'/20';
@@ -596,7 +597,33 @@
     if(!nm){ $id.value=''; return; }
     $id.value = await makeUniqueSchoolId(slugifySchoolId(nm));
   });
-  // schoolId é sempre gerado pela página — o campo é readonly (sem edição manual).
+  // schoolId: sugerido pelo nome, mas editável ao CRIAR uma escola. Ao editar uma escola
+  // existente o campo fica readonly (ver botão Editar), porque os dados dela vivem em
+  // schools/{schoolId}/... e os usuários apontam para esse ID.
+  const ID_VALIDO = /^[A-Z0-9][A-Z0-9_-]*$/;
+  function normalizarIdDigitado(v){
+    return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .toUpperCase().replace(/[^A-Z0-9_-]+/g,'_');
+  }
+  $id.addEventListener('input', () => {
+    if(editingId) return;
+    const pos = $id.selectionStart;
+    const antes = $id.value;
+    $id.value = normalizarIdDigitado(antes);
+    try{ $id.setSelectionRange(pos, pos); }catch(e){}
+    // campo apagado volta ao modo automático; qualquer texto digitado vira manual
+    idDirty = $id.value.trim() !== '';
+  });
+  $id.addEventListener('change', async () => {
+    if(editingId) return;
+    const v = $id.value.trim();
+    if(!v) { const nm = ($name.value||'').trim(); if(nm) $id.value = await makeUniqueSchoolId(slugifySchoolId(nm)); return; }
+    try{
+      if(v.toUpperCase() === 'ADMIN'){ setMsg('"ADMIN" é um ID reservado do sistema.', 'err'); return; }
+      const snap = await Auth.db.collection('schools').doc(v).get();
+      if(snap.exists) setMsg('Já existe uma escola com o ID '+v+'. Escolha outro.', 'err');
+    }catch(e){ /* a checagem definitiva acontece ao salvar */ }
+  });
 
   $frm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -609,7 +636,23 @@
     let   sid  = ($id.value||'').trim().toUpperCase();
 
     if(!nm){ setMsg('Informe o nome.', 'err'); return; }
-    if(!sid){ sid = await makeUniqueSchoolId(slugifySchoolId(nm)); }
+    if(!sid){ sid = await makeUniqueSchoolId(slugifySchoolId(nm)); idDirty = false; }
+
+    // Validação do ID só na CRIAÇÃO (escola existente mantém o ID travado).
+    if(!editingId){
+      if(sid === 'ADMIN'){ setMsg('"ADMIN" é um ID reservado do sistema. Escolha outro.', 'err'); return; }
+      if(!ID_VALIDO.test(sid) || /^__.*__$/.test(sid)){
+        setMsg('ID inválido. Use só letras, números, _ e - (começando por letra ou número).', 'err'); return;
+      }
+      // Checagem direta no banco (não na lista em cache): upsertSchool usa merge e
+      // sobrescreveria em silêncio uma escola que já existe com esse ID.
+      const jaExiste = (await Auth.db.collection('schools').doc(sid).get()).exists;
+      if(jaExiste){
+        if(idDirty){ setMsg('Já existe uma escola com o ID '+sid+'. Escolha outro.', 'err'); $id.focus(); return; }
+        sid = await makeUniqueSchoolId(slugifySchoolId(nm));   // ID automático ficou velho: gera outro livre
+        $id.value = sid;
+      }
+    }
 
     const btnSave = $frm.querySelector('button[type="submit"]');
     btnSave.disabled = true; btnSave.textContent = 'Salvando...';
@@ -635,7 +678,7 @@
       }
       if(schemaOk) setMsg(criando ? 'Escola cadastrada!' : 'Escola atualizada!', 'ok');
       else setMsg('Escola cadastrada, mas o schema padrão de Atas NÃO foi criado. Use o botão "Schema padrão" na lista.', 'err');
-      editingId = null; idDirty = false;
+      editingId = null; idDirty = false; $id.readOnly = false;
       $name.value = ''; $id.value = ''; $display.value = '';
       $counter.textContent = '0/20'; $counter.className = 'counter';
       await renderSchoolRows();
