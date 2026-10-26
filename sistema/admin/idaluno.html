@@ -36,6 +36,8 @@
   .manual{display:flex;gap:8px;align-items:flex-end;margin-top:14px}
   .manual .field{flex:1;min-width:0}
   .mt-12{margin-top:12px}
+  /* slider sobre o card de destaque: o accent-color de marca some contra o fundo de marca */
+  .card-destaque input[type="range"]{accent-color:var(--dest-fg)}
   @media (max-width:700px){.item{flex-direction:column}.container{padding:24px 16px}}
 </style>
 <title>Verificação de Alunos</title>
@@ -44,14 +46,14 @@
 <div id="header-placeholder"></div>
 
 <div class="container">
-  <div class="card">
+  <div class="card card-destaque">
     <h2 class="section-title">Verificação e vínculo de alunos</h2>
     <div class="aviso-warn" id="avisoSemEscola" hidden>ℹ️ Escolha uma escola no topo da página para verificar alunos.</div>
     <div class="barra">
-      <button class="btn primary" id="tab1" type="button" data-act="aba" data-a="atas">1) Duplicatas em Atas</button>
-      <button class="btn secondary" id="tab2" type="button" data-act="aba" data-a="cross">2) Ano-Ativo ↔ Atas</button>
-      <button class="btn secondary" id="tab3" type="button" data-act="aba" data-a="vinc">3) Vínculos</button>
-      <button class="btn secondary" id="tab4" type="button" data-act="aba" data-a="verif">4) Verificados</button>
+      <button class="btn primary field-h" id="tab1" type="button" data-act="aba" data-a="atas">1) Duplicatas em Atas</button>
+      <button class="btn secondary field-h" id="tab2" type="button" data-act="aba" data-a="cross">2) Ano-Ativo ↔ Atas</button>
+      <button class="btn secondary field-h" id="tab3" type="button" data-act="aba" data-a="vinc">3) Vínculos</button>
+      <button class="btn secondary field-h" id="tab4" type="button" data-act="aba" data-a="verif">4) Verificados</button>
       <div class="field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
         <input id="cut" type="range" min="70" max="95" value="85"/></div>
     </div>
@@ -60,8 +62,8 @@
   <div class="card" id="abaAtas">
     <h3 class="section-title">Duplicatas em Atas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Nada é lido do banco até você apertar <b>Carregar</b>. A análise de trajetória lê só as matrículas dos alunos com nome parecido.</span></span></h3>
     <div class="barra">
-      <button class="btn secondary" type="button" data-act="carAtas">🔄 Carregar alunos de Atas</button>
-      <button class="btn primary" type="button" id="btnTraj" data-act="traj1" disabled>🧭 Analisar trajetória</button>
+      <button class="btn secondary field-h" type="button" data-act="carAtas">🔄 Carregar alunos de Atas</button>
+      <button class="btn primary field-h" type="button" id="btnTraj" data-act="traj1" disabled>🧭 Analisar trajetória</button>
       <label class="check"><input type="checkbox" id="mostrarInc" autocomplete="off"> Mostrar incompatíveis (<span id="nInc">0</span>)</label>
     </div>
     <div class="stats-row">
@@ -75,9 +77,9 @@
   <div class="card" id="abaCross" hidden>
     <h3 class="section-title">Ano-Ativo ↔ Atas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Lista os alunos do Ano-Ativo sem vínculo com Atas. Os dois IDs continuam existindo; o vínculo é gravado em <b>alunos</b>. “Buscar compatíveis” não lê nada do banco; a análise de trajetória lê só as matrículas dos pares encontrados.</span></span></h3>
     <div class="barra">
-      <button class="btn secondary" type="button" data-act="carPend">🔄 Carregar pendentes do Ano-Ativo</button>
-      <button class="btn secondary" type="button" id="btnComp" data-act="buscarComp" disabled>🔎 Buscar compatíveis</button>
-      <button class="btn primary" type="button" id="btnTraj2" data-act="analCross" disabled>🧭 Analisar trajetória</button>
+      <button class="btn secondary field-h" type="button" data-act="carPend">🔄 Carregar pendentes do Ano-Ativo</button>
+      <button class="btn secondary field-h" type="button" id="btnComp" data-act="buscarComp" disabled>🔎 Buscar compatíveis</button>
+      <button class="btn primary field-h" type="button" id="btnTraj2" data-act="analCross" disabled>🧭 Analisar trajetória</button>
       <label class="check"><input type="checkbox" id="mostrarInc2" autocomplete="off"> Mostrar incompatíveis (<span id="nInc2">0</span>)</label>
     </div>
     <div class="stats-row">
@@ -96,8 +98,8 @@
   <div class="card" id="abaVinc" hidden>
     <h3 class="section-title">Vínculos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Desfazer um vínculo apaga só o elo em <b>alunos</b>: os cadastros de Atas e do Ano-Ativo continuam existindo. Os dados pessoais que o histórico guardava antes do vínculo não voltam.<br><br>“Conferir” lê todos os alunos de Atas e do Ano-Ativo (1 leitura por documento) e marca os vínculos que apontam para um aluno que não existe mais. Eles aparecem primeiro na lista.</span></span></h3>
     <div class="barra">
-      <button class="btn secondary" type="button" data-act="carVinc">🔄 Carregar vínculos</button>
-      <button class="btn secondary" type="button" id="btnConfVinc" data-act="confVinc" disabled>🔍 Conferir se os alunos existem</button>
+      <button class="btn secondary field-h" type="button" data-act="carVinc">🔄 Carregar vínculos</button>
+      <button class="btn secondary field-h" type="button" id="btnConfVinc" data-act="confVinc" disabled>🔍 Conferir se os alunos existem</button>
       <div class="field"><label for="filtroVinc">Filtrar por nome ou ID</label><input class="input" id="filtroVinc" placeholder="Nome ou ID"/></div>
     </div>
     <div class="stats-row">
@@ -110,7 +112,7 @@
   <div class="card" id="abaVerif" hidden>
     <h3 class="section-title">Verificados <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Pares marcados como “são diferentes” e alunos marcados como verificados. “Voltar a analisar” faz o par (ou o aluno) voltar a ser sugerido.</span></span></h3>
     <div class="barra">
-      <button class="btn secondary" type="button" data-act="carVerif">🔄 Carregar verificados</button>
+      <button class="btn secondary field-h" type="button" data-act="carVerif">🔄 Carregar verificados</button>
       <div class="field"><label for="filtroVerif">Filtrar por nome ou ID</label><input class="input" id="filtroVerif" placeholder="Nome ou ID"/></div>
     </div>
     <div class="stats-row"><div class="stat-box"><div class="stat-num" id="statVerif">—</div><div class="stat-lbl">Verificados</div></div></div>
@@ -652,9 +654,9 @@ async function liberar(it){
 /* ── Eventos ── */
 function aba(x){
   $('abaAtas').hidden = x !== 'atas'; $('abaCross').hidden = x !== 'cross'; $('abaVinc').hidden = x !== 'vinc'; $('abaVerif').hidden = x !== 'verif';
-  $('tab4').className = 'btn ' + (x === 'verif' ? 'primary' : 'secondary');
-  $('tab3').className = 'btn ' + (x === 'vinc' ? 'primary' : 'secondary');
-  $('tab1').className = 'btn ' + (x === 'atas' ? 'primary' : 'secondary'); $('tab2').className = 'btn ' + (x === 'cross' ? 'primary' : 'secondary');
+  $('tab4').className = 'btn field-h ' + (x === 'verif' ? 'primary' : 'secondary');
+  $('tab3').className = 'btn field-h ' + (x === 'vinc' ? 'primary' : 'secondary');
+  $('tab1').className = 'btn field-h ' + (x === 'atas' ? 'primary' : 'secondary'); $('tab2').className = 'btn field-h ' + (x === 'cross' ? 'primary' : 'secondary');
 }
 async function comLoading(msg, fn){
   if(_semEscola()) return;
