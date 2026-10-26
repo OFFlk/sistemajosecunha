@@ -933,13 +933,29 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
         document.addEventListener('auth:ready', res, { once: true });
       });
 
-      const funcionarios = await window.DB.funcionarios.list();
+      // Professores ficam em funcionariosMatriculas (vínculo pessoa × ano): é lá que moram
+      // `funcao`, `status` e `anoLetivo`. A coleção `funcionarios` guarda só a pessoa.
+      const anoForm = parseInt($("anoSelect")?.value, 10) || getAnoAtivoDefault();
+      let mats = [];
+      try { mats = await window.DB.funcionariosMatriculas.whereEquals('anoLetivo', anoForm); }
+      catch (e) { console.warn('carregarProfessores (query por ano):', e); }
+      if (!mats.length) {
+        // Fallback: lê tudo e filtra no cliente (anoLetivo pode ter sido gravado como string)
+        const todas = await window.DB.funcionariosMatriculas.list();
+        mats = todas.filter(m => String(m.anoLetivo) === String(anoForm));
+      }
 
-      // Filtra quem tem função de professor/professora (case-insensitive)
-      const FUNCOES_PROF = ['PROFESSOR', 'PROFESSORA', 'PROFESSOR(A)'];
-      const profs = funcionarios.filter(f => {
-        const funcao = String(f.funcao || '').toUpperCase().trim();
-        return FUNCOES_PROF.some(fp => funcao.includes(fp));
+      // Só professores (funcao contém "PROFESSOR") e não inativos; sem duplicar a mesma pessoa
+      const vistos = new Set();
+      const profs = mats.filter(m => {
+        const funcao = String(m.funcao || '').toUpperCase().trim();
+        if (!funcao.includes('PROFESSOR')) return false;
+        const st = String(m.status || '').toUpperCase().trim();
+        if (st === 'INATIVO' || st === 'INATIVA') return false;
+        const chave = m.funcId || m._id;
+        if (vistos.has(chave)) return false;
+        vistos.add(chave);
+        return true;
       });
 
       // Preserva valor atual caso já esteja editando uma turma
@@ -966,7 +982,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 
       if (help) {
         if (profs.length === 0) {
-          help.textContent = 'Nenhum professor(a) cadastrado no sistema ainda.';
+          help.textContent = 'Nenhum professor(a) matriculado em ' + anoForm + '. Confira o cadastro de funcionários.';
         } else {
           help.textContent = '';
         }
@@ -978,6 +994,8 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
   }
 
   // ---------- events ----------
+  // Professores dependem do ano letivo: recarrega a lista quando o ano muda (só em turma nova)
+  $("anoSelect")?.addEventListener("change", ()=>{ if(!editingTurmaId) carregarProfessores(); });
   $("btnAddSerie")?.addEventListener("click", ()=>{
     const s = normalizeSerie($("serieSelect")?.value);
     if(!s) return;
