@@ -818,7 +818,7 @@ async function _garantirMatsDasTurmas(tMarcadas){
       _addMats(t.anoLetivo, _normalizarMats(r).filter(m => m.anoLetivo === String(t.anoLetivo).trim()));
       _turmasCarregadas.add(t.turmaId + '|' + st);
       // autoverificação do contador (sem custo extra: a lista já foi lida)
-      if(st === 'ATIVO' && typeof t.qtdAlunos === 'number' && !_divergAvisadas.has(t.turmaId)){
+      if(typeof t.qtdAlunos === 'number' && !_divergAvisadas.has(t.turmaId)){
         const real = _matsAtuaisDaTurma(t.turmaId, t.anoLetivo).length;
         if(real !== t.qtdAlunos){
           _divergAvisadas.add(t.turmaId);
@@ -866,7 +866,8 @@ function _qtdsTurma(t){
     const matsT = _matsAtuaisDaTurma(t.turmaId, t.anoLetivo);
     return { qtd: matsT.length, integral: matsT.filter(m => (m.modelo||'').toUpperCase() === 'INTEGRAL').length };
   }
-  if(ehAtual && typeof t.qtdAlunos === 'number') return { qtd: t.qtdAlunos, integral: typeof t.qtdIntegral === 'number' ? t.qtdIntegral : 0 };
+  // contador gravado na turma (card "Contadores das turmas" da gestão): vale para qualquer ano
+  if(typeof t.qtdAlunos === 'number') return { qtd: t.qtdAlunos, integral: typeof t.qtdIntegral === 'number' ? t.qtdIntegral : 0 };
   return { qtd: null, integral: 0 };
 }
 function _atualizarBadgesTurmas(lista){
