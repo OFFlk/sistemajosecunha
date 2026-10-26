@@ -316,11 +316,11 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <!-- ── CONTADORES DAS TURMAS ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secContadores', event)">
-      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano ativo contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Escolha o ano antes de verificar: lê só as turmas e as matrículas ativas desse ano (1 leitura por documento). Os contadores só existem para o ano ativo; outro ano é recusado. Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
+      <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano escolhido contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Escolha o ano antes de verificar: lê as turmas e as matrículas ativas desse ano (1 leitura por documento); em anos passados lê todas as matrículas do ano, já que estão encerradas. Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
       <button type="button" class="sec-toggle" id="togSecContadores" aria-expanded="true" aria-controls="secContadores" aria-label="Recolher">▼</button>
     </div>
     <div class="sec-body" id="secContadores">
-      <div class="muted">Escolha o ano antes de verificar: só as turmas e as matrículas ativas dele são lidas. Os contadores só existem para o ano ativo.</div>
+      <div class="muted">Escolha o ano antes de verificar: no ano ativo só as turmas e as matrículas ativas dele são lidas; em anos passados, todas as matrículas do ano.</div>
       <div class="row-btns">
         <select id="ctAno" class="input ano-sel" aria-label="Ano letivo" onchange="ctResetAno()">
           <option value="" disabled hidden selected>Selecione o ano…</option>
@@ -1007,7 +1007,7 @@ function _ctTs(m) {
   return d && !isNaN(d) ? d.getTime() : 0;
 }
 const _ctCanon = m => m._id === `MAT|${m.turmaId}|${m.alunoId}|${m.anoLetivo}`;
-function _ctCalcular(turmasAno, matsAtivas) {
+function _ctCalcular(turmasAno, matsAtivas, anoPassado) {
   const porAluno = new Map();
   matsAtivas.forEach(m => {
     const k = String(m.alunoId || '').trim(); if (!k) return;
@@ -1019,9 +1019,14 @@ function _ctCalcular(turmasAno, matsAtivas) {
   porAluno.forEach((lista, alunoId) => {
     const ord = lista.slice().sort((a, b) =>
       (_ctTs(b) - _ctTs(a)) || ((_ctCanon(b) ? 1 : 0) - (_ctCanon(a) ? 1 : 0)) || ((b.fotoUrl ? 1 : 0) - (a.fotoUrl ? 1 : 0)));
+    // ano passado: toda matrícula já está encerrada; vale a ATIVA se houver, senão a mais recente (igual à pesquisa)
+    if (anoPassado) {
+      const at = ord.filter(m => String(m.status || 'ATIVO').toUpperCase() === 'ATIVO');
+      if (at.length) ord.splice(0, ord.length, ...at);
+    }
     const keep = ord[0], c = cont.get(String(keep.turmaId));
     if (c) { c.qtd++; if (_ehInt(keep.modelo)) c.integral++; }
-    if (ord.length > 1) dups.push({ alunoId, nome: keep.nome || '', keep, remove: ord.slice(1), empate: _ctTs(ord[1]) === _ctTs(keep) });
+    if (!anoPassado && ord.length > 1) dups.push({ alunoId, nome: keep.nome || '', keep, remove: ord.slice(1), empate: _ctTs(ord[1]) === _ctTs(keep) });
   });
   return { cont, dups };
 }
@@ -1030,18 +1035,17 @@ async function contadoresVerificar() {
   if (!IS_ADMIN || !escolaSelecionada()) return;
   const anoSel = document.getElementById('ctAno').value.trim();
   if (!/^\d{4}$/.test(anoSel)) { setMsg('Selecione o ano a verificar.', 'warn'); return; }
-  // Só o ano ativo tem contador (qtdAlunos/qtdIntegral): a pesquisa ignora o contador dos outros anos.
-  // Verificar outro ano contaria 0 matrículas ATIVAS e proporia gravar zero nas turmas.
+  // Ano ativo: conta só matrículas ATIVAS. Ano passado: todas já estão encerradas, então lê todas as
+  // matrículas do ano e conta cada aluno uma vez, na matrícula atual dele (a mesma regra da pesquisa).
   let anoAtivoLido;
   try { anoAtivoLido = gaAnoAtivoDe(await window.DB.escola.get()); }
   catch (e) { setMsg('Não foi possível ler o ano ativo da escola. Tente de novo.', 'err'); return; }
-  if (anoSel !== String(anoAtivoLido)) {
-    setMsg(`Os contadores só existem para o ano ativo (${anoAtivoLido}). Selecione ${anoAtivoLido}.`, 'warn');
-    return;
-  }
+  const anoPassado = anoSel !== String(anoAtivoLido);
   const ok = await _confirmModal({
     titulo: 'Verificar contadores',
-    corpo: 'Lê só as turmas de ' + anoAtivoLido + ' e as matrículas ATIVAS desse ano (1 leitura por documento).\n\nCada aluno é contado uma vez, na matrícula ativa mais recente, igual à pesquisa. Duplicidades são listadas. Nada é gravado nesta etapa.',
+    corpo: anoPassado
+      ? 'Lê as turmas de ' + anoSel + ' e TODAS as matrículas desse ano (1 leitura por documento), porque em anos passados elas já estão encerradas.\n\nCada aluno é contado uma vez, na matrícula atual dele (a ativa, se houver; senão a mais recente), igual à pesquisa. Nada é gravado nesta etapa.'
+      : 'Lê só as turmas de ' + anoAtivoLido + ' e as matrículas ATIVAS desse ano (1 leitura por documento).\n\nCada aluno é contado uma vez, na matrícula ativa mais recente, igual à pesquisa. Duplicidades são listadas. Nada é gravado nesta etapa.',
     textoConfirmar: 'Verificar',
   });
   if (!ok) return;
@@ -1051,13 +1055,13 @@ async function contadoresVerificar() {
   ['ctPreview', 'ctAplicarWrap', 'ctDupWrap'].forEach(id => { document.getElementById(id).style.display = 'none'; });
   try {
     setMsg('Conferindo contadores…', 'loading');
-    const ano = anoAtivoLido;
+    const ano = anoSel;
     const turmas = await _lerDocsDoAno('anoAtivoTurmas', ano);   // só as turmas do ano (não baixa as dos outros anos)
     // anoLetivo pode estar como número ou texto: as duas consultas leem só matrículas ATIVAS do ano
-    const lidas = (await Promise.all([ano, String(ano)].map(av =>
-      window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, { and: [['status', 'ATIVO']] })))).flat();
+    const lidas = (await Promise.all([Number(ano), String(ano)].map(av =>
+      window.DB.anoAtivoMatriculas.whereEquals('anoLetivo', av, anoPassado ? undefined : { and: [['status', 'ATIVO']] })))).flat();
     const unicas = Array.from(new Map(lidas.map(m => [m._id, m])).values());
-    const { cont, dups } = _ctCalcular(turmas, unicas);
+    const { cont, dups } = _ctCalcular(turmas, unicas, anoPassado);
     const linhas = turmas.map(t => {
       const tid = String(t.turmaId || t._id), c = cont.get(tid);
       return { id: t._id || tid, nome: t.nome || tid, qtd: c.qtd, integral: c.integral, qtdAtual: t.qtdAlunos, integralAtual: t.qtdIntegral };
@@ -1065,7 +1069,7 @@ async function contadoresVerificar() {
     const difs = linhas.filter(l => l.qtdAtual !== l.qtd || l.integralAtual !== l.integral)
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
     const nomes = new Map(turmas.map(t => [String(t.turmaId || t._id), t.nome || t.turmaId || t._id]));
-    _CT = { difs, dups, total: linhas.length, ano, nomes };
+    _CT = { difs, dups, total: linhas.length, ano, nomes, anoPassado };
     const fmt = (q, i) => (q === undefined ? '—' : q) + ' / ' + (i === undefined ? '—' : i);
     const nT = id => esc(nomes.get(String(id)) || id);
     const el = document.getElementById('ctPreview');
@@ -1073,7 +1077,7 @@ async function contadoresVerificar() {
       `<div class="stats-row">` +
       `<div class="stat-box"><div class="stat-num">${linhas.length}</div><div class="stat-lbl">turmas de ${ano} conferidas</div></div>` +
       `<div class="stat-box"><div class="stat-num">${difs.length}</div><div class="stat-lbl">com divergência</div></div>` +
-      `<div class="stat-box"><div class="stat-num">${dups.length}</div><div class="stat-lbl">alunos com matrícula ativa duplicada</div></div></div>` +
+      (anoPassado ? '' : `<div class="stat-box"><div class="stat-num">${dups.length}</div><div class="stat-lbl">alunos com matrícula ativa duplicada</div></div>`) + `</div>` +
       (difs.length
         ? `<div class="preview-scroll"><table><thead><tr><th>Turma</th><th>Contador (alunos / integral)</th><th>Real (alunos / integral)</th></tr></thead><tbody>` +
           difs.map(d => `<tr><td>${esc(d.nome)}</td><td>${fmt(d.qtdAtual, d.integralAtual)}</td><td>${fmt(d.qtd, d.integral)}</td></tr>`).join('') + `</tbody></table></div>`
