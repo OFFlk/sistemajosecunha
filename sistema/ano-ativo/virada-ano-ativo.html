@@ -49,7 +49,7 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
   <div id="avisoSemEscola" class="aviso-warn" hidden>Escolha uma escola no topo da página para fazer a virada de ano.</div>
 
   <div class="card card-destaque">
-    <div class="card-head"><h3>Virada de ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cadastre antes as turmas do ano de destino em Cadastro de turmas, já com as séries certas. Aqui você leva os alunos das turmas de um ano para as de outro, criando as matrículas novas; as matrículas do ano de origem não são alteradas. Alunos com série diferente das séries da turma de destino são ignorados. Se o destino for anterior ao ano ativo, a situação do aluno no destino será pedida.</span></span></h3></div>
+    <div class="card-head"><h3>Virada de ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cadastre antes as turmas do ano de destino em Cadastro de turmas, já com as séries certas. Aqui você leva os alunos das turmas de um ano para as de outro, criando as matrículas novas; as matrículas do ano de origem não são alteradas. Alunos com série diferente das séries da turma de destino são ignorados. Se o destino for anterior ao ano ativo, a situação do aluno no destino será pedida e alunos ainda ativos também podem ser levados (fluxo inverso: a série sugerida é a anterior).</span></span></h3></div>
     <div class="va-params">
       <div class="field"><label for="anoOrigem">Ano de origem</label><select id="anoOrigem"></select></div>
       <div class="field"><label for="anoDestino">Ano de destino</label><input type="number" id="anoDestino" inputmode="numeric" min="2000" max="2100"></div>
@@ -147,6 +147,7 @@ function _confirmModal({ titulo, corpo, textoConfirmar }){
 // ── Séries (mesma lista e regras do cadastro de turmas) ──
 const CADEIA = ['G1','G2','G3','G4','G5','1º ANO','2º ANO','3º ANO','4º ANO','5º ANO','6º ANO','7º ANO','8º ANO','9º ANO','1º EM','2º EM','3º EM'];
 const normSerie = s => s ? String(s).trim().toUpperCase().replace(/\s+/g,' ').replace(/^EIXO\s*(\d)$/,'EIXO $1') : '';
+const anterior = s => { const i = CADEIA.indexOf(normSerie(s)); return i > 0 ? CADEIA[i - 1] : null; };
 const proxima = s => { const i = CADEIA.indexOf(normSerie(s)); return (i >= 0 && i < CADEIA.length - 1) ? CADEIA[i+1] : null; };
 
 // Chips de resultado (mapa do guia, por valor)
@@ -222,7 +223,7 @@ async function carregarOrigem(){
 function bloqueio(m){
   const id = String(m.alunoId), st = String(m.status || '').toUpperCase(), sit = String(m.situacao || '').toUpperCase();
   if(DEST.has(id)) return `já matriculado em ${nomeTurma(DEST.get(id))}`;
-  if(st === 'ATIVO' && !sit) return 'ainda ATIVA — encerre antes';
+  if(st === 'ATIVO' && !sit && !retro()) return 'ainda ATIVA — encerre antes';   // em destino retroativo, aluno ativo pode ser levado
   if(sit === 'FALECIDO') return 'falecido';
   return '';
 }
@@ -232,7 +233,8 @@ function renderAlunos(){
   if(!lista.length){ tb.innerHTML = '<tr><td colspan="5"><span class="subnote">Nenhum aluno para mostrar.</span></td></tr>'; return; }
   tb.innerHTML = lista.map(m => {
     const id = String(m.alunoId), blq = bloqueio(m), sit = String(m.situacao || '').toUpperCase(), p = PLANO.get(id);
-    const res = sit ? `<span class="badge small ${COR_RES[sit] || ''}">${esc(sit)}</span>` : '<span class="badge small gray">sem situação</span>';
+    const ativa = String(m.status || '').toUpperCase() === 'ATIVO' && !sit;
+    const res = sit ? `<span class="badge small ${COR_RES[sit] || ''}">${esc(sit)}</span>` : (ativa ? '<span class="badge small ok">ATIVO</span>' : '<span class="badge small gray">sem situação</span>');
     const dest = blq ? `<span class="badge small bad">${esc(blq)}</span>` :
       p ? `<span class="badge small">${esc(nomeTurma(p.turmaId))} · ${esc(p.serie)}${p.situacao ? ' · ' + esc(p.situacao) : ''}</span>` : '<span class="subnote">—</span>';
     return `<tr><td><input type="checkbox" data-id="${esc(id)}" ${blq ? 'disabled' : ''}></td><td>${esc(m.nome || id)}</td><td>${esc(m.serie || '')}</td><td>${res}</td><td>${dest}</td></tr>`;
@@ -258,6 +260,12 @@ async function atribuir(){
   ids.forEach(id => {
     const m = ORIG.find(x => String(x.alunoId) === id); if(!m) return;
     const sit = String(m.situacao || '').toUpperCase(), aprov = sit === 'APROVADO', origem = normSerie(m.serie);
+    const ativa = String(m.status || '').toUpperCase() === 'ATIVO' && !sit;       // só chega aqui em destino retroativo
+    if(ativa){                                                                      // fluxo inverso: série esperada = a anterior
+      const sa = escolhida || anterior(m.serie);
+      if(!sa || !seriesT.includes(sa)){ pulados++; return; }
+      novos.push([id, { mat: m, turmaId: t.turmaId, serie: sa, situacao: sitDest }]); return;
+    }
     // Só o APROVADO avança sozinho; reprovado, desistente e transferido ficam na mesma série
     let serie = escolhida || (aprov ? proxima(m.serie) : origem);
     if(!serie || !seriesT.includes(serie)){
