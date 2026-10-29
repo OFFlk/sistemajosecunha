@@ -2139,20 +2139,39 @@ function _prefixosBusca(nome){
   return [...prefixos].filter(Boolean);
 }
 
+const LIMITE_BUSCA_CATALOGO = 25;
+
 async function _candidatosCatalogo(nome, cachePrefixo){
   const prefixos = _prefixosBusca(nome);
   if (!prefixos.length) return [];
-  const listas = await Promise.all(prefixos.map(async p => {
+  const buscar = async (p) => {
     if (cachePrefixo && cachePrefixo.has(p)) return cachePrefixo.get(p);
-    const achados = await window.Identidade.buscarAtasPorNome(p, 25);
+    const achados = await window.Identidade.buscarAtasPorNome(p, LIMITE_BUSCA_CATALOGO);
     if (cachePrefixo) cachePrefixo.set(p, achados);
     return achados;
-  }));
+  };
+  const listas = await Promise.all(prefixos.map(buscar));
   const porId = new Map();
   for (const lista of listas) for (const a of lista) porId.set(a.alunoId, a);
-  return [...porId.values()]
+  const montar = () => [...porId.values()]
     .map(a => ({ alunoId:a.alunoId, nome:a.nome, score:similaridade(nome, a.nome) }))
     .filter(c => c.score >= SIMILARIDADE_CUT);
+
+  let cands = montar();
+
+  // Fallback: a consulta por prefixo devolve os N primeiros em ORDEM ALFABÉTICA. Se o prefixo do primeiro nome veio
+  // "cheio" (ex.: "mari" → Maria A…, Maria B…, … cortado em 25), o aluno certo pode ter ficado de fora.
+  // Só nesse caso, e só se nenhum candidato idêntico (100%) foi achado, faz UMA consulta pelo nome completo.
+  // Prefixo que veio com menos de 25 resultados está completo: não gasta leitura extra.
+  const primeiraCheia = (listas[0] || []).length >= LIMITE_BUSCA_CATALOGO;
+  if (primeiraCheia && !cands.some(c => c.score >= SIMILARIDADE_AUTO)) {
+    const nomeCompleto = window.Identidade.normNome(nome);
+    if (nomeCompleto && !prefixos.includes(nomeCompleto)) {
+      for (const a of await buscar(nomeCompleto)) porId.set(a.alunoId, a);
+      cands = montar();
+    }
+  }
+  return cands;
 }
 
 function _categoriaResultado(resultado) {
@@ -2219,19 +2238,23 @@ function avaliarTrajetoria(ultimo, novo) {
   const tipoTxt = serieNova.tipo || serieUltima.tipo || '';
   const fmt = (x) => x.ini === x.fim ? `${x.ini}` : `${x.ini} e ${x.fim}`;
   if (categoria === 'AVANCA') {
-    // Aprovado em [a,b] (b = a em série comum): o próximo registro começa em b+1.
-    const esperado = serieUltima.fim + 1;
-    if (serieNova.ini !== esperado) {
-      return { status:'amarelo', motivo:`série esperada era ${esperado}${tipoTxt?` (${tipoTxt})`:''}, mas veio ${fmt(serieNova)}${sufixoGap}` };
+    // Aprovado em [a,b] (b = a em série comum): com `gap` anos até o próximo registro, a série pode ser qualquer
+    // uma de b+1 até b+gap (os anos do meio podem simplesmente não estar cadastrados ainda).
+    const minimo = serieUltima.fim + 1, maximo = serieUltima.fim + gap;
+    if (serieNova.ini < minimo || serieNova.ini > maximo) {
+      const esperadoTxt = minimo === maximo ? `${minimo}` : `entre ${minimo} e ${maximo}`;
+      return { status:'amarelo', motivo:`série esperada era ${esperadoTxt}${tipoTxt?` (${tipoTxt})`:''}, mas veio ${fmt(serieNova)}${sufixoGap}` };
     }
   } else {
     // Reprovado/mantido em [a,b]: o próximo registro pode começar em qualquer série de a a b
     // (ex.: reprovou em "3º e 4º" → "3º e 4º", "4º e 5º", 3ª única ou 4ª única).
-    if (serieNova.ini < serieUltima.ini || serieNova.ini > serieUltima.fim) {
-      if (serieNova.ini === serieUltima.fim + 1) {
+    // Com `gap` anos de intervalo, ele pode ter repetido no 1º ano e avançado nos seguintes: aceita até fim+gap-1.
+    const maximoOk = serieUltima.fim + gap - 1;
+    if (serieNova.ini < serieUltima.ini || serieNova.ini > maximoOk) {
+      if (serieNova.ini === serieUltima.fim + gap) {
         return { status:'amarelo', motivo:`último registro (${ultimo.anoLetivo}) foi reprovado/mantido, mas a série avançou mesmo assim (prática comum em anos anteriores) — confira se é o mesmo aluno${sufixoGap}` };
       }
-      const esperadoTxt = serieUltima.ini === serieUltima.fim ? `${serieUltima.ini}` : `uma entre ${serieUltima.ini} e ${serieUltima.fim}`;
+      const esperadoTxt = serieUltima.ini === maximoOk ? `${serieUltima.ini}` : `uma entre ${serieUltima.ini} e ${maximoOk}`;
       return { status:'amarelo', motivo:`série esperada era ${esperadoTxt}${tipoTxt?` (${tipoTxt})`:''}, mas veio ${fmt(serieNova)}${sufixoGap}` };
     }
   }
