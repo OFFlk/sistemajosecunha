@@ -24,92 +24,68 @@
 <style>
 /* Prefixo desta página: va- (virada-ano-ativo). Sem variáveis próprias. */
 .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
-h1 { margin: 0 0 4px; font-size: 22px; font-weight: 800; }
-.sub { margin: 0 0 16px; color: var(--ui-muted); font-size: 14px; }
 .va-params { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
-.va-grid { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 16px; align-items: start; }
 .va-linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .va-linha .input { width: auto; min-width: 150px; }
-.va-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.va-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--ui-border); background: var(--ui-chip-bg); color: var(--ui-text); padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-.va-chip button { border: 0; background: transparent; cursor: pointer; color: var(--ui-text); font-weight: 900; padding: 0; }
-.va-turma { padding: 8px 0; border-bottom: 1px solid var(--ui-border); }
-.va-turma:last-child { border-bottom: 0; }
-.va-turma b { font-size: 14px; }
 .table-scroll { max-height: 460px; overflow: auto; }
 td .input { width: 100%; }
-@media (max-width: 900px) { .va-grid, .va-params { grid-template-columns: 1fr; } }
+.va-linha + .va-linha { margin-top: 10px; }
+.va-ano-ativo { display: flex; gap: 6px; align-items: center; min-height: var(--field-h, 43px); }
+@media (max-width: 900px) { .va-params { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <script>window.Auth && window.Auth.requireAuth();</script>
 <div id="header-placeholder"></div>
 <main class="wrap">
-  <h1>🔁 Virada de ano</h1>
-  <p class="sub">Leva alunos de turmas de um ano para turmas de outro, criando as matrículas novas. As matrículas do ano de origem não são alteradas.</p>
   <div id="avisoSemEscola" class="aviso-warn" hidden>Escolha uma escola no topo da página para fazer a virada de ano.</div>
 
-  <div class="card">
+  <div class="card card-destaque">
+    <div class="card-head"><h2>🔁 Virada de ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Cadastre antes as turmas do ano de destino em Cadastro de turmas, já com as séries certas. Aqui você leva os alunos das turmas de um ano para as de outro, criando as matrículas novas; as matrículas do ano de origem não são alteradas. Alunos com série diferente das séries da turma de destino são ignorados. Se o destino for anterior ao ano ativo, a situação do aluno no destino será pedida.</span></span></h2></div>
     <div class="va-params">
       <div class="field"><label for="anoOrigem">Ano de origem</label><select id="anoOrigem"></select></div>
       <div class="field"><label for="anoDestino">Ano de destino</label><input type="number" id="anoDestino" inputmode="numeric" min="2000" max="2100"></div>
-      <div class="field"><span class="help" id="infoAno">—</span></div>
+      <div class="field"><label>Ano ativo</label>
+        <div class="va-ano-ativo"><span class="badge" id="badgeAtivo">—</span><span class="badge neutral" id="badgeRetro" hidden>Destino retroativo</span></div>
+      </div>
     </div>
   </div>
 
-  <div class="va-grid">
-    <div>
-      <div class="card">
-        <div class="section-title">1. Turmas de destino</div>
-        <div id="listaDestino"><span class="subnote">Informe o ano de destino.</span></div>
-      </div>
-      <div class="card">
-        <div class="section-title">Nova turma</div>
-        <div class="field">
-          <label for="serieSel">Séries da turma</label>
-          <div class="va-linha">
-            <select id="serieSel" class="input"></select>
-            <button type="button" class="btn secondary field-h" id="btnAddSerie">Adicionar</button>
-          </div>
-        </div>
-        <div class="va-chips" id="chipsSeries"></div>
-        <div class="field"><label for="turnoNova">Turno</label>
-          <select id="turnoNova"><option>MATUTINO</option><option>VESPERTINO</option><option>NOTURNO</option><option>INTEGRAL</option></select>
-        </div>
-        <div class="va-linha" style="margin-top:12px"><button type="button" class="btn primary" id="btnCriarTurma">Criar turma</button></div>
-      </div>
+  <div class="card">
+    <div class="section-title">Distribuir alunos</div>
+    <div id="avisoSemTurmas" class="aviso-warn" hidden></div>
+    <div class="va-linha">
+      <select id="turmaOrigem" class="input" aria-label="Turma de origem"></select>
+      <select id="fSerie" class="input" aria-label="Filtrar por série"></select>
     </div>
+    <div class="va-linha">
+      <button type="button" class="btn secondary" id="btnSelAprov">Selecionar aprovados</button>
+      <button type="button" class="btn secondary" id="btnSelReprov">Selecionar reprovados</button>
+      <button type="button" class="btn neutral" id="btnLimparSel">Limpar seleção</button>
+    </div>
+    <div class="table-scroll" style="margin-top:10px">
+      <table><thead><tr><th><input type="checkbox" id="chkTodos" aria-label="Marcar todos"></th><th>Aluno</th><th>Série</th><th>Resultado</th><th>Destino</th></tr></thead>
+      <tbody id="tbAlunos"><tr><td colspan="5"><span class="subnote">Escolha uma turma de origem.</span></td></tr></tbody></table>
+    </div>
+    <div class="va-linha" style="margin-top:12px">
+      <select id="dTurma" class="input" aria-label="Turma de destino"></select>
+      <select id="dSerie" class="input" aria-label="Série de destino"></select>
+      <select id="dSit" class="input" aria-label="Situação no ano de destino" hidden></select>
+    </div>
+    <div class="va-linha">
+      <button type="button" class="btn primary" id="btnAtribuir">Atribuir aos marcados</button>
+      <button type="button" class="btn neutral" id="btnRemover">Remover atribuição</button>
+    </div>
+  </div>
 
-    <div>
-      <div class="card">
-        <div class="section-title">2. Distribuir alunos</div>
-        <div class="va-linha">
-          <select id="turmaOrigem" class="input" aria-label="Turma de origem"></select>
-          <select id="fSerie" class="input" aria-label="Filtrar por série"></select>
-          <button type="button" class="btn secondary" id="btnSelAprov">Selecionar aprovados</button>
-          <button type="button" class="btn secondary" id="btnSelReprov">Selecionar reprovados</button>
-          <button type="button" class="btn neutral" id="btnLimparSel">Limpar seleção</button>
-        </div>
-        <div class="table-scroll" style="margin-top:10px">
-          <table><thead><tr><th><input type="checkbox" id="chkTodos" aria-label="Marcar todos"></th><th>Aluno</th><th>Série</th><th>Resultado</th><th>Destino</th></tr></thead>
-          <tbody id="tbAlunos"><tr><td colspan="5"><span class="subnote">Escolha uma turma de origem.</span></td></tr></tbody></table>
-        </div>
-        <div class="va-linha" style="margin-top:12px">
-          <select id="dTurma" class="input" aria-label="Turma de destino"></select>
-          <select id="dSerie" class="input" aria-label="Série de destino"></select>
-          <select id="dSit" class="input" aria-label="Situação no ano de destino" hidden></select>
-          <button type="button" class="btn primary" id="btnAtribuir">Atribuir aos marcados</button>
-          <button type="button" class="btn neutral" id="btnRemover">Remover atribuição</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="section-title">3. Plano e confirmação</div>
-        <div id="plano"><span class="subnote">Nenhum aluno atribuído.</span></div>
-        <div class="va-linha" style="margin-top:12px"><button type="button" class="btn primary" id="btnGravar">Gravar plano</button></div>
-      </div>
-    </div>
+  <div class="card">
+    <div class="section-title">Plano e confirmação</div>
+    <div id="plano"><span class="subnote">Nenhum aluno atribuído.</span></div>
+    <div class="va-linha" style="margin-top:12px"><button type="button" class="btn primary" id="btnGravar">Gravar plano</button></div>
   </div>
 </main>
+
+<script src="../header-logic.js"></script>
 
 <script>
 (function(){
@@ -155,20 +131,9 @@ function _confirmModal({ titulo, corpo, textoConfirmar }){
 }
 
 // ── Séries (mesma lista e regras do cadastro de turmas) ──
-const SERIES = ['G1','G2','G3','G4','G5','ALFABETIZAÇÃO','EIXO 1','EIXO 2','EIXO 3','EIXO 4','EIXO 5','MULTISERIADA',
-  '1º ANO','2º ANO','3º ANO','4º ANO','5º ANO','6º ANO','7º ANO','8º ANO','9º ANO','1º EM','2º EM','3º EM'];
 const CADEIA = ['G1','G2','G3','G4','G5','1º ANO','2º ANO','3º ANO','4º ANO','5º ANO','6º ANO','7º ANO','8º ANO','9º ANO','1º EM','2º EM','3º EM'];
 const normSerie = s => s ? String(s).trim().toUpperCase().replace(/\s+/g,' ').replace(/^EIXO\s*(\d)$/,'EIXO $1') : '';
 const proxima = s => { const i = CADEIA.indexOf(normSerie(s)); return (i >= 0 && i < CADEIA.length - 1) ? CADEIA[i+1] : null; };
-const slugSerie = s => normSerie(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[ºª]/g,'').replace(/\s+/g,'_').replace(/[^A-Z0-9_]/g,'');
-const letras = n => { let o = '', x = n; for(;;){ o = String.fromCharCode(65 + (x % 26)) + o; x = Math.floor(x/26) - 1; if(x < 0) break; } return o; };
-const letrasIdx = s => { const t = String(s||'').toUpperCase().replace(/[^A-Z]/g,''); if(!t) return null; let n = 0; for(const c of t) n = n*26 + (c.charCodeAt(0)-64); return n-1; };
-function proximoId(base){
-  const pre = base + '|', usados = new Set();
-  TURMAS.forEach(t => { const id = t.turmaId || ''; if(id.startsWith(pre)){ const i = letrasIdx(id.slice(pre.length)); if(i !== null) usados.add(i); } });
-  let n = 0; while(usados.has(n)) n++;
-  return pre + letras(n);
-}
 
 // Chips de resultado (mapa do guia, por valor)
 const COR_RES = { APROVADO:'ok', REPROVADO:'bad', TRANSFERIDO:'neutral', DESISTENTE:'gray', FALECIDO:'gray' };
@@ -179,7 +144,6 @@ let TURMAS = [], ANO_ATIVO = null, PODE = false;
 let ORIG = [];                 // matrículas da turma de origem aberta
 let DEST = new Map();          // alunoId → turmaId (já matriculados no ano de destino)
 const PLANO = new Map();       // alunoId → { mat, turmaId, serie, situacao }
-let novasSeries = [];
 
 const anoOrigem = () => parseInt($('anoOrigem').value, 10) || null;
 const anoDestino = () => parseInt($('anoDestino').value, 10) || null;
@@ -208,60 +172,19 @@ async function carregarDestino(){
   mats.forEach(m => DEST.set(String(m.alunoId), m.turmaId));
 }
 
-// ── Turmas de destino ──
+// ── Turmas de destino (só leitura: quem cria turma é o Cadastro de turmas) ──
 function renderDestino(){
-  const box = $('listaDestino'), d = anoDestino();
-  const ts = d ? turmasDoAno(d) : [];
-  box.innerHTML = ts.length ? ts.map(t => `<div class="va-turma"><b>${esc(t.nome || t.turmaId)}</b><div class="va-chips">`+
-    (t.series || []).map(s => `<span class="badge small neutral">${esc(s)}</span>`).join('') +
-    `<span class="badge small gray">${esc(t.turno || '')}</span></div></div>`).join('') : '<span class="subnote">Nenhuma turma neste ano. Crie abaixo.</span>';
+  const d = anoDestino(), ts = d ? turmasDoAno(d) : [];
   $('dTurma').innerHTML = '<option value="" disabled hidden selected>Turma de destino…</option>' + ts.map(t => `<option value="${esc(t.turmaId)}">${esc(t.nome || t.turmaId)}</option>`).join('');
   renderSerieDestino();
   $('dSit').hidden = !retro();
+  const av = $('avisoSemTurmas');
+  av.hidden = !d || ts.length > 0;
+  if(!av.hidden) av.innerHTML = `Não há turmas de ${d}. Cadastre-as em <a href="cadastro-turma-ativa.html">Cadastro de turmas</a>, já com as séries atualizadas, e volte aqui.`;
 }
 function renderSerieDestino(){
   const t = turmaPorId($('dTurma').value);
   $('dSerie').innerHTML = '<option value="">Série automática</option>' + (t ? (t.series || []).map(s => `<option>${esc(s)}</option>`).join('') : '');
-}
-function renderChipsNova(){
-  const b = $('chipsSeries'); b.innerHTML = '';
-  novasSeries.forEach(s => {
-    const c = document.createElement('span'); c.className = 'va-chip'; c.textContent = s;
-    const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'remover');
-    x.onclick = () => { novasSeries = novasSeries.filter(v => v !== s); renderChipsNova(); };
-    c.appendChild(x); b.appendChild(c);
-  });
-}
-async function registrarAnoNoIndice(ano){
-  try{
-    const sid = Auth.getActiveSchoolId && Auth.getActiveSchoolId();
-    const FV = firebase.firestore.FieldValue;
-    const ref = Auth.db.collection('schools').doc(sid), snap = await ref.get();
-    const anos = snap.exists ? ((snap.data().anoAtivoIndice || {}).anos) : null;
-    if(!Array.isArray(anos) || !anos.length || anos.map(String).includes(String(ano))) return;   // só acrescenta a índice existente
-    await ref.set({ anoAtivoIndice: { anos: FV.arrayUnion(String(ano)) } }, { merge: true });
-  }catch(e){ console.warn('registrarAnoNoIndice:', e); }
-}
-async function criarTurma(){
-  const ano = anoDestino();
-  if(!PODE) return setMsg('Somente administradores podem criar turmas.', 'warn');
-  if(!ano || !anoValido()) return;
-  if(!novasSeries.length) return setMsg('Adicione pelo menos 1 série à turma.', 'err');
-  const turno = $('turnoNova').value;
-  const base = `ATUR|${ano}|${novasSeries.map(slugSerie).join('+')}`;
-  const turmaId = proximoId(base);
-  const nome = `${novasSeries.join(' e ')} ${ano} (${turno})`;
-  setMsg('Criando turma…', 'loading');
-  try{
-    if(await DB.anoAtivoTurmas.get(turmaId)) throw Object.assign(new Error('ID ocupado'), { userMsg: 'Já existe uma turma com esse ID. Recarregue a página.' });
-    const payload = { _id: turmaId, id: turmaId, turmaId, nome, anoLetivo: ano, series: [...novasSeries], turno, professor: '', criadoEm: Date.now(), status: 'ATIVA', qtdAlunos: 0, qtdIntegral: 0 };
-    await DB.anoAtivoTurmas.save(payload);
-    if(window.Log) await Log.registrar({ acao: 'criar', colecao: 'anoAtivoTurmas', docId: turmaId, depois: payload, resumo: `Turma ${nome} — ${turno}, ${novasSeries.join(' + ')} (virada de ano)` });
-    TURMAS.push(payload);
-    await registrarAnoNoIndice(ano);
-    novasSeries = []; renderChipsNova(); renderDestino();
-    setMsg('Turma criada.', 'ok');
-  }catch(e){ console.error('criarTurma:', e); setMsg(e.userMsg || 'Não foi possível criar a turma.', 'err'); }
 }
 
 // ── Alunos de origem ──
@@ -308,31 +231,45 @@ function marcarPorSituacao(sit){
 }
 
 // ── Atribuição e plano ──
-function atribuir(){
+async function atribuir(){
   const ids = marcados(), t = turmaPorId($('dTurma').value);
   if(!ids.length) return setMsg('Marque pelo menos um aluno.', 'warn');
   if(!t) return setMsg('Escolha a turma de destino.', 'warn');
   const sitDest = retro() ? $('dSit').value : null;
   if(retro() && !sitDest) return setMsg('O ano de destino não é o ativo: escolha a situação no ano de destino.', 'err');
+  const seriesT = (t.series || []).map(normSerie), novos = [], excecoes = [];
   let pulados = 0;
   ids.forEach(id => {
     const m = ORIG.find(x => String(x.alunoId) === id); if(!m) return;
-    const serie = normSerie($('dSerie').value) ||
-      (String(m.situacao || '').toUpperCase() === 'REPROVADO' ? normSerie(m.serie) : proxima(m.serie));
-    if(!serie || !(t.series || []).map(normSerie).includes(serie)){ pulados++; return; }
-    PLANO.set(id, { mat: m, turmaId: t.turmaId, serie, situacao: sitDest });
+    const rep = String(m.situacao || '').toUpperCase() === 'REPROVADO';
+    const serie = normSerie($('dSerie').value) || (rep ? normSerie(m.serie) : proxima(m.serie));
+    if(!serie || !seriesT.includes(serie)){ pulados++; return; }          // série fora das séries da turma: ignorado
+    if(rep && serie !== normSerie(m.serie)) excecoes.push(m.nome || id);
+    novos.push([id, { mat: m, turmaId: t.turmaId, serie, situacao: sitDest }]);
   });
+  if(excecoes.length){
+    const lista = excecoes.slice(0, 8).map(esc).join(', ') + (excecoes.length > 8 ? ` e mais ${excecoes.length - 8}` : '');
+    const ok = await _confirmModal({ titulo: 'Reprovado em série diferente',
+      corpo: `${excecoes.length} aluno(s) REPROVADO(S) irão para uma série diferente da atual: ${lista}.\nReprovados normalmente repetem a série, mas há exceções (aprovação pelo conselho de classe, regra de várias reprovações). Confirma?`,
+      textoConfirmar: 'Confirmar exceção' });
+    if(!ok) return;
+  }
+  novos.forEach(([id, v]) => PLANO.set(id, v));
   renderAlunos(); renderPlano();
-  if(pulados) setMsg(`${pulados} aluno(s) não atribuído(s): a série sugerida não existe nessa turma. Escolha a série manualmente.`, 'warn');
+  if(pulados) setMsg(`${pulados} aluno(s) ignorado(s): a série deles não existe nessa turma.`, 'warn');
 }
 function removerAtribuicao(){ marcados().forEach(id => PLANO.delete(id)); renderAlunos(); renderPlano(); }
 function renderPlano(){
   const box = $('plano');
   if(!PLANO.size){ box.innerHTML = '<span class="subnote">Nenhum aluno atribuído.</span>'; return; }
-  const g = new Map();
-  PLANO.forEach(p => { const k = p.turmaId + '|' + p.serie; g.set(k, (g.get(k) || 0) + 1); });
-  box.innerHTML = '<table><thead><tr><th>Turma de destino</th><th>Série</th><th>Alunos</th></tr></thead><tbody>' +
-    [...g.entries()].map(([k, n]) => { const [tid, s] = k.split('|'); return `<tr><td>${esc(nomeTurma(tid))}</td><td>${esc(s)}</td><td>${n}</td></tr>`; }).join('') +
+  const r = retro(), ano = anoDestino(), g = new Map();
+  PLANO.forEach(p => {
+    const k = [p.turmaId, p.serie, p.situacao || ''].join('\u0001');      // separador que não aparece em ID (o ID tem "|")
+    const x = g.get(k) || { p, n: 0 }; x.n++; g.set(k, x);
+  });
+  const linhas = [...g.values()].sort((a, b) => nomeTurma(a.p.turmaId).localeCompare(nomeTurma(b.p.turmaId), 'pt-BR'));
+  box.innerHTML = `<table><thead><tr><th>Ano</th><th>Turma de destino</th><th>Série</th>${r ? '<th>Situação</th>' : ''}<th>Alunos</th></tr></thead><tbody>` +
+    linhas.map(({ p, n }) => `<tr><td>${ano}</td><td>${esc(nomeTurma(p.turmaId))}</td><td>${esc(p.serie)}</td>${r ? `<td>${esc(p.situacao || '')}</td>` : ''}<td>${n}</td></tr>`).join('') +
     `</tbody></table><div class="help" style="margin-top:8px">Total: ${PLANO.size} aluno(s). Quem ficou sem atribuição não recebe matrícula.</div>`;
 }
 
@@ -384,7 +321,8 @@ async function gravar(){
 async function aoMudarAnos(){
   PLANO.clear(); renderPlano();
   const d = anoDestino();
-  $('infoAno').textContent = ANO_ATIVO ? `Ano ativo: ${ANO_ATIVO}${retro() ? ' — destino retroativo: a situação será pedida' : ''}` : '—';
+  $('badgeAtivo').textContent = ANO_ATIVO || '—';
+  $('badgeRetro').hidden = !retro();
   try{ if(anoValido()) await carregarDestino(); else DEST = new Map(); }catch(e){ console.error('carregarDestino:', e); setMsg('Não foi possível ler as matrículas do ano de destino.', 'err'); }
   renderDestino();
   const ts = turmasDoAno(anoOrigem());
@@ -406,7 +344,6 @@ async function init(){
     const s = Auth.getSession && Auth.getSession();
     PODE = !!s && s.role === 'admin';
     $('avisoSemEscola').hidden = !(Auth.semEscola && Auth.semEscola() && PODE);
-    $('serieSel').innerHTML = '<option value="" disabled hidden selected>Escolha a série…</option>' + SERIES.map(x => `<option>${esc(x)}</option>`).join('');
     $('dSit').innerHTML = '<option value="" disabled hidden selected>Situação no ano…</option>' + SITUACOES.map(x => `<option>${esc(x)}</option>`).join('');
     if(!(Auth.semEscola && Auth.semEscola())){
       const [lista, escola] = await Promise.all([DB.anoAtivoTurmas.list(), DB.escola.get()]);
@@ -419,10 +356,9 @@ async function init(){
     $('anoDestino').value = dest;
     if(anos.includes(dest - 1)) $('anoOrigem').value = String(dest - 1);
 
+    document.addEventListener('click', () => document.querySelectorAll('.info-tip.open').forEach(el => el.classList.remove('open')));
     $('anoOrigem').onchange = aoMudarAnos;
     $('anoDestino').onchange = aoMudarAnos;
-    $('btnAddSerie').onclick = () => { const v = $('serieSel').value; if(v && !novasSeries.includes(v)){ novasSeries.push(v); renderChipsNova(); } $('serieSel').value = ''; };
-    $('btnCriarTurma').onclick = criarTurma;
     $('turmaOrigem').onchange = carregarOrigem;
     $('fSerie').onchange = renderAlunos;
     $('dTurma').onchange = renderSerieDestino;
@@ -433,7 +369,7 @@ async function init(){
     $('btnAtribuir').onclick = atribuir;
     $('btnRemover').onclick = removerAtribuicao;
     $('btnGravar').onclick = gravar;
-    if(!PODE){ $('btnGravar').disabled = true; $('btnCriarTurma').disabled = true; setMsg('Modo somente leitura — apenas administradores gravam a virada.', 'warn'); }
+    if(!PODE){ $('btnGravar').disabled = true; setMsg('Modo somente leitura — apenas administradores gravam a virada.', 'warn'); }
     await aoMudarAnos();
   }catch(e){
     console.error('[init]', e);
