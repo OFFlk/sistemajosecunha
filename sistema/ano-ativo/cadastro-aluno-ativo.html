@@ -3582,12 +3582,19 @@ function normSerie(s){
       const fileIdAntigo = _fotoFileIdAtual;
       await window.DB.anoAtivoMatriculas.save({ _id: _fotoMatriculaId, fotoUrl: null, fotoFileId: null });
       if(fileIdAntigo){
-        try{
-          await fetch('/api/drive-delete', {
-            method: 'DELETE', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
-          });
-        }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+        // A virada de ano faz matrículas de anos diferentes apontarem pro mesmo arquivo: só apaga no Cloudinary
+        // se nenhuma outra matrícula o usar (mesma regra da Gestão). Na dúvida, mantém o arquivo.
+        let emUso = true;
+        try{ emUso = (await window.DB.anoAtivoMatriculas.whereEquals('fotoFileId', fileIdAntigo, { limit: 1 })).length > 0; }
+        catch(e){ console.warn('Não foi possível checar o uso da foto; arquivo mantido por segurança:', e); }
+        if(!emUso){
+          try{
+            await fetch('/api/drive-delete', {
+              method: 'DELETE', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ fileId: fileIdAntigo, resourceType: 'image' }),
+            });
+          }catch(e){ console.warn('Erro ao apagar foto no Cloudinary:', e); }
+        }
       }
       _limparToast();
       _fotoFileIdAtual = null; _fotoRemover = false; _fotoTinhaSalva = false;

@@ -331,6 +331,7 @@ async function gravar(){
       nova = MatriculaUtils.validarMatricula(nova);
       Object.assign(nova, { nome: m.nome ?? '', sexo: m.sexo ?? '', nascDia: m.nascDia ?? null, nascMes: m.nascMes ?? null, nascAno: m.nascAno ?? null,
         viradaId, origemMatriculaId: m.matriculaId || m._id });
+      if(m.fotoUrl){ nova.fotoUrl = m.fotoUrl; nova.fotoFileId = m.fotoFileId || null; }   // referência ao mesmo arquivo; o cadastro só apaga o arquivo se nenhuma outra matrícula o usar
       ops.push({ col: 'anoAtivoMatriculas', op: 'set', id, data: nova });
     });
   }catch(e){ console.error('gravar/montar:', e); return setMsg(e.message || 'Matrícula inválida. Nada foi gravado.', 'err'); }
