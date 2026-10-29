@@ -514,16 +514,47 @@ function formatarSerieBonita(s) {
   return t;
 }
 
+// Interpreta uma série para COMPARAÇÃO (não altera o valor gravado).
+// Regras de equivalência:
+//   "1º ano"  -> só ANO        "1ª série" -> só SÉRIE
+//   "1ª"      -> só SÉRIE      (o "ª" só existe em série)
+//   "1º"      -> ANO ou SÉRIE  (planilhas antigas perdiam o "ª": "1ª série" chegava como "1º")
+//   "E2" / "Eixo 2" -> Eixo 2   "Alfabetização" -> ALFA
+function _serieInfoComparavel(valor) {
+  const bonito = formatarSerieBonita(valor);
+  if (!bonito) return null;
+  const u = normalizarTxt(bonito);
+  if (/ALFABETIZ/.test(u)) return { base:'ALFA', num:0, tipos:['ALFA'] };
+  let m = u.match(/^EIXO\s*(\d+)$/) || u.match(/^E\s*(\d+)$/);
+  if (m) return { base:'EIXO', num:Number(m[1]), tipos:['EIXO'] };
+  m = u.match(/^(\d+)\s*([ºª])?\s*(ANO|S[EÉ]RIE|EM)?$/);
+  if (m) {
+    const palavra = m[3] ? (m[3] === 'ANO' ? 'ANO' : m[3] === 'EM' ? 'EM' : 'SERIE') : null;
+    const tipos = palavra ? [palavra] : (m[2] === 'ª' ? ['SERIE'] : ['ANO','SERIE']);
+    return { base:'NUM', num:Number(m[1]), tipos };
+  }
+  return { base:'TXT', key: normalizarSerieChave(bonito) };
+}
+
+function _seriesCompativeis(a, b) {
+  const x = _serieInfoComparavel(a), y = _serieInfoComparavel(b);
+  if (!x || !y) return false;
+  if (x.base !== y.base) return false;
+  if (x.base === 'TXT') return x.key === y.key;
+  if (x.num !== y.num) return false;
+  return x.tipos.some(t => y.tipos.includes(t));
+}
+
 function dedupSeries(lista) {
   const out = [];
-  const seen = new Set();
   for (const item of (lista || [])) {
     const bonito = formatarSerieBonita(item);
-    const key = normalizarSerieChave(bonito);
     if (!bonito) continue;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(bonito);
+    const idx = out.findIndex(o => _seriesCompativeis(o, bonito));
+    if (idx === -1) { out.push(bonito); continue; }
+    // já existe uma equivalente: se a existente é "genérica" ("1º") e a nova é específica ("1º ano"), fica a específica
+    const antiga = _serieInfoComparavel(out[idx]), nova = _serieInfoComparavel(bonito);
+    if (antiga?.tipos?.length > 1 && nova?.tipos?.length === 1) out[idx] = bonito;
   }
   return out;
 }
@@ -586,7 +617,8 @@ function atualizarSelectSerieAluno() {
   }
 
   const keyAtual = normalizarSerieChave(atual);
-  const match = listaUnica.find(s => normalizarSerieChave(s) === keyAtual);
+  const match = listaUnica.find(s => normalizarSerieChave(s) === keyAtual)
+             || listaUnica.find(s => _seriesCompativeis(s, atual));
   if (match) selAluno.value = match;
   else selAluno.selectedIndex = -1;   // sem opção "Selecione": fica em branco até escolher (a validação do Adicionar continua valendo)
 }
@@ -1099,7 +1131,12 @@ function editarAluno(i) {
       const keyV = normalizarSerieChave(vBonito);
 
       const opts = Array.from(selSerie.options);
-      const existe = opts.some(o => normalizarSerieChave(o.value) === keyV);
+      // 1º) igualdade exata; 2º) equivalência ("1º" ≈ "1º ano" / "1ª série"; "1ª" ≈ "1ª série")
+      const exata = opts.find(o => normalizarSerieChave(o.value) === keyV);
+      const compat = opts.filter(o => _seriesCompativeis(o.value, vBonito));
+      // Equivalente única → usa ela. Mais de uma (ex.: "1º" numa turma multisseriada que lista ano e série) → ambígua: não adivinha.
+      const eq = exata || (compat.length === 1 ? compat[0] : null);
+      const existe = !!exata || compat.length > 0;
 
       if (vBonito && !existe) {
         const opt = document.createElement("option");
@@ -1108,8 +1145,9 @@ function editarAluno(i) {
         selSerie.appendChild(opt);
       }
 
-      const eq = Array.from(selSerie.options).find(o => normalizarSerieChave(o.value) === keyV);
-      if (eq) selSerie.value = eq.value;
+      const eq2 = eq || (existe ? null : Array.from(selSerie.options).find(o => normalizarSerieChave(o.value) === keyV));
+      if (eq2) selSerie.value = eq2.value;
+      else if (existe) selSerie.selectedIndex = -1;   // ambígua: usuário escolhe
     }
   }
 
@@ -2134,7 +2172,7 @@ function _parseSerieCanonica(serieDisplay) {
   const s = normalizarTxt(serieDisplay);
   if (!s) return null;
   if (/ALFABETIZ/.test(s)) return { tipo:'ALFA', ini:0, fim:0 };
-  const mEixo = s.match(/EIXO\s*(\d+)/);
+  const mEixo = s.match(/EIXO\s*(\d+)/) || s.match(/^E\s*(\d+)$/);   // "E2" = "Eixo 2"
   if (mEixo) return { tipo:'EIXO', ini:Number(mEixo[1]), fim:Number(mEixo[1]) };
   const nums = [...s.matchAll(/(\d+)/g)].map(m=>Number(m[1]));
   if (!nums.length) return null;
@@ -2142,7 +2180,7 @@ function _parseSerieCanonica(serieDisplay) {
   const tipo = /\bEM\b/.test(s) ? 'EM'
              : /S[EÉ]RIE/.test(s) ? 'SERIE'
              : /\bANO\b/.test(s) ? 'ANO'
-             : (nums.length > 1 ? null : 'ANO');
+             : (nums.length > 1 ? null : (/ª/.test(s) ? 'SERIE' : 'ANO'));
   return { tipo, ini, fim };
 }
 
@@ -2173,7 +2211,9 @@ function avaliarTrajetoria(ultimo, novo) {
   if (!serieUltima || !serieNova) {
     return { status:'amarelo', motivo:`não foi possível interpretar a série de um dos registros para comparação${sufixoGap}` };
   }
-  if (serieUltima.tipo && serieNova.tipo && serieUltima.tipo !== serieNova.tipo) {
+  // "ano" e "série" são equivalentes (ambos são formato padrão): só ALFA / EIXO / EM / ANO-SÉRIE diferentes entre si geram aviso.
+  const _familia = (t) => (t === 'ANO' || t === 'SERIE') ? 'ANO_SERIE' : t;
+  if (serieUltima.tipo && serieNova.tipo && _familia(serieUltima.tipo) !== _familia(serieNova.tipo)) {
     return { status:'amarelo', motivo:`vocabulário de série mudou (${serieUltima.tipo} → ${serieNova.tipo})${sufixoGap}` };
   }
   const tipoTxt = serieNova.tipo || serieUltima.tipo || '';
@@ -2310,12 +2350,24 @@ function mapearColunasImport(rowCab, schema) {
   return { colMap, materiasSemColuna, colunasNaoReconhecidas };
 }
 
+// Resultados que o sistema grava. Qualquer outro valor vira "Não informado".
+const RESULTADOS_VALIDOS_IMPORT = ['AP','REP','CON','DEST','TRA','FAL','AND'];
+// Siglas alternativas que aparecem em atas antigas -> sigla oficial do sistema:
+//   P / S (promovido/seguiu, atas de 2018 do 1º e 2º ano) -> AP
+//   R (reprovado, mesma lógica)                           -> REP
+//   C (conservado)                                        -> CON
+const RESULTADO_EQUIVALENCIAS_IMPORT = { P:'AP', S:'AP', R:'REP', C:'CON' };
+function normalizarResultadoImport(raw) {
+  const r0 = normalizarTxt(raw);
+  const r = RESULTADO_EQUIVALENCIAS_IMPORT[r0] || r0;
+  return RESULTADOS_VALIDOS_IMPORT.includes(r) ? r : 'Não informado';
+}
+
 function _importExtrairLinhas(matriz, rHead, colMap, schema) {
   const acha = tipo => { const k = Object.keys(colMap).find(k => colMap[k].tipo===tipo); return k!==undefined ? Number(k) : undefined; };
   const cNum = acha('num'), cNome = acha('nome'), cSerie = acha('serie'), cResultado = acha('resultado');
   const colsMateria = Object.entries(colMap).filter(([,v])=>v.tipo==='materia');
   const colunasSchema = getColunasAtivas(schema);
-  const validosResultado = ['AP','REP','CON','DEST','TRA','FAL','AND'];
 
   const linhas = [];
   for (let r = rHead+1; r < matriz.length; r++) {
@@ -2329,8 +2381,7 @@ function _importExtrairLinhas(matriz, rHead, colMap, schema) {
     if (cSerie!==undefined && schema.serieAtiva) aluno.serie = formatarSerieBonita(row[cSerie]);
     if (schema.serieAtiva && !aluno.serie && _turmaEhAceleracao() && _rotuloAceleracao()) aluno.serie = _rotuloAceleracao();
     if (cResultado!==undefined && schema.resultadoAtivo) {
-      const rraw = normalizarTxt(row[cResultado]);
-      aluno.resultado = validosResultado.includes(rraw) ? rraw : 'Não informado';
+      aluno.resultado = normalizarResultadoImport(row[cResultado]);
     }
     for (const [cStr, info] of colsMateria) {
       const raw = row[Number(cStr)];
@@ -2433,6 +2484,17 @@ function _importArquivoSelecionado(event) {
 
 function _importFecharModal() {
   document.getElementById('_importAtaModal')?.remove();
+  document.removeEventListener('keydown', _importOnKeyEsc, true);
+}
+// Esc fecha o modal de importação — só se ele for o modal mais ao topo (não interfere em confirmações abertas por cima).
+function _importOnKeyEsc(ev) {
+  if (ev.key !== 'Escape') return;
+  const modal = document.getElementById('_importAtaModal');
+  if (!modal) return;
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+  if (backdrops[backdrops.length - 1] !== modal) return;
+  ev.stopPropagation();
+  _importFecharModal();
 }
 
 function _importMontarModal(bodyHtml, largura, footHtml) {
@@ -2450,7 +2512,9 @@ function _importMontarModal(bodyHtml, largura, footHtml) {
       (footHtml ? `<div class="modal-foot">${footHtml}</div>` : '')+
     `</div>`;
   document.body.appendChild(backdrop);
-  backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) _importFecharModal(); });
+  // Clicar fora NÃO fecha (evita cancelar a importação sem querer, ex.: ao selecionar/copiar texto).
+  // Fecha só por ✕, Cancelar ou Esc.
+  document.addEventListener('keydown', _importOnKeyEsc, true);
 }
 
 function _importAbrirModalEscolhaAba() {
@@ -2515,7 +2579,7 @@ async function _importConfirmarAba() {
   }
 
   _toastLimpar();
-  // Se o usuário fechou o modal (✕ / clique fora) enquanto analisava, não
+  // Se o usuário fechou o modal (✕ / Cancelar / Esc) enquanto analisava, não
   // reabre a revisão sozinha.
   if (!document.getElementById('_importAtaModal')) return;
 
