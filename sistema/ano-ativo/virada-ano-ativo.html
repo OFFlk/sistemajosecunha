@@ -167,11 +167,11 @@ const turmaPorId = id => TURMAS.find(t => t.turmaId === id);
 const turmasDoAno = a => TURMAS.filter(t => String(t.turmaId||'').startsWith('ATUR|') && parseInt(t.anoLetivo,10) === a)
   .sort((x, y) => String(x.nome||'').localeCompare(String(y.nome||''), 'pt-BR'));
 const nomeTurma = id => { const t = turmaPorId(id); return t ? (t.nome || t.turmaId) : id; };
-function anoValido(){
+function anoValido(tipo = 'warn'){            // tipo 'err' quando a checagem barra o salvamento
   const o = anoOrigem(), d = anoDestino();
   if(!o || !d) return false;
-  if(d <= o){ setMsg('O ano de destino precisa ser maior que o de origem.', 'warn'); return false; }
-  if(ANO_ATIVO && d > ANO_ATIVO){ setMsg(`O destino (${d}) é posterior ao ano ativo (${ANO_ATIVO}). Anos futuros ainda não são suportados.`, 'warn'); return false; }
+  if(d === o){ setMsg('Os anos de origem e de destino precisam ser diferentes.', tipo); return false; }
+  if(ANO_ATIVO && d > ANO_ATIVO){ setMsg(`O destino (${d}) é posterior ao ano ativo (${ANO_ATIVO}). Anos futuros ainda não são suportados.`, tipo); return false; }
   return true;
 }
 
@@ -302,9 +302,9 @@ function renderPlano(){
 }
 
 async function gravar(){
-  if(!PODE) return setMsg('Somente administradores podem gravar a virada.', 'warn');
-  if(!PLANO.size) return setMsg('O plano está vazio.', 'warn');
-  if(!anoValido()) return;
+  if(!PODE) return setMsg('Somente administradores podem gravar a virada.', 'err');
+  if(!PLANO.size) return setMsg('O plano está vazio.', 'err');
+  if(!anoValido('err')) return;
   const ano = anoDestino(), anoO = anoOrigem(), ehAtivo = !retro();
   setMsg('Conferindo matrículas existentes…', 'loading');
   try{
@@ -312,7 +312,7 @@ async function gravar(){
     const ja = new Set(frescas.map(m => String(m.alunoId)));
     const conflitos = [...PLANO.keys()].filter(id => ja.has(id));
     conflitos.forEach(id => PLANO.delete(id));
-    if(conflitos.length){ await carregarDestino(); renderAlunos(); renderPlano(); setMsg(`${conflitos.length} aluno(s) já tinham matrícula em ${ano} e saíram do plano.`, 'warn'); if(!PLANO.size) return; }
+    if(conflitos.length){ await carregarDestino(); renderAlunos(); renderPlano(); setMsg(`${conflitos.length} aluno(s) já tinham matrícula em ${ano} e saíram do plano.`, PLANO.size ? 'warn' : 'err'); if(!PLANO.size) return; }
     else setMsg('', 'ok');
   }catch(e){ console.error('gravar/conferir:', e); return setMsg('Não foi possível conferir as matrículas do ano de destino. Nada foi gravado.', 'err'); }
 
