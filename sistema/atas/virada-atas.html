@@ -287,6 +287,22 @@ function marcarPorResultado(fn){
 }
 
 // ── Atribuição e plano ──
+// Decide a série de destino de um aluno. Mesmas regras da virada do Ano Ativo:
+//  • avançando no tempo, só o AP promove sozinho; REP, CON, DEST, TRA, AND e sem resultado ficam na mesma série;
+//  • turma de série única: o não aprovado vai para ela como EXCEÇÃO (pede confirmação), em vez de ser barrado;
+//  • série escolhida no seletor vale sempre; só pede confirmação se um não aprovado for para série diferente da atual;
+//  • fluxo inverso: série anterior (sem confirmação).
+function decidirSerie(a, t, fwd, escolhida){
+  const ap = normRes(a.res) === 'AP';
+  let serie = escolhida;
+  if(!serie){
+    serie = acharSerieNaTurma(t.series, alvoSerie(a.serie, fwd ? (ap ? 1 : 0) : -1));
+    if(!serie && fwd && !ap && (t.series || []).length === 1) serie = t.series[0];
+  }
+  if(!serie) return { serie:'', excecao:false };
+  const mudou = !acharSerieNaTurma([serie], alvoSerie(a.serie, 0));      // série de destino ≠ série atual do aluno
+  return { serie, excecao: fwd && !ap && mudou };
+}
 async function atribuir(){
   const ids = marcados(), t = turmaDestPorId($('dTurma').value);
   if(!anoValido('err')) return;
@@ -298,16 +314,12 @@ async function atribuir(){
   const novos = [], excecoes = []; let pulados = 0;
   ids.forEach(id => {
     const a = ORIG.find(x => x.id === id); if(!a) return;
-    const ap = normRes(a.res) === 'AP';
     let serie = '';
     if(sc.serieAtiva){
-      serie = escolhida;
-      if(!serie){
-        const passo = fwd ? (ap ? 1 : 0) : -1;                         // avançando: só AP promove; inverso: série anterior
-        serie = acharSerieNaTurma(t.series, alvoSerie(a.serie, passo));
-      }
-      if(!serie){ pulados++; return; }                                  // sem série esperada nessa turma: escolha manualmente
-      if(fwd && !ap && !acharSerieNaTurma([serie], alvoSerie(a.serie, 0))) excecoes.push(`${esc(a.nome)} (${esc(normRes(a.res) || 'sem resultado')}: ${esc(a.serie)} → ${esc(serie)})`);
+      const d = decidirSerie(a, t, fwd, escolhida);
+      if(!d.serie){ pulados++; return; }                                // sem série esperada nessa turma: escolha manualmente
+      serie = d.serie;
+      if(d.excecao) excecoes.push(`${esc(a.nome)} (${esc(normRes(a.res) || 'sem resultado')}: ${esc(a.serie)} → ${esc(serie)})`);
     }
     novos.push([id, { nome: a.nome, origSerie: a.serie, origRes: a.res, turmaId: t.turmaId, serie, resultado }]);
   });
@@ -320,7 +332,7 @@ async function atribuir(){
   }
   novos.forEach(([id, v]) => PLANO.set(id, v));
   renderAlunos(); renderPlano();
-  if(pulados) setMsg(`${pulados} aluno(s) ignorado(s): a série esperada não existe nessa turma (ou não há série automática, como em Alfabetização/Multisseriada). Escolha a série de destino manualmente.`, 'warn');
+  if(pulados) setMsg(`${pulados} aluno(s) ignorado(s): a série esperada não existe nessa turma (ou não há série automática, como em Alfabetização/Multisseriada). Para exceções, escolha a série de destino manualmente.`, 'warn');
 }
 function removerAtribuicao(){ marcados().forEach(id => PLANO.delete(id)); renderAlunos(); renderPlano(); }
 function renderPlano(){
