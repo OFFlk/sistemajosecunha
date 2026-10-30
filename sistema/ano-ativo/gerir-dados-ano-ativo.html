@@ -56,6 +56,30 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 #avisoReadonly { margin-bottom:16px; }
 
 /* card recolhível (.sec-header/.sec-toggle/.sec-body): CSS é do global (components.css); aqui só o JS (toggleSec) */
+/* ── Seções da página (agrupam os cards) ── */
+.gd-grupo { margin-top: 26px; }
+.gd-grupo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 8px; margin-bottom: 12px; border-bottom: 1px solid var(--ui-border); }
+.gd-grupo.perigo .gd-grupo-head { border-left: 3px solid var(--ui-st-bad-bd); padding-left: 10px; }
+.gd-grupo-tit { margin: 0; font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.gd-grupo-n { margin-left: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ui-muted); }
+.gd-grupo-head.fechada { cursor: pointer; }
+.gd-grupo-head.fechada:hover .gd-grupo-tit { color: var(--brand-text); }
+.gd-grupo-corpo.fechado { display: none; }
+.gd-par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .gd-par { grid-template-columns: 1fr; } }
+/* barra de atalhos (stepper dentro do destaque, tokens --dest-*) */
+.gd-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
+@media (max-width: 900px) { .gd-nav { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .gd-nav { grid-template-columns: 1fr; } }
+.gd-step { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; padding: 8px 18px 8px 10px; border-radius: 12px; border: 0; background: transparent; text-align: left; font: inherit; transition: background .15s; }
+.gd-step:hover { background: var(--dest-btn-hover); }
+.gd-step.active, .gd-step.active:hover { background: var(--bg); }
+.gd-step-num { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 2px solid var(--dest-fg); color: var(--dest-fg); background: transparent; }
+.gd-step.active .gd-step-num { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
+.gd-step-label { display: block; font-size: 11px; font-weight: 700; color: var(--dest-fg); opacity: .75; text-transform: uppercase; letter-spacing: .05em; }
+.gd-step-title { display: block; font-size: 14px; font-weight: 800; color: var(--dest-fg); }
+.gd-step.active .gd-step-label { color: var(--ui-muted); opacity: 1; }
+.gd-step.active .gd-step-title { color: var(--ui-text); }
 
 /* ── Migração (status ok/aviso/perigo: candidato a global, D3) ── */
 .migr-item {
@@ -142,31 +166,20 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <button class="btn secondary" onclick="carregarDados()">🔄 Carregar dados</button>
     </div>
     <div class="console" id="logGeral" style="display:none;"></div>
-  </div>
-
-  <!-- ── VIRADA DE ANO (atalho) ── -->
-  <div class="card">
-    <h3>🔁 Virada de ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Abre a página que leva alunos das turmas de um ano para as turmas de outro, criando as matrículas novas. Cadastre antes as turmas do ano de destino em Cadastro de turmas, já com as séries atualizadas. As matrículas do ano de origem não são alteradas.</span></span></h3>
-    <div class="row-btns">
-      <button class="btn primary" onclick="location.href='virada-ano-ativo.html'">Abrir a virada de ano</button>
+    <div class="gd-nav" id="gdNav">
+      <button type="button" class="gd-step" onclick="gdIrPara('grpConsulta', this)"><span class="gd-step-num">1</span><span><span class="gd-step-label">Seção 1</span><span class="gd-step-title">Consultar e exportar</span></span></button>
+      <button type="button" class="gd-step" onclick="gdIrPara('grpManut', this)"><span class="gd-step-num">2</span><span><span class="gd-step-label">Seção 2</span><span class="gd-step-title">Manutenção</span></span></button>
+      <button type="button" class="gd-step" onclick="gdIrPara('grpFluxos', this)"><span class="gd-step-num">3</span><span><span class="gd-step-label">Seção 3</span><span class="gd-step-title">Fluxos</span></span></button>
+      <button type="button" class="gd-step" onclick="gdIrPara('grpExcl', this)"><span class="gd-step-num">4</span><span><span class="gd-step-label">Seção 4</span><span class="gd-step-title">Exclusões</span></span></button>
     </div>
   </div>
 
-  <!-- ── ÍNDICE DE ANOS (espelho do atasIndice) ── -->
-  <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secIndice', event)">
-      <h3>📅 Índice de anos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Lista dos anos letivos das turmas do ano ativo, guardada no documento da escola (campo <b>anoAtivoIndice</b>). Ela alimenta os filtros de ano desta página — assim nenhum card precisa ler as turmas só para montar o filtro (1 leitura para tudo). O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas e também remove anos que não têm mais turma. Enquanto o índice estiver vazio, os filtros usam uma lista fixa de anos.</span></span></h3>
-      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-controls="secIndice" aria-label="Recolher">▼</button>
+  <section class="gd-grupo" id="grpConsulta">
+    <div class="gd-grupo-head" onclick="gdGrupoHeaderClick('grpConsulta', event)">
+      <h2 class="gd-grupo-tit">Consultar e exportar <span class="gd-grupo-n">2 cards</span></h2>
+      <button type="button" class="sec-toggle" id="tog_grpConsulta" aria-expanded="true" aria-controls="corpo_grpConsulta" aria-label="Recolher">▼</button>
     </div>
-    <div class="sec-body" id="secIndice">
-      <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
-      <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
-      <div class="row-btns">
-        <button class="btn primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
-      </div>
-    </div>
-  </div>
-
+    <div class="gd-grupo-corpo" id="corpo_grpConsulta">
   <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secPesquisa', event)">
@@ -192,142 +205,57 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <div class="console" id="logPsq" style="display:none;"></div>
     </div>
   </div>
-
-  <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
-  <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secExcluirAluno', event)">
-      <h3>🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
-      <button type="button" class="sec-toggle" id="togSecExcluirAluno" aria-expanded="true" aria-controls="secExcluirAluno" aria-label="Recolher">▼</button>
+  <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
+  <div class="card card-destaque">
+    <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
+      <h3>💾 Backup do ano ativo</h3>
+      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-controls="secBackup" aria-label="Recolher">▼</button>
     </div>
-    <div class="sec-body" id="secExcluirAluno">
-      <div class="row-btns">
-        <input type="text" id="inpAlunoIdExcluir" class="input cresce" placeholder="alunoId (ex.: ALU-000123)">
-        <button class="btn secondary field-h" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
-      </div>
-
-      <div id="previewAluno" class="mt-14" style="display:none;">
-        <div id="previewAlunoInfo"></div>
-        <div id="previewAlunoMats" class="mt-8"></div>
-        <div id="previewAlunoDocs" class="mt-8"></div>
-        <div id="previewAlunoFoto" class="mt-8"></div>
-        <div id="previewAlunoElo" class="mt-8"></div>
-        <div class="row-btns mt-14">
-          <button class="btn danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
+    <div class="sec-body" id="secBackup">
+      <div class="bk-grid">
+        <div>
+          <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).</span></span></div>
+          <div class="row-btns mt-0">
+            <button class="btn primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
+          </div>
+        </div>
+        <div>
+          <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
+          <div class="row-btns mt-0">
+            <label class="btn primary" id="lblImportJSON">
+              📂 Carregar JSON de backup
+              <input type="file" id="fileJSON" accept=".json" hidden onchange="importarJSON(event)">
+            </label>
+          </div>
+          <div class="console" id="logImport" style="display:none;"></div>
         </div>
       </div>
-
-      <div class="console" id="logExcluirAluno" style="display:none;"></div>
     </div>
   </div>
+    </div>
+  </section>
 
-  <!-- ── EXCLUSÃO PONTUAL: MATRÍCULA ── -->
+  <section class="gd-grupo" id="grpManut">
+    <div class="gd-grupo-head" onclick="gdGrupoHeaderClick('grpManut', event)">
+      <h2 class="gd-grupo-tit">Manutenção <span class="gd-grupo-n">4 cards</span></h2>
+      <button type="button" class="sec-toggle" id="tog_grpManut" aria-expanded="true" aria-controls="corpo_grpManut" aria-label="Recolher">▼</button>
+    </div>
+    <div class="gd-grupo-corpo" id="corpo_grpManut">
+  <div class="gd-par">
+  <!-- ── ÍNDICE DE ANOS (espelho do atasIndice) ── -->
   <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secExcluirMatricula', event)">
-      <h3>🗑️ Excluir matrícula (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove só <b>uma matrícula</b> (<b>anoAtivoMatriculas</b>), sem apagar o aluno nem a turma. Busque pelo <b>matriculaId</b> (lista sempre 1 matrícula) ou pelo <b>alunoId</b> (lista todas as matrículas do aluno) e escolha qual revisar. A revisão mostra se a matrícula tem algum problema (turma inativa, turma ou aluno inexistente, ID fora do padrão). Se a matrícula estiver ativa no ano ativo, o contador da turma é reduzido; o avatar dela só é apagado se nenhuma outra matrícula o usar. O erro <b>B6</b> da Consistência abre esta busca já preenchida. <b>Ação irreversível.</b></span></span></h3>
-      <button type="button" class="sec-toggle" id="togSecExcluirMatricula" aria-expanded="true" aria-controls="secExcluirMatricula" aria-label="Recolher">▼</button>
+    <div class="sec-header" onclick="secHeaderClick('secIndice', event)">
+      <h3>📅 Índice de anos <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Lista dos anos letivos das turmas do ano ativo, guardada no documento da escola (campo <b>anoAtivoIndice</b>). Ela alimenta os filtros de ano desta página — assim nenhum card precisa ler as turmas só para montar o filtro (1 leitura para tudo). O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas e também remove anos que não têm mais turma. Enquanto o índice estiver vazio, os filtros usam uma lista fixa de anos.</span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-controls="secIndice" aria-label="Recolher">▼</button>
     </div>
-    <div class="sec-body" id="secExcluirMatricula">
+    <div class="sec-body" id="secIndice">
+      <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
+      <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
       <div class="row-btns">
-        <input type="text" id="inpMatIdExcluir" class="input cresce" placeholder="matriculaId (ex.: MAT|turmaId|ALU-000123|2026)">
-        <button class="btn secondary field-h" id="btnBuscarMatricula" onclick="buscarMatriculaExcluir()">🔍 Buscar por matrícula</button>
+        <button class="btn primary" id="btnReconstruirAnos" onclick="reconstruirIndiceAnos()">🔄 Reconstruir índice</button>
       </div>
-      <div class="row-btns">
-        <input type="text" id="inpAlunoIdExcluirMat" class="input cresce" placeholder="alunoId (ex.: ALU-000123)">
-        <button class="btn secondary field-h" id="btnBuscarMatriculasAluno" onclick="buscarMatriculasDoAluno()">🔍 Buscar por aluno</button>
-      </div>
-
-      <div id="listaMatExcluir" class="mt-14" style="display:none;"></div>
-
-      <div id="previewMatricula" class="mt-14" style="display:none;">
-        <div id="previewMatInfo"></div>
-        <div id="previewMatProblemas" class="mt-8"></div>
-        <div id="previewMatEfeitos" class="mt-8"></div>
-        <div class="row-btns mt-14">
-          <button class="btn danger" id="btnExcluirMatricula" onclick="executarExclusaoMatricula()">🗑️ Excluir definitivamente</button>
-        </div>
-      </div>
-
-      <div class="console" id="logExcluirMatricula" style="display:none;"></div>
     </div>
   </div>
-
-  <!-- ── EXCLUSÃO PONTUAL: TURMA ── -->
-  <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secExcluirTurma', event)">
-      <h3>🗑️ Excluir turma (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove uma turma (<b>anoAtivoTurmas</b>) e as matrículas (<b>anoAtivoMatriculas</b>) que apontam para ela, evitando matrículas órfãs. Os alunos não são apagados. <b>Ação irreversível.</b></span></span></h3>
-      <button type="button" class="sec-toggle" id="togSecExcluirTurma" aria-expanded="true" aria-controls="secExcluirTurma" aria-label="Recolher">▼</button>
-    </div>
-    <div class="sec-body" id="secExcluirTurma">
-      <div class="row-btns">
-        <input type="text" id="inpTurmaIdExcluir" class="input cresce" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)">
-        <button class="btn secondary field-h" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
-      </div>
-
-      <div id="previewTurma" class="mt-14" style="display:none;">
-        <div id="previewTurmaInfo"></div>
-        <div id="previewTurmaMats" class="mt-8"></div>
-        <div class="row-btns mt-14">
-          <button class="btn danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
-        </div>
-      </div>
-
-      <div class="console" id="logExcluirTurma" style="display:none;"></div>
-    </div>
-  </div>
-
-  <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
-  <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secGerarAta', event)">
-      <h3>📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Escolha o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
-      <button type="button" class="sec-toggle" id="togSecGerarAta" aria-expanded="true" aria-controls="secGerarAta" aria-label="Recolher">▼</button>
-    </div>
-    <div class="sec-body" id="secGerarAta">
-      <div class="row-btns mt-0">
-        <select id="gaAno" class="input cresce" aria-label="Ano letivo da turma"
-          onchange="document.getElementById('gaForm').style.display='none'; gaResetPlano();">
-          <option value="" disabled hidden selected>Ano letivo da turma (não pode ser o ano ativo)</option>
-        </select>
-        <button class="btn secondary" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
-      </div>
-
-      <div id="gaForm" class="mt-14" style="display:none;">
-        <label class="muted" for="gaTurma">Turmas</label>
-        <select id="gaTurma" class="input cheio" onchange="gaResetPlano()"></select>
-        <label class="muted" for="gaSchema">Schema da ata</label>
-        <select id="gaSchema" class="input cheio" onchange="gaResetPlano()"></select>
-        <div class="row-btns mt-0">
-          <button class="btn secondary" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
-        </div>
-      </div>
-
-      <div id="gaPreview" class="mt-14" style="display:none;"></div>
-      <div class="row-btns" id="gaGerarWrap" style="display:none;">
-        <button class="btn primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
-      </div>
-      <div class="console" id="logGerarAta" style="display:none;"></div>
-    </div>
-  </div>
-
-  <!-- ── MIGRAÇÃO: dados de busca nas matrículas ── -->
-  <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secMigracao', event)">
-      <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Sem ano escolhido, lê todos os alunos e todas as matrículas (1 leitura por documento); com um ano, lê só as matrículas dele e os alunos dessas matrículas. <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
-      <button type="button" class="sec-toggle" id="togSecMigracao" aria-expanded="true" aria-controls="secMigracao" aria-label="Recolher">▼</button>
-    </div>
-    <div class="sec-body" id="secMigracao">
-      <div class="muted">Escolha um ano para ler só as matrículas dele e os alunos dessas matrículas (menos leituras no banco), ou deixe em "Todos os anos".</div>
-      <div class="row-btns">
-        <select id="mgAno" class="input ano-sel" aria-label="Ano letivo" onchange="mgResetAno()"><option value="">Todos os anos</option></select>
-        <button class="btn secondary field-h" id="btnMgAnalisar" onclick="migracaoAnalisar()">🔍 Analisar</button>
-      </div>
-      <div id="mgPreview" class="mt-14" style="display:none;"></div>
-      <div class="row-btns mt-14" id="mgAplicarWrap" style="display:none;">
-        <button class="btn primary" id="btnMgAplicar" onclick="migracaoAplicar()">✅ Aplicar ajustes</button>
-      </div>
-      <div class="console" id="logMigracao" style="display:none;"></div>
-    </div>
-  </div>
-
   <!-- ── CONTADORES DAS TURMAS ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secContadores', event)">
@@ -352,7 +280,26 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <div class="console" id="logContadores" style="display:none;"></div>
     </div>
   </div>
-
+  </div>
+  <!-- ── MIGRAÇÃO: dados de busca nas matrículas ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secMigracao', event)">
+      <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Sem ano escolhido, lê todos os alunos e todas as matrículas (1 leitura por documento); com um ano, lê só as matrículas dele e os alunos dessas matrículas. <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecMigracao" aria-expanded="true" aria-controls="secMigracao" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secMigracao">
+      <div class="muted">Escolha um ano para ler só as matrículas dele e os alunos dessas matrículas (menos leituras no banco), ou deixe em "Todos os anos".</div>
+      <div class="row-btns">
+        <select id="mgAno" class="input ano-sel" aria-label="Ano letivo" onchange="mgResetAno()"><option value="">Todos os anos</option></select>
+        <button class="btn secondary field-h" id="btnMgAnalisar" onclick="migracaoAnalisar()">🔍 Analisar</button>
+      </div>
+      <div id="mgPreview" class="mt-14" style="display:none;"></div>
+      <div class="row-btns mt-14" id="mgAplicarWrap" style="display:none;">
+        <button class="btn primary" id="btnMgAplicar" onclick="migracaoAplicar()">✅ Aplicar ajustes</button>
+      </div>
+      <div class="console" id="logMigracao" style="display:none;"></div>
+    </div>
+  </div>
   <!-- ── CONSISTÊNCIA ── -->
   <div class="card">
     <div class="sec-header" onclick="secHeaderClick('secConsist', event)">
@@ -410,34 +357,144 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <div class="console" id="logConsist" style="display:none;"></div>
     </div>
   </div>
-
-  <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
-  <div class="card card-destaque">
-    <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
-      <h3>💾 Backup do ano ativo</h3>
-      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-controls="secBackup" aria-label="Recolher">▼</button>
     </div>
-    <div class="sec-body" id="secBackup">
-      <div class="bk-grid">
-        <div>
-          <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Exporta turmas, alunos e matrículas do módulo de ano ativo em JSON (<b>anoAtivoTurmas</b>, <b>anoAtivoAlunos</b> e <b>anoAtivoMatriculas</b>).</span></span></div>
-          <div class="row-btns mt-0">
-            <button class="btn primary" id="btnExportJSON" onclick="exportarJSON()">⬇ Exportar JSON</button>
-          </div>
-        </div>
-        <div>
-          <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide align-right">Restaura um backup gerado por esta página nas mesmas três coleções. Documentos com o mesmo ID são atualizados; os novos são adicionados. Backups de outro módulo (como o de Atas) são recusados antes de gravar qualquer coisa.</span></span></div>
-          <div class="row-btns mt-0">
-            <label class="btn primary" id="lblImportJSON">
-              📂 Carregar JSON de backup
-              <input type="file" id="fileJSON" accept=".json" hidden onchange="importarJSON(event)">
-            </label>
-          </div>
-          <div class="console" id="logImport" style="display:none;"></div>
-        </div>
-      </div>
+  </section>
+
+  <section class="gd-grupo" id="grpFluxos">
+    <div class="gd-grupo-head" onclick="gdGrupoHeaderClick('grpFluxos', event)">
+      <h2 class="gd-grupo-tit">Fluxos <span class="gd-grupo-n">2 cards</span></h2>
+      <button type="button" class="sec-toggle" id="tog_grpFluxos" aria-expanded="true" aria-controls="corpo_grpFluxos" aria-label="Recolher">▼</button>
+    </div>
+    <div class="gd-grupo-corpo" id="corpo_grpFluxos">
+  <!-- ── VIRADA DE ANO (atalho) ── -->
+  <div class="card">
+    <h3>🔁 Virada de ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Abre a página que leva alunos das turmas de um ano para as turmas de outro, criando as matrículas novas. Cadastre antes as turmas do ano de destino em Cadastro de turmas, já com as séries atualizadas. As matrículas do ano de origem não são alteradas.</span></span></h3>
+    <div class="row-btns">
+      <button class="btn primary" onclick="location.href='virada-ano-ativo.html'">Abrir a virada de ano</button>
     </div>
   </div>
+  <!-- ── GERAR ATA DE TURMA (ano-ativo → módulo de Atas) ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secGerarAta', event)">
+      <h3>📜 Gerar ata de turma (módulo de Atas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Cria no módulo de Atas a turma e a ata de uma turma do módulo de ano ativo, com os alunos matriculados, o schema escolhido e as notas em branco. Escolha o ano letivo antes de carregar: só as turmas daquele ano são lidas. Só turmas de ano <b>não ativo</b>, com alunos, turno, nome e séries aceitas pelo módulo de Atas. Cada turma é gerada <b>uma única vez</b> (para refazer, apague-a em Gestão de Atas). Alunos sem vínculo (elo) recebem ID novo em Atas; a união dos IDs é feita na página de IDs.</span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecGerarAta" aria-expanded="true" aria-controls="secGerarAta" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secGerarAta">
+      <div class="row-btns mt-0">
+        <select id="gaAno" class="input cresce" aria-label="Ano letivo da turma"
+          onchange="document.getElementById('gaForm').style.display='none'; gaResetPlano();">
+          <option value="" disabled hidden selected>Ano letivo da turma (não pode ser o ano ativo)</option>
+        </select>
+        <button class="btn secondary" id="btnGaCarregar" onclick="gaCarregar()">🔄 Carregar turmas</button>
+      </div>
+
+      <div id="gaForm" class="mt-14" style="display:none;">
+        <label class="muted" for="gaTurma">Turmas</label>
+        <select id="gaTurma" class="input cheio" onchange="gaResetPlano()"></select>
+        <label class="muted" for="gaSchema">Schema da ata</label>
+        <select id="gaSchema" class="input cheio" onchange="gaResetPlano()"></select>
+        <div class="row-btns mt-0">
+          <button class="btn secondary" id="btnGaAnalisar" onclick="gaAnalisar()">🔍 Analisar</button>
+        </div>
+      </div>
+
+      <div id="gaPreview" class="mt-14" style="display:none;"></div>
+      <div class="row-btns" id="gaGerarWrap" style="display:none;">
+        <button class="btn primary" id="btnGaGerar" onclick="gaGerar()">📜 Gerar ata</button>
+      </div>
+      <div class="console" id="logGerarAta" style="display:none;"></div>
+    </div>
+  </div>
+    </div>
+  </section>
+
+  <section class="gd-grupo perigo" id="grpExcl">
+    <div class="gd-grupo-head fechada" onclick="gdGrupoHeaderClick('grpExcl', event)">
+      <h2 class="gd-grupo-tit">Exclusões <span class="gd-grupo-n">3 cards · fechada ao abrir a página</span></h2>
+      <button type="button" class="sec-toggle collapsed" id="tog_grpExcl" aria-expanded="false" aria-controls="corpo_grpExcl" aria-label="Recolher">▼</button>
+    </div>
+    <div class="gd-grupo-corpo fechado" id="corpo_grpExcl">
+  <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secExcluirAluno', event)">
+      <h3>🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecExcluirAluno" aria-expanded="true" aria-controls="secExcluirAluno" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secExcluirAluno">
+      <div class="row-btns">
+        <input type="text" id="inpAlunoIdExcluir" class="input cresce" placeholder="alunoId (ex.: ALU-000123)">
+        <button class="btn secondary field-h" id="btnBuscarAluno" onclick="buscarAlunoExcluir()">🔍 Buscar</button>
+      </div>
+
+      <div id="previewAluno" class="mt-14" style="display:none;">
+        <div id="previewAlunoInfo"></div>
+        <div id="previewAlunoMats" class="mt-8"></div>
+        <div id="previewAlunoDocs" class="mt-8"></div>
+        <div id="previewAlunoFoto" class="mt-8"></div>
+        <div id="previewAlunoElo" class="mt-8"></div>
+        <div class="row-btns mt-14">
+          <button class="btn danger" id="btnExcluirAluno" onclick="executarExclusaoAluno()">🗑️ Excluir definitivamente</button>
+        </div>
+      </div>
+
+      <div class="console" id="logExcluirAluno" style="display:none;"></div>
+    </div>
+  </div>
+  <!-- ── EXCLUSÃO PONTUAL: MATRÍCULA ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secExcluirMatricula', event)">
+      <h3>🗑️ Excluir matrícula (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove só <b>uma matrícula</b> (<b>anoAtivoMatriculas</b>), sem apagar o aluno nem a turma. Busque pelo <b>matriculaId</b> (lista sempre 1 matrícula) ou pelo <b>alunoId</b> (lista todas as matrículas do aluno) e escolha qual revisar. A revisão mostra se a matrícula tem algum problema (turma inativa, turma ou aluno inexistente, ID fora do padrão). Se a matrícula estiver ativa no ano ativo, o contador da turma é reduzido; o avatar dela só é apagado se nenhuma outra matrícula o usar. O erro <b>B6</b> da Consistência abre esta busca já preenchida. <b>Ação irreversível.</b></span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecExcluirMatricula" aria-expanded="true" aria-controls="secExcluirMatricula" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secExcluirMatricula">
+      <div class="row-btns">
+        <input type="text" id="inpMatIdExcluir" class="input cresce" placeholder="matriculaId (ex.: MAT|turmaId|ALU-000123|2026)">
+        <button class="btn secondary field-h" id="btnBuscarMatricula" onclick="buscarMatriculaExcluir()">🔍 Buscar por matrícula</button>
+      </div>
+      <div class="row-btns">
+        <input type="text" id="inpAlunoIdExcluirMat" class="input cresce" placeholder="alunoId (ex.: ALU-000123)">
+        <button class="btn secondary field-h" id="btnBuscarMatriculasAluno" onclick="buscarMatriculasDoAluno()">🔍 Buscar por aluno</button>
+      </div>
+
+      <div id="listaMatExcluir" class="mt-14" style="display:none;"></div>
+
+      <div id="previewMatricula" class="mt-14" style="display:none;">
+        <div id="previewMatInfo"></div>
+        <div id="previewMatProblemas" class="mt-8"></div>
+        <div id="previewMatEfeitos" class="mt-8"></div>
+        <div class="row-btns mt-14">
+          <button class="btn danger" id="btnExcluirMatricula" onclick="executarExclusaoMatricula()">🗑️ Excluir definitivamente</button>
+        </div>
+      </div>
+
+      <div class="console" id="logExcluirMatricula" style="display:none;"></div>
+    </div>
+  </div>
+  <!-- ── EXCLUSÃO PONTUAL: TURMA ── -->
+  <div class="card">
+    <div class="sec-header" onclick="secHeaderClick('secExcluirTurma', event)">
+      <h3>🗑️ Excluir turma (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove uma turma (<b>anoAtivoTurmas</b>) e as matrículas (<b>anoAtivoMatriculas</b>) que apontam para ela, evitando matrículas órfãs. Os alunos não são apagados. <b>Ação irreversível.</b></span></span></h3>
+      <button type="button" class="sec-toggle" id="togSecExcluirTurma" aria-expanded="true" aria-controls="secExcluirTurma" aria-label="Recolher">▼</button>
+    </div>
+    <div class="sec-body" id="secExcluirTurma">
+      <div class="row-btns">
+        <input type="text" id="inpTurmaIdExcluir" class="input cresce" placeholder="turmaId (ex.: ATUR|2026|MAT|G1)">
+        <button class="btn secondary field-h" id="btnBuscarTurma" onclick="buscarTurmaExcluir()">🔍 Buscar</button>
+      </div>
+
+      <div id="previewTurma" class="mt-14" style="display:none;">
+        <div id="previewTurmaInfo"></div>
+        <div id="previewTurmaMats" class="mt-8"></div>
+        <div class="row-btns mt-14">
+          <button class="btn danger" id="btnExcluirTurma" onclick="executarExclusaoTurma()">🗑️ Excluir definitivamente</button>
+        </div>
+      </div>
+
+      <div class="console" id="logExcluirTurma" style="display:none;"></div>
+    </div>
+  </div>
+    </div>
+  </section>
 
 </div>
 
@@ -601,6 +658,29 @@ function secHeaderClick(id, ev) {
   if (!body) return;
   const fechado = body.classList.contains('collapsed');
   if (fechado || (ev && ev.target && ev.target.closest && ev.target.closest('.sec-toggle'))) toggleSec(id);
+}
+
+// ── Seções da página ──
+function gdSetGrupo(id, aberto) {
+  const corpo = document.getElementById('corpo_' + id), tog = document.getElementById('tog_' + id);
+  if (!corpo) return;
+  corpo.classList.toggle('fechado', !aberto);
+  if (tog) { tog.classList.toggle('collapsed', !aberto); tog.setAttribute('aria-expanded', String(aberto)); }
+  const hdr = corpo.previousElementSibling; if (hdr) hdr.classList.toggle('fechada', !aberto);
+}
+function gdAbrirGrupo(id) { gdSetGrupo(id, true); }
+// Aberta: só a seta recolhe. Fechada: o cabeçalho inteiro abre.
+function gdGrupoHeaderClick(id, ev) {
+  const corpo = document.getElementById('corpo_' + id); if (!corpo) return;
+  const fechada = corpo.classList.contains('fechado');
+  if (fechada || (ev && ev.target && ev.target.closest && ev.target.closest('.sec-toggle'))) gdSetGrupo(id, fechada);
+}
+// Barra de atalhos da Visão geral: abre a seção e rola até ela
+function gdIrPara(id, el) {
+  gdAbrirGrupo(id);
+  document.querySelectorAll('#gdNav .gd-step').forEach(b => b.classList.toggle('active', b === el));
+  const alvo = document.getElementById(id);
+  if (alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function esc(s) {
@@ -2973,6 +3053,7 @@ async function _consEncerrar(its, sit) {
 
 // B3 — não duplica a exclusão: abre o fluxo completo de "Excluir aluno" (documentos, avatar, elo, contadores)
 async function _consAbrirExcluir(it) {
+  gdAbrirGrupo('grpExcl');
   const campo = document.getElementById('inpAlunoIdExcluir');
   const corpo = document.getElementById('secExcluirAluno');
   if (!campo || !corpo) return;
@@ -2983,6 +3064,7 @@ async function _consAbrirExcluir(it) {
 }
 // B6 — abre o card "Excluir matrícula" já com a matrícula preenchida e buscada
 async function _consAbrirExcluirMat(it) {
+  gdAbrirGrupo('grpExcl');
   const campo = document.getElementById('inpMatIdExcluir');
   const corpo = document.getElementById('secExcluirMatricula');
   if (!campo || !corpo) return;
