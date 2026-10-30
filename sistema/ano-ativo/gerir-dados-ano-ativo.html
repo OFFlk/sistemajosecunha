@@ -55,87 +55,13 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 /* Aviso somente-leitura: .aviso-warn global; aqui só o espaçamento */
 #avisoReadonly { margin-bottom:16px; }
 
-/* ── Seções da página (abas) ── */
-.gd-painel { margin-top: 22px; }
-.gd-painel[hidden] { display: none; }
-.gd-painel.perigo { border-left: 3px solid var(--ui-st-bad-bd); padding-left: 12px; }
-.gd-step:not(.active) .gd-step-num.aviso { border-style: dashed; }   /* resultado novo numa aba fora de vista: tracejado + ⚠️ (guia 4.5) */
+/* ── Abas de seção: aparência em components.css (3-B); aqui só LAYOUT ── */
+.abas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
+@media (max-width: 900px) { .abas { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .abas { grid-template-columns: 1fr; } }
+.aba-painel { margin-top: 22px; }
 .gd-par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .gd-par { grid-template-columns: 1fr; } }
-/* barra de atalhos (stepper dentro do destaque, tokens --dest-*) */
-.gd-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
-@media (max-width: 900px) { .gd-nav { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 520px) { .gd-nav { grid-template-columns: 1fr; } }
-.gd-step { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; padding: 8px 18px 8px 10px; border-radius: 12px; border: 0; background: transparent; text-align: left; font: inherit; transition: background .15s; }
-.gd-step:hover { background: var(--dest-btn-hover); }
-.gd-step.active, .gd-step.active:hover { background: var(--bg); }
-.gd-step-num { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; border: 2px solid var(--dest-fg); color: var(--dest-fg); background: transparent; }
-.gd-step.active .gd-step-num { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
-.gd-step-label { display: block; font-size: 11px; font-weight: 700; color: var(--dest-fg); opacity: .75; text-transform: uppercase; letter-spacing: .05em; }
-.gd-step-title { display: block; font-size: 14px; font-weight: 800; color: var(--dest-fg); }
-.gd-step.active .gd-step-label { color: var(--ui-muted); opacity: 1; }
-.gd-step.active .gd-step-title { color: var(--ui-text); }
-
-/* ── Migração (status ok/aviso/perigo: candidato a global, D3) ── */
-.migr-item {
-  display:flex; align-items:center; gap:10px;
-  padding:9px 14px; border-radius:8px;
-  border:1px solid var(--ui-border);
-  background:var(--ui-surface); margin-bottom:6px; font-size:13px;
-}
-.migr-item.ok     { border-color:var(--ui-st-ok-bd);   background:var(--ui-st-ok-bg); }
-.migr-item.warn   { border-color:var(--ui-st-warn-bd); background:var(--ui-st-warn-bg); }
-.migr-item.danger { border-color:var(--ui-st-bad-bd);  background:var(--ui-st-bad-bg); }
-
-/* ── Barra de progresso ── */
-.progress-wrap { background:var(--ui-border); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
-.progress-bar  { background:var(--ui-brand); height:100%; border-radius:999px; transition:width .3s; width:0%; }
-
-/* ── Pesquisa de alunos (várias escolas) ── */
-/* campos fora de .field usam .input/.check (globais); aqui só a disposição */
-.input.cresce { flex:1; min-width:220px; }
-.input.cheio  { display:block; width:100%; margin:4px 0 12px; }
-.psq-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:4px; transition:opacity .2s; }
-.psq-chips.off { opacity:.35; pointer-events:none; }
-.psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--ui-brand-faded); border:1px solid var(--ui-border); color:var(--ui-brand-text); font-size:13px; font-weight:700; }
-.psq-chip button { border:none; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px; font-weight:800; }
-/* Modal de pesquisa: aparência (fundo, borda, raio, sombra) vem de .modal; aqui só tamanho e disposição */
-.psq-modal { --modal-w:min(1280px,98vw); --modal-h:none; }   /* altura vem do JS (psqAjustarModal) */
-.psq-modal .modal-head .row-btns { margin:0; }
-.psq-tab { font-size:12px; }
-.psq-tab th { position:sticky; top:0; z-index:2; background:var(--ui-surface); padding:6px 8px; white-space:nowrap; }
-.psq-tab td { padding:4px 8px; vertical-align:top; }
-.psq-tab td.nw { white-space:nowrap; }
-.psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.psq-tab tbody tr:hover { background:var(--ui-brand-faded); }
-
-/* ── Card de destaque: fundo, h3, botões, tabela e .aviso-warn são do global (components.css).
-      Aqui só o que é desta página, usando --dest-* ── */
-
-/* ── Backup (exportar à esquerda, importar à direita) ── */
-.bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-.bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
-@media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
-/* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
-
-/* ── Consistência (matrículas sem turma/aluno, alunos sem matrícula): layout local; cor só por .badge / --ui-* ── */
-.cons-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-.cons-barra .cons-ano { width:150px; }
-.row-btns .ano-sel { width:190px; }
-/* índice de anos (espelho do card de Gestão de Atas) */
-.chips-anos { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
-.aviso-linha { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
-.cons-barra .cons-busca { flex:1; min-width:200px; }
-.cons-sit { width:170px; }
-.cons-area[hidden] { display:none; }
-.cons-lista { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
-.cons-item { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
-.cons-left { flex:1; min-width:240px; }
-.cons-tit { font-size:14px; font-weight:800; margin-bottom:6px; word-break:break-word; }
-.cons-chips { display:flex; flex-wrap:wrap; gap:6px; }
-.cons-det { margin-top:6px; word-break:break-word; }
-.cons-right { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-.cons-pag { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -161,15 +87,15 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       <button class="btn secondary" onclick="carregarDados()">🔄 Carregar dados</button>
     </div>
     <div class="console" id="logGeral" style="display:none;"></div>
-    <div class="gd-nav" id="gdNav" role="tablist" aria-label="Seções da página">
-      <button type="button" class="gd-step active" id="tab_grpConsulta" role="tab" aria-selected="true" aria-controls="grpConsulta" tabindex="0" onclick="gdSelecionarAba('grpConsulta')"><span class="gd-step-num" data-icone="🔎">🔎</span><span><span class="gd-step-label">2 cards</span><span class="gd-step-title">Consultar e exportar</span></span></button>
-      <button type="button" class="gd-step" id="tab_grpManut" role="tab" aria-selected="false" aria-controls="grpManut" tabindex="-1" onclick="gdSelecionarAba('grpManut')"><span class="gd-step-num" data-icone="🛠️">🛠️</span><span><span class="gd-step-label">4 cards</span><span class="gd-step-title">Manutenção</span></span></button>
-      <button type="button" class="gd-step" id="tab_grpFluxos" role="tab" aria-selected="false" aria-controls="grpFluxos" tabindex="-1" onclick="gdSelecionarAba('grpFluxos')"><span class="gd-step-num" data-icone="🔁">🔁</span><span><span class="gd-step-label">2 cards</span><span class="gd-step-title">Fluxos</span></span></button>
-      <button type="button" class="gd-step" id="tab_grpExcl" role="tab" aria-selected="false" aria-controls="grpExcl" tabindex="-1" onclick="gdSelecionarAba('grpExcl')"><span class="gd-step-num" data-icone="🗑️">🗑️</span><span><span class="gd-step-label">3 cards</span><span class="gd-step-title">Exclusões</span></span></button>
+    <div class="abas" id="gdNav" role="tablist" aria-label="Seções da página">
+      <button type="button" class="aba" id="tab_grpConsulta" role="tab" aria-selected="true" aria-controls="grpConsulta" tabindex="0" onclick="gdSelecionarAba('grpConsulta')"><span class="aba-num" data-icone="🔎">🔎</span><span><span class="aba-sub">2 cards</span><span class="aba-tit">Consultar e exportar</span></span></button>
+      <button type="button" class="aba" id="tab_grpManut" role="tab" aria-selected="false" aria-controls="grpManut" tabindex="-1" onclick="gdSelecionarAba('grpManut')"><span class="aba-num" data-icone="🛠️">🛠️</span><span><span class="aba-sub">4 cards</span><span class="aba-tit">Manutenção</span></span></button>
+      <button type="button" class="aba" id="tab_grpFluxos" role="tab" aria-selected="false" aria-controls="grpFluxos" tabindex="-1" onclick="gdSelecionarAba('grpFluxos')"><span class="aba-num" data-icone="🔁">🔁</span><span><span class="aba-sub">2 cards</span><span class="aba-tit">Fluxos</span></span></button>
+      <button type="button" class="aba" id="tab_grpExcl" role="tab" aria-selected="false" aria-controls="grpExcl" tabindex="-1" onclick="gdSelecionarAba('grpExcl')"><span class="aba-num" data-icone="🗑️">🗑️</span><span><span class="aba-sub">3 cards</span><span class="aba-tit">Exclusões</span></span></button>
     </div>
   </div>
 
-  <section class="gd-painel" id="grpConsulta" role="tabpanel" aria-labelledby="tab_grpConsulta">
+  <section class="aba-painel" id="grpConsulta" role="tabpanel" aria-labelledby="tab_grpConsulta">
   <!-- ── PESQUISAR ALUNOS (VÁRIAS ESCOLAS) ── -->
   <div class="card">
     <h3>🔎 Pesquisar alunos (várias escolas) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Consulta somente leitura. Escolha as escolas (ou marque <b>Todas</b>) e o ano letivo (a lista vem do índice de anos das escolas escolhidas); o resultado abre numa tabela com exportação em CSV (todos os dados) e PDF (colunas essenciais). Com uma escola específica no topo da página, a pesquisa fica limitada a ela e o ano ativo já vem preenchido. Lê as matrículas do ano e os alunos de cada escola escolhida: no ano ativo entram só as matrículas em curso; em anos anteriores, todas.</span></span></h3>
@@ -218,7 +144,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   </div>
   </section>
 
-  <section class="gd-painel" id="grpManut" role="tabpanel" aria-labelledby="tab_grpManut" hidden>
+  <section class="aba-painel" id="grpManut" role="tabpanel" aria-labelledby="tab_grpManut" hidden>
   <div class="gd-par">
   <!-- ── ÍNDICE DE ANOS (espelho do atasIndice) ── -->
   <div class="card">
@@ -325,7 +251,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   </div>
   </section>
 
-  <section class="gd-painel" id="grpFluxos" role="tabpanel" aria-labelledby="tab_grpFluxos" hidden>
+  <section class="aba-painel" id="grpFluxos" role="tabpanel" aria-labelledby="tab_grpFluxos" hidden>
   <!-- ── VIRADA DE ANO (atalho) ── -->
   <div class="card">
     <h3>🔁 Virada de ano <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Abre a página que leva alunos das turmas de um ano para as turmas de outro, criando as matrículas novas. Cadastre antes as turmas do ano de destino em Cadastro de turmas, já com as séries atualizadas. As matrículas do ano de origem não são alteradas.</span></span></h3>
@@ -364,7 +290,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   </div>
   </section>
 
-  <section class="gd-painel perigo" id="grpExcl" role="tabpanel" aria-labelledby="tab_grpExcl" hidden>
+  <section class="aba-painel perigo" id="grpExcl" role="tabpanel" aria-labelledby="tab_grpExcl" hidden>
   <!-- ── EXCLUSÃO PONTUAL: ALUNO ── -->
   <div class="card">
     <h3>🗑️ Excluir aluno (registro pontual) <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Remove um aluno: dados pessoais (<b>anoAtivoAlunos</b>), todas as matrículas de qualquer ano (<b>anoAtivoMatriculas</b>), documentos anexados, avatar e o vínculo (elo) com o módulo de Atas. Útil para limpar dados de teste. <b>Ação irreversível.</b></span></span></h3>
@@ -591,7 +517,7 @@ function gdSelecionarAba(id, foco) {
   GD_ABAS.forEach(a => {
     const on = a === id, painel = document.getElementById(a), tab = document.getElementById('tab_' + a);
     if (painel) painel.hidden = !on;
-    if (tab) { tab.classList.toggle('active', on); tab.setAttribute('aria-selected', String(on)); tab.tabIndex = on ? 0 : -1; }
+    if (tab) { tab.setAttribute('aria-selected', String(on)); tab.tabIndex = on ? 0 : -1; }
   });
   gdAviso(id, false);
   if (foco) { const t = document.getElementById('tab_' + id); if (t) t.focus(); }
@@ -599,14 +525,14 @@ function gdSelecionarAba(id, foco) {
 function gdAbrirGrupo(id) { gdSelecionarAba(id); }          // usado pelos atalhos da Consistência
 function gdAviso(id, ativo) {
   const tab = document.getElementById('tab_' + id); if (!tab) return;
-  const num = tab.querySelector('.gd-step-num');
-  num.classList.toggle('aviso', !!ativo);
+  const num = tab.querySelector('.aba-num');
+  num.classList.toggle('pendente', !!ativo);
   num.textContent = ativo ? '⚠️' : num.dataset.icone;
   tab.title = ativo ? 'Há um resultado novo nesta seção' : '';
 }
 function gdSinalizar(id) {                                   // resultado pronto numa aba que não está à vista
   const tab = document.getElementById('tab_' + id);
-  if (tab && !tab.classList.contains('active')) gdAviso(id, true);
+  if (tab && tab.getAttribute('aria-selected') !== 'true') gdAviso(id, true);
 }
 function gdMonitorar(grp, nomes) {
   nomes.forEach(n => {
