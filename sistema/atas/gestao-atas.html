@@ -240,9 +240,13 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 
   <!-- ── CONSISTÊNCIA ── -->
   <div class="card">
-    <h3>🔍 Consistência</h3>
+    <h3>🔍 Consistência
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble wide">Procura matrículas, cadastros e elos que ficaram soltos ou divergentes dentro do módulo de atas. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede a sua confirmação.<br><br>Por ano, lê as turmas e as matrículas do ano, os cadastros desses alunos e as matrículas deles em outros anos. A verificação global lê tudo (turmas, matrículas, cadastros e elos) e é a única que acha cadastros sem matrícula (A5), elos sem cadastro em Atas (A6) e elos sem vínculo, sem dados e sem CPF (A10). Elo vinculado ao Ano-Ativo, ou só de histórico com dados pessoais, cujo cadastro existe, é normal e não aparece.</span>
+      </span>
+    </h3>
     <div id="secConsist">
-      <div class="muted">Procura matrículas, cadastros e elos que ficaram soltos ou divergentes dentro do módulo de atas. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede a sua confirmação.</div>
       <div class="con-barra">
         <select class="input con-ano" id="conAno" aria-label="Ano letivo">
           <option value="" disabled hidden selected>Selecione o ano…</option>
@@ -250,8 +254,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
         <button class="btn primary field-h" id="btnConVerificar" onclick="conVerificar(false)">🔍 Verificar o ano</button>
         <button class="btn secondary field-h" id="btnConGlobal" onclick="conVerificar(true)">🌐 Verificação global</button>
       </div>
-      <div class="muted mt-8">Por ano, lê as turmas e as matrículas do ano, os cadastros desses alunos e as matrículas deles em outros anos. A verificação global lê tudo (turmas, matrículas, cadastros e elos) e é a única que acha cadastros sem matrícula (A5), elos sem cadastro em Atas (A6) e elos sem vínculo, sem dados e sem CPF (A10). Elo vinculado ao Ano-Ativo, ou só de histórico com dados pessoais, cujo cadastro existe, é normal e não aparece.</div>
-
+      
       <div class="con-area mt-14" id="conArea" hidden>
         <div class="stats-row">
           <div class="stat-box"><div class="stat-num" id="conStat_A1">0</div><div class="stat-lbl">A1 · Matrícula sem turma</div></div>
@@ -300,11 +303,10 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
     <h3>🗑️ Apagar turmas
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
-          <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card Backup (aba Ferramentas) antes de apagar qualquer turma.</span>
+          <span class="info-tip-bubble wide">Escolha um ano para ler só as turmas dele (menos leituras no banco) ou deixe em "Todos os anos" para listar todas.<br><br>Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card Backup (aba Ferramentas) antes de apagar qualquer turma.</span>
         </span>
       </h3>
     <div id="secApagar">
-      <div class="muted">Escolha um ano para ler só as turmas dele (menos leituras no banco) ou deixe em "Todos os anos" para listar todas.</div>
       <div class="apagar-barra mt-8">
         <select class="input apagar-ano" id="apagarAno" aria-label="Filtrar por ano letivo">
           <option value="">Todos os anos</option>
