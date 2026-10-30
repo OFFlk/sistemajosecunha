@@ -47,7 +47,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 /* ── Card de destaque: fundo, h3, botões e tabela são do global (components.css).
       Aqui só o que é desta página, usando --dest-* ── */
-.card-destaque .sec-toggle { color:var(--dest-fg); }
 .card-destaque .stat-box { background:var(--ui-cell-bg); border-color:transparent; }
 .card-destaque.contraste-claro .stat-box { border-color:var(--ui-border); }
 
@@ -57,7 +56,14 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .stat-num { font-size:26px; font-weight:800; color:var(--ui-brand-text); line-height:1; }
 .stat-lbl { font-size:12px; color:var(--ui-muted); margin-top:4px; }
 
-/* ── Seção recolhível: .sec-header/.sec-toggle/.sec-body são do global (guia 4.3) ── */
+/* ── Abas de seção: aparência é do global (components.css, 3-B); aqui só o layout ── */
+.abas { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
+@media (max-width:900px) { .abas { grid-template-columns:1fr 1fr; } }
+@media (max-width:520px) { .abas { grid-template-columns:1fr; } }
+.aba-painel { margin-top:22px; }
+/* dois cards leves lado a lado */
+.gd-par { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+@media (max-width:900px) { .gd-par { grid-template-columns:1fr; } }
 
 /* ── Checkbox: só o tamanho; a cor da paleta já vem do base.css ── */
 input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
@@ -137,8 +143,16 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
     <div class="row-btns mt-14">
       <button class="btn secondary" id="btnCarregarDados" onclick="carregarDados()">🔄 Carregar dados</button>
     </div>
+    <div class="abas" id="gdNav" role="tablist" aria-label="Seções da página">
+      <button type="button" class="aba" id="tab_grpFluxos" role="tab" aria-selected="true" aria-controls="grpFluxos" tabindex="0" onclick="gdSelecionarAba('grpFluxos')"><span class="aba-num" data-icone="🧭">🧭</span><span><span class="aba-sub">3 cards</span><span class="aba-tit">Ferramentas</span></span></button>
+      <button type="button" class="aba" id="tab_grpManut" role="tab" aria-selected="false" aria-controls="grpManut" tabindex="-1" onclick="gdSelecionarAba('grpManut')"><span class="aba-num" data-icone="🛠️">🛠️</span><span><span class="aba-sub">2 cards</span><span class="aba-tit">Manutenção</span></span></button>
+      <button type="button" class="aba" id="tab_grpExcl" role="tab" aria-selected="false" aria-controls="grpExcl" tabindex="-1" onclick="gdSelecionarAba('grpExcl')"><span class="aba-num" data-icone="🗑️">🗑️</span><span><span class="aba-sub">1 card</span><span class="aba-tit">Exclusão</span></span></button>
+    </div>
   </div>
 
+  <!-- ═══ ABA: FERRAMENTAS ═══ -->
+  <section class="aba-painel" id="grpFluxos" role="tabpanel" aria-labelledby="tab_grpFluxos">
+  <div class="gd-par">
   <!-- ── SCHEMAS DE ATA ── -->
   <div class="card">
     <h3>🧩 Schemas de ata
@@ -149,23 +163,73 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
     </h3>
     <div class="row-btns">
       <a class="btn primary" href="../atas/schema_ata.html">🧩 Gerenciar schemas</a>
-      <!-- Provisório: atalho da virada de ano das atas (mover para um card próprio depois) -->
-      <a class="btn primary" href="../atas/virada-atas.html">🔄 Virada de ano</a>
     </div>
   </div>
 
+  <!-- ── VIRADA DE ANO ── -->
+  <div class="card">
+    <h3>🔄 Virada de ano
+      <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+        i
+        <span class="info-tip-bubble wide">Leva alunos das turmas de um ano para turmas já cadastradas de outro, vinculando cada um ao mesmo ID e já criando a ata e a matrícula. As notas e o resultado final são preenchidos depois, na edição da ata (Cadastro de atas). Cadastre antes as turmas do ano de destino.</span>
+      </span>
+    </h3>
+    <div class="row-btns">
+      <a class="btn primary" href="../atas/virada-atas.html">Abrir a virada de ano</a>
+    </div>
+  </div>
+  </div>
+
+  <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
+  <div class="card card-destaque">
+    <h3>💾 Backup do módulo de atas</h3>
+    <div id="secBackup">
+      <div class="bk-grid">
+        <div>
+          <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Baixa uma cópia de segurança com todos os dados do módulo de atas: as turmas (com os alunos de cada uma), as identidades dos alunos e os schemas. O CSV leva só a lista de turmas.</span></span></div>
+          <div class="row-btns mt-0">
+            <button class="btn primary" onclick="exportarJSON()">⬇ Exportar JSON</button>
+            <button class="btn outline" onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
+          </div>
+        </div>
+        <div>
+          <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble align-right">Restaura turmas e schemas a partir de um arquivo de backup (.json). Você vê o que é novo, o que já existe e o que é diferente, e nada é substituído sem a sua escolha.</span></span></div>
+          <div class="row-btns mt-0">
+            <label class="btn primary">
+              📂 Carregar JSON de backup
+              <input type="file" accept=".json" hidden onchange="analisarJSON(event)">
+            </label>
+          </div>
+        </div>
+      </div>
+      <div id="mergePreview" class="dest-painel mt-14" style="display:none;">
+        <div class="linha-merge">
+          <div id="mergeResumo" class="merge-resumo"></div>
+          <button class="btn primary" onclick="aplicarMerge()">✅ Aplicar merge</button>
+          <button class="btn secondary" onclick="cancelarMerge()">✖ Cancelar</button>
+        </div>
+        <div class="muted sub-tit">Turmas</div>
+        <div id="mergeLista"></div>
+        <div id="mergeSchemasWrap" class="mt-14" style="display:none;">
+          <div class="muted sub-tit">Schemas de ata</div>
+          <div id="mergeListaSchemas"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </section>
+
+  <!-- ═══ ABA: MANUTENÇÃO ═══ -->
+  <section class="aba-painel" id="grpManut" role="tabpanel" aria-labelledby="tab_grpManut" hidden>
   <!-- ── ÍNDICE DE ANOS ── -->
   <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secIndice', event)">
-      <h3>📅 Índice de anos
+    <h3>📅 Índice de anos
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
           <span class="info-tip-bubble wide">Lista dos anos letivos que alimenta os filtros de ano da pesquisa de atas e dos cards Consistência e Apagar turmas, guardada no documento da escola — assim a pesquisa não precisa ler as turmas só para montar o filtro. O cadastro de turmas acrescenta o ano sozinho ao salvar. "Reconstruir" refaz a lista a partir das turmas (carrega as turmas se ainda não estiverem carregadas) e também remove anos que não têm mais turma.</span>
         </span>
       </h3>
-      <button type="button" class="sec-toggle" id="togSecIndice" aria-expanded="true" aria-controls="secIndice" aria-label="Recolher ou expandir">▼</button>
-    </div>
-    <div class="sec-body" id="secIndice">
+    <div id="secIndice">
       <div class="chips-anos" id="indiceAnosBox"><span class="muted">carregando…</span></div>
       <div class="aviso-warn aviso-linha mt-8" id="indiceAnosInfo" style="display:none;"></div>
       <div class="row-btns">
@@ -176,11 +240,8 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 
   <!-- ── CONSISTÊNCIA ── -->
   <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secConsist', event)">
-      <h3>🔍 Consistência</h3>
-      <button type="button" class="sec-toggle" id="togSecConsist" aria-expanded="true" aria-controls="secConsist" aria-label="Recolher ou expandir">▼</button>
-    </div>
-    <div class="sec-body" id="secConsist">
+    <h3>🔍 Consistência</h3>
+    <div id="secConsist">
       <div class="muted">Procura matrículas, cadastros e elos que ficaram soltos ou divergentes dentro do módulo de atas. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede a sua confirmação.</div>
       <div class="con-barra">
         <select class="input con-ano" id="conAno" aria-label="Ano letivo">
@@ -230,60 +291,19 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
       </div>
     </div>
   </div>
+  </section>
 
-  <!-- ── BACKUP: exportar (esquerda) e importar (direita) ── -->
-  <div class="card card-destaque">
-    <div class="sec-header" onclick="secHeaderClick('secBackup', event)">
-      <h3>💾 Backup do módulo de atas</h3>
-      <button type="button" class="sec-toggle" id="togSecBackup" aria-expanded="true" aria-controls="secBackup" aria-label="Recolher ou expandir">▼</button>
-    </div>
-    <div class="sec-body" id="secBackup">
-      <div class="bk-grid">
-        <div>
-          <div class="dest-tit">Exportar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Baixa uma cópia de segurança com todos os dados do módulo de atas: as turmas (com os alunos de cada uma), as identidades dos alunos e os schemas. O CSV leva só a lista de turmas.</span></span></div>
-          <div class="row-btns mt-0">
-            <button class="btn primary" onclick="exportarJSON()">⬇ Exportar JSON</button>
-            <button class="btn outline" onclick="exportarCSV()">⬇ Exportar CSV (turmas)</button>
-          </div>
-        </div>
-        <div>
-          <div class="dest-tit">Importar <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble align-right">Restaura turmas e schemas a partir de um arquivo de backup (.json). Você vê o que é novo, o que já existe e o que é diferente, e nada é substituído sem a sua escolha.</span></span></div>
-          <div class="row-btns mt-0">
-            <label class="btn primary">
-              📂 Carregar JSON de backup
-              <input type="file" accept=".json" hidden onchange="analisarJSON(event)">
-            </label>
-          </div>
-        </div>
-      </div>
-      <div id="mergePreview" class="dest-painel mt-14" style="display:none;">
-        <div class="linha-merge">
-          <div id="mergeResumo" class="merge-resumo"></div>
-          <button class="btn primary" onclick="aplicarMerge()">✅ Aplicar merge</button>
-          <button class="btn secondary" onclick="cancelarMerge()">✖ Cancelar</button>
-        </div>
-        <div class="muted sub-tit">Turmas</div>
-        <div id="mergeLista"></div>
-        <div id="mergeSchemasWrap" class="mt-14" style="display:none;">
-          <div class="muted sub-tit">Schemas de ata</div>
-          <div id="mergeListaSchemas"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
+  <!-- ═══ ABA: EXCLUSÃO ═══ -->
+  <section class="aba-painel perigo" id="grpExcl" role="tabpanel" aria-labelledby="tab_grpExcl" hidden>
   <!-- ── APAGAR TURMAS ── -->
   <div class="card">
-    <div class="sec-header" onclick="secHeaderClick('secApagar', event)">
-      <h3>🗑️ Apagar turmas
+    <h3>🗑️ Apagar turmas
         <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
           i
-          <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card acima antes de apagar qualquer turma.</span>
+          <span class="info-tip-bubble wide">Essa função apaga permanentemente as turmas e todos os dados vinculados a elas! Para evitar perdas, sempre salve um backup no card Backup (aba Ferramentas) antes de apagar qualquer turma.</span>
         </span>
       </h3>
-      <button type="button" class="sec-toggle" id="togSecApagar" aria-expanded="true" aria-controls="secApagar" aria-label="Recolher ou expandir">▼</button>
-    </div>
-    <div class="sec-body" id="secApagar">
+    <div id="secApagar">
       <div class="muted">Escolha um ano para ler só as turmas dele (menos leituras no banco) ou deixe em "Todos os anos" para listar todas.</div>
       <div class="apagar-barra mt-8">
         <select class="input apagar-ano" id="apagarAno" aria-label="Filtrar por ano letivo">
@@ -293,7 +313,7 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
       </div>
     </div>
   </div>
-
+  </section>
 </div>
 
 <!-- ── Modal: turmas para apagar (carregado só ao apertar "Carregar turmas") ── -->
@@ -717,21 +737,41 @@ async function reconstruirIndiceAnos() {
 /* =============================================
    UI HELPERS
 ============================================= */
-function toggleSec(id) {
-  const body = document.getElementById(id);
-  const tog  = document.getElementById('tog' + id.charAt(0).toUpperCase() + id.slice(1));   // 'secIndice' → 'togSecIndice'
-  if (!body) return;
-  const col = body.classList.toggle('collapsed');
-  if (tog) { tog.classList.toggle('collapsed', col); tog.setAttribute('aria-expanded', String(!col)); }
-  const hdr = body.previousElementSibling;
-  if (hdr) hdr.classList.toggle('fechada', col);
+const GD_ABAS = ['grpFluxos', 'grpManut', 'grpExcl'];
+function gdSelecionarAba(id, foco) {
+  if (!GD_ABAS.includes(id)) return;
+  GD_ABAS.forEach(a => {
+    const on = a === id, painel = document.getElementById(a), tab = document.getElementById('tab_' + a);
+    if (painel) painel.hidden = !on;
+    if (tab) { tab.setAttribute('aria-selected', String(on)); tab.tabIndex = on ? 0 : -1; }
+  });
+  gdAviso(id, false);
+  if (foco) { const t = document.getElementById('tab_' + id); if (t) t.focus(); }
 }
-// Aberto: só a seta recolhe. Fechado: o cabeçalho inteiro abre.
-function secHeaderClick(id, ev) {
-  const body = document.getElementById(id);
-  if (!body) return;
-  const fechado = body.classList.contains('collapsed');
-  if (fechado || (ev && ev.target && ev.target.closest && ev.target.closest('.sec-toggle'))) toggleSec(id);
+function gdAbrirGrupo(id) { gdSelecionarAba(id); }
+function gdAviso(id, ativo) {
+  const tab = document.getElementById('tab_' + id); if (!tab) return;
+  const num = tab.querySelector('.aba-num');
+  num.classList.toggle('pendente', !!ativo);
+  num.textContent = ativo ? '⚠️' : num.dataset.icone;
+  tab.title = ativo ? 'Há um resultado novo nesta seção' : '';
+}
+function gdSinalizar(id) {
+  const tab = document.getElementById('tab_' + id);
+  if (tab && tab.getAttribute('aria-selected') !== 'true') gdAviso(id, true);
+}
+function gdMonitorar(grp, nomes) {
+  nomes.forEach(n => {
+    const f = window[n]; if (typeof f !== 'function') return;
+    window[n] = async function (...a) { try { return await f.apply(this, a); } finally { gdSinalizar(grp); } };
+  });
+}
+function gdTeclasAbas(ev) {
+  const i = GD_ABAS.findIndex(a => document.getElementById('tab_' + a) === document.activeElement); if (i < 0) return;
+  const L = GD_ABAS.length; let n;
+  if (ev.key === 'ArrowRight') n = (i + 1) % L; else if (ev.key === 'ArrowLeft') n = (i - 1 + L) % L;
+  else if (ev.key === 'Home') n = 0; else if (ev.key === 'End') n = L - 1; else return;
+  ev.preventDefault(); gdSelecionarAba(GD_ABAS[n], true);
 }
 
 /* =============================================
@@ -2222,6 +2262,11 @@ async function _conAtualizarAno(it) {
   setMsg('Ano atualizado.', 'ok');
 }
 /* FIM CONSISTÊNCIA */
+
+/* ── Abas: aviso (⚠️) quando uma operação longa termina com a aba em segundo plano ── */
+gdMonitorar('grpManut', ['reconstruirIndiceAnos', 'conVerificar']);
+gdMonitorar('grpFluxos', ['exportarJSON', 'exportarCSV', 'aplicarMerge']);
+document.getElementById('gdNav').addEventListener('keydown', gdTeclasAbas);
 </script>
 
 </body>
