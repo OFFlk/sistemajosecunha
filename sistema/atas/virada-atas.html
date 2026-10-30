@@ -287,21 +287,30 @@ function marcarPorResultado(fn){
 }
 
 // ── Atribuição e plano ──
-// Decide a série de destino de um aluno. Mesmas regras da virada do Ano Ativo:
+// Decide a série de destino de um aluno. Mesmas regras da virada do Ano Ativo, mais o limite de intervalo:
 //  • avançando no tempo, só o AP promove sozinho; REP, CON, DEST, TRA, AND e sem resultado ficam na mesma série;
 //  • turma de série única: o não aprovado vai para ela como EXCEÇÃO (pede confirmação), em vez de ser barrado;
-//  • série escolhida no seletor vale sempre; só pede confirmação se um não aprovado for para série diferente da atual;
-//  • fluxo inverso: série anterior (sem confirmação).
-function decidirSerie(a, t, fwd, escolhida){
+//  • série escolhida no seletor vale, e só pede confirmação se um não aprovado for para série diferente da atual;
+//  • fluxo inverso: série anterior (sem confirmação);
+//  • LIMITE: entre duas séries numéricas (ano/série) ninguém anda mais séries do que o número de anos de intervalo
+//    (3º → 5º em 1 ano é inválido). Alfabetização, Eixo e Multisseriada ficam livres.
+function foraDoIntervalo(origem, destino, fwd, gap){
+  const o = parseSerie(origem), d = parseSerie(destino);
+  if(!o || !d || o.multi || d.multi) return false;
+  if(familia(o.tipo) !== 'ANO_SERIE' || familia(d.tipo) !== 'ANO_SERIE') return false;
+  return fwd ? d.ini > o.fim + gap : d.fim < o.ini - gap;
+}
+function decidirSerie(a, t, fwd, escolhida, gap = 1){
   const ap = normRes(a.res) === 'AP';
   let serie = escolhida;
   if(!serie){
     serie = acharSerieNaTurma(t.series, alvoSerie(a.serie, fwd ? (ap ? 1 : 0) : -1));
     if(!serie && fwd && !ap && (t.series || []).length === 1) serie = t.series[0];
   }
-  if(!serie) return { serie:'', excecao:false };
+  if(!serie) return { serie:'', excecao:false, foraIntervalo:false };
+  if(foraDoIntervalo(a.serie, serie, fwd, gap)) return { serie:'', excecao:false, foraIntervalo:true, tentada:serie };
   const mudou = !acharSerieNaTurma([serie], alvoSerie(a.serie, 0));      // série de destino ≠ série atual do aluno
-  return { serie, excecao: fwd && !ap && mudou };
+  return { serie, excecao: fwd && !ap && mudou, foraIntervalo:false };
 }
 async function atribuir(){
   const ids = marcados(), t = turmaDestPorId($('dTurma').value);
@@ -311,12 +320,14 @@ async function atribuir(){
   const sc = schemaDe(t), fwd = avancando();
   const escolhida = sc.serieAtiva ? $('dSerie').value : '';
   const resultado = sc.resultadoAtivo ? ($('dRes').value || 'Não informado') : 'Não informado';
-  const novos = [], excecoes = []; let pulados = 0;
+  const novos = [], excecoes = [], foraGap = []; let pulados = 0;
+  const gapAnos = Math.abs(anoDestino() - anoOrigem());
   ids.forEach(id => {
     const a = ORIG.find(x => x.id === id); if(!a) return;
     let serie = '';
     if(sc.serieAtiva){
-      const d = decidirSerie(a, t, fwd, escolhida);
+      const d = decidirSerie(a, t, fwd, escolhida, gapAnos);
+      if(d.foraIntervalo){ foraGap.push(`${esc(a.nome)} (${esc(a.serie)} → ${esc(d.tentada)})`); return; }
       if(!d.serie){ pulados++; return; }                                // sem série esperada nessa turma: escolha manualmente
       serie = d.serie;
       if(d.excecao) excecoes.push(`${esc(a.nome)} (${esc(normRes(a.res) || 'sem resultado')}: ${esc(a.serie)} → ${esc(serie)})`);
@@ -332,6 +343,7 @@ async function atribuir(){
   }
   novos.forEach(([id, v]) => PLANO.set(id, v));
   renderAlunos(); renderPlano();
+  if(foraGap.length) setMsg(`${foraGap.length} aluno(s) não foram atribuídos: a série de destino está além do intervalo de ${gapAnos} ano(s) — ${foraGap.slice(0, 4).join('; ')}${foraGap.length > 4 ? '; …' : ''}.`, 'err');
   if(pulados) setMsg(`${pulados} aluno(s) ignorado(s): a série esperada não existe nessa turma (ou não há série automática, como em Alfabetização/Multisseriada). Para exceções, escolha a série de destino manualmente.`, 'warn');
 }
 function removerAtribuicao(){ marcados().forEach(id => PLANO.delete(id)); renderAlunos(); renderPlano(); }
