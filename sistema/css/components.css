@@ -25,7 +25,7 @@
      0. Tokens de UI (--ui-*)
      1. Card / título / campo / lista / badge / tabela
      2. Botões
-     3. Card de destaque
+     3. Card de destaque (+ 3-B. Abas de seção)
      4. Aviso de card (.aviso-warn)
      5. Ícone de dica (ⓘ) e 5-C. Popover/dropdown
      6. Toast
@@ -522,6 +522,34 @@ html[data-theme="dark"] .config-card.card-destaque{
 .sec-toggle.collapsed{ transform:rotate(-90deg); }
 .sec-body.collapsed{ display:none; }
 .card-destaque .sec-toggle{ color:var(--dest-fg); }
+
+/* ── 3-B. ABAS DE SEÇÃO (stepper dentro do card de destaque) ──
+   Navegação entre painéis da MESMA página; só um painel visível por vez. Trocar de aba só esconde o
+   painel (JS, DOM e resultados em memória continuam vivos).
+   Markup:
+     <div class="abas" role="tablist">
+       <button class="aba" role="tab" aria-selected="true|false" aria-controls="ID" id="tab_ID">
+         <span class="aba-num">ÍCONE</span><span><span class="aba-sub">legenda</span><span class="aba-tit">Título</span></span>
+       </button> …
+     </div>
+     <section class="aba-painel" id="ID" role="tabpanel" aria-labelledby="tab_ID" [hidden]> …cards… </section>
+   O estado ativo é aria-selected="true" (não há classe .active). Feita para ficar DENTRO de .card-destaque
+   (usa --dest-*). O LAYOUT do container (.abas: colunas, gap, quebra no mobile) e a margem do painel são da página.
+   .aba-num.pendente = resultado novo numa aba fora de vista: tracejado + ⚠️ (guia 4.5, nunca amarelo).
+   .aba-painel.perigo = painel de ações destrutivas (faixa de alerta à esquerda). ── */
+.aba{ display:flex; align-items:center; gap:10px; min-width:0; cursor:pointer; padding:8px 18px 8px 10px; border-radius:12px; border:0; background:transparent; text-align:left; font:inherit; transition:background .15s; }
+.aba:hover{ background:var(--dest-btn-hover); }
+.aba:focus-visible{ outline:2px solid var(--dest-fg); outline-offset:2px; }
+.aba[aria-selected="true"], .aba[aria-selected="true"]:hover{ background:var(--bg); }
+.aba-num{ width:32px; height:32px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; border:2px solid var(--dest-fg); color:var(--dest-fg); background:transparent; }
+.aba[aria-selected="true"] .aba-num{ background:var(--ui-brand); border-color:var(--ui-brand); color:var(--ui-brand-fg); }
+.aba[aria-selected="false"] .aba-num.pendente{ border-style:dashed; }
+.aba-sub{ display:block; font-size:11px; font-weight:700; color:var(--dest-fg); opacity:.75; text-transform:uppercase; letter-spacing:.05em; }
+.aba-tit{ display:block; font-size:14px; font-weight:800; color:var(--dest-fg); }
+.aba[aria-selected="true"] .aba-sub{ color:var(--ui-muted); opacity:1; }
+.aba[aria-selected="true"] .aba-tit{ color:var(--ui-text); }
+.aba-painel[hidden]{ display:none; }
+.aba-painel.perigo{ border-left:3px solid var(--ui-st-bad-bd); padding-left:12px; }
 
 /* ── CAIXA DE NÚMERO (.stat-box): número grande + rótulo. A linha que as agrupa (.stats-row) é layout da página. ── */
 .stat-box{
