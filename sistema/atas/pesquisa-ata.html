@@ -125,11 +125,6 @@
         </div>
         <div class="chips" id="chipsSeries"></div>
       </div>
-
-      <div class="field">
-        <label>Busca geral</label>
-        <input id="fBusca" type="text" placeholder="Procura por aba, arquivo, série ou aluno...">
-      </div>
     </div>
 
     <div class="filter-actions">
@@ -155,9 +150,13 @@
       </div>
       <div class="aluno-search-actions">
         <label class="check">
-          <input type="checkbox" id="alunoParcial" checked>
-          Início do nome (desmarque para nome exato)
+          <input type="checkbox" id="alunoParteNome">
+          Qualquer parte do nome (só turmas já carregadas)
         </label>
+        <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
+          i
+          <span class="info-tip-bubble wide">Desmarcado: procura no banco pelo <b>início</b> do nome completo (ex.: “mar” acha Maria, mas não Ana Maria). Já inclui o nome exato.<br>Marcado: procura o texto em <b>qualquer parte</b> do nome, mas só nas turmas que já foram carregadas nesta sessão (pelo botão Pesquisar ou ao abrir uma turma). Não consulta o banco, então não gasta leituras.</span>
+        </span>
         <button class="btn primary" type="button" onclick="pesquisarAluno()">Pesquisar</button>
         <button class="btn secondary" type="button" onclick="limparPesquisaAluno()">Limpar</button>
       </div>
@@ -500,7 +499,7 @@ function preencherFiltroAno(anosIndice) {
   sel.innerHTML = `<option value="">Todos</option>` + anos.map(a => `<option value="${a}">${a}</option>`).join("");
 }
 
-// Busca no Firestore SÓ o que os filtros pedem (ano, turno e série viram query; só a busca geral filtra no cliente).
+// Busca no Firestore SÓ o que os filtros pedem (ano, turno e série viram query).
 // Reaproveita o que já foi lido na sessão (ver _coberta): busca igual ou mais estreita que uma anterior não lê o banco.
 // Memória da página (variáveis JS — nada no localStorage; some ao recarregar a aba):
 // _memoria = turmas já lidas nesta sessão; _buscasFeitas = "regiões" já lidas por inteiro.
@@ -820,29 +819,15 @@ function renderResumoTurma(t) {
 /* =========================
    Aplicar filtros
 ========================= */
-// Filtros de série e busca geral "valem" só no clique em Pesquisar: aqui fica o retrato deles naquele momento.
+// O filtro de série "vale" só no clique em Pesquisar: aqui fica o retrato deles naquele momento.
 // Assim, mexer nos campos (como ano e turno) não muda a lista até você pesquisar de novo; reordenar a lista não troca os filtros.
-let _filtrosAplicados = { series: [], busca: "" };
+let _filtrosAplicados = { series: [] };
 function aplicarFiltros() {
-  const fBusca = _filtrosAplicados.busca;
-
   let lista = turmas.slice();
 
   if (_filtrosAplicados.series.length) {
     const alvo = _filtrosAplicados.series.map(serieChave);
     lista = lista.filter(t => { const ds = seriesDaTurma(t); return alvo.some(x => ds.has(x)); });
-  }
-
-  if (fBusca) {
-    lista = lista.filter(t => {
-      const base =
-        norm(t.nome || "") + " " +
-        norm(serieTextoDaTurma(t)) + " " +
-        norm(t.turno || "") + " " +
-        norm(t.anoLetivo || "");
-      if (base.includes(fBusca)) return true;
-      return (t.alunos || []).some(a => norm(nomeAtual(a)).includes(fBusca));
-    });
   }
 
   renderListaTurmas(ordenarTurmas(lista));
@@ -1176,7 +1161,7 @@ async function carregar() {
   recomputarTurmasBase();
 
   document.getElementById("dbInfoTip").textContent =
-    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano, o turno e a série escolhidos (só as turmas que casam são lidas). A busca geral refina o que já foi buscado e não reduz leituras. Sem ano, turno nem série, a pesquisa lê todas as turmas. Os anos do filtro vêm do índice mantido em Gestão de Atas.`;
+    `As turmas são buscadas no banco ao clicar em "Pesquisar", conforme o ano, o turno e a série escolhidos (só as turmas que casam são lidas). Sem ano, turno nem série, a pesquisa lê todas as turmas. Para achar um aluno sem saber a turma, use a Pesquisa por aluno. Os anos do filtro vêm do índice mantido em Gestão de Atas.`;
 
   preencherFiltroAno(await carregarAnosDoIndice());
 
@@ -1187,20 +1172,12 @@ async function carregar() {
 
   document.getElementById("btnPesquisar").onclick = async function(){
     const btn = this, box = document.getElementById("listaTurmas");
-    // A busca geral é texto livre (inclui nomes de alunos dentro da turma): o Firestore não filtra isso no servidor.
-    // Ela só refina turmas já buscadas por ano/turno/série — sozinha, obrigaria ler o banco inteiro.
-    const _temFiltroServidor = document.getElementById("fAno").value.trim() || document.getElementById("fTurno").value.trim() || seriesSelecionadas.length;
-    if (norm(document.getElementById("fBusca").value) && !_temFiltroServidor) {
-      box.innerHTML = `<div class="aviso-warn">A busca geral refina turmas já filtradas. Escolha ao menos um <b>ano</b>, <b>turno</b> ou <b>série</b> — ou use a <b>Pesquisa por aluno</b> para achar um nome.</div>`;
-      setMsg("Escolha ano, turno ou série para usar a busca geral.", "warn");
-      return;
-    }
     btn.disabled = true;
     box.innerHTML = `<div class="aviso-warn">Buscando turmas…</div>`;
     try {
       turmasTodas = await buscarTurmasNoBanco();
       recomputarTurmasBase();
-      _filtrosAplicados = { series: seriesSelecionadas.slice(), busca: norm(document.getElementById("fBusca").value) };
+      _filtrosAplicados = { series: seriesSelecionadas.slice() };
       _jaFoiPesquisado = true;
       aplicarFiltros();
     } catch(e) {
@@ -1211,7 +1188,7 @@ async function carregar() {
       btn.disabled = false;
     }
   };
-  // TODOS os filtros (ano, turno, série, busca geral) só valem ao clicar em Pesquisar.
+  // TODOS os filtros (ano, turno, série) só valem ao clicar em Pesquisar.
   preencherFiltroSerie();
   document.getElementById("btnAddSerie").onclick = function(){
     const sel = document.getElementById("selSerieAdd");
@@ -1225,12 +1202,9 @@ async function carregar() {
   document.getElementById("btnLimparFiltros").onclick = function(){
     document.getElementById("fAno").value = "";
     document.getElementById("fTurno").value = "";
-    document.getElementById("fBusca").value = "";
     seriesSelecionadas = [];
     renderChipsSeries();   // só limpa os campos; a lista só muda ao clicar em Pesquisar
   };
-  // Busca geral: Enter equivale a clicar em Pesquisar (digitar não refiltra sozinho)
-  document.getElementById("fBusca").onkeydown = function(ev){ if (ev.key === "Enter") { ev.preventDefault(); document.getElementById("btnPesquisar").click(); } };
 
   try{
     if(window.ThemeColors && typeof ThemeColors.ajustarContraste === 'function') ThemeColors.ajustarContraste();
@@ -1278,11 +1252,58 @@ document.addEventListener("DOMContentLoaded", carregar);
   };
 
   let _alunoSeq = 0;
+
+  function _renderAchadosAluno(out, achados, rodapeHtml){
+    achados.sort((x,y)=>{
+      const ax = parseInt(String(x.ano||"0"),10) || 0;
+      const ay = parseInt(String(y.ano||"0"),10) || 0;
+      if (ax !== ay) return ax - ay;
+      return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
+    });
+    out.innerHTML = achados.map(h => `
+      <div class="aluno-result-row">
+        <div class="aluno-result-info">
+          <div><b>${_escHtml(h.ano || "?")}</b> — ${_escHtml(h.serie || "?")} — <b>${_escHtml(h.aluno)}</b>${h.resultado ? " — " + _escHtml(h.resultado) : ""}</div>
+        </div>
+        <div class="aluno-result-actions">
+          <button class="btn secondary small" type="button" onclick="abrirTurmaPorId('${_escHtml(h.id)}')">Abrir</button>
+        </div>
+      </div>
+    `).join("") + (rodapeHtml || "");
+  }
+
+  // Modo "qualquer parte do nome": só nas turmas que já estão em memória (nunca consulta o banco).
+  const LIMITE_CACHE = 200;
+  function _pesquisarAlunoNoCache(termo, textoOriginal, out){
+    const porId = new Map();
+    for (const t of _memoria.values()) if (t && t.turmaId) porId.set(t.turmaId, t);
+    for (const t of turmasTodas) if (t && t.turmaId) porId.set(t.turmaId, t);
+    if (!porId.size){
+      out.innerHTML = `<div class="aviso-warn">Ainda não há turmas carregadas. Use <b>🔍 Pesquisar</b> nos filtros (ano, turno ou série) para carregar turmas, ou desmarque a opção para procurar no banco pelo início do nome.</div>`;
+      return;
+    }
+    const achados = []; let passou = false;
+    for (const t of porId.values()){
+      for (const a of (t.alunos || [])){
+        const atual = nomeAtual(a);
+        if (!(normNome(atual).includes(termo) || normNome(a.nome).includes(termo))) continue;
+        if (achados.length >= LIMITE_CACHE){ passou = true; continue; }
+        achados.push({ aluno: atual, ano: t.anoLetivo || "", serie: a.serie || serieTextoDaTurma(t) || "", resultado: a.resultado || "", id: t.turmaId });
+      }
+    }
+    const rodape = `<div class="subnote">Procurado só nas ${porId.size} turma(s) já carregadas nesta sessão.</div>` +
+      (passou ? `<div class="aviso-warn">Mostrando os primeiros ${LIMITE_CACHE} resultados — digite mais do nome para refinar.</div>` : "");
+    if (!achados.length){
+      out.innerHTML = `<div class="aviso-warn">Nenhuma ocorrência de <b>${_escHtml(textoOriginal)}</b> nas turmas já carregadas.</div>` + rodape;
+      return;
+    }
+    _renderAchadosAluno(out, achados, rodape);
+  }
   // Consulta direcionada (sem baixar turmas): alunos-atas por prefixo do nome → matrículas desses alunos.
   // Custo ≈ alunos encontrados (máx. 10) + matrículas deles. A turma só é lida quando você clica em "Abrir".
   window.pesquisarAluno = async function(){
     const qEl = document.getElementById("alunoQuery");
-    const parcialEl = document.getElementById("alunoParcial");
+    const parteEl = document.getElementById("alunoParteNome");
     const out = document.getElementById("alunoResultados");
 
     if (!qEl || !out) {
@@ -1291,10 +1312,11 @@ document.addEventListener("DOMContentLoaded", carregar);
     }
 
     const termo = normNome(qEl.value);
-    const prefixo = !!(parcialEl && parcialEl.checked);   // marcado: início do nome; desmarcado: nome exato
+    const parteDoNome = !!(parteEl && parteEl.checked);   // marcado: qualquer parte do nome, só no cache; desmarcado: início do nome no banco
 
     if (!termo) { setMsg("Digite o nome do aluno.", "err"); return; }
     if (termo.length < 3) { setMsg("Digite ao menos 3 letras do nome.", "err"); return; }
+    if (parteDoNome){ ++_alunoSeq; _pesquisarAlunoNoCache(termo, qEl.value, out); return; }
     if (!(window.Identidade && Identidade.buscarAtasPorNome && window.DB && DB.matriculas && DB.matriculas.whereIn)) {
       setMsg("Erro: módulo de busca indisponível.", "err"); return;
     }
@@ -1306,7 +1328,6 @@ document.addEventListener("DOMContentLoaded", carregar);
       let alunos = await Identidade.buscarAtasPorNome(termo, LIMITE + 1);
       const temMais = alunos.length > LIMITE;
       alunos = alunos.slice(0, LIMITE);
-      if (!prefixo) alunos = alunos.filter(a => normNome(a.nome) === termo);
       const mats = alunos.length ? await DB.matriculas.whereIn("alunoId", alunos.map(a => a.alunoId)) : [];
       if (seq !== _alunoSeq) return;
 
@@ -1326,23 +1347,7 @@ document.addEventListener("DOMContentLoaded", carregar);
         return;
       }
 
-      achados.sort((x,y)=>{
-        const ax = parseInt(String(x.ano||"0"),10) || 0;
-        const ay = parseInt(String(y.ano||"0"),10) || 0;
-        if (ax !== ay) return ax - ay;
-        return String(x.serie||"").localeCompare(String(y.serie||""), "pt-BR");
-      });
-
-      out.innerHTML = achados.map(h => `
-      <div class="aluno-result-row">
-        <div class="aluno-result-info">
-          <div><b>${_escHtml(h.ano || "?")}</b> — ${_escHtml(h.serie || "?")} — <b>${_escHtml(h.aluno)}</b>${h.resultado ? " — " + _escHtml(h.resultado) : ""}</div>
-        </div>
-        <div class="aluno-result-actions">
-          <button class="btn secondary small" type="button" onclick="abrirTurmaPorId('${_escHtml(h.id)}')">Abrir</button>
-        </div>
-      </div>
-    `).join("") + (temMais ? `<div class="aviso-warn">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
+      _renderAchadosAluno(out, achados, temMais ? `<div class="aviso-warn">Há mais alunos com esse início de nome — digite mais do nome para refinar.</div>` : "");
     } catch(e) {
       if (seq !== _alunoSeq) return;
       console.warn("[pesquisa-ata] pesquisarAluno:", e);
