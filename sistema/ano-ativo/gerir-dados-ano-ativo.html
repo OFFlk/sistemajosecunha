@@ -62,6 +62,67 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .aba-painel { margin-top: 22px; }
 .gd-par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 @media (max-width: 900px) { .gd-par { grid-template-columns: 1fr; } }
+
+/* ── Migração (status ok/aviso/perigo: candidato a global, D3) ── */
+.migr-item {
+  display:flex; align-items:center; gap:10px;
+  padding:9px 14px; border-radius:8px;
+  border:1px solid var(--ui-border);
+  background:var(--ui-surface); margin-bottom:6px; font-size:13px;
+}
+.migr-item.ok     { border-color:var(--ui-st-ok-bd);   background:var(--ui-st-ok-bg); }
+.migr-item.warn   { border-color:var(--ui-st-warn-bd); background:var(--ui-st-warn-bg); }
+.migr-item.danger { border-color:var(--ui-st-bad-bd);  background:var(--ui-st-bad-bg); }
+
+/* ── Barra de progresso ── */
+.progress-wrap { background:var(--ui-border); border-radius:999px; height:8px; margin-top:10px; overflow:hidden; }
+.progress-bar  { background:var(--ui-brand); height:100%; border-radius:999px; transition:width .3s; width:0%; }
+
+/* ── Pesquisa de alunos (várias escolas) ── */
+/* campos fora de .field usam .input/.check (globais); aqui só a disposição */
+.input.cresce { flex:1; min-width:220px; }
+.input.cheio  { display:block; width:100%; margin:4px 0 12px; }
+.psq-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:4px; transition:opacity .2s; }
+.psq-chips.off { opacity:.35; pointer-events:none; }
+.psq-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 12px; border-radius:999px; background:var(--ui-brand-faded); border:1px solid var(--ui-border); color:var(--ui-brand-text); font-size:13px; font-weight:700; }
+.psq-chip button { border:none; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px; font-weight:800; }
+/* Modal de pesquisa: aparência (fundo, borda, raio, sombra) vem de .modal; aqui só tamanho e disposição */
+.psq-modal { --modal-w:min(1280px,98vw); --modal-h:none; }   /* altura vem do JS (psqAjustarModal) */
+.psq-modal .modal-head .row-btns { margin:0; }
+.psq-tab { font-size:12px; }
+.psq-tab th { position:sticky; top:0; z-index:2; background:var(--ui-surface); padding:6px 8px; white-space:nowrap; }
+.psq-tab td { padding:4px 8px; vertical-align:top; }
+.psq-tab td.nw { white-space:nowrap; }
+.psq-tab td.esc { max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.psq-tab tbody tr:hover { background:var(--ui-brand-faded); }
+
+/* ── Card de destaque: fundo, h3, botões, tabela e .aviso-warn são do global (components.css).
+      Aqui só o que é desta página, usando --dest-* ── */
+
+/* ── Backup (exportar à esquerda, importar à direita) ── */
+.bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
+@media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
+/* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
+
+/* ── Consistência (matrículas sem turma/aluno, alunos sem matrícula): layout local; cor só por .badge / --ui-* ── */
+.cons-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.cons-barra .cons-ano { width:150px; }
+.row-btns .ano-sel { width:190px; }
+/* índice de anos (espelho do card de Gestão de Atas) */
+.chips-anos { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+.aviso-linha { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.cons-barra .cons-busca { flex:1; min-width:200px; }
+.cons-sit { width:170px; }
+.cons-area[hidden] { display:none; }
+.cons-lista { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+.cons-item { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.cons-left { flex:1; min-width:240px; }
+.cons-tit { font-size:14px; font-weight:800; margin-bottom:6px; word-break:break-word; }
+.cons-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.cons-det { margin-top:6px; word-break:break-word; }
+.cons-right { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.cons-pag { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
 </style>
 </head>
 <body>
@@ -161,7 +222,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <h3>🔢 Contadores das turmas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Confere o contador de alunos (e de integral) de cada turma do ano escolhido contra as matrículas ATIVAS reais, contando cada aluno uma vez, como a pesquisa, e corrige as que divergirem. Lista alunos com mais de uma matrícula ativa no ano e permite remover as extras. Escolha o ano antes de verificar: lê as turmas e as matrículas ativas desse ano (1 leitura por documento); em anos passados lê todas as matrículas do ano, já que estão encerradas. Rode depois de migrar os dados antigos e sempre que a pesquisa avisar que um contador divergiu.</span></span></h3>
     <div id="secContadores">
-      <div class="muted">Escolha o ano antes de verificar: no ano ativo só as turmas e as matrículas ativas dele são lidas; em anos passados, todas as matrículas do ano.</div>
       <div class="row-btns">
         <select id="ctAno" class="input ano-sel" aria-label="Ano letivo" onchange="ctResetAno()">
           <option value="" disabled hidden selected>Selecione o ano…</option>
@@ -183,7 +243,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   <div class="card">
     <h3>🧬 Dados de busca nas matrículas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Preenche nas matrículas antigas os dados usados pela pesquisa (nome, sexo, dia, mês e ano de nascimento) e padroniza série, turno, modelo e status em maiúsculas. Sem ano escolhido, lê todos os alunos e todas as matrículas (1 leitura por documento); com um ano, lê só as matrículas dele e os alunos dessas matrículas. <b>Analisar</b> só lê; nada é gravado até aplicar. Rode antes de verificar os contadores.</span></span></h3>
     <div id="secMigracao">
-      <div class="muted">Escolha um ano para ler só as matrículas dele e os alunos dessas matrículas (menos leituras no banco), ou deixe em "Todos os anos".</div>
       <div class="row-btns">
         <select id="mgAno" class="input ano-sel" aria-label="Ano letivo" onchange="mgResetAno()"><option value="">Todos os anos</option></select>
         <button class="btn secondary field-h" id="btnMgAnalisar" onclick="migracaoAnalisar()">🔍 Analisar</button>
@@ -197,9 +256,8 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
   </div>
   <!-- ── CONSISTÊNCIA ── -->
   <div class="card">
-    <h3>🔍 Consistência</h3>
+    <h3>🔍 Consistência <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Procura matrículas que ficaram soltas (sem turma ou sem aluno), alunos sem nenhuma matrícula, matrículas com ID fora do padrão, matrículas dentro de turmas inativas e matrículas ATIVAS fora do ano ativo. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede confirmação. Dados de busca divergentes e contadores das turmas continuam nos cards "Dados de busca nas matrículas" e "Contadores das turmas". Por ano, lê as turmas e as matrículas do ano e os alunos dessas matrículas (1 leitura por documento). A verificação global lê todas as turmas, todas as matrículas e todos os alunos da escola e é a única que acha alunos sem matrícula.</span></span></h3>
     <div id="secConsist">
-      <div class="muted">Procura matrículas que ficaram soltas (sem turma ou sem aluno), alunos sem nenhuma matrícula, matrículas com ID fora do padrão, matrículas dentro de turmas inativas e matrículas ATIVAS fora do ano ativo. Nada é corrigido sozinho: cada correção relê o banco, mostra o que vai mudar e pede confirmação. Dados de busca divergentes e contadores das turmas continuam nos dois cards acima.</div>
       <div class="cons-barra">
         <select class="input cons-ano" id="consAno" aria-label="Ano letivo">
           <option value="" disabled hidden selected>Selecione o ano…</option>
@@ -207,7 +265,6 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
         <button class="btn primary field-h" id="btnConsVerificar" onclick="consVerificar(false)">🔍 Verificar o ano</button>
         <button class="btn secondary field-h" id="btnConsGlobal" onclick="consVerificar(true)">🌐 Verificação global</button>
       </div>
-      <div class="muted mt-8">Por ano, lê as turmas e as matrículas do ano e os alunos dessas matrículas (1 leitura por documento). A verificação global lê todas as turmas, todas as matrículas e todos os alunos da escola e é a única que acha alunos sem matrícula.</div>
 
       <div class="cons-area mt-14" id="consArea" hidden>
         <div class="stats-row">
