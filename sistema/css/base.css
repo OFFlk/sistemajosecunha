@@ -11,6 +11,19 @@
    (--card, --text, --border, --danger, --field-*...). Se precisar de um
    valor diferente, use outro nome com prefixo da página.
 
+   BREAKPOINTS PADRÃO (v3) — use SEMPRE estes três, em max-width:
+     1024px  tablet / meia tela      (3 colunas → 2)
+      768px  tablet vertical         (lista + detalhe → uma tela por vez)
+      480px  celular                 (tudo em 1 coluna)
+   Variável CSS não funciona dentro de @media, então os valores se repetem
+   escritos. Não crie outros (nada de 980, 920, 900, 860, 700, 600...).
+   LARGURA MÍNIMA: abaixo de --page-min-w (320px) a página para de encolher e
+   passa a rolar na horizontal, mantendo o layout de 320px sem distorção.
+   Vale para celular, tablet, meia tela e zoom alto no PC. Para mudar o piso,
+   altere SÓ o valor de --page-min-w abaixo (não crie regras por página).
+   Referência de teste no PC (monitor de 1920px): zoom 150% ≈ 1280px,
+   200% ≈ 960px, 250% ≈ 770px, 400% ≈ 480px (celular).
+
    Obs.: header.css (ainda não migrado) repete reset, fonte, body e
    alguns tokens. Quando o header for reformulado, esses itens saem de
    lá e ficam só aqui.
@@ -21,6 +34,16 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html {
+  /* iOS: não aumenta o texto sozinho ao girar o aparelho */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  /* Piso de largura: abaixo disso a janela rola na horizontal em vez de
+     espremer os elementos (comportamento de "zoom mínimo"). */
+  min-width: var(--page-min-w, 320px);
 }
 
 html, body {
@@ -34,6 +57,14 @@ body {
   background: var(--page-bg);
   color: var(--text-color);
   transition: background 0.3s, color 0.3s;
+  /* e-mail, CPF e nomes longos quebram em vez de vazar do card
+     (break-word não altera a largura mínima de tabelas e flex) */
+  overflow-wrap: break-word;
+}
+
+/* imagem nunca passa da largura do contêiner (avatar, fotos, documentos) */
+img {
+  max-width: 100%;
 }
 
 /* ── Variáveis globais — Tema claro (padrão) ── */
@@ -82,6 +113,9 @@ body {
 
   /* Offset de scroll: header (72px) + barra gradiente (2px) */
   --header-height: 74px;
+
+  /* Largura mínima da página (ver "LARGURA MÍNIMA" no topo) */
+  --page-min-w: 320px;
 }
 
 /* ── Variáveis globais — Tema escuro ── */
@@ -183,4 +217,17 @@ html[data-theme="dark"] { accent-color: var(--brand-d); }
 /* ── Offset de scroll para âncoras (usa --header-height) ── */
 html {
   scroll-padding-top: var(--header-height);
+}
+
+
+/* ── Ajustes por largura (tokens lidos pelo components.css) ──
+   --input-fs : fonte dos campos. 16px no celular, senão o iOS dá zoom
+                automático na página ao focar um campo.
+   --card-pad : respiro interno do card (cards que definem o próprio valor
+                continuam mandando). */
+@media (max-width: 768px) {
+  :root { --input-fs: 16px; }
+}
+@media (max-width: 480px) {
+  :root { --card-pad: 14px; }
 }
