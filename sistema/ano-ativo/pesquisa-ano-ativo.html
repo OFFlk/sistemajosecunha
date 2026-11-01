@@ -34,11 +34,18 @@
 
 /* ── Layout ── */
 .wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
-.grid   { display: grid; grid-template-columns: 220px 1fr auto; gap: 14px; align-items: stretch; }
+/* Linha 1 do card de pesquisa: ano | busca | pesquisa avançada (áreas nomeadas: a ordem muda por faixa, sem depender do HTML) */
+.grid   { display: grid; grid-template-columns: 220px minmax(0, 1fr) auto; grid-template-areas: "ano busca av"; gap: 14px; align-items: stretch; }
+.f-ano   { grid-area: ano; }
+.f-busca { grid-area: busca; min-width: 0; }
+.f-av    { grid-area: av; }
 #blocoStatusAtivo > .btn-avancada { flex: 1; }
-.split  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.split > .card { min-height: 200px; }
-@media(max-width:980px){ .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr !important; } }
+@media(max-width:1024px){ .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "ano av" "busca busca"; } }
+@media(max-width:480px){  .grid { grid-template-columns: 1fr; grid-template-areas: "ano" "busca" "av"; } }
+
+/* Turmas | Alunos: .split-view e .split-tabs são do components.css (10-C). Desktop continua 1:1 como antes. */
+#splitView { --split-cols: minmax(0, 1fr) minmax(0, 1fr); }
+.split-view > .card { min-height: 200px; }
 
 /* ── Utilitárias de layout ── */
 .stack    { display: flex; flex-direction: column; }
@@ -56,10 +63,6 @@
 .busca-row    { display: flex; gap: 8px; align-items: stretch; }
 .busca-row input, .busca-row select { flex: 1; min-width: 0; }
 .bloco-filtros { margin-top: 10px; }
-.filtros-row  { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
-.filtros-row .field { margin: 0; min-width: 160px; }
-.filtros-row .field.grow { flex: 1; }
-.filtros-row .field.w230 { min-width: 230px; }
 .chips        { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 /* Chip removível (com ×): fica na página (D2/5-A) */
@@ -97,7 +100,7 @@
 /* ── Painéis (Turmas / Alunos) ── */
 .panel-head    { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .titulo-painel { display: flex; align-items: center; gap: 10px; }
-.split .card h2 { font-size: 17px; margin: 0; font-weight: 800; }
+.split-view .card h2 { font-size: 17px; margin: 0; font-weight: 800; }
 .count         { background: var(--ui-chip-bg); border: 1px solid var(--ui-border); padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--ui-chip-color); font-weight: 700; }
 .panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
 .check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); font-weight: 700; cursor: pointer; }
@@ -191,6 +194,28 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 .th-ord      { cursor: pointer; white-space: nowrap; user-select: none; }
 .th-ord.ativo { color: var(--ui-brand-text); }
 .vazio-tab   { padding: 20px; text-align: center; }
+
+/* ══ RESPONSIVO (v3) — breakpoints padrão 1024 / 768 / 480 (base.css) ══ */
+.tab-scroll { max-height: 60vh; }
+@supports (height: 1dvh) { .tab-scroll { max-height: 60dvh; } }
+
+/* ≤768: cada lista ocupa a tela inteira (aba), então os cards dos itens ficam lado a lado */
+@media(max-width:768px){
+  .split-view .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 8px; }
+  .split-view .list > :not(.item) { grid-column: 1 / -1; }   /* avisos ocupam a linha toda */
+}
+
+@media(max-width:480px){
+  .wrap { padding: 16px 12px 40px; }
+  .f-busca .busca-row { flex-wrap: wrap; }
+  .f-busca .busca-row input { flex: 1 1 100%; }
+  .f-busca .busca-row .btn { flex: 1 1 auto; }
+  .panel-actions { justify-content: flex-start; width: 100%; }
+  .item { flex-direction: column; align-items: stretch; }
+  .item .right { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+  .pop-avancada { min-width: 0; width: min(340px, calc(100vw - 48px)); }
+  .ficha-grid { grid-template-columns: 1fr; }
+}
 </style>
 
 <title>Ano Ativo • Pesquisa e Lista</title>
@@ -209,12 +234,12 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
     <!-- Linha 1: ano + busca + pesquisa avançada -->
     <div class="grid">
-      <div class="field stack">
+      <div class="field stack f-ano">
         <label for="selAno">Ano letivo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">O ano ativo declarado pelo sistema é preenchido automaticamente. Para ver dados de anos passados, altere o seletor manualmente. Se o ano que você procura não aparecer, ou se o preenchimento automático estiver errado, contate o responsável pelo sistema.</span></span></label>
         <select id="selAno"></select>
       </div>
 
-      <div class="field stack">
+      <div class="field stack f-busca">
         <label for="inpBusca">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por nome ou CPF. A busca por nome precisa de no mínimo 3 letras e vale só para o início do nome: pesquisar “ana” mostra nomes que começam com Ana e ignora nomes com “ana” no meio, como Mariana. A busca por CPF só funciona com os 11 números preenchidos; usar ou não pontos e traço é irrelevante.</span></span></label>
         <div class="busca-row">
           <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF"/>
@@ -223,7 +248,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
         </div>
       </div>
 
-      <div class="field stack rel" id="blocoStatusAtivo">
+      <div class="field stack rel f-av" id="blocoStatusAtivo">
         <label class="lbl-oculto">Pesquisa avançada</label>
         <button type="button" class="btn btn-avancada nowrap rel" id="btnPesquisaAvancada" data-dropdown="painelPesquisaAvancada" aria-haspopup="menu" aria-expanded="false" style="background:linear-gradient(var(--ui-st-warn-bg),var(--ui-st-warn-bg)),var(--ui-cell-bg);color:var(--ui-st-warn-fg);border:1.5px solid var(--ui-st-warn-bd);font-weight:800;">
           🔎 Pesquisa avançada
@@ -316,7 +341,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
     <!-- Linha 2: filtros de série + turno + modelo -->
     <div class="bloco-filtros">
-      <div class="filtros-row">
+      <div class="filters-grid">
         <div class="field grow">
           <label for="selSerieAdd">Filtrar por série <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Escolha uma série no seletor e aperte <b>+ Adicionar</b>. O filtro só passa a valer depois que você aperta o botão e a série aparece abaixo do seletor.</span></span></label>
           <div class="busca-row">
@@ -367,9 +392,13 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
     </div>
   </div>
 
-  <!-- Turmas + Alunos lado a lado -->
-  <div class="split">
-    <div class="card">
+  <!-- Turmas + Alunos: lado a lado em tela larga; abas em ≤768px -->
+  <div class="split-tabs" id="splitTabs" role="tablist" aria-label="Turmas e alunos">
+    <button type="button" class="split-tab" role="tab" data-view="lista" aria-selected="true">🏫 Turmas <span class="tab-count" id="tabCountTurmas">0</span></button>
+    <button type="button" class="split-tab" role="tab" data-view="detalhe" aria-selected="false">👥 Alunos <span class="tab-count" id="tabCountAlunos">0</span></button>
+  </div>
+  <div class="split-view" id="splitView" data-view="lista">
+    <div class="card pane-lista">
       <div class="panel-head">
         <div class="titulo-painel">
           <h2>Turmas</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só são exibidos depois que você seleciona uma turma ou faz uma pesquisa/filtro no card de pesquisa. Clicar em um espaço vazio do card de uma turma seleciona ou desmarca essa turma.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todas as turmas.<br><b>Abrir tabela:</b> abre uma tabela com as informações das turmas, uma por linha.<br><b>Exportar PDF:</b> exporta essas mesmas informações em um arquivo PDF.<br><b>Ordenar por:</b> ordena as turmas em ordem crescente pelo item escolhido no seletor.<br><b>Etiquetas do card:</b> 👥 quantidade de alunos da turma; 📚 série(s) da turma; 📚 “integral”: quantos alunos da turma são do modelo integral (só aparece se houver); 👩‍🏫 professor(a) da turma; ID: código de identificação da turma.</span></span><span class="count" id="countTurmas">0</span>
@@ -393,7 +422,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       <div class="loading" id="loadingTurmas"></div>
     </div>
 
-    <div class="card">
+    <div class="card pane-detalhe">
       <div class="panel-head">
         <div class="titulo-painel">
           <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
@@ -1570,7 +1599,7 @@ async function _atualizarListaAlunos(_tScope){
   }
   if(!busca && modo !== "serie" && !tMarcadas.length){
     alunosOrdenados = []; countAlunos.textContent = "—";
-    listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ Para ver os alunos, marque uma ou mais turmas (ou a opção <b>Todos</b>) no card <b>Turmas</b>, à esquerda, ou faça uma busca no card de pesquisa.</div>`;
+    listaAlunos.innerHTML = `<div class="aviso-warn">⚠️ Para ver os alunos, marque uma ou mais turmas (ou a opção <b>Todos</b>) no card <b>Turmas</b> ou faça uma busca no card de pesquisa.</div>`;
     return;
   }
   listaAlunos.innerHTML = `<div class="aviso-warn">⏳ Carregando alunos…</div>`;
@@ -2942,6 +2971,43 @@ function restaurarEstadoPagina(){
   Loading.esconder();
 })().catch(e => { console.error('init:', e); _toastErro('Erro ao iniciar a página.'); Loading.esconder(); });
 
+})();
+</script>
+
+<script>
+/* Turmas | Alunos em abas (≤768px). Em tela larga as abas ficam ocultas por CSS e o data-view não tem efeito. */
+(function(){
+  const sv = document.getElementById('splitView');
+  const tabs = Array.from(document.querySelectorAll('#splitTabs .split-tab'));
+  if(!sv || !tabs.length) return;
+
+  function setView(v){
+    sv.dataset.view = v;
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
+  }
+  tabs.forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
+
+  // Contagem nas abas = espelho dos contadores que a página já atualiza (#countTurmas / #countAlunos)
+  const cTurmas = document.getElementById('countTurmas'), cAlunos = document.getElementById('countAlunos');
+  const tTurmas = document.getElementById('tabCountTurmas'), tAlunos = document.getElementById('tabCountAlunos');
+
+  // Busca por nome/CPF: o resultado aparece na aba Alunos, então vai para ela sozinho (só nesse caso:
+  // marcar turmas não troca de aba, senão atrapalharia quem seleciona várias).
+  let buscaEm = 0;
+  const btnBuscar = document.getElementById('btnAtualizar'), inpBusca = document.getElementById('inpBusca');
+  if(btnBuscar) btnBuscar.addEventListener('click', () => { if(inpBusca && inpBusca.value.trim()) buscaEm = Date.now(); });
+
+  if(cTurmas && tTurmas){
+    const sync = () => { tTurmas.textContent = cTurmas.textContent; };
+    new MutationObserver(sync).observe(cTurmas, { childList: true, characterData: true, subtree: true }); sync();
+  }
+  if(cAlunos && tAlunos){
+    const sync = () => {
+      tAlunos.textContent = cAlunos.textContent;
+      if(buscaEm && Date.now() - buscaEm < 10000 && /^\d+$/.test(cAlunos.textContent.trim())){ buscaEm = 0; setView('detalhe'); }
+    };
+    new MutationObserver(sync).observe(cAlunos, { childList: true, characterData: true, subtree: true }); sync();
+  }
 })();
 </script>
 
