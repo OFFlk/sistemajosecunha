@@ -208,6 +208,7 @@
     user.setAttribute('tabindex', '0');
     user.setAttribute('aria-haspopup', 'true');
     user.setAttribute('aria-expanded', 'false');
+    user.setAttribute('aria-label', 'Menu do usuário: ' + name);
 
     var avatar = document.createElement('div');
     avatar.className = 'avatar';
@@ -235,6 +236,20 @@
     var menu = document.createElement('div');
     menu.className = 'ctx-menu';
     menu.id = 'userMenu';
+
+    // Nome e e-mail no topo do menu: em ≤1024px o chip vira só avatar e é aqui que se lê
+    // quem está logado (o CSS oculta este bloco em tela larga).
+    var info = document.createElement('div');
+    info.className = 'menu-user';
+    var infoName = document.createElement('div');
+    infoName.className = 'mu-name';
+    infoName.textContent = name;
+    var infoSub = document.createElement('div');
+    infoSub.className = 'mu-sub';
+    infoSub.textContent = email || role;
+    info.appendChild(infoName);
+    info.appendChild(infoSub);
+    menu.appendChild(info);
 
     var btnPerfil = document.createElement('button');
     btnPerfil.type = 'button';
@@ -336,12 +351,29 @@
     }
   }
 
+  // ─── 5-B. Altura real do header → --header-height ───────────────────────
+  // A altura varia (1 ou 2 linhas no celular). O base.css só traz um valor inicial;
+  // aqui ele passa a acompanhar a medida, para scroll-padding e cálculos de modal
+  // (que usam o topo útil da tela) ficarem certos em qualquer largura.
+  function trackHeaderHeight() {
+    var header = document.querySelector('.app-header');
+    if (!header) return;
+    function set() {
+      // +2px = barra gradiente do topo (o header gruda em top:2px)
+      document.documentElement.style.setProperty('--header-height', (header.offsetHeight + 2) + 'px');
+    }
+    set();
+    if (window.ResizeObserver) new ResizeObserver(set).observe(header);
+    else window.addEventListener('resize', set);
+  }
+
   // ─── 6. Inicialização ────────────────────────────────────────────────────
   function init() {
     buildHeader(function () {
       applyButtonVisibility();
       setupTheme();
       renderContext();
+      trackHeaderHeight();
       runAuthGuard();
     });
   }
