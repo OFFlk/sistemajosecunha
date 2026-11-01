@@ -125,7 +125,7 @@ html[data-theme="dark"] {
   transition: background 0.3s, border-color 0.3s;
 }
 .app-header-inner {
-  width: 100%; padding: 0 36px; height: 72px;
+  width: 100%; padding: 0 36px; min-height: 72px;   /* min-height: o header pode crescer (2ª linha no celular) */
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
 }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -159,10 +159,7 @@ html[data-theme="dark"] {
   display: flex; align-items: center; gap: 8px;
   flex-wrap: nowrap; justify-content: flex-end;
 }
-@media (max-width: 640px) {
-  .header-actions { flex-wrap: wrap; }
-  .brand { min-width: 0; }
-}
+/* Responsivo: ver a seção "RESPONSIVO (v3)" no fim do arquivo. */
 
 
 /* ============================================================
@@ -357,3 +354,82 @@ html[data-theme="dark"] {
 html[data-theme="dark"] .ctx-menu .menu-btn:hover { filter: brightness(1.3); }
 .ctx-menu .menu-btn.danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-color); }
 .ctx-menu .menu-btn.danger:hover { filter: none; background: rgba(185,28,28,0.22); border-color: rgba(185,28,28,0.55); }
+
+
+/* ============================================================
+   BLOCO DO USUÁRIO NO MENU (nome + e-mail)
+   Criado pelo header-logic.js. Em tela larga o nome/e-mail já aparecem
+   no chip, então o bloco fica oculto; em ≤1024px o chip vira só avatar
+   e o bloco passa a ser onde se lê quem está logado.
+   ============================================================ */
+.menu-user {
+  display: none;
+  padding: 8px 10px 10px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--chip-border);
+}
+.menu-user .mu-name { font-size: 13px; font-weight: 800; color: var(--title-color); overflow-wrap: anywhere; }
+.menu-user .mu-sub  { font-size: 12px; color: var(--sub-color); margin-top: 2px; overflow-wrap: anywhere; }
+
+
+/* ============================================================
+   RESPONSIVO (v3) — breakpoints padrão 1024 / 768 / 480 (ver base.css)
+
+   ≤1024  COMPACTO (meia tela, tablet): usuário só avatar (o menu mostra
+          nome e e-mail), Voltar/Início só ícone, tema só ícone, some o
+          subtítulo "// gestão escolar interna".
+   ≤768   a escola vai para uma 2ª linha, em largura total.
+   ≤480   logo e título menores; some o selo "v2".
+
+   ⚠️ NÃO coloque display em #headerBtnBack / #headerBtnHome: o
+   header-logic.js define o display deles inline (none / inline-flex)
+   conforme a página (index, hub, demais). Aqui só se mexe nos filhos.
+   O mesmo vale para o botão de tema: o JS escolhe completo × compacto
+   por inline, e o !important abaixo é o que força o compacto no celular.
+   ============================================================ */
+@media (max-width: 1024px) {
+  .app-header-inner { padding: 0 20px; }
+  .brand-sub { display: none; }
+
+  /* Voltar / Início: só ícone, 36×36 */
+  .btn-back, .btn-home { width: 36px; height: 36px; justify-content: center; }
+  .btn-back .b-label, .btn-home .b-label { display: none; }
+  .btn-back .b-icon, .btn-home .b-icon {
+    flex: 1; padding: 0; justify-content: center;
+    border-right: 0; background: transparent;
+  }
+
+  /* Tema: sempre o compacto */
+  .theme-toggle { display: none !important; }
+  .theme-toggle-compact { display: inline-flex !important; }
+
+  /* Usuário: só o avatar. O chip deixa de ser a âncora do menu (position:static),
+     então o menu ancora no header e abre debaixo dele, sem estourar a tela. */
+  .header-context { margin-right: 0; flex-wrap: nowrap; }
+  .ctx-chip.ctx-clickable {
+    position: static; width: 36px; height: 36px;
+    padding: 0; gap: 0; justify-content: center;
+  }
+  .ctx-chip.ctx-clickable > .text { display: none; }
+  .ctx-chip.ctx-clickable .avatar { width: 24px; height: 24px; }
+  .ctx-menu { top: calc(100% + 6px); right: 12px; left: auto; width: min(260px, calc(100vw - 24px)); }
+  .menu-user { display: block; }
+}
+
+@media (max-width: 768px) {
+  .app-header-inner { min-height: 56px; padding: 8px 16px; flex-wrap: wrap; gap: 8px 6px; }
+
+  /* Achata os dois contêineres: usuário, escola e botões viram itens diretos do
+     header, e a escola (order) vai para a 2ª linha, ocupando a largura toda. */
+  .header-actions, .header-context { display: contents; }
+  .brand { flex: 1 1 0; min-width: 0; }
+  .school-pill { order: 2; flex: 1 0 100%; max-width: none; justify-content: flex-start; }
+  .school-pill select { flex: 1; font-size: var(--input-fs, 12px); }   /* 16px no celular: o iOS não dá zoom ao focar */
+}
+
+@media (max-width: 480px) {
+  .app-header-inner { padding: 8px 12px; }
+  .mark { width: 40px; height: 40px; border-radius: 11px; font-size: 12px; }
+  .brand { gap: 8px; }
+  .brand-title { font-size: 14px; line-height: 1.15; }
+  .v-badge { display: none; }
+}
