@@ -173,7 +173,7 @@ html[data-theme="dark"]{
   box-sizing:border-box; padding:11px 12px; min-height:var(--field-h, 43px);
   border:1px solid var(--field-border, var(--ui-border)); border-radius:10px;
   background:var(--field-bg, var(--ui-surface)); color:var(--ui-text);
-  font-size:14px; font-family:'Nunito', ui-sans-serif, system-ui, sans-serif;
+  font-size:var(--input-fs, 14px); font-family:'Nunito', ui-sans-serif, system-ui, sans-serif;
   outline:none; transition:border-color .15s, box-shadow .15s;
 }
 .field :is(input:where(:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])), select, textarea){ width:100%; }   /* .input avulso: largura é da página */
@@ -622,8 +622,8 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .info-tip.open .info-tip-bubble{ display:block; }
 .info-tip-bubble.wide{ width:min(520px, 90vw); max-height:280px; }
 .info-tip-bubble.align-right{ left:auto; right:0; }
-/* alinha à direita só em tela larga (640px+): ⓘ que fica na borda direita em grade de colunas, mas à esquerda no celular (1 coluna) */
-@media (min-width:641px){ .info-tip-bubble.align-right-md{ left:auto; right:0; } }
+/* alinha à direita só em tela larga (769px+): ⓘ que fica na borda direita em grade de colunas, mas à esquerda no celular (1 coluna) */
+@media (min-width:769px){ .info-tip-bubble.align-right-md{ left:auto; right:0; } }
 
 
 /* ============================================================
@@ -722,13 +722,13 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .cm-titulo.perigo{ color:var(--ui-danger-fg); }
 .cm-titulo.ok{ color:var(--ui-st-ok-fg); }
 .cm-corpo{ margin:0 0 14px; font-size:13px; color:var(--ui-text); white-space:pre-line; line-height:1.5; }
-.cm-acoes{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.cm-acoes{ display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .cm-opcao{ width:100%; justify-content:flex-start; }
 .cm-input{
   width:100%; box-sizing:border-box; padding:10px 12px; margin-top:8px;
   border:1px solid var(--ui-border); border-radius:10px;
   background:var(--field-bg, var(--ui-surface)); color:var(--ui-text);
-  font-size:14px; font-family:'Nunito', ui-sans-serif, system-ui, sans-serif; outline:none;
+  font-size:var(--input-fs, 14px); font-family:'Nunito', ui-sans-serif, system-ui, sans-serif; outline:none;
 }
 .cm-input:focus{ border-color:var(--ui-brand); }
 
@@ -800,3 +800,108 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
 .badge{ margin-left:4px; }
 /* regra de UMA página (card de detalhes) */
 #card-direita .detalhe-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+
+
+/* ============================================================
+   10. LAYOUT RESPONSIVO — primitivas opt-in (v3)
+   Exceção declarada à regra "layout é da página": estas classes só entram
+   numa página quando ela usa o nome. Nada aqui muda página que não as use.
+   Breakpoints: 1024 / 768 / 480 (ver base.css). A ORDEM VISUAL é sempre a
+   ordem do HTML — nada de flex-wrap decidindo quem quebra de linha.
+
+   10-A. GRADE DE FILTROS  .filters-grid
+     3 colunas → 2 (≤1024) → 1 (≤480). Campo que ocupa a linha toda: .col-todo
+       <div class="filters-grid">
+         <div class="field">…</div>   <div class="field">…</div>   <div class="field">…</div>
+         <div class="field col-todo">…busca…</div>
+       </div>
+     Ajuste: --grid-gap (padrão 14px)
+
+   10-B. GRADE DE RESULTADOS  .results-grid
+     cards de resultado lado a lado; o número de colunas é automático.
+     --results-min = largura mínima de cada card (padrão 360px). Para no
+     máximo 2 colunas num .wrap de 1300px use  --results-min:440px.
+
+   10-C. LISTA + DETALHE  .split-view
+     lado a lado (5fr / 6fr; troque com --split-cols) até 769px. Em ≤768px o JS escolhe UMA tela:
+       <div class="split-view" data-view="lista">      ← JS troca para "detalhe"
+         <div class="card pane-lista">…</div>
+         <div class="card pane-detalhe">
+           <button class="btn btn-voltar-lista">← Voltar à lista</button> …
+       Sem data-view (página ainda não migrada), as duas ficam empilhadas.
+   ============================================================ */
+.filters-grid{
+  display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:var(--grid-gap, 14px); align-items:start;
+}
+.filters-grid > .field{ min-width:0; margin:0; }
+.col-todo{ grid-column:1 / -1; }
+@media (max-width:1024px){ .filters-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width:480px){  .filters-grid{ grid-template-columns:1fr; } }
+
+.results-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(min(100%, var(--results-min, 360px)), 1fr));
+  gap:var(--grid-gap, 12px);
+}
+
+.split-view{
+  display:grid; grid-template-columns:var(--split-cols, minmax(0, 5fr) minmax(0, 6fr));
+  gap:16px; align-items:start;
+}
+.split-view > .card{ margin-bottom:0; }
+.btn-voltar-lista{ display:none; }
+@media (max-width:768px){
+  .split-view{ grid-template-columns:1fr; }
+  .split-view[data-view="lista"]   > .pane-detalhe{ display:none; }
+  .split-view[data-view="detalhe"] > .pane-lista  { display:none; }
+  .split-view[data-view="detalhe"] .btn-voltar-lista{ display:inline-flex; margin-bottom:12px; }
+}
+
+/* 10-C-2. ABAS para as duas telas do .split-view (alternativa ao "← Voltar à lista":
+   use quando as duas partes são "irmãs", ex.: Turmas | Alunos). Ocultas em tela larga.
+     <div class="split-tabs" id="splitTabs" role="tablist">
+       <button type="button" class="split-tab" role="tab" data-view="lista" aria-selected="true">Turmas <span class="tab-count">12</span></button>
+       <button type="button" class="split-tab" role="tab" data-view="detalhe" aria-selected="false">Alunos <span class="tab-count">340</span></button>
+     </div>
+   O JS só troca  .split-view[data-view]  e  aria-selected  das abas. */
+.split-tabs{ display:none; }
+@media (max-width:768px){
+  .split-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+}
+.split-tab{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:10px 12px; border-radius:10px; cursor:pointer;
+  border:1px solid var(--ui-border); background:var(--ui-surface); color:var(--ui-text);
+  font-family:inherit; font-size:14px; font-weight:800;
+  transition:background .15s, border-color .15s, color .15s;
+}
+.split-tab:hover{ border-color:var(--ui-brand); }
+.split-tab:focus-visible{ outline:2px solid var(--ui-brand); outline-offset:2px; }
+.split-tab .tab-count{
+  padding:1px 8px; border-radius:999px; font-size:12px; font-weight:700;
+  background:var(--ui-chip-bg); color:var(--ui-chip-color); border:1px solid var(--ui-chip-border);
+}
+.split-tab[aria-selected="true"]{ background:var(--ui-brand); border-color:var(--ui-brand); color:var(--ui-brand-fg); }
+.split-tab[aria-selected="true"] .tab-count{
+  background:color-mix(in srgb, var(--ui-brand-fg) 20%, transparent);
+  border-color:transparent; color:inherit;
+}
+
+/* ── 10-D. Ajustes de componentes em tela pequena ── */
+/* modal: altura dinâmica (no celular o 100vh inclui a barra de endereço) */
+@supports (height:1dvh){
+  .modal{ max-height:var(--modal-h, 86dvh); }
+  .cm-box{ max-height:90dvh; }
+}
+@media (max-width:480px){
+  .modal-backdrop{ padding:8px; }
+  .modal-foot .btn, .cm-acoes .btn, .cm-acoes .cm-ok{ flex:1 1 auto; }
+}
+/* menus e popovers nunca passam da largura da tela */
+.popover{ max-width:calc(100vw - 24px); }
+/* toque (não depende da largura da janela): alvo mínimo confortável */
+@media (pointer:coarse){
+  .btn{ min-height:40px; }
+  .btn.small{ min-height:36px; }
+}
