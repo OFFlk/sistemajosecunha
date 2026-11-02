@@ -33,18 +33,24 @@
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/components.css">
-<link rel="stylesheet" href="/css/pesquisa.css">
 
 <style>
 /* ═══════════════════════════════════════════════════════════════
    pesquisa-ata — só LAYOUT e componentes próprios da página.
-   Aparência (card, destaque, botão, campo, badge, tooltip, toast)
-   vem do components.css. Layout geral: /css/pesquisa.css.
+   Aparência (card, destaque, botão, campo, badge, tooltip, toast,
+   item de lista, resumo) vem do components.css.
+   Responsividade: breakpoints 1024 / 768 / 480 (guia, seção 3).
+   Fluxo ≤768px: abrir uma turma mostra só o detalhe; "✕ Fechar" volta à lista.
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Filtros (card de destaque) ── */
-.filters { align-items:start; }
+/* ── Contêiner da página ── */
+.wrap { max-width:1200px; margin:32px auto; padding:0 24px; display:flex; flex-direction:column; gap:20px; }
+@media (max-width:480px){ .wrap { margin:16px auto; padding:0 12px; gap:14px; } }
+
+/* ── Filtros (card de destaque): .filters-grid do components.css ── */
+.filters-grid { --grid-gap:12px; margin-bottom:14px; }
 #campoSerie { min-width:0; }
+@media (max-width:1024px){ #campoSerie { grid-column:1 / -1; } }   /* com 2 colunas, a série ocupa a linha toda */
 .serie-add-row { display:flex; gap:8px; align-items:stretch; }
 .serie-add-row select { flex:1; min-width:0; }
 .filter-actions { display:flex; align-items:center; gap:8px; }
@@ -53,29 +59,113 @@
 /* Chip removível (série escolhida, com ×) solto sobre o destaque: fundo liso (D10), não é .badge (5-A) */
 .chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--ui-border); background:var(--ui-cell-bg); color:var(--ui-text); padding:5px 10px; border-radius:999px; font-size:12.5px; font-weight:700; max-width:100%; }
 .chip button { border:0; background:transparent; cursor:pointer; color:inherit; font-weight:900; font-size:14px; line-height:1; padding:0; }
+@media (max-width:1024px){
+  /* ⓘ vai para a borda direita e o balão abre para a esquerda (não estoura a tela) */
+  .filter-actions { display:grid; grid-template-columns:auto auto minmax(0, 1fr); }
+  .filter-actions .info-tip { justify-self:end; }
+  .filter-actions .info-tip-bubble { left:auto; right:0; }
+}
+@media (max-width:480px){
+  .filter-actions { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .filter-actions .btn { white-space:normal; }
+}
+
+/* ── Pesquisa por aluno ── */
+.aluno-search-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:14px; align-items:end; }
+.aluno-search-row > .field { min-width:0; }
+.aluno-search-actions { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; gap:10px; align-items:center; }
+.aluno-search-btns { display:flex; gap:10px; }
+@media (max-width:1024px){
+  .aluno-search-row { grid-template-columns:minmax(0, 1fr); }
+  .aluno-search-actions { grid-template-columns:minmax(0, 1fr) auto; }
+  .aluno-search-btns { grid-column:1 / -1; }
+  .aluno-search-actions .info-tip-bubble { left:auto; right:0; }
+}
+@media (max-width:480px){ .aluno-search-btns .btn { flex:1; } }
 
 /* ── Título TURMAS clicável (ordenador) ── */
 #sidebarTitulo { cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; }
 #sidebarTitulo:hover { opacity:.75; }
 #sortIndicator { font-size:11px; opacity:.6; transition:transform .2s; }
 
-/* ── Sidebar expandida: compacta ao máximo ── */
+/* ── Turmas + Detalhes (grid do .split-view; as duas colunas mudam com layout-normal/expandido) ── */
+#container {
+  --split-cols:minmax(0, 1fr) minmax(0, 1fr);
+  gap:20px;
+  transition:grid-template-columns .3s ease;
+  scroll-margin-top:calc(var(--header-height, 72px) + 8px);
+}
+#container.layout-expandido { --split-cols:220px minmax(0, 1fr); }
+#container > .card { min-width:0; margin-bottom:var(--card-gap, 16px); }
+/* mesma altura no estado normal */
+#container.layout-normal { align-items:stretch; }
+#container.layout-normal #card-esquerda,
+#container.layout-normal #card-direita { align-self:stretch; }
+
+/* ── Card esquerdo (lista de turmas) ── */
+#card-esquerda { display:flex; flex-direction:column; min-height:0; }
+#card-esquerda .list { flex:1; overflow-y:auto; min-height:0; }
+#card-esquerda .list::-webkit-scrollbar { width:8px; }
+#card-esquerda .list::-webkit-scrollbar-track { background:transparent; }
+#card-esquerda .list::-webkit-scrollbar-thumb { background:var(--ui-brand); border-radius:8px; }
+[data-theme="dark"] #card-esquerda .list::-webkit-scrollbar-thumb { background:color-mix(in srgb, var(--ui-brand) 70%, #fff 10%); }
+#card-esquerda .list-item:not(.selected):hover { background:color-mix(in srgb, var(--ui-brand) 8%, transparent); cursor:pointer; }
+
+/* ── Sidebar expandida (turma aberta): compacta ao máximo ── */
+.layout-expandido #card-esquerda { position:sticky; top:80px; max-height:calc(100vh - 100px); cursor:pointer; }
+.layout-expandido #card-esquerda .list { max-height:calc(100vh - 160px); }
+@supports (height:1dvh){
+  .layout-expandido #card-esquerda { max-height:calc(100dvh - 100px); }
+  .layout-expandido #card-esquerda .list { max-height:calc(100dvh - 160px); }
+}
+.layout-expandido #card-esquerda .right { display:none; }
+.layout-expandido #card-esquerda .list-item { padding:7px 8px; font-size:12px; border-radius:8px; cursor:pointer; transition:background .15s; white-space:normal; word-break:break-word; }
+.layout-expandido #card-esquerda .list-item:not(.selected):hover {
+  background:color-mix(in srgb, var(--ui-brand) 18%, transparent);
+  outline:1px solid color-mix(in srgb, var(--ui-brand) 28%, transparent);
+}
+.layout-expandido #card-esquerda .list-item .left { min-width:0; }
+.layout-expandido #card-esquerda .list-item .left > div:first-child { white-space:normal; word-break:break-word; line-height:1.35; }
+.layout-expandido #card-esquerda .list-item .left > div:first-child > b { display:block; white-space:normal; word-break:break-word; line-height:1.35; }
+.layout-expandido #card-esquerda .list-item .left > div:not(:first-child) { display:flex; flex-wrap:wrap; gap:3px; }
 .layout-expandido #card-esquerda .list-item .item-meta { display:none !important; }
 .layout-expandido #card-esquerda .list-item .badges-row { flex-wrap:nowrap; overflow:hidden; }
 .layout-expandido #card-esquerda .list-item .badges-row .badge {
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:90px; font-size:10px; padding:1px 5px;
 }
+.layout-expandido #card-esquerda > .section-title::after { content:" ◀"; font-size:10px; opacity:.4; }
+.layout-expandido #card-esquerda > .section-title { font-size:11px; text-transform:uppercase; letter-spacing:.04em; opacity:.6; margin-bottom:6px; }
 
-/* ── Cards mesma altura no estado normal ── */
-#container.split.layout-normal { align-items:stretch; }
-#container.split.layout-normal #card-esquerda,
-#container.split.layout-normal #card-direita { align-self:stretch; }
+/* ── Card direito (detalhes) ── */
+#detalhesBox { display:none; }          /* o JS controla por style.display */
+#card-direita td { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }   /* evita quebra feia em célula */
+/* Ações: filtro de aluno em linha cheia; depois Exportar, Editar e (à direita) Fechar.
+   Seletor com #card-direita de propósito: o components.css (legado) usa o mesmo e precisa ser vencido. */
+#card-direita .detalhe-actions {
+  display:grid; gap:8px; margin-bottom:16px;
+  grid-template-columns:auto auto minmax(0, 1fr) auto;
+  grid-template-areas:"filtro filtro filtro filtro" "exp edit . fechar";
+}
+.detalhe-actions #fAluno { grid-area:filtro; width:100%; }
+.detalhe-actions .rel-inline { grid-area:exp; justify-self:start; }
+.detalhe-actions #btnEditarTurma { grid-area:edit; justify-self:start; }
+.detalhe-actions #btnFecharTurma { grid-area:fechar; justify-self:end; }
 
-/* ── Hover do list-item no estado normal ── */
-#card-esquerda .list-item:not(.selected):hover { background:color-mix(in srgb, var(--ui-brand) 8%, transparent); cursor:pointer; }
-
-/* ── Detalhes: filtro de aluno em linha cheia + menu "Exportar" ── */
-.detalhe-actions .input { width:100%; }
+/* ── ≤768px: uma tela por vez (lista OU detalhe) ── */
+@media (max-width:768px){
+  /* lista de turmas em grade; avisos ocupam a linha toda */
+  #listaTurmas { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:10px; }
+  #listaTurmas > :not(.list-item) { grid-column:1 / -1; }
+  #listaTurmas > .list-item { border:1px solid var(--ui-border); border-radius:10px; padding:10px 12px; }
+  /* ações do detalhe em 2 colunas */
+  #card-direita .detalhe-actions {
+    grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:"filtro filtro" "exp fechar" "edit edit";
+  }
+  .detalhe-actions .rel-inline { display:block; justify-self:stretch; }
+  .detalhe-actions .rel-inline > .btn { width:100%; }
+  .detalhe-actions #btnEditarTurma, .detalhe-actions #btnFecharTurma { justify-self:stretch; }
+}
 </style>
 
 <title>Pesquisa de Atas</title>
@@ -99,7 +189,7 @@
   <div class="card card-destaque">
     <p class="section-title">Filtros</p>
 
-    <div class="filters">
+    <div class="filters-grid">
       <div class="field">
         <label>Ano letivo</label>
         <select id="fAno">
@@ -158,18 +248,20 @@
           i
           <span class="info-tip-bubble wide">Desmarcado: procura no banco pelo <b>início</b> do nome completo (ex.: “mar” acha Maria, mas não Ana Maria). Já inclui o nome exato.<br>Marcado: procura o texto em <b>qualquer parte</b> do nome, mas só nas turmas que já foram carregadas nesta sessão (pelo botão Pesquisar ou ao abrir uma turma). Não consulta o banco, então não gasta leituras.</span>
         </span>
-        <button class="btn primary" type="button" onclick="pesquisarAluno()">Pesquisar</button>
-        <button class="btn secondary" type="button" onclick="limparPesquisaAluno()">Limpar</button>
+        <div class="aluno-search-btns">
+          <button class="btn primary" type="button" onclick="pesquisarAluno()">Pesquisar</button>
+          <button class="btn secondary" type="button" onclick="limparPesquisaAluno()">Limpar</button>
+        </div>
       </div>
     </div>
     <div id="alunoResultados"></div>
   </div>
 
   <!-- Split: Turmas + Detalhes -->
-<div id="container" class="split layout-normal">
+<div id="container" class="split-view layout-normal" data-view="lista">
 
   <!-- Lista de turmas -->
-  <div id="card-esquerda" class="card">
+  <div id="card-esquerda" class="card pane-lista">
     <p class="section-title" id="sidebarTitulo" title="Clique para ordenar as turmas">TURMAS <span id="sortIndicator">↑</span></p>
     <div id="listaTurmas" class="list">
       <div class="aviso-warn">Nenhuma turma carregada.</div>
@@ -177,7 +269,7 @@
   </div>
 
   <!-- Detalhes da turma -->
-  <div id="card-direita" class="card">
+  <div id="card-direita" class="card pane-detalhe">
     <p class="section-title">Detalhes</p>
 
       <div id="detalhesVazio" class="aviso-warn">
@@ -197,7 +289,7 @@
             </div>
           </div>
           <button class="btn" id="btnEditarTurma" type="button" onclick="editarTurmaSelecionada()">📋 Editar cadastro completo</button>
-          <button class="btn secondary small" type="button" onclick="fecharTurma()">✕ Fechar</button>
+          <button class="btn secondary small" id="btnFecharTurma" type="button" onclick="fecharTurma()">✕ Fechar</button>
         </div>
 
         <div class="table-scroll">
@@ -670,6 +762,15 @@ async function abrirTurmaPorId(id) {
 }
 window.abrirTurmaPorId = abrirTurmaPorId;
 
+// Tela estreita (≤768px): abrir a turma mostra só o detalhe; "✕ Fechar" volta à lista.
+// Em tela larga o data-view não tem efeito (as duas colunas aparecem juntas).
+function _irParaView(view) {
+  const c = document.getElementById("container");
+  if (!c) return;
+  c.dataset.view = view;
+  if (window.matchMedia("(max-width:768px)").matches) c.scrollIntoView({ block: "start" });
+}
+
 function selecionarTurma(id) {
   turmaSelecionada = turmas.find(t => t.turmaId === id) || null;
 
@@ -709,6 +810,7 @@ function selecionarTurma(id) {
     container.classList.remove("layout-normal");
     container.classList.add("layout-expandido");
   }
+  _irParaView("detalhe");
 
   // Destaca item selecionado na sidebar
   document.querySelectorAll("#listaTurmas .list-item").forEach(el => {
@@ -739,6 +841,7 @@ function fecharTurma() {
     container.classList.remove("layout-expandido");
     container.classList.add("layout-normal");
   }
+  _irParaView("lista");
 
   document.querySelectorAll("#listaTurmas .list-item").forEach(el => {
     el.classList.remove("selected");
