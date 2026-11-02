@@ -57,11 +57,11 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 
 /* ── Abas de seção: aparência em components.css (3-B); aqui só LAYOUT ── */
 .abas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
-@media (max-width: 900px) { .abas { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 520px) { .abas { grid-template-columns: 1fr; } }
+/* As 4 abas ficam lado a lado em qualquer largura; no celular viram ícone em cima + título curto (bloco final) */
+.aba-tit .t-curto { display: none; }
 .aba-painel { margin-top: 22px; }
-.gd-par { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-@media (max-width: 900px) { .gd-par { grid-template-columns: 1fr; } }
+.gd-par { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1024px) { .gd-par { grid-template-columns: minmax(0, 1fr); } }
 
 /* ── Migração (status ok/aviso/perigo: candidato a global, D3) ── */
 .migr-item {
@@ -100,9 +100,9 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
       Aqui só o que é desta página, usando --dest-* ── */
 
 /* ── Backup (exportar à esquerda, importar à direita) ── */
-.bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.bk-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
-@media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
+@media (max-width:768px) { .bk-grid { grid-template-columns:minmax(0,1fr); } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
 /* ── Modal de resultado da pesquisa: altura calculada em JS (abaixo do header) ── */
 
 /* ── Consistência (matrículas sem turma/aluno, alunos sem matrícula): layout local; cor só por .badge / --ui-* ── */
@@ -123,6 +123,58 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .cons-det { margin-top:6px; word-break:break-word; }
 .cons-right { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
 .cons-pag { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
+/* ══ Responsividade (Guia v3) — breakpoints 1024 / 768 / 480; tudo dentro de @media, o desktop (≥1280px) não muda ══ */
+@media (max-width: 768px) {
+  /* Balão do ⓘ: ancora no título/rótulo e ocupa a largura dele (senão sai da tela) */
+  label, h3, .dest-tit { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide, .info-tip-bubble.wide.align-right { left: 0; right: 0; width: auto; }
+
+  /* Abas: ícone em cima, texto centralizado, lado a lado (os 4 itens dividem a linha) */
+  .abas { gap: 8px; }
+  .abas .aba { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; text-align: center; gap: 6px; padding: 10px 6px; min-width: 0; }
+  .abas .aba > span:not(.aba-num) { display: block; min-width: 0; }
+  .abas .aba-sub, .abas .aba-tit { display: block; }
+
+  /* Linhas de campo + botão: colunas definidas pela largura (no lugar do flex-wrap); um por linha quando não cabem 2 */
+  .row-btns, .cons-barra { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .cons-barra { align-items: center; }
+  .input.cresce, .cons-barra .cons-busca { min-width: 0; }
+  .row-btns .ano-sel, .cons-barra .cons-ano, .cons-barra .cons-sit { width: 100%; }
+  .row-btns .btn, .cons-barra .btn { white-space: normal; }
+
+  /* Caixas de número (visão geral, consistência): grade */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr)); }
+  .stats-row .stat-box { min-width: 0; }
+
+  /* Itens da consistência: texto + botões */
+  .cons-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .cons-left { min-width: 0; }
+
+  /* Modal da pesquisa: título em cima, três botões dividindo a linha */
+  .psq-modal .modal-head { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .psq-modal .modal-head .row-btns { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .container { padding: 16px 12px 40px; }
+  .container .card { --card-pad: 14px; }   /* a página redeclara --card-pad; aqui volta ao valor compacto do base.css */
+
+  /* 4 abas lado a lado: sem o "N cards", título curto e fonte menor; as colunas nunca ficam menores que o texto */
+  .abas { grid-template-columns: repeat(4, minmax(min-content, 1fr)); gap: 6px; }
+  .abas .aba { padding: 8px 3px; gap: 4px; }
+  .abas .aba-sub { display: none; }
+  .abas .aba-tit { font-size: 11px; }
+  .aba-tit .t-completo { display: none; }
+  .aba-tit .t-curto { display: inline; }
+
+  .cons-item { grid-template-columns: minmax(0, 1fr); }
+  .cons-right { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); justify-content: stretch; }
+  .cons-right .btn { white-space: normal; }
+
+  /* Paginação da consistência: anterior | página | próxima na mesma linha */
+  .cons-pag { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .cons-pag .badge { justify-self: center; text-align: center; white-space: normal; }
+}
 </style>
 </head>
 <body>
@@ -149,7 +201,7 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
     </div>
     <div class="console" id="logGeral" style="display:none;"></div>
     <div class="abas" id="gdNav" role="tablist" aria-label="Seções da página">
-      <button type="button" class="aba" id="tab_grpConsulta" role="tab" aria-selected="true" aria-controls="grpConsulta" tabindex="0" onclick="gdSelecionarAba('grpConsulta')"><span class="aba-num" data-icone="🔎">🔎</span><span><span class="aba-sub">2 cards</span><span class="aba-tit">Consultar e exportar</span></span></button>
+      <button type="button" class="aba" id="tab_grpConsulta" role="tab" aria-selected="true" aria-controls="grpConsulta" tabindex="0" onclick="gdSelecionarAba('grpConsulta')"><span class="aba-num" data-icone="🔎">🔎</span><span><span class="aba-sub">2 cards</span><span class="aba-tit"><span class="t-completo">Consultar e exportar</span><span class="t-curto">Consultar</span></span></span></button>
       <button type="button" class="aba" id="tab_grpManut" role="tab" aria-selected="false" aria-controls="grpManut" tabindex="-1" onclick="gdSelecionarAba('grpManut')"><span class="aba-num" data-icone="🛠️">🛠️</span><span><span class="aba-sub">4 cards</span><span class="aba-tit">Manutenção</span></span></button>
       <button type="button" class="aba" id="tab_grpFluxos" role="tab" aria-selected="false" aria-controls="grpFluxos" tabindex="-1" onclick="gdSelecionarAba('grpFluxos')"><span class="aba-num" data-icone="🔁">🔁</span><span><span class="aba-sub">2 cards</span><span class="aba-tit">Fluxos</span></span></button>
       <button type="button" class="aba" id="tab_grpExcl" role="tab" aria-selected="false" aria-controls="grpExcl" tabindex="-1" onclick="gdSelecionarAba('grpExcl')"><span class="aba-num" data-icone="🗑️">🗑️</span><span><span class="aba-sub">3 cards</span><span class="aba-tit">Exclusões</span></span></button>
@@ -2605,11 +2657,12 @@ function psqAjustarModal() {
     const r = el.getBoundingClientRect();
     if (r.height > 0 && r.top <= 1) fim = Math.max(fim, r.bottom);
   });
-  const topo = (fim || 76) + PSQ_FOLGA_HEADER;
+  const topo = (fim || 76) + (window.matchMedia('(max-width:768px)').matches ? 12 : PSQ_FOLGA_HEADER);   // no celular o respiro é pequeno
   bd.style.alignItems = 'flex-start';
   bd.style.paddingTop = topo + 'px';
   bd.style.paddingBottom = '24px';
-  bd.querySelector('.psq-modal').style.height = `calc(100vh - ${topo + 24}px)`;
+  const _alt = (window.CSS && CSS.supports && CSS.supports('height', '100dvh')) ? '100dvh' : '100vh';   // dvh: no celular 100vh inclui a barra de endereço
+  bd.querySelector('.psq-modal').style.height = `calc(${_alt} - ${topo + 24}px)`;
 }
 window.addEventListener('resize', () => { const m = document.getElementById('psqModal'); if (m && m.classList.contains('open')) psqAjustarModal(); });
 function psqFecharModal() { document.getElementById('psqModal').classList.remove('open'); }
