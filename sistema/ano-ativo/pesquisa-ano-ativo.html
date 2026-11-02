@@ -41,7 +41,7 @@
 .f-av    { grid-area: av; }
 #blocoStatusAtivo > .btn-avancada { flex: 1; }
 @media(max-width:1024px){ .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "ano av" "busca busca"; } }
-@media(max-width:480px){  .grid { grid-template-columns: 1fr; grid-template-areas: "ano" "busca" "av"; } }
+@media(max-width:480px){  .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ano" "busca" "av"; } }
 
 /* Turmas | Alunos: .split-view e .split-tabs são do components.css (10-C). Desktop continua 1:1 como antes. */
 #splitView { --split-cols: minmax(0, 1fr) minmax(0, 1fr); }
@@ -169,6 +169,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 /* ── Conteúdo dos modais: ficha do aluno ── */
 .foto-ficha      { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid var(--ui-border); }
 .foto-ficha.vazia { background: var(--ui-chip-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.ficha-cab > div { min-width: 0; }
 .ficha-cab       { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-chip-bg); display: flex; align-items: center; gap: 12px; }
 .ficha-grid      { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .ficha-campo     { padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px; }
@@ -180,7 +181,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 .ficha-linha     { font-size: 13px; margin-top: 8px; }
 .ficha-erro      { font-size: 13px; color: var(--ui-danger-fg); }
 .doc-linha       { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--ui-border); }
-.doc-linha .doc-nome { flex: 1; font-size: 13px; }
+.doc-linha .doc-nome { flex: 1; min-width: 0; font-size: 13px; }
 .doc-linha a     { font-size: 12px; font-weight: 800; text-decoration: none; }
 .chips-row       { display: flex; flex-wrap: wrap; gap: 6px; }
 .hdr-extra       { margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-chip-bg); font-size: 13px; line-height: 1.8; }
@@ -203,13 +204,18 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 @media(max-width:768px){
   .split-view .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 8px; }
   .split-view .list > :not(.item) { grid-column: 1 / -1; }   /* avisos ocupam a linha toda */
+
+  /* Balão do ⓘ: ancora no label / cabeçalho do bloco e ocupa a largura dele (senão sai da tela quando o ⓘ não está na borda esquerda) */
+  label, .card-head, .panel-head { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
 }
 
 @media(max-width:480px){
   .wrap { padding: 16px 12px 40px; }
-  .f-busca .busca-row { flex-wrap: wrap; }
-  .f-busca .busca-row input { flex: 1 1 100%; }
-  .f-busca .busca-row .btn { flex: 1 1 auto; }
+  .f-busca .busca-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .f-busca .busca-row input { grid-column: 1 / -1; }
+  .f-busca .busca-row .btn { white-space: normal; }   /* sobrepõe .nowrap: os dois botões dividem a linha */
   .panel-actions { justify-content: flex-start; width: 100%; }
   .item { flex-direction: column; align-items: stretch; }
   .item .right { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
