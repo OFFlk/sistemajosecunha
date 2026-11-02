@@ -120,6 +120,11 @@
       if (icon)  icon.textContent  = emoji;
       if (iconC) iconC.textContent = emoji;
       if (text)  text.textContent  = label;
+      // linha de tema do painel (≤768px): mesmo texto de ação dos outros botões
+      var rowIcon = document.getElementById('themeIconRow');
+      var rowText = document.getElementById('themeTextRow');
+      if (rowIcon) rowIcon.textContent = emoji;
+      if (rowText) rowText.textContent = (t === 'dark') ? 'Tema claro' : 'Tema escuro';
     }
 
     var mode = getPageMode();
@@ -181,11 +186,43 @@
     if (window.Auth && typeof Auth.listSchools === 'function') return Auth.listSchools() || [];
     return safeParse(localStorage.getItem('auth_schools_v1') || '[]', []);
   }
+  // Nome de exibição de um cadastro de escola (o displayName é o oficial)
+  function schoolLabel(x) {
+    if (!x) return '';
+    return (x.displayName || x.name || x.nome || x.schoolName || '').toString().trim();
+  }
+  function sameId(a, b) {
+    return (a == null ? '' : String(a)).trim().toLowerCase() === (b == null ? '' : String(b)).trim().toLowerCase();
+  }
+
   function getActiveSchoolId(session) {
     if (!session) return null;
     var sid = (session.schoolId || '').toString();
     if (sid.toUpperCase() !== 'ADMIN') return sid;
     return (localStorage.getItem('admin_active_school_v1') || '').trim() || 'ADMIN';
+  }
+
+  // Linha "Tema claro/escuro" do painel do menu (≤768px; oculta por CSS em telas maiores).
+  // Reaproveita o botão #themeToggle (mesmo handler), então não duplica a lógica do tema.
+  function buildThemeRow() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'ctx-theme-row';
+    var ic = document.createElement('span');
+    ic.id = 'themeIconRow';
+    ic.textContent = dark ? '☀️' : '🌙';
+    var tx = document.createElement('span');
+    tx.id = 'themeTextRow';
+    tx.textContent = dark ? 'Tema claro' : 'Tema escuro';
+    row.appendChild(ic);
+    row.appendChild(tx);
+    row.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var t = document.getElementById('themeToggle');
+      if (t) t.click();
+    });
+    return row;
   }
 
   function renderContext() {
@@ -195,7 +232,7 @@
     activeSelect = null;
     var s = getSession();
     host.innerHTML = '';
-    if (!s) return;
+    if (!s) { host.appendChild(buildThemeRow()); return; }   // login/cadastro: o painel só tem o tema
 
     var email    = (s.email || '').toString();
     var name     = (s.name || s.displayName || '').toString() || (email ? email.split('@')[0] : 'Usuário');
@@ -298,9 +335,9 @@
 
     var schools   = listSchools();
     var effective = getActiveSchoolId(s);
-    var matched   = schools.find(function (x) { return x && (x.schoolId || '').toString() === effective; })
-                 || schools.find(function (x) { return x && (x.id || '').toString()       === effective; });
-    var schoolName = matched ? (matched.displayName || matched.name || matched.nome || '').toString().trim() : '';
+    var matched   = schools.find(function (x) { return x && sameId(x.schoolId, effective); })
+                 || schools.find(function (x) { return x && sameId(x.id, effective); });
+    var schoolName = schoolLabel(matched);
 
     var wrap = document.createElement('div');
     wrap.className = 'school-pill';
@@ -316,7 +353,7 @@
       sel.appendChild(optAll);
       var seen = new Set();
       schools
-        .map(function (x) { return { schoolId: (x.schoolId || x.id || '').toString(), name: (x.displayName || x.name || x.nome || '').toString() }; })
+        .map(function (x) { return { schoolId: (x.schoolId || x.id || '').toString(), name: schoolLabel(x) }; })
         .filter(function (o) { return o.schoolId && o.schoolId !== 'ADMIN' && !seen.has(o.schoolId) && seen.add(o.schoolId); })
         .sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); })
         .forEach(function (o) {
@@ -337,17 +374,47 @@
       styleSelectOptions();
     } else {
       var span = document.createElement('span');
+      // Prioridade: displayName do cadastro de escolas > nome gravado na sessão > ID.
+      // (Antes a sessão vinha primeiro; se ela guardava o ID em schoolName, o ID aparecia.)
       var sessionSchoolName = (s.schoolName || '').toString().trim();
-      span.textContent = sessionSchoolName || schoolName || schoolId;
+      span.textContent = schoolName || sessionSchoolName || schoolId;
       wrap.appendChild(span);
     }
     host.appendChild(wrap);
+    host.appendChild(buildThemeRow());
   }
 
   // ─── 5. Auth guard ────────────────────────────────────────────────────────
   function runAuthGuard() {
     if (window.Auth && typeof Auth.requireAuth === 'function') {
       Auth.requireAuth('/login.html');
+    }
+  }
+
+  // ─── 5-A. Botão ☰ (≤768px): abre/fecha o painel com escola, usuário e tema ──
+  // O painel é o próprio #headerContext (o CSS o posiciona); aqui só se alterna a
+  // classe .menu-open no header. Fecha ao tocar fora, com Esc e ao voltar para tela larga.
+  function setupMenuToggle() {
+    var btn = document.getElementById('headerMenuBtn');
+    var header = document.querySelector('.app-header');
+    if (!btn || !header) return;
+    function set(open) {
+      header.classList.toggle('menu-open', !!open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      set(!header.classList.contains('menu-open'));
+    });
+    document.addEventListener('click', function (ev) {
+      if (!ev.target.closest || !ev.target.closest('#headerContext')) set(false);
+    });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') set(false); });
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(min-width: 769px)');
+      var onChange = function (e) { if (e.matches) set(false); };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq.addListener) mq.addListener(onChange);
     }
   }
 
@@ -373,6 +440,7 @@
       applyButtonVisibility();
       setupTheme();
       renderContext();
+      setupMenuToggle();
       trackHeaderHeight();
       runAuthGuard();
     });
