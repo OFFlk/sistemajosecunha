@@ -47,24 +47,48 @@
 /* ── Layout geral ── */
 .container { max-width: 1100px; margin: 22px auto 48px; padding: 0 18px; }
 .card { --card-pad: 20px; }
+@media (max-width:480px){
+  .container { margin: 14px auto 32px; padding: 0 12px; }
+  .card { --card-pad: 14px; }   /* devolve o padding compacto do base.css (a linha acima o vencia) */
+}
 .mt-14 { margin-top: 14px; }
 .hidden { display: none !important; }
 
 /* ── Campos: só disposição (aparência é do .field global) ── */
-.row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:15px; margin-top:15px; }
-@media(max-width:900px){ .row{ grid-template-columns:1fr 1fr; } }
-@media(max-width:540px){ .row{ grid-template-columns:1fr; } }
-.row.row-2 { grid-template-columns:1fr 1fr; }          /* ano + turma: sempre lado a lado */
+.row { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:15px; margin-top:15px; }   /* ano + turma lado a lado */
+@media (max-width:768px){ .row { grid-template-columns:minmax(0, 1fr); } }
 .field { display:flex; flex-direction:column; min-width:0; }
 .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:15px; }
+@media (max-width:768px){ .form-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } }   /* campos de nota são curtos: 3 e depois 2 por linha */
+@media (max-width:480px){ .form-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 .actions { display:flex; gap:10px; margin-top:15px; flex-wrap:wrap; }
 .actions-split { justify-content:space-between; }
 .actions-group { display:flex; gap:10px; flex-wrap:wrap; }
+/* ≤1024: os dois grupos de botões não cabem lado a lado; um grupo por linha (em vez de quebrar sozinho) */
+@media (max-width:1024px){
+  .actions-split { display:grid; grid-template-columns:minmax(0, 1fr); }
+  .actions-group { flex-wrap:nowrap; }
+}
+/* ≤768: botões de cada grupo dividem a linha em partes iguais; ≤480: um por linha */
+@media (max-width:768px){
+  .actions-group { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); }
+  .actions-group .btn { white-space:normal; }
+}
+@media (max-width:480px){
+  .actions-group { grid-auto-flow:row; grid-template-columns:minmax(0, 1fr); }
+}
 
 /* Linha de topo do formulário (nome + resultado final) */
-.linha-topo-cadastro { grid-column:1/-1; display:flex; gap:14px; flex-wrap:wrap; }
+.linha-topo-cadastro { grid-column:1/-1; display:flex; gap:14px; }
 .campo-nome { flex:3 1 320px; min-width:260px; }
 .campo-resultado { flex:1 1 170px; min-width:150px; }
+/* ≤768: grade 3:1 (sem resultado, o nome ocupa a linha toda); ≤480: um embaixo do outro */
+@media (max-width:768px){
+  .linha-topo-cadastro { display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 1fr); }
+  .campo-nome, .campo-resultado { min-width:0; }
+  .campo-nome:only-child { grid-column:1 / -1; }
+}
+@media (max-width:480px){ .linha-topo-cadastro { grid-template-columns:minmax(0, 1fr); } }
 .nome-busca { display:flex; gap:6px; }
 .nome-busca input { flex:1 1 auto; min-width:0; }
 .nome-busca .btn { flex-shrink:0; }
@@ -76,6 +100,11 @@
 /* Desvincular à esquerda e Excluir à direita, na mesma linha; 4pt de folga em cima e embaixo */
 .field.wrap-excluir { flex-direction:row; align-items:center; justify-content:space-between; gap:10px; margin-block:4pt; }
 .field.wrap-excluir #btnExcluirAluno { margin-left:auto; }
+@media (max-width:480px){
+  .field.wrap-excluir { flex-direction:column; align-items:stretch; }
+  .field.wrap-excluir .btn { width:100%; }
+  .field.wrap-excluir #btnExcluirAluno { margin-left:0; }
+}
 
 /* ── Tabela (D1 em aberto: regras mantidas) ── */
 .table-wrap { overflow-x:auto; padding-bottom:6px; border:1px solid var(--ui-border); border-radius:14px; margin-top:14px; }
@@ -99,6 +128,7 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 
 /* Metadados da turma escolhida: aparência vem de .dest-painel */
 .info-turma { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; margin-bottom:12px; padding:12px 14px; font-size:13px; }
+@media (max-width:480px){ .info-turma { flex-direction:column; gap:6px; } }
 
 /* ── Scans de documentos (visual próprio da página) ── */
 .scans-wrap { display:none; }
@@ -124,6 +154,12 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 .scans-item-nome { font-weight:700; color:var(--ui-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .scans-item-meta { font-size:11px; color:var(--ui-muted); margin-top:1px; }
 .scans-item-actions { display:flex; gap:6px; flex-shrink:0; }
+/* ≤480: ícone + nome na primeira linha; botões (Ver / PDF / Excluir) na de baixo, em partes iguais */
+@media (max-width:480px){
+  .scans-item { display:grid; grid-template-columns:auto minmax(0, 1fr); }
+  .scans-item-actions { grid-column:1 / -1; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); }
+  .scans-item-actions .btn { white-space:normal; justify-content:center; }
+}
 .scans-status { font-size:13px; color:var(--ui-muted); margin-bottom:8px; min-height:18px; }
 /* Scan marcado para exclusão (só some de verdade ao "Salvar no banco") */
 .scans-item.scan-removendo { opacity:.6; }
@@ -138,6 +174,16 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 .import-item-info { font-size:12px; color:var(--ui-muted); margin-top:2px; }
 #_importAtaModal .input { width:100%; box-sizing:border-box; }
 .import-sel { margin-top:6px; }
+@supports (height:1dvh){ .import-lista { max-height:50dvh; } }
+
+/* ── Balão do ⓘ em tela estreita ──
+   O balão larga (até 520px) abria a partir do ⓘ e estourava a tela quando o ⓘ não estava na borda esquerda.
+   ≤768: o balão passa a ancorar no label/título (largura = a do bloco), sempre abaixo dele. */
+@media (max-width:768px){
+  label, h3 { position:relative; }
+  .info-tip { position:static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left:0; right:0; width:auto; }
+}
 </style>
 <script src="../db.firebase.js"></script>
 <script src="../identidade-aluno.js"></script>
@@ -151,7 +197,7 @@ th.th-nota, td.col-nota { width:42px; font-size:11px; }
 
   <div class="card card-destaque">
     <div id="avisoSemEscola" class="aviso-warn" hidden>
-      ⚠️ Escolha uma escola no topo da página para cadastrar atas.
+      ⚠️ Escolha uma escola no cabeçalho da página para cadastrar atas.
     </div>
     <div id="avisoEscola" class="aviso-warn" hidden>
       ⚠️ Nenhuma escola cadastrada. Vá em <b>Editar escola</b> para configurar o cabeçalho.
