@@ -41,8 +41,7 @@
 h1      { font-size: 24px; margin: 0 0 4px; font-weight: 800; }
 h2      { font-size: 16px; margin: 0 0 14px; font-weight: 800; }
 .sub    { color: var(--ui-muted); font-size: 13px; margin: 0; }
-.grid2  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+.grid2  { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
 .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
 .mt-14  { margin-top: 14px; }
 .chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -51,7 +50,6 @@ h2      { font-size: 16px; margin: 0 0 14px; font-weight: 800; }
 .ficha-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
                 padding: 12px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-chip-bg); margin-bottom: 14px; }
 .ficha-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
-@media (max-width: 640px) { .ficha-grid { grid-template-columns: 1fr; } }
 .ficha-item { padding: 8px 10px; border: 1px solid var(--ui-border); border-radius: 8px; }
 .ficha-rot  { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .04em; }
 .ficha-item .ficha-rot { margin: 0; }
@@ -81,6 +79,38 @@ h2      { font-size: 16px; margin: 0 0 14px; font-weight: 800; }
 .doc-nome   { font-size: 13px; font-weight: 700; }
 .doc-meta   { font-size: 11px; color: var(--ui-muted); }
 .doc-item .btn { white-space: nowrap; }
+
+/* ── Responsividade (guia v3: só 1024 / 768 / 480) ── */
+@media (max-width: 768px) {
+  /* Cancelar / Confirmar dividem a linha em partes iguais */
+  .actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .actions .btn { white-space: normal; }
+
+  /* Balão do ⓘ: ancorado no título da foto, ocupando a largura dele */
+  .foto-tit { position: relative; }
+  .foto-tit .info-tip { position: static; }
+  .foto-tit .info-tip-bubble { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 16px 12px 32px; }
+  h1    { font-size: 20px; }
+
+  .grid2, .ficha-grid { grid-template-columns: minmax(0, 1fr); }
+
+  /* Botões do rodapé: um por linha, na ordem do HTML */
+  .actions { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
+
+  /* Foto + ações: coluna, círculo centralizado, botões dividindo a linha */
+  .foto-box   { flex-direction: column; align-items: stretch; gap: 12px; }
+  .foto-circulo { align-self: center; }
+  .foto-info  { flex: none; text-align: center; }
+  .foto-acoes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .foto-acoes .btn { white-space: normal; }
+
+  /* Documento anexado: ícone + texto em cima, botão em linha própria */
+  .doc-item { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+  .doc-item .btn { grid-column: 1 / -1; white-space: normal; text-align: center; justify-content: center; }
+}
 </style>
 
 <title>Readmitir aluno</title>
