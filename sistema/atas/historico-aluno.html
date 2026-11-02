@@ -42,6 +42,10 @@
 /* ===== Layout desta página ===== */
 .container{ max-width:1100px; margin:22px auto 48px; padding:0 18px; }
 .container .card{ --card-pad:20px; }
+@media (max-width:480px){
+  .container{ margin:14px auto 32px; padding:0 12px; }
+  .container .card{ --card-pad:14px; }   /* devolve o padding compacto do base.css (a linha acima o vencia) */
+}
 
 /* espaçamentos (substituem style="margin-top:..." inline) */
 .mt-4{ margin-top:4px; }
@@ -51,9 +55,14 @@
 .mt-16{ margin-top:16px; }
 
 /* card "Buscar aluno" */
-.busca-linha{ display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin-top:10px; }
-.busca-campo{ flex:1; min-width:200px; }
-.busca-acoes{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding-bottom:2px; }
+.busca-linha{ display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:14px; align-items:end; margin-top:10px; }
+.busca-campo{ min-width:0; }
+.busca-acoes{ display:flex; gap:10px; align-items:center; padding-bottom:2px; }
+/* ≤480: campo em linha própria; Pesquisar / Limpar dividem a linha de baixo */
+@media (max-width:480px){
+  .busca-linha{ grid-template-columns:minmax(0, 1fr); }
+  .busca-acoes{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); padding-bottom:0; }
+}
 
 /* ===== Tabela da turma aberta (D1 em aberto: mantida como estava) ===== */
 table{ width:max-content; min-width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
@@ -66,8 +75,10 @@ html[data-theme="dark"] tbody tr:hover td{ background:var(--ui-chip-bg); }
 tr.linha-alvo{ font-weight:800; }
 
 /* ===== Complementos específicos: Histórico por Aluno ===== */
-.split{display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; align-items:stretch;}
-@media (max-width: 980px){ .split{grid-template-columns:1fr;} }
+/* Resultados + Detalhes: .split-view do components.css. ≥769px lado a lado; ≤768px uma tela por vez
+   (selecionar um aluno abre o detalhe; "← Voltar à lista" volta). */
+#split{ --split-cols:minmax(0, 1.15fr) minmax(0, .85fr); align-items:stretch; scroll-margin-top:calc(var(--header-height, 72px) + 8px); }
+#split > .card{ min-width:0; margin-bottom:var(--card-gap, 16px); }
 
 .muted{color:var(--ui-muted); font-size:13px;}
 .aluno-nome{font-size:18px; font-weight:900;}
@@ -79,6 +90,17 @@ tr.linha-alvo{ font-weight:800; }
 .item .sub{color:var(--ui-muted); font-size:13px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .item .right{display:flex; gap:8px; justify-content:flex-end; flex-wrap:nowrap; align-items:center;}
 .w-90{width:90px; justify-content:center;}
+/* ≤1024: o painel de resultados fica estreito; a coluna do botão deixa de reservar 220px */
+@media (max-width:1024px){ .item{ grid-template-columns:minmax(0, 1fr) auto; } }
+/* ≤768: resultados em grade; ≤480: botão Abrir em largura total embaixo do nome */
+@media (max-width:768px){
+  .resultados{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+}
+@media (max-width:480px){
+  .item{ grid-template-columns:minmax(0, 1fr); }
+  .item .right{ justify-content:stretch; }
+  .item .right .btn, .w-90{ width:100%; }
+}
 
 /* timeline do histórico */
 .timeline{margin-top:10px; border-top:1px solid var(--ui-border);}
@@ -89,6 +111,22 @@ tr.linha-alvo{ font-weight:800; }
 .tright{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
 
 .badges-linha{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}
+/* ≤1024: linha da timeline em duas camadas (turma em cima; Ver turma / Exportar ano em partes iguais embaixo) */
+@media (max-width:1024px){
+  .trow{ display:grid; grid-template-columns:minmax(0, 1fr); gap:8px; }
+  .tright{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); }
+  .tright .btn{ white-space:normal; }
+  .tright:empty{ display:none; }
+}
+
+/* ── Balão do ⓘ em tela estreita ──
+   O balão largo abria a partir do ⓘ e estourava a tela. ≤768: ancora no label / cabeçalho do card
+   (largura do bloco, logo abaixo). */
+@media (max-width:768px){
+  label, .card-head{ position:relative; }
+  .info-tip{ position:static; }
+  .info-tip-bubble, .info-tip-bubble.wide{ left:0; right:0; width:auto; }
+}
 </style>
 
 <title>Histórico por Aluno</title>
@@ -119,11 +157,11 @@ tr.linha-alvo{ font-weight:800; }
       </div>
     </div>
     <!-- Guia 18.3: admin global sem escola só recebe aviso (visível só nesse caso) -->
-    <div class="aviso-warn mt-10" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no topo da página para pesquisar alunos.</div>
+    <div class="aviso-warn mt-10" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no cabeçalho da página para pesquisar alunos.</div>
   </div>
 
-  <div class="split">
-    <div class="card">
+  <div class="split-view" id="split" data-view="lista">
+    <div class="card pane-lista">
       <div class="card-head">
         <h3>Resultados
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
@@ -138,7 +176,8 @@ tr.linha-alvo{ font-weight:800; }
       </div>
     </div>
 
-    <div class="card">
+    <div class="card pane-detalhe">
+      <button class="btn btn-voltar-lista" type="button" onclick="voltarParaLista()">← Voltar à lista</button>
       <div class="card-head">
         <h3>Detalhes do aluno
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
@@ -433,7 +472,21 @@ async function montarAlunoComOcorrencias(candidato){
 }
 
 
+// Tela estreita (≤768px): selecionar um aluno mostra só o detalhe; "← Voltar à lista" volta.
+// Em tela larga o data-view não tem efeito (as duas colunas aparecem juntas).
+function irParaView(view, rolar = true){
+  const s = $("split");
+  if (!s) return;
+  s.dataset.view = view;
+  if (rolar && window.matchMedia("(max-width:768px)").matches) s.scrollIntoView({ block: "start" });
+}
+function voltarParaLista(){
+  fecharTurmaAberta();
+  irParaView("lista");
+}
+
 function limpar(){
+  irParaView("lista", false);
   $("q").value = "";
   $("lista").innerHTML = `<div class="aviso-warn">Digite um nome e clique em <b>Pesquisar</b>.</div>`;
   $("count").textContent = "";
@@ -457,6 +510,7 @@ async function buscar(){
 
   $("lista").innerHTML = `<div class="aviso-warn">Buscando…</div>`;
   $("count").textContent = "";
+  irParaView("lista", false);
 
   let candidatos = [];
   try{
@@ -509,6 +563,7 @@ async function selecionarAluno(alunoId){
   const candidato = (window._candidatosBusca && window._candidatosBusca.get(alunoId))
     || { alunoId, nome: alunoId };
 
+  irParaView("detalhe");
   $("detalhes").innerHTML = `<div class="aviso-warn">Carregando histórico…</div>`;
   $("btnExportarSel").disabled = true;
   fecharTurmaAberta();
