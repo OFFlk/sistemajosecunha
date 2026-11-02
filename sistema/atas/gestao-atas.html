@@ -31,6 +31,7 @@ body { visibility: hidden; }
 
 /* ── Layout ── */
 .container { max-width:1100px; margin:0 auto; padding:36px 24px 60px; }
+@media (max-width:480px) { .container { padding:20px 12px 40px; } }
 h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .muted { color:var(--ui-muted); font-size:13px; }
 .row-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
@@ -57,13 +58,22 @@ h3 { margin:0 0 10px; font-size:15px; font-weight:800; }
 .stat-lbl { font-size:12px; color:var(--ui-muted); margin-top:4px; }
 
 /* ── Abas de seção: aparência é do global (components.css, 3-B); aqui só o layout ── */
-.abas { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:18px; }
-@media (max-width:900px) { .abas { grid-template-columns:1fr 1fr; } }
-@media (max-width:520px) { .abas { grid-template-columns:1fr; } }
+/* As 3 abas ficam SEMPRE lado a lado (como nas outras páginas). ≤768px o botão vira compacto:
+   ícone em cima, texto embaixo, centralizado; ≤480px some o "N cards" e o título encolhe um pouco. */
+.abas { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; margin-top:18px; }
+@media (max-width:768px) {
+  .abas { gap:8px; }
+  .aba { flex-direction:column; justify-content:flex-start; gap:6px; padding:8px 6px; text-align:center; }
+  .aba-tit { overflow-wrap:anywhere; }
+}
+@media (max-width:480px) {
+  .aba-sub { display:none; }
+  .aba-tit { font-size:clamp(10.5px, 3.2vw, 12px); }
+}
 .aba-painel { margin-top:22px; }
 /* dois cards leves lado a lado */
-.gd-par { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
-@media (max-width:900px) { .gd-par { grid-template-columns:1fr; } }
+.gd-par { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:16px; align-items:start; }
+@media (max-width:768px) { .gd-par { grid-template-columns:minmax(0, 1fr); } }
 
 /* ── Checkbox: só o tamanho; a cor da paleta já vem do base.css ── */
 input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
@@ -104,9 +114,9 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 .tur-tab tbody tr:hover { background:var(--ui-brand-faded); }
 
 /* ── Backup (exportar à esquerda, importar à direita), igual ao gerir-dados-ano-ativo ── */
-.bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.bk-grid { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:24px; }
 .bk-grid > div + div { border-left:1px solid var(--dest-btn-bd); padding-left:24px; }
-@media (max-width:700px) { .bk-grid { grid-template-columns:1fr; } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
+@media (max-width:768px) { .bk-grid { grid-template-columns:minmax(0, 1fr); } .bk-grid > div + div { border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:16px; } }
 
 /* ── Consistência (órfãos e divergências): layout local; cores só por .badge / --ui-* ── */
 .con-barra { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
@@ -123,6 +133,50 @@ input[type="checkbox"] { width:15px; height:15px; cursor:pointer; }
 .con-det { margin-top:6px; word-break:break-word; }
 .con-right { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
 .con-pag { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; }
+
+/* ═══ Responsivo (guia v3): 1024 / 768 / 480 ═══ */
+@media (max-width:768px) {
+  /* caixas de número: 2 por linha */
+  .stats-row { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .stats-row .stat-box { min-width:0; }
+  /* merge: resumo em linha cheia; Aplicar / Cancelar dividem a linha de baixo */
+  .linha-merge { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
+  .merge-resumo { grid-column:1 / -1; min-width:0; }
+  .linha-merge .btn { white-space:normal; }
+  /* barras de filtro (Consistência / Apagar turmas): campos em linha cheia; botões dividem a linha */
+  .con-barra { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
+  .con-barra .con-ano, .con-barra .con-busca, .con-barra > select, .con-barra > .badge { grid-column:1 / -1; width:100%; min-width:0; }
+  .con-barra > .badge { width:auto; justify-self:start; }
+  .con-barra .btn { white-space:normal; }
+  .apagar-barra { display:grid; grid-template-columns:minmax(0, 1fr); }
+  .apagar-barra .apagar-ano { width:100%; }
+  /* item de inconsistência: texto em cima; ações em partes iguais embaixo */
+  .con-item { display:grid; grid-template-columns:minmax(0, 1fr); }
+  .con-left { min-width:0; }
+  .con-right { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); }
+  .con-right .btn { white-space:normal; }
+  .con-right .badge { justify-self:start; }
+}
+@media (max-width:480px) {
+  /* grupos de botões dos cards: um por linha, largura total */
+  .card .row-btns { display:grid; grid-template-columns:minmax(0, 1fr); }
+  .card .row-btns .btn { width:100%; justify-content:center; white-space:normal; }
+  .con-right { grid-auto-flow:row; grid-template-columns:minmax(0, 1fr); }
+  .con-pag { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; gap:8px; }
+  .con-pag .badge { justify-self:center; }
+  /* modal de turmas: Apagar selecionadas + Fechar em uma linha */
+  .tur-modal .modal-head .row-btns { display:grid; grid-template-columns:minmax(0, 1fr) auto; width:100%; }
+  .tur-modal .modal-head .row-btns .btn { white-space:normal; }
+}
+
+/* ── Balão do ⓘ em tela estreita ──
+   O balão largo abria a partir do ⓘ e estourava a tela. ≤768: ancora no título do bloco
+   (largura do bloco, logo abaixo). */
+@media (max-width:768px) {
+  h3, .dest-tit { position:relative; }
+  .info-tip { position:static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left:0; right:0; width:auto; }
+}
 </style>
 </head>
 <body>
@@ -956,11 +1010,13 @@ function turAjustarModal() {
     const r = el.getBoundingClientRect();
     if (r.height > 0 && r.top <= 1) fim = Math.max(fim, r.bottom);
   });
-  const topo = (fim || 76) + TUR_FOLGA_HEADER;
+  const folga = window.matchMedia('(max-width:768px)').matches ? 12 : TUR_FOLGA_HEADER;   // celular: modal quase em tela cheia
+  const topo = (fim || 76) + folga;
   bd.style.alignItems = 'flex-start';
   bd.style.paddingTop = topo + 'px';
   bd.style.paddingBottom = '24px';
-  bd.querySelector('.tur-modal').style.height = `calc(100vh - ${topo + 24}px)`;
+  const un = (window.CSS && CSS.supports && CSS.supports('height', '1dvh')) ? 'dvh' : 'vh';   // dvh: respeita a barra do navegador no celular
+  bd.querySelector('.tur-modal').style.height = `calc(100${un} - ${topo + 24}px)`;
 }
 window.addEventListener('resize', () => { const m = document.getElementById('turModal'); if (m && m.classList.contains('open')) turAjustarModal(); });
 function turFecharModal() { document.getElementById('turModal').classList.remove('open'); }
