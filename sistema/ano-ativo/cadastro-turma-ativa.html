@@ -40,9 +40,10 @@
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
 h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-.split-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
-@media (max-width: 900px) { .split-grid { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+/* Cadastro | Turmas: .split-view e .split-tabs são do components.css (10-C). Desktop continua 1.15fr / .85fr como antes. */
+#splitView { --split-cols: minmax(0, 1.15fr) minmax(0, .85fr); --grid-gap: 16px; align-items: start; }
+#splitTabs { scroll-margin-top: calc(var(--header-height, 72px) + 8px); }
+@media (max-width: 1024px) { .form-row { grid-template-columns: minmax(0, 1fr); } }
 .mt-10 { margin-top: 10px; }
 .mono  { font-family: ui-monospace, monospace; font-size: 12px; }
 .actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 18px; flex-wrap: wrap; }
@@ -92,15 +93,64 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .btn.danger-soft:hover  { background: color-mix(in srgb, var(--ui-st-bad-fg) 20%, transparent); border-color: var(--ui-st-bad-fg); color: var(--ui-st-bad-fg); }
 .btn.success-soft { background: var(--ui-st-ok-bg);  border-color: var(--ui-st-ok-bd);  color: var(--ui-st-ok-fg); }
 .btn.success-soft:hover { background: color-mix(in srgb, var(--ui-st-ok-fg) 20%, transparent);  border-color: var(--ui-st-ok-fg);  color: var(--ui-st-ok-fg); }
+/* ══ Responsividade (Guia v3) — breakpoints 1024 / 768 / 480; tudo dentro de @media, o desktop (≥1280px) não muda ══ */
+@media (max-width: 768px) {
+  .lista-head .input { font-size: var(--input-fs, 16px); }   /* o iOS dá zoom em campo menor que 16px */
+
+  /* Balão do ⓘ: ancora no rótulo/título e ocupa a largura dele (senão sai da tela) */
+  label, h2, .id-badge-row { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+
+  /* Cabeçalho da lista em grid (no lugar do flex-wrap): título; ano | status; contagem; ordenação */
+  .lista-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; align-items: center; }
+  .lista-head h2 { grid-column: 1 / -1; }
+  .lista-head .filtro-ano, .lista-head .filtro-status { max-width: none; }
+  .lista-head #countTurmasLista { grid-column: 1 / -1; }
+  .lista-head #countTurmasLista:empty { display: none; }
+  .lista-head .ordem { grid-column: 1 / -1; margin-left: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .lista-head .ordem .input { max-width: none; }
+
+  /* Lista de turmas em grade; avisos ocupam a linha toda */
+  .split-view .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 10px; }
+  .split-view .list > :not(.item) { grid-column: 1 / -1; }
+
+  /* Botões do formulário: dividem a linha em partes iguais */
+  .actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); justify-content: stretch; align-items: stretch; }
+  .actions .btn { white-space: normal; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 16px 12px 40px; }
+  .actions { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); }
+
+  /* Série: o seletor ocupa a linha e os dois botões dividem a de baixo */
+  .linha-serie { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .linha-serie select { grid-column: 1 / -1; }
+  .linha-serie .btn { white-space: normal; }
+
+  /* ID da turma pode ser longo: quebra em vez de vazar */
+  .id-badge-row .badge { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+
+  /* Item da turma: texto em cima, botões embaixo dividindo a linha */
+  .item { flex-direction: column; align-items: stretch; }
+  .btns { flex-direction: row; min-width: 0; }
+  .btns .btn { flex: 1; }
+}
+/* Telas de toque: alvo maior para «Detalhes» */
+@media (pointer: coarse) { .detalhes-toggle { display: inline-block; padding: 8px 6px; } }
 </style>
 </head>
 <body>
 <script>window.Auth && window.Auth.requireAuth();</script>
 <div id="header-placeholder"></div>
 <main class="wrap">
-  <div class="split-grid">
+  <div class="split-tabs" id="splitTabs" role="tablist" aria-label="Cadastro e turmas">
+    <button type="button" class="split-tab" role="tab" data-view="detalhe" aria-selected="true">📝 Cadastro</button>
+    <button type="button" class="split-tab" role="tab" data-view="lista" aria-selected="false">🏫 Turmas <span class="tab-count" id="tabCountTurmas">0</span></button>
+  </div>
+  <div class="split-view" id="splitView" data-view="detalhe">
 
-    <div class="card">
+    <div class="card pane-detalhe">
       <h2>Cadastrar / editar turma <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Por enquanto, esta tela cadastra e edita apenas turmas. No próximo passo, vamos matricular alunos na página de cadastro!</span></span></h2>
 
       <div class="form-section">
@@ -167,7 +217,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
       </div>
     </div>
 
-    <div class="card card-destaque">
+    <div class="card card-destaque pane-lista">
       <div class="lista-head">
         <h2>Turmas cadastradas <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Este card tem 3 filtros. Ao lado do título, o <b>ano letivo</b>: alterne entre os anos que já têm turmas cadastradas. Abaixo do título, o <b>status</b>: mostre turmas ativas, inativas ou todas. Por último, o <b>ordenador</b>: escolha a ordem (data de criação, nome ou série); o botão ao lado alterna entre crescente e decrescente.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Ao clicar em <b>Editar</b>, os dados da turma voltam para o formulário e você pode alterar o nome, o turno e o professor(a). Para os demais dados, siga as dicas em <b>ID da turma</b>. <b>Inativar</b> muda o status da turma para inativa; para vê-las, troque o filtro do card de "Ativas" para "Inativas".</span></span></h2>
         <select id="filtroAnoLista" class="input filtro-ano"></select>
@@ -702,7 +752,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
         btnEdit.className = "btn primary";
         btnEdit.type = "button";
         btnEdit.textContent = "Editar";
-        btnEdit.addEventListener("click", ()=> loadTurma(t.turmaId));
+        btnEdit.addEventListener("click", ()=>{ loadTurma(t.turmaId); if(window._setAbaTurma) window._setAbaTurma("detalhe", true); });
         right.appendChild(btnEdit);
 
         const btnStatus = document.createElement("button");
@@ -1072,6 +1122,31 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
     }
   }
   init();
+})();
+</script>
+
+<script>
+/* Cadastro | Turmas em abas (≤768px). Em tela larga as abas ficam ocultas por CSS e o data-view não tem efeito.
+   «Editar» na lista leva para Cadastro; «Salvar» não troca de aba; o contador da aba espelha #countTurmasLista. */
+(function(){
+  const sv = document.getElementById('splitView');
+  const bar = document.getElementById('splitTabs');
+  const tabs = Array.from(document.querySelectorAll('#splitTabs .split-tab'));
+  if(!sv || !tabs.length) return;
+
+  function setView(v, rolar){
+    sv.dataset.view = v;
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.view === v)));
+    if(rolar && matchMedia('(max-width:768px)').matches) bar.scrollIntoView({ block: 'start' });
+  }
+  window._setAbaTurma = setView;
+  tabs.forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
+
+  const c = document.getElementById('countTurmasLista'), tc = document.getElementById('tabCountTurmas');
+  if(c && tc){
+    const sync = () => { const m = c.textContent.match(/\d+/); tc.textContent = m ? m[0] : '0'; };
+    new MutationObserver(sync).observe(c, { childList: true, characterData: true, subtree: true }); sync();
+  }
 })();
 </script>
 
