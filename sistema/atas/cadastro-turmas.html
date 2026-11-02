@@ -40,8 +40,11 @@
 
 /* ── Layout geral ── */
 .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
-.split-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; align-items: start; }
-@media (max-width: 900px) { .split-grid { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .wrap { padding: 14px 12px 32px; } }
+/* Formulário + lista: .split-view do components.css. ≥769px lado a lado (1.15 / 0.85); ≤768px abas "Cadastro | Turmas".
+   Nesta página o formulário vem PRIMEIRO no HTML: ele é o .pane-detalhe e a lista é o .pane-lista (data-view="detalhe" = formulário). */
+#splitView { --split-cols: minmax(0, 1.15fr) minmax(0, 0.85fr); }
+#splitView > .card { min-width: 0; margin-bottom: var(--card-gap, 16px); }
 h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }   /* D6: h2/h3 seguem locais */
 h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .h2-form { margin-bottom: 10px; }
@@ -55,7 +58,7 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .wrap .input { width: 100%; }                    /* .input avulso não tem largura própria */
 .filtro-ano { max-width: 140px; font-size: 13px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .form-row { grid-template-columns: minmax(0, 1fr); } }
 
 .form-section { margin-top: 18px; }
 .form-section:first-of-type { margin-top: 4px; }
@@ -66,8 +69,18 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .form-section-label::after { content: ""; flex: 1; height: 1px; background: var(--ui-border); }
 
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.row.serie-linha { align-items: flex-end; margin-top: 6px; }
-.form-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; }
+/* Série: o select ocupa a linha toda; "Adicionar" e "Limpar séries" ficam logo abaixo (mesmo resultado de antes, agora fixo em grade) */
+.row.serie-linha { display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-areas: "sel sel sel" "add clr ."; gap: 10px; align-items: end; margin-top: 6px; }
+.row.serie-linha #serieSelect { grid-area: sel; }
+.row.serie-linha #btnAddSerie { grid-area: add; }
+.row.serie-linha #btnClearSeries { grid-area: clr; }
+.form-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 18px; }
+@media (max-width: 480px) {
+  .row.serie-linha { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "sel sel" "add clr"; }
+  .row.serie-linha .btn { white-space: normal; }
+  .form-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .form-actions .btn { white-space: normal; }
+}
 .btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: stretch; min-width: 90px; }
 
 .id-badge-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
@@ -97,6 +110,27 @@ h3 { margin: 0 0 8px; font-size: 15px; font-weight: 800; }
 .help.sem-margem { margin: 0; }
 /* .help solto sobre o destaque já é coberto pelo global (D22). Dentro de .item o fundo é neutro, não o de marca: */
 .card-destaque .item .help { color: var(--ui-muted); }
+
+/* ── ≤768px: lista de turmas em grade (aviso "nenhuma turma" ocupa a linha toda) ── */
+@media (max-width: 768px) {
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+  .list > :not(.item) { grid-column: 1 / -1; }
+}
+/* ── ≤480px: turma em coluna; o botão Editar vira uma linha embaixo ── */
+@media (max-width: 480px) {
+  .item { flex-direction: column; align-items: stretch; }
+  .btns { flex-direction: row; min-width: 0; }
+  .btns .btn { flex: 1; }
+}
+
+/* ── Balão do ⓘ em tela estreita ──
+   Os balões largos abriam a partir do ⓘ e estouravam a tela. ≤768: ancoram no label / cabeçalho / linha do ID
+   (largura do bloco, sempre logo abaixo). */
+@media (max-width: 768px) {
+  label, .dest-head, .id-badge-row { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+}
 </style>
 </head>
 <body>
@@ -114,11 +148,16 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 <div id="header-placeholder"></div>
 <main class="wrap">
   <div id="avisoSemEscola" class="aviso-warn" hidden>
-    ⚠️ Escolha uma escola no topo da página para cadastrar turmas.
+    ⚠️ Escolha uma escola no cabeçalho da página para cadastrar turmas.
   </div>
-  <div class="split-grid">
+  <!-- Abas (só ≤768px): Cadastro = formulário · Turmas = lista -->
+  <div class="split-tabs" id="splitTabs" role="tablist" aria-label="Cadastro e turmas">
+    <button type="button" class="split-tab" role="tab" data-view="detalhe" aria-selected="true">Cadastro</button>
+    <button type="button" class="split-tab" role="tab" data-view="lista" aria-selected="false">Turmas <span class="tab-count" id="tabCountTurmas">0</span></button>
+  </div>
+  <div class="split-view" id="splitView" data-view="detalhe">
 
-    <div class="card">
+    <div class="card pane-detalhe">
       <h2 class="h2-form">Cadastrar / editar turma (Atas)</h2>
 
       <div class="form-section">
@@ -214,12 +253,12 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
       </div>
     </div>
 
-    <div class="card card-destaque">
+    <div class="card card-destaque pane-lista">
       <div class="dest-head">
         <h2>Turmas cadastradas
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
-            <span class="info-tip-bubble">Selecione um ano no seletor ao lado — ele vai listar automaticamente todas as turmas encontradas para aquele filtro.</span>
+            <span class="info-tip-bubble">Selecione um ano no seletor desta lista — ele vai listar automaticamente todas as turmas encontradas para aquele filtro.</span>
           </span>
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -668,6 +707,8 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
 
     const countEl = $("countTurmasLista");
     if(countEl) countEl.textContent = turmas.length ? `${turmas.length} turma(s)` : "";
+    const tabCount = $("tabCountTurmas");              // contador da aba "Turmas" (só aparece ≤768px)
+    if(tabCount) tabCount.textContent = String(turmas.length);
 
     if(!turmas.length){
       list.innerHTML = '<div class="help">Nenhuma turma cadastrada ainda.</div>';
@@ -749,6 +790,20 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     });
   }
 
+  // Abas (≤768px): "Cadastro" (formulário) | "Turmas" (lista). Em tela larga as duas colunas
+  // aparecem juntas e o data-view não tem efeito. Só troca data-view e aria-selected.
+  function irParaAba(view){
+    const sv = $("splitView");
+    if(!sv) return;
+    sv.dataset.view = view;
+    document.querySelectorAll("#splitTabs .split-tab").forEach(b => {
+      b.setAttribute("aria-selected", String(b.dataset.view === view));
+    });
+  }
+  document.querySelectorAll("#splitTabs .split-tab").forEach(b => {
+    b.addEventListener("click", () => irParaAba(b.dataset.view));
+  });
+
   function loadTurma(turmaId){
     if(!turmaId) return;
     const t = getTurmas().find(x => x.turmaId === turmaId);
@@ -776,6 +831,7 @@ window.Auth && window.Auth.onReady && window.Auth.onReady(() => {
     renderChips();
     syncDerived();
     renderListaTurmas();
+    irParaAba("detalhe");   // celular: "Editar" leva para a aba do formulário
     window.scrollTo({top:0, behavior:"smooth"});
   }
 
