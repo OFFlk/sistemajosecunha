@@ -32,6 +32,8 @@
      7. Modais (confirmação .cm-* e modal grande .modal)
      8. Legado (aliases)
      9. Legado de LAYOUT (a migrar para as páginas e apagar)
+   10. Layout responsivo — primitivas opt-in (v3)
+   11. Pesquisa — o que sobrou do pesquisa.css (v2)
    ============================================================ */
 
 
@@ -223,6 +225,10 @@ html[data-theme="dark"]{
 .list-item:last-child{ border-bottom:none; }
 .list-item .left{ display:flex; flex-direction:column; gap:3px; }
 .list-item .right{ display:flex; gap:6px; }
+.list-item.selected{                       /* item escolhido (por JS) */
+  background:color-mix(in srgb, var(--ui-brand) 15%, transparent);
+  border-left:3px solid var(--ui-brand);
+}
 
 /* ── SUB-CARD: item de resultado dentro de um card de listagem (campos de informação + botão "Abrir") ──
    Só a APARÊNCIA da caixa. O conteúdo (esquerda/direita, título, meta) é layout da página.
@@ -905,3 +911,18 @@ html[data-theme="dark"] .aviso-warn a:hover{ color:inherit; font-weight:700; tex
   .btn{ min-height:40px; }
   .btn.small{ min-height:36px; }
 }
+
+
+/* ============================================================
+   11. PESQUISA — o que era usado do pesquisa.css (v2)
+   Só a APARÊNCIA de componentes. O layout (.wrap, colunas, ações) é de cada página.
+   ============================================================ */
+/* linha de resultado da "pesquisa por aluno" (nome + botão "Abrir") */
+.aluno-result-row{
+  display:flex; justify-content:space-between; gap:10px;
+  border-top:1px solid var(--ui-border); padding:8px 0;
+}
+.aluno-result-info{ min-width:0; }
+.aluno-result-actions{ flex:none; }
+/* resumo em texto ao fim do detalhe da turma */
+.summary{ margin-top:12px; padding:12px 16px; border-radius:10px; font-size:13px; }
