@@ -103,8 +103,12 @@
 #container.layout-normal #card-direita { align-self:stretch; }
 
 /* ── Card esquerdo (lista de turmas) ── */
-#card-esquerda { display:flex; flex-direction:column; min-height:0; }
 #card-esquerda .list { flex:1; overflow-y:auto; min-height:0; }
+/* ⚠️ display NUNCA em #card-esquerda fora do @media: seletor de ID venceria o
+   .split-view[data-view] > .pane-lista { display:none } do components.css e o card não sumiria no celular. */
+@media (min-width:769px){
+  #card-esquerda { display:flex; flex-direction:column; min-height:0; }
+}
 #card-esquerda .list::-webkit-scrollbar { width:8px; }
 #card-esquerda .list::-webkit-scrollbar-track { background:transparent; }
 #card-esquerda .list::-webkit-scrollbar-thumb { background:var(--ui-brand); border-radius:8px; }
@@ -112,11 +116,15 @@
 #card-esquerda .list-item:not(.selected):hover { background:color-mix(in srgb, var(--ui-brand) 8%, transparent); cursor:pointer; }
 
 /* ── Sidebar expandida (turma aberta): compacta ao máximo ── */
-.layout-expandido #card-esquerda { position:sticky; top:80px; max-height:calc(100vh - 100px); cursor:pointer; }
-.layout-expandido #card-esquerda .list { max-height:calc(100vh - 160px); }
-@supports (height:1dvh){
-  .layout-expandido #card-esquerda { max-height:calc(100dvh - 100px); }
-  .layout-expandido #card-esquerda .list { max-height:calc(100dvh - 160px); }
+/* sticky + altura máxima só com as duas colunas lado a lado (≥769px). Empilhado (celular),
+   o sticky grudava a lista por cima do detalhe e o detalhe sumia. */
+@media (min-width:769px){
+  .layout-expandido #card-esquerda { position:sticky; top:80px; max-height:calc(100vh - 100px); cursor:pointer; }
+  .layout-expandido #card-esquerda .list { max-height:calc(100vh - 160px); }
+  @supports (height:1dvh){
+    .layout-expandido #card-esquerda { max-height:calc(100dvh - 100px); }
+    .layout-expandido #card-esquerda .list { max-height:calc(100dvh - 160px); }
+  }
 }
 .layout-expandido #card-esquerda .right { display:none; }
 .layout-expandido #card-esquerda .list-item { padding:7px 8px; font-size:12px; border-radius:8px; cursor:pointer; transition:background .15s; white-space:normal; word-break:break-word; }
