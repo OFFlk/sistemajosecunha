@@ -81,11 +81,19 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .card .inline { display: grid; grid-template-columns: 1.2fr .7fr 1fr; gap: 18px; align-items: start; }
 .inline { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .inline > * { flex: 1; min-width: 180px; }
-.inline-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; align-items: start; }
+.inline-2 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; align-items: start; }
 .split { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .split { grid-template-columns: 1fr; } .card .inline { grid-template-columns: 1fr; } }
-@media (max-width: 920px) { .grid2, .grid3, .form-grid { grid-template-columns: 1fr; } }
-@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+/* Breakpoints do guia: 1024 (3→2 colunas) e 480 (1 coluna). Só dentro de @media: o desktop não muda. */
+@media (max-width: 1024px) {
+  .grid, .split { grid-template-columns: minmax(0, 1fr); }
+  .card .inline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card .inline > * { min-width: 0; }
+  .card .inline > #wrapStatusPadrao { grid-column: 1 / -1; }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .card .inline, .grid-3, .grid2, .grid3, .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
 .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .top-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .stack { display: flex; flex-direction: column; }
@@ -157,8 +165,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .wz-etapa.bloqueada { opacity: .5; filter: grayscale(.35); pointer-events: none; user-select: none; }
 .card-destaque .inline > div > label { color: var(--dest-fg); }
 .topo-destaque .wz-stepper { margin-top: 18px; }
-.wz-stepper { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 700px) { .wz-stepper { grid-template-columns: 1fr; } }
+.wz-stepper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 768px) { .wz-stepper { grid-template-columns: minmax(0, 1fr); } }
 .wz-step { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; padding: 8px 18px 8px 10px; border-radius: 12px; transition: background .15s; }
 .wz-step:hover { background: var(--dest-btn-hover); }
 .wz-step.active, .wz-step.active:hover { background: var(--bg); }
@@ -257,8 +265,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .nee-panel { display: none; padding: 16px; border-top: 1px solid var(--ui-border); }
 .nee-panel.open { display: block; animation: fadeSlide .18s ease; }
 .nee-section-title { font-size: 11px; font-weight: 800; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; }
-.nee-simple-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-@media (max-width: 540px) { .nee-simple-grid { grid-template-columns: 1fr; } }
+.nee-simple-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 480px) { .nee-simple-grid { grid-template-columns: minmax(0, 1fr); } }
 .nee-simple-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; border: 1.5px solid var(--ui-border); background: var(--ui-surface); font-size: 13px; font-weight: 700; color: var(--ui-text); transition: background .15s, border-color .15s; user-select: none; }
 .nee-simple-item:hover { border-color: var(--ui-brand); background: var(--ui-brand-faded); }
 .nee-simple-item.checked { background: var(--ui-brand); border-color: var(--ui-brand); color: var(--ui-brand-fg); }
@@ -288,7 +296,6 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .dz-row > button { flex: 0 0 auto; white-space: nowrap; }
 .dz-row.dz-primeira { border-radius: 12px 12px 0 0; border-bottom: 1px solid var(--ui-st-bad-bd); }
 .dz-row.dz-ultima { border-radius: 0 0 12px 12px; }
-@media (max-width: 560px) { .dz-row { flex-wrap: wrap !important; } }
 .dz-wrap { width: 100%; margin-top: 10px; }
 .dz-desc { font-size: 12px; color: var(--ui-muted); margin-top: 3px; font-weight: 600; }
 .dz-btn { padding: 6px 18px; border-radius: 999px; font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; background: var(--ui-st-bad-bg); border: 1.5px solid var(--ui-st-bad-bd); color: var(--ui-st-bad-fg); }
@@ -317,6 +324,63 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .id-res-vazio { padding: 4px 2px; }
 .id-tag { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--ui-chip-border); background: var(--ui-chip-bg); color: var(--ui-text); font-weight: 700; }
 .id-res-novo { flex-direction: row; align-items: center; font-size: 13px; font-weight: 800; border-style: dashed; }
+/* ══ Responsividade (Guia v3) — breakpoints 1024 / 768 / 480; tudo dentro de @media, o desktop (≥1280px) não muda ══ */
+@media (max-width: 768px) {
+  /* Campos em 16px (o iOS dá zoom ao focar campo menor). Os seletores repetem os de "Campos soltos dentro de .card" para vencer por ordem. */
+  .card select, .card input[type="text"], .card input[type="number"], .card input[type="date"] { font-size: var(--input-fs, 16px); }
+  .nat-wrap .nat-input-real, .nat-wrap .nat-ghost-layer { font-size: var(--input-fs, 16px); }   /* ghost e campo precisam ter o mesmo tamanho */
+  .docs-fila-label { font-size: var(--input-fs, 16px); }
+
+  /* Balão do ⓘ: ancora no rótulo/cabeçalho do bloco e ocupa a largura dele (senão sai da tela) */
+  label, .card-head, h2, h3, .foto-tit, .nee-header-label { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+
+  /* Blocos Sim/Não e seletores: rótulo + botões em grid, no lugar do flex-wrap */
+  .nee-header:not(.dz-row) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .nee-header-label { min-width: 0; }
+
+  /* Botões do wizard: dividem a linha em partes iguais (o .left some do layout e seus botões entram na grade) */
+  .actions-wizard { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: stretch; }
+  .actions-wizard .left { display: contents; }
+  .actions-wizard .btn { white-space: normal; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 16px 12px 40px; }
+
+  /* Sim/Não e seletores: rótulo em cima, botões dividindo a linha */
+  .nee-header:not(.dz-row) { grid-template-columns: minmax(0, 1fr); }
+  .nee-toggle { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .nee-toggle > button { white-space: normal; }
+  .actions-wizard { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); }
+
+  /* Zona de perigo: texto em cima, botão embaixo (antes decidido por flex-wrap) */
+  .dz-row { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .dz-row > button { white-space: normal; }
+
+  /* Banners: ícone + texto na 1ª linha, botão na 2ª (o ID do banner usa display !important, por isso o seletor repete) */
+  #bannerAlunoEncontrado.visible { display: grid !important; grid-template-columns: auto minmax(0, 1fr); }
+  #bannerAlunoEncontrado > .btn { grid-column: 1 / -1; }
+  .modo-edicao-banner.show { display: grid; grid-template-columns: auto minmax(0, 1fr); }
+  .modo-edicao-banner > .modo-edicao-banner-btn { grid-column: 1 / -1; }
+
+  /* Foto: círculo no topo, botões dividindo a linha */
+  .foto-box { flex-direction: column; align-items: stretch; }
+  .foto-circulo { align-self: center; }
+  .foto-tit { text-align: center; }
+  .foto-acoes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .foto-acoes .btn { white-space: normal; }
+  .foto-status { justify-content: center; }
+
+  /* Fila de documentos: miniatura à esquerda; nome e rótulo em cima; tamanho e botões embaixo */
+  .docs-fila-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; column-gap: 10px; row-gap: 6px; align-items: center; }
+  .docs-fila-item > .docs-fila-icon, .docs-fila-item > .docs-fila-thumb { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
+  .docs-fila-item > .docs-fila-info { grid-column: 2 / -1; grid-row: 1; }
+  .docs-fila-item > :not(.docs-fila-icon):not(.docs-fila-thumb):not(.docs-fila-info) { grid-row: 2; justify-self: end; }
+  .docs-fila-item > .docs-fila-size { justify-self: start; }
+}
+/* Telas de toque: os botões em pílula (Sim/Não, CPF/Nome, Regular/Integral, zona de perigo) chegam a 40px, como o .btn */
+@media (pointer: coarse) { .integral-btn, .nee-sim-nao, .dz-btn { min-height: 40px; } }
 </style>
 
 <title>Cadastro de alunos • Ano Ativo</title>
