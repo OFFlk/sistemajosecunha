@@ -25,24 +25,47 @@
 <style>
 /* Prefixo desta página: va- (mesmo molde de virada-ano-ativo). Sem variáveis próprias. */
 .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 18px 48px; }
+@media (max-width: 480px) { .wrap { padding: 14px 12px 32px; } }
 .va-params { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
+@media (max-width: 480px) { .va-params { grid-template-columns: minmax(0, 1fr); } }
 .va-linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .va-linha .input { width: auto; min-width: 150px; }
 .va-linha + .va-linha { margin-top: 10px; }
 .table-scroll { max-height: 460px; overflow: auto; }
 .va-mt { margin-top: 12px; }
-.va-grid { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 16px; align-items: start; }
+/* Turmas de destino + Distribuir alunos: .split-view do components.css. ≥769px lado a lado (0.8 / 1.4);
+   ≤768px abas "Turmas de destino | Distribuir alunos". */
+#vaSplit { --split-cols: minmax(0, 0.8fr) minmax(0, 1.4fr); }
+#vaSplit > .card { min-width: 0; margin-bottom: var(--card-gap, 16px); }
+@media (max-width: 768px) {
+  #vaSplit.va-mt { margin-top: 0; }
+  #splitTabs { margin-top: 12px; }
+}
 .va-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .va-turma { padding: 8px 0; border-bottom: 1px solid var(--ui-border); }
 .va-turma:last-child { border-bottom: 0; }
 h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
-@media (max-width: 900px) { .va-params, .va-grid { grid-template-columns: 1fr; } }
+/* Linhas de selects / botões: ≥1025px seguem em flex como antes; ≤1024px viram grade (sem quebra "por acaso") */
+@media (max-width: 1024px) {
+  .va-selects { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .va-selects > :first-child:nth-last-child(3) { grid-column: 1 / -1; }   /* com 3 selects, o primeiro ocupa a linha */
+  .va-selects .input { width: 100%; min-width: 0; }
+  .va-botoes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .va-botoes .btn { white-space: normal; }
+}
+@media (max-width: 480px) {
+  .va-selects { grid-template-columns: minmax(0, 1fr); }
+  .va-botoes { grid-auto-flow: row; grid-template-columns: minmax(0, 1fr); }
+}
+/* Plano gravado: a tabela é gerada pelo JS fora do .table-scroll; rola de lado se não couber */
+#plano { overflow-x: auto; }
+@supports (height: 1dvh) { .table-scroll { max-height: min(460px, 70dvh); } }
 </style>
 </head>
 <body>
 <div id="header-placeholder"></div>
 <main class="wrap">
-  <div id="avisoSemEscola" class="aviso-warn" hidden>Escolha uma escola no topo da página para fazer a virada de ano.</div>
+  <div id="avisoSemEscola" class="aviso-warn" hidden>Escolha uma escola no cabeçalho da página para fazer a virada de ano.</div>
 
   <div class="card card-destaque">
     <div class="card-head"><h3>Virada de ano • Atas finais</h3></div>
@@ -53,19 +76,24 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
     <div class="help va-mt">Leva alunos de uma ata para uma turma já cadastrada em outro ano, vinculando cada um ao mesmo ID e já criando a ata/matrícula. As notas e o resultado final são preenchidos depois, na edição da ata (Cadastro de atas). O ano de destino pode ser anterior ao de origem.</div>
   </div>
 
-  <div class="va-grid va-mt">
-  <div class="card">
+  <!-- Abas (só ≤768px): Turmas de destino = lista · Distribuir alunos = ação principal -->
+  <div class="split-tabs" id="splitTabs" role="tablist" aria-label="Destino e distribuição">
+    <button type="button" class="split-tab" role="tab" data-view="lista" aria-selected="false">Turmas de destino <span class="tab-count" id="tabCountDestino">0</span></button>
+    <button type="button" class="split-tab" role="tab" data-view="detalhe" aria-selected="true">Distribuir alunos</button>
+  </div>
+  <div class="split-view va-mt" id="vaSplit" data-view="detalhe">
+  <div class="card pane-lista">
     <div class="section-title">Turmas de destino</div>
     <div id="listaDestino"></div>
   </div>
 
-  <div class="card">
+  <div class="card pane-detalhe">
     <div class="section-title">Distribuir alunos</div>
-    <div class="va-linha">
+    <div class="va-linha va-selects">
       <select id="turmaOrigem" class="input" aria-label="Turma de origem"></select>
       <select id="fSerie" class="input" aria-label="Filtrar por série"></select>
     </div>
-    <div class="va-linha">
+    <div class="va-linha va-botoes">
       <button type="button" class="btn secondary" id="btnSelAprov">Selecionar aprovados</button>
       <button type="button" class="btn secondary" id="btnSelReprov">Selecionar reprovados</button>
       <button type="button" class="btn neutral" id="btnLimparSel">Limpar seleção</button>
@@ -74,12 +102,12 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
       <table><thead><tr><th><input type="checkbox" id="chkTodos" aria-label="Marcar todos"></th><th>Aluno</th><th>Série</th><th>Resultado</th><th>Destino</th></tr></thead>
       <tbody id="tbAlunos"><tr><td colspan="5"><span class="subnote">Escolha uma turma de origem.</span></td></tr></tbody></table>
     </div>
-    <div class="va-linha va-mt">
+    <div class="va-linha va-selects va-mt">
       <select id="dTurma" class="input" aria-label="Turma de destino"></select>
       <select id="dSerie" class="input" aria-label="Série de destino"></select>
       <select id="dRes" class="input" aria-label="Resultado no ano de destino"></select>
     </div>
-    <div class="va-linha">
+    <div class="va-linha va-botoes">
       <button type="button" class="btn primary" id="btnAtribuir">Atribuir aos marcados</button>
       <button type="button" class="btn neutral" id="btnRemover">Remover atribuição</button>
     </div>
@@ -89,7 +117,7 @@ h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
   <div class="card va-mt">
     <div class="section-title">Plano e confirmação</div>
     <div id="plano"><span class="subnote">Nenhum aluno atribuído.</span></div>
-    <div class="va-linha va-mt"><button type="button" class="btn primary" id="btnGravar">Gravar plano</button><button type="button" class="btn neutral" id="btnLimparPlano">Limpar plano</button></div>
+    <div class="va-linha va-botoes va-mt"><button type="button" class="btn primary" id="btnGravar">Gravar plano</button><button type="button" class="btn neutral" id="btnLimparPlano">Limpar plano</button></div>
     <div id="resultadoGravacao" class="va-mt"></div>
   </div>
 </main>
@@ -229,8 +257,20 @@ async function carregarAnosIndice(){
 }
 
 // ── Turmas de destino (só leitura: quem cria turma é o Cadastro de turmas) ──
+// Abas (≤768px): "Turmas de destino" | "Distribuir alunos". Em tela larga as duas colunas aparecem juntas
+// e o data-view não tem efeito. Só troca data-view e aria-selected.
+function irParaAba(view){
+  const sv = $('vaSplit');
+  if(!sv) return;
+  sv.dataset.view = view;
+  document.querySelectorAll('#splitTabs .split-tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === view)));
+}
+document.querySelectorAll('#splitTabs .split-tab').forEach(b => b.addEventListener('click', () => irParaAba(b.dataset.view)));
+
 function renderDestino(){
   const d = anoDestino(), ts = d ? TURMAS_DEST : [];
+  const tabC = $('tabCountDestino'); if(tabC) tabC.textContent = String(ts.length);
+  if(d && !ts.length) irParaAba('lista');   // celular: sem turmas no ano de destino, mostra o aviso (com o link para o cadastro)
   $('listaDestino').innerHTML = ts.length ? ts.map(t => `<div class="va-turma"><b>${esc(t.nome || t.turmaId)}</b><div class="va-chips">` +
     (t.series || []).map(x => `<span class="badge small neutral">${esc(x)}</span>`).join('') +
     `<span class="badge small gray">${esc(t.turno || '')}</span><span class="badge small gray">${(t.alunos || []).length} aluno(s)</span></div></div>`).join('') :
