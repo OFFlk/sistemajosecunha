@@ -272,16 +272,18 @@ document.addEventListener("click", ()=>{
     inputSchool.disabled = false;
   }
 
-  // Lê a lista atual no Firestore; se falhar (regras, rede), cai no cache local
+  // Lê a lista atual direto do servidor. Nunca usa cache (IndexedDB do Firestore
+  // ou localStorage): num formulário de cadastro, lista velha = escola faltando
+  // sem nenhum aviso. Se não conseguir, mostra erro em vez de lista desatualizada.
   async function loadSchools() {
     try {
-      const snap = await Auth.db.collection('schools').get();
-      populateSchools(snap.docs.map(d => ({ schoolId: d.id, id: d.id, ...d.data() })));
+      const snap = await Auth.db.collection('schools').get({ source: 'server' });
+      // O ID do documento vem por último: ele sempre vence qualquer campo
+      // "schoolId"/"id" salvo dentro do documento.
+      populateSchools(snap.docs.map(d => ({ ...d.data(), schoolId: d.id, id: d.id })));
     } catch (e) {
       console.warn('cadastro: erro ao carregar escolas', e);
-      const cached = Auth.listSchools();
-      if (cached && cached.length) populateSchools(cached);
-      else erroSelect('Erro ao carregar escolas');
+      erroSelect('Não foi possível carregar as escolas. Recarregue a página.');
     }
   }
 
