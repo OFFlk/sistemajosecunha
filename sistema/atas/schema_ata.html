@@ -95,12 +95,12 @@ tr:last-child td { border-bottom: none; }
     display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px;
     grid-template-areas: "chave rotulo" "tipo ativa" "acoes acoes";
     padding: 12px; margin-bottom: 10px; border: 1px solid var(--ui-border); border-radius: 10px;
+    background: var(--ui-table-cell-bg);   /* o fundo é do card inteiro (igual às células do desktop) ... */
   }
-  tbody td { padding: 0; border: 0; text-align: left; min-width: 0; border-radius: 0; }
+  tbody td, .card-destaque tbody td { padding: 0; border: 0; text-align: left; min-width: 0; border-radius: 0; background: transparent; }   /* ... e as células ficam transparentes (no destaque o components.css pinta cada td) */
   tbody td::before { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ui-muted); }
   tbody td:nth-child(1) { grid-area: ativa; display: flex; align-items: center; gap: 8px; align-self: end; }
-  tbody td:nth-child(1)::before { margin: 0; order: 2; }
-  tbody td:nth-child(1)::before { content: "Ativa"; }
+  tbody td:nth-child(1)::before { content: "Ativa"; margin: 0; order: 2; }   /* checkbox primeiro, rótulo depois */
   tbody td:nth-child(2) { grid-area: chave; }
   tbody td:nth-child(2)::before { content: "Chave (id)"; }
   tbody td:nth-child(3) { grid-area: rotulo; }
