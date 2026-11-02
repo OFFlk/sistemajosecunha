@@ -166,7 +166,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 .card-destaque .inline > div > label { color: var(--dest-fg); }
 .topo-destaque .wz-stepper { margin-top: 18px; }
 .wz-stepper { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 768px) { .wz-stepper { grid-template-columns: minmax(0, 1fr); } }
+/* As etapas ficam lado a lado em qualquer largura; no celular o título vira a versão curta (ver bloco final) */
+.wz-step > div:not(.wz-step-num) { min-width: 0; }
+.wz-step-title .t-curto { display: none; }
 .wz-step { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; padding: 8px 18px 8px 10px; border-radius: 12px; transition: background .15s; }
 .wz-step:hover { background: var(--dest-btn-hover); }
 .wz-step.active, .wz-step.active:hover { background: var(--bg); }
@@ -348,6 +350,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
 @media (max-width: 480px) {
   .wrap { padding: 16px 12px 40px; }
 
+  /* Etapas lado a lado: número em cima, texto centralizado e título curto */
+  .wz-stepper { gap: 8px; }
+  .wz-step { flex-direction: column; text-align: center; gap: 6px; padding: 8px 6px; }
+  .wz-step-num { width: 28px; height: 28px; }
+  .wz-step-label { font-size: 10px; }
+  .wz-step-title { font-size: 13px; }
+  .wz-step-title .t-completo { display: none; }
+  .wz-step-title .t-curto { display: inline; }
+
   /* Sim/Não e seletores: rótulo em cima, botões dividindo a linha */
   .nee-header:not(.dz-row) { grid-template-columns: minmax(0, 1fr); }
   .nee-toggle { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
@@ -418,7 +429,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
     <div class="wz-step-num" id="wzStepNum1">1</div>
     <div>
       <div class="wz-step-label">Etapa 1 de 2</div>
-      <div class="wz-step-title">Identificação e matrícula</div>
+      <div class="wz-step-title"><span class="t-completo">Identificação e matrícula</span><span class="t-curto">Matrícula</span></div>
     </div>
   </div>
   <div class="wz-sep" id="wzStepSep"></div>
@@ -426,7 +437,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ui-brand); }  
     <div class="wz-step-num" id="wzStepNum2">2</div>
     <div>
       <div class="wz-step-label">Etapa 2 de 2</div>
-      <div class="wz-step-title">Dados complementares</div>
+      <div class="wz-step-title"><span class="t-completo">Dados complementares</span><span class="t-curto">D. complementar</span></div>
     </div>
   </div>
 </div>
