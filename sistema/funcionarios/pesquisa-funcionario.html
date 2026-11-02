@@ -32,27 +32,27 @@
 <style>
 /* Prefixo de variáveis desta página: pf- (pesquisa-funcionario). Hoje não há variável própria.
    Card de destaque, botões, campos, chip (.badge), tooltip, popover/dropdown, modal, toast e .check são GLOBAIS:
-   aqui só layout e o que é exclusivo da página. O CSS externo desta página deixou de ser usado. */
+   aqui só layout e o que é exclusivo da página. A página não carrega CSS externo próprio (só base, header e components).
+   Breakpoints: apenas 1024 / 768 / 480 (bloco "Responsividade" no fim deste <style>). */
 
 /* ── Layout ── */
 .wrap   { max-width: 1300px; margin: 0 auto; padding: 24px 16px 48px; }
 .muted  { color: var(--ui-muted); }
-.col-todo { grid-column: 1 / -1; }
 
 /* ── Card de filtros (destaque global): só layout ── */
-.ano-row    { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
-.ano-field  { width: 220px; flex: 0 0 220px; margin: 0; }
+.ano-row    { display: grid; grid-template-columns: 220px minmax(0, 1fr) auto; grid-template-areas: "ano busca av"; gap: 16px; align-items: end; margin-bottom: 16px; }
+.ano-field  { grid-area: ano; width: 100%; max-width: 220px; margin: 0; }
 .ano-field select { width: 100%; }
 .ano-erro   { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--dest-fg); }
-.filters-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.busca-field { flex: 1 1 280px; min-width: 0; margin: 0; }
+.filters-grid { --grid-gap: 14px; }   /* colunas (3 / 2 / 1) vêm da primitiva do components.css */
+.busca-field { grid-area: busca; min-width: 0; margin: 0; }
 .busca-field input { width: 100%; }
-@media(max-width:980px){ .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media(max-width:600px){ .filters-grid { grid-template-columns: 1fr; } }
-.linha-acoes { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
-.linha-acoes .bloco-turno { margin: 0 0 0 auto; }
+#blocoPesquisaAvancada { grid-area: av; }
+.linha-acoes { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "limpar turno"; align-items: end; gap: 16px; margin-top: 16px; }
+.linha-acoes #btnLimparFiltros { grid-area: limpar; }
+.linha-acoes .bloco-turno { grid-area: turno; justify-self: end; margin: 0; }
 .lbl-turno   { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--dest-fg); opacity: .85; text-transform: uppercase; letter-spacing: .4px; }
-.turnos-row  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.turnos-row  { display: grid; grid-auto-flow: column; grid-auto-columns: max-content; justify-content: start; align-items: center; gap: 10px; }
 
 /* Chip marcável de turno (receita do guia 4.5): desmarcado = contorno translúcido; marcado = preenchimento sólido --dest-fg */
 .turno-checkbox-wrap { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-text); font-size: 13px; font-weight: 700; cursor: pointer; user-select: none; transition: background .15s, border-color .15s, color .15s; }
@@ -77,7 +77,7 @@
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
 .pop-foot     { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-@media(max-width:700px){ .pop-avancada { right: auto; left: 0; max-width: calc(100vw - 48px); } }
+.pop-avancada .input { min-width: 0; }
 .card-destaque .pop-avancada .btn.secondary {
   --btn-bg: var(--ui-surface); --btn-fg: var(--ui-text); --btn-bd: var(--ui-border);
   --btn-bg-h: var(--ui-chip-bg); --btn-fg-h: var(--ui-text); --btn-bd-h: var(--ui-border);
@@ -93,14 +93,13 @@
 .count-selecionados { background: var(--ui-brand-faded); border-color: var(--ui-brand-border); color: var(--ui-brand-text); }
 .panel-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; overflow: visible; }
 .check-all     { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ui-muted); font-weight: 700; cursor: pointer; }
-.list          { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media(max-width:860px){ .list { grid-template-columns: 1fr; } }
+#listaFuncionarios { --results-min: 440px; --grid-gap: 12px; }   /* no máx. 2 colunas num contêiner de 1300px */
 .loading       { font-size: 12px; color: var(--ui-muted); margin-top: 8px; }
 
 /* ── Ordenação ── */
 .sort-control  { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 14px; background: var(--ui-chip-bg); border: 1px solid var(--ui-border); border-radius: 10px; }
 .sort-control .lbl { margin: 0; white-space: nowrap; }
-.sort-control .input { flex: 1; }
+.sort-control .input { flex: 1; min-width: 0; }
 
 /* ── Sub-card (um por funcionário; definição local, igual à pesquisa-ano-ativo) ── */
 .item        { border: 1px solid var(--ui-border); border-radius: 10px; padding: 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -130,7 +129,7 @@ input[type="checkbox"] { accent-color: var(--ui-brand); }   /* accent-color segu
 .item.selecionavel:has(.chkFuncionario:checked) .selo-selecionado { display: flex; }
 
 /* ── Modal (esqueleto global; aqui só o tamanho) ── */
-#modalBackdrop .modal { --modal-w: 900px; }
+#modalBackdrop .modal { --modal-w: min(900px, 96vw); }
 body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atrás do modal */
 
 /* ── Conteúdo do modal: ficha do funcionário ── */
@@ -149,7 +148,44 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 .ficha-txt, .ficha-vazio { font-size: 13px; color: var(--ui-muted); }
 .ficha-erro  { font-size: 13px; color: var(--ui-danger-fg); }
 .doc-linha   { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--ui-border); }
-.doc-linha .doc-nome { flex: 1; font-size: 13px; }
+.doc-linha .doc-nome { flex: 1; min-width: 0; font-size: 13px; }
+.ficha-cab > :last-child { min-width: 0; }
+
+/* ══ Responsividade (guia v3: só 1024 / 768 / 480) ══ */
+@media (max-width: 1024px){
+  .ano-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "ano av" "busca busca"; }
+}
+@media (max-width: 768px){
+  /* Limpar filtros e Turnos: uma coluna; chips de turno dividem a linha em partes iguais */
+  .linha-acoes { grid-template-columns: minmax(0, 1fr); grid-template-areas: "limpar" "turno"; }
+  .linha-acoes .bloco-turno { justify-self: stretch; }
+  .turnos-row { grid-auto-columns: minmax(0, 1fr); justify-content: stretch; }
+  .turno-checkbox-wrap { min-width: 0; }
+  /* Ano letivo ocupa a coluna toda (o balão do ⓘ se ancora no rótulo); o select continua com 220px */
+  .ano-field { max-width: none; }
+  .ano-field select { max-width: 220px; }
+  /* Balão do ⓘ (correção do guia, seção 5) */
+  .ano-field label { display: block; }
+  .ano-field label, .lbl-turno { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px){
+  .wrap { padding: 12px 12px 32px; }
+  .ano-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ano" "busca" "av"; }
+  #blocoPesquisaAvancada .btn-avancada { width: 100%; }
+  .pop-avancada { min-width: 0; max-width: none; width: min(340px, calc(100vw - 48px)); }
+  #btnLimparFiltros { width: 100%; }
+  .turnos-row { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); }
+  /* Card do funcionário: texto em cima, botões em partes iguais embaixo */
+  .item { flex-direction: column; align-items: stretch; }
+  .item .title { padding-right: 28px; }                       /* espaço para o selo ✓ no canto superior direito */
+  .item .meta-i { white-space: normal; }
+  .item .right { flex-direction: row; min-width: 0; }
+  .item .right .btn { flex: 1; }
+  .item.selecionavel .selo-selecionado { top: 10px; bottom: auto; }
+  .ficha-grid { grid-template-columns: minmax(0, 1fr); }
+}
 </style>
 
 <!-- ══ Bibliotecas de Exportação (PDF) ══ -->
@@ -166,7 +202,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 <!-- ══ MAIN CONTENT ══ -->
 <main class="wrap">
 
-  <div class="aviso-warn" id="avisoSemEscola" hidden>🔒 Escolha uma escola no topo da página para pesquisar funcionários.</div>
+  <div class="aviso-warn" id="avisoSemEscola" hidden>🔒 Escolha uma escola no cabeçalho da página para pesquisar funcionários.</div>
 
   <!-- ══════════════════════════════════════════
        CARD: Filtros de Pesquisa
@@ -263,8 +299,8 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       </div>
     </div>
 
-    <!-- Linha 3: Limpar filtros (esquerda) + Turnos (direita).
-         O painel da pesquisa avançada abre à direita, sobre os turnos, e deixa o "Limpar filtros" visível. -->
+    <!-- Linha 3: Limpar filtros + Turnos (lado a lado no desktop, empilhados em ≤768px).
+         O painel da pesquisa avançada abre sobre os turnos e deixa o "Limpar filtros" visível. -->
     <div class="linha-acoes">
       <button class="btn secondary" id="btnLimparFiltros" type="button">✕ Limpar filtros</button>
 
@@ -326,7 +362,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
 
     <!-- Estados da lista (guia 7.2): .aviso-warn como irmão do contêiner, nunca dentro dele -->
     <div class="aviso-warn" id="avisoLista" hidden></div>
-    <div class="list" id="listaFuncionarios"></div>
+    <div class="results-grid" id="listaFuncionarios"></div>
     <div class="aviso-warn" id="loadingFuncionarios" hidden>ℹ️ Carregando funcionários…</div>
   </div>
 
@@ -906,7 +942,7 @@ function _semEscola(){
   ══════════════════════════════════════════ */
   // Diz POR QUE a lista está vazia (falha de leitura, escola não selecionada, ano sem cadastros...).
   function mensagemVazio(){
-    if(_semEscola()) return '🔒 Escolha uma escola no topo da página para pesquisar funcionários.';
+    if(_semEscola()) return '🔒 Escolha uma escola no cabeçalho da página para pesquisar funcionários.';
     if(erroCarga) return '⚠️ Não foi possível carregar os funcionários: ' + escapeHtml(erroCarga);
     let escola = '';
     try{ escola = (window.Auth && window.Auth.getActiveSchoolId && window.Auth.getActiveSchoolId()) || ''; }catch(_){}
