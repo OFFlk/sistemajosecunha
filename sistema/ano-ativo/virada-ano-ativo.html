@@ -31,7 +31,7 @@
 td .input { width: 100%; }
 .va-linha + .va-linha { margin-top: 10px; }
 .va-mt { margin-top: 12px; }
-.va-grid { display: grid; grid-template-columns: 0.8fr 1.4fr; gap: 16px; align-items: start; }
+.va-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
 .va-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .va-turma { padding: 8px 0; border-bottom: 1px solid var(--ui-border); }
 .va-turma:last-child { border-bottom: 0; }
@@ -39,7 +39,30 @@ td .input { width: 100%; }
 .va-badge-dest { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 6px 16px; border-radius: 10px; font-size: 14px; font-weight: 800; background: var(--dest-btn-bg); border: 1px solid var(--dest-btn-bd); color: var(--dest-fg); }
 h3 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
 .va-ano-ativo { display: flex; gap: 6px; align-items: center; min-height: var(--field-h, 43px); }
-@media (max-width: 900px) { .va-params, .va-grid { grid-template-columns: 1fr; } }
+
+/* ── Responsividade (guia v3: só 1024 / 768 / 480) ── */
+#plano { overflow-x: auto; }   /* tabela do plano rola dentro do bloco (decisão D1) */
+@media (max-width: 1024px) {
+  .va-params { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .va-grid   { grid-template-columns: minmax(0, 1fr); }   /* duas colunas ficariam apertadas */
+}
+@media (max-width: 768px) {
+  /* linhas de selects e de botões: grade na ordem do HTML, sem flex-wrap decidindo a quebra */
+  .va-linha { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+  .va-linha .input { width: 100%; min-width: 0; }
+  .va-linha .btn { white-space: normal; }
+
+  /* Balão do ⓘ: ancorado no cabeçalho do card, ocupando a largura dele */
+  .card-head { position: relative; }
+  .card-head .info-tip { position: static; }
+  .card-head .info-tip-bubble, .card-head .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 16px 12px 32px; }
+  .va-params { grid-template-columns: minmax(0, 1fr); }
+  .va-linha  { grid-template-columns: minmax(0, 1fr); }
+  .va-ano-ativo { flex-wrap: wrap; }   /* cluster de selos: exceção aceita ao princípio 4 */
+}
 </style>
 </head>
 <body>
