@@ -249,7 +249,7 @@ async function carregarAnosIndice(){
   ANOS = [];
   try{
     const schoolId = Auth.getActiveSchoolId && Auth.getActiveSchoolId();
-    if(!Auth.db || !schoolId || String(schoolId).toUpperCase() === 'ADMIN') return;
+    if(!Auth.db || !schoolId || String(schoolId).toUpperCase() === 'ADMIN'){ console.warn('carregarAnosIndice: sem Firestore ou escola ativa', { db: !!Auth.db, schoolId }); return; }
     const snap = await Auth.db.collection('schools').doc(schoolId).get();
     const idx = snap.exists ? snap.data().atasIndice : null;
     ANOS = (idx && Array.isArray(idx.anos) ? idx.anos : []).map(a => parseInt(a, 10)).filter(Boolean).sort((a, b) => b - a);
@@ -515,7 +515,8 @@ async function aoMudarAnos(){
 async function init(){
   try{
     await new Promise(res => {
-      if(window.Auth && Auth.getSession && Auth.getSession()) return res();
+      // Não usar Auth.getSession() como atalho: ele devolve a sessão em cache (localStorage) antes dos SDKs do
+      // Firebase carregarem, e aí Auth.db ainda é undefined. onReady só dispara depois que _db existe.
       if(Auth && Auth.onReady) Auth.onReady(res); else document.addEventListener('auth:ready', res, { once: true });
     });
     const s = Auth.getSession && Auth.getSession();
