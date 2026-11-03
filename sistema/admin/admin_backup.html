@@ -69,8 +69,7 @@
      como esperado — remover de novo só depois de confirmar/corrigir base.css */
   .container { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; display: flex; flex-direction: column; gap: 18px; }
 
-  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
-  @media(max-width:640px){ .grid{ grid-template-columns: 1fr; } }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 
   .card-title { font-size: 15px; font-weight: 800; color: var(--title-color); margin: 0 0 8px; }
 
@@ -178,13 +177,68 @@
   .log-linha .field { flex: 1 1 260px; min-width: 0; max-width: 420px; }
   .log-linha .field.sm { flex: 0 1 170px; }
   .log-linha [hidden] { display: none !important; }
-  #modalLogs .modal { --modal-w: 1000px; --modal-h: 85vh; }
+  #modalLogs .modal { --modal-w: min(1000px, 96vw); --modal-h: 85vh; }
+  @supports (height: 100dvh) { #modalLogs .modal { --modal-h: 85dvh; } }
   .log-scroll { overflow-x: auto; }
   .log-scroll table { width: 100%; min-width: 760px; }
   .log-quando { white-space: nowrap; }
   .log-sub { display: block; font-size: 12px; color: var(--ui-muted); }
   .log-rodape { margin-right: auto; }
   .log-det-corpo { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; padding: 10px 12px; border-radius: 8px; background: var(--ui-chip-bg); border: 1px solid var(--ui-chip-border); color: var(--ui-text); }
+
+  /* ══════════════════════════════════════════════════════════════
+     Responsivo — breakpoints do guia: 1024 / 768 / 480 (max-width)
+     Desktop (≥1280px) não muda: tudo abaixo só age em telas menores.
+     ══════════════════════════════════════════════════════════════ */
+  @media (max-width: 1024px) {
+    /* Registro de alterações: grade em vez de flex-wrap (ordem visual = ordem do HTML) */
+    .log-linha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+    .log-linha .field,
+    .log-linha .field.sm { max-width: none; min-width: 0; }
+    .log-linha > .btn { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 768px) {
+    .container { padding: 24px 16px 48px; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+
+    /* Grupos de botões e rádios: grade na ordem do HTML (2 por linha quando cabe) */
+    .row-btns,
+    .row-radios { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); }
+    .row-btns > button { white-space: normal; justify-content: center; text-align: center; }
+    .row-btns > .row-note { grid-column: 1 / -1; }
+    .btn-file { white-space: normal; }
+
+    /* Select de escopo: sem largura mínima fixa e sem zoom no iOS */
+    .scope-select { min-width: 0; width: 100%; font-size: var(--input-fs, 16px); }
+
+    /* Balão do ⓘ: ancorado no título do card, ocupando a largura dele */
+    .card-title { position: relative; }
+    .info-tip { position: static; }
+    .info-tip-bubble,
+    .info-tip-bubble.wide,
+    .info-tip-bubble.align-right { left: 0; right: 0; width: auto; }
+  }
+
+  @media (max-width: 480px) {
+    .container { padding: 16px 12px 40px; }
+    .row-btns,
+    .row-radios { grid-template-columns: minmax(0, 1fr); }
+    .btn-file { display: flex; justify-content: center; text-align: center; }
+    .log-linha { grid-template-columns: minmax(0, 1fr); }
+
+    /* Modais: respiro do backdrop e rodapé do modal de confirmação */
+    .modal-backdrop { padding: 8px; --bk-confirm-pad: 16px; }
+    .confirm-actions { flex-direction: column; }
+    .confirm-actions > button { justify-content: center; }
+    .log-rodape { flex: 1 1 100%; margin-right: 0; }
+    .log-rodape:empty { display: none; }
+  }
+
+  /* Telas de toque: alvo mínimo de 40px nos botões desta página */
+  @media (pointer: coarse) {
+    .btn-action, .btn-file, .btn-neutral, .btn-danger { min-height: 40px; }
+  }
 </style>
 
 <title>Backup e restaurar</title>
@@ -202,7 +256,7 @@
 
   <div class="card">
     <div class="card-title">🎯 Escopo das ações abaixo <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Escolha se backup, restauração e limpeza afetam só uma escola, ou todas as escolas do sistema de uma vez.</span></span></div>
-    <div class="row" style="margin-top:0;">
+    <div class="row row-radios" style="margin-top:0;">
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;">
         <input type="radio" name="scope" id="scopeTodas" value="todas" checked> Todas as escolas
       </label>
@@ -221,9 +275,9 @@
   <div class="grid">
     <div class="card">
       <div class="card-title">⬇️ Exportar backup <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble">Baixa um arquivo .json de backup. O conteúdo segue o escopo escolhido acima: apenas a escola selecionada ou todas as escolas do sistema.</span></span></div>
-      <div class="row" style="margin-top:0;">
+      <div class="row row-btns" style="margin-top:0;">
         <button class="btn-action" onclick="exportarBackup()" type="button">Baixar backup</button>
-        <span style="font-size:12px;color:var(--muted);">Inclui turmas, alunos, schemas e auxiliares.</span>
+        <span class="row-note" style="font-size:12px;color:var(--muted);">Inclui turmas, alunos, schemas e auxiliares.</span>
       </div>
     </div>
 
@@ -235,7 +289,7 @@
         <input accept=".json,application/json" id="fileBackup" onchange="previewBackup(event)" style="display:none" type="file"/>
       </label>
       <div class="summary" id="preview">Nenhum arquivo selecionado.</div>
-      <div class="row">
+      <div class="row row-btns">
         <button class="btn-action" disabled id="btnRestore" onclick="restaurarBackup()" type="button">Restaurar</button>
         <button class="btn-neutral" disabled id="btnCancel" onclick="cancelarRestore()" type="button">Cancelar</button>
       </div>
@@ -245,7 +299,7 @@
   <div class="card card-destaque">
     <div class="card-title">🧹 Limpeza controlada <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Apagar turmas</b> — apaga as turmas dos módulos de atas e ano ativo, junto com o que depende delas (atas e matrículas).<br><b>Limpar alunos / IDs</b> — apaga os alunos e seus IDs dos módulos de atas e ano ativo, junto com o que depende deles (atas e matrículas). As turmas são mantidas.<br><b>Apagar funcionários</b> — apaga todos os funcionários cadastrados.<br><br>Vale para o escopo escolhido acima. Ação revogável apenas com um arquivo de backup exportado previamente.</span></span></div>
     <div class="danger-box" id="cleanupWarn">⛔ As ações abaixo apagam dados permanentemente. Não é possível desfazer sem um backup.</div>
-    <div class="row" style="margin-top:0;">
+    <div class="row row-btns" style="margin-top:0;">
       <button class="btn-danger" id="btnLimparTudo" onclick="limparTudo()" type="button">Apagar TODOS os dados</button>
       <button class="btn-danger" id="btnApagarTurmas" onclick="apagarTurmas()" type="button">Apagar somente turmas</button>
       <button class="btn-danger" id="btnLimparAlunos" onclick="limparAlunosIds()" type="button">Limpar alunos / IDs</button>
@@ -492,7 +546,7 @@
       `background:${bg};color:#fff;font-family:'Nunito',sans-serif;`+
       `font-size:14px;font-weight:800;padding:12px 16px 12px 20px;border-radius:12px;`+
       `box-shadow:0 4px 24px ${shadow||'rgba(0,0,0,0.25)'};z-index:9999;`+
-      `animation:toastSubir .25s ease;max-width:min(90vw,480px);text-align:left;`;
+      `animation:toastSubir .25s ease;width:max-content;max-width:min(90vw,480px);text-align:left;`;
     const span = document.createElement('span');
     span.textContent = msg;
     span.style.cssText = 'flex:1;line-height:1.4;';
@@ -548,7 +602,7 @@
       backdrop.setAttribute('role', 'dialog');
       backdrop.setAttribute('aria-modal', 'true');
       backdrop.innerHTML =
-        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:22px;max-width:440px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
+        `<div style="background:var(--card-bg,#fff);border-radius:14px;padding:var(--bk-confirm-pad,22px);max-width:440px;width:100%;max-height:90vh;max-height:90dvh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25);">`+
           `<h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:${cor};">${_escHtml(titulo || 'Confirmar ação')}</h3>`+
           `<div style="overflow-y:auto;margin:0 0 ${digitar ? '12px' : '18px'};">`+
             `<p style="margin:0;font-size:13px;color:var(--muted);white-space:pre-line;line-height:1.5;">${corpo || ''}</p>`+
@@ -556,10 +610,10 @@
           (digitar
             ? `<div style="margin:0 0 18px;">`+
                 `<label for="_confirmModalInput" style="display:block;font-size:13px;color:var(--ink);margin-bottom:6px;">Para confirmar, digite <b>${_escHtml(digitar)}</b>:</label>`+
-                `<input id="_confirmModalInput" type="text" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;background:var(--field-bg,#fff);border:1px solid var(--field-border,#ccc);color:var(--ink);font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;">`+
+                `<input id="_confirmModalInput" type="text" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;background:var(--field-bg,#fff);border:1px solid var(--field-border,#ccc);color:var(--ink);font-family:'Nunito',sans-serif;font-size:var(--input-fs,14px);font-weight:700;">`+
               `</div>`
             : '')+
-          `<div style="display:flex;justify-content:flex-end;gap:8px;">`+
+          `<div class="confirm-actions" style="display:flex;justify-content:flex-end;gap:8px;">`+
             `<button type="button" class="btn-neutral" id="_confirmModalCancelar" style="padding:9px 16px;">${_escHtml(textoCancelar || 'Cancelar')}</button>`+
             `<button type="button" id="_confirmModalOk" style="padding:9px 16px;border-radius:8px;font-size:13px;font-weight:800;`+
               `background:${cor};border:1px solid ${cor};color:#fff;cursor:pointer;font-family:'Nunito',sans-serif;">`+
