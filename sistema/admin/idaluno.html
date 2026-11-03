@@ -51,7 +51,46 @@
   .aba-step.active .aba-step-title{color:var(--ui-text)}
   /* slider sobre o card de destaque: o accent-color de marca some contra o fundo de marca */
   .card-destaque input[type="range"]{accent-color:var(--dest-fg)}
-  @media (max-width:700px){.item{flex-direction:column}.container{padding:24px 16px}.abas-stepper{grid-template-columns:1fr 1fr}.sim-field{width:100%}}
+  .t-curto{display:none}
+
+  /* ══════════════════════════════════════════════════════════════
+     Responsivo — breakpoints do guia: 1024 / 768 / 480 (max-width)
+     Desktop (≥1280px) não muda.
+     ══════════════════════════════════════════════════════════════ */
+  @media (max-width:768px){
+    .container{padding:24px 16px 48px}
+    .sim-field{width:100%}
+
+    /* barras de botões/filtros e linha campo + botões: grade na ordem do HTML */
+    .barra,.manual{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));align-items:end}
+    .barra .field{min-width:0}
+    .barra .btn,.manual .btn{white-space:normal;justify-content:center;text-align:center}
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr))}
+
+    /* abas de seção: sempre lado a lado, compactas (número em cima do texto) */
+    .abas-stepper{grid-template-columns:repeat(4,minmax(min-content,1fr));gap:6px}
+    .aba-step{flex-direction:column;gap:6px;padding:8px 4px;text-align:center}
+    .aba-step>div:last-child{text-align:center}
+
+    /* balão do ⓘ ancorado no título, ocupando a largura dele */
+    .section-title{position:relative}
+    .info-tip{position:static}
+    .info-tip-bubble,.info-tip-bubble.wide,.info-tip-bubble.align-right{left:0;right:0;width:auto}
+  }
+  @media (max-width:480px){
+    .container{padding:16px 12px 40px}
+    .barra,.manual{grid-template-columns:minmax(0,1fr)}
+    /* item de resultado: texto em cima, botões embaixo dividindo a linha */
+    .item{flex-direction:column}
+    .item .right{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,130px),1fr))}
+    .item .right .btn{white-space:normal;justify-content:center;text-align:center}
+    /* abas: some o subtítulo, título curto e menor */
+    .aba-step-label{display:none}
+    .aba-step-num{width:26px;height:26px;font-size:12px}
+    .aba-step-title{font-size:clamp(10.5px,3.2vw,12px)}
+    .t-completo{display:none}
+    .t-curto{display:inline}
+  }
 </style>
 <title>Verificação de Alunos</title>
 </head>
@@ -65,34 +104,34 @@
       <div class="field sim-field"><label for="cut">Similaridade mínima: <b id="cutVal">85</b>%</label>
         <input id="cut" type="range" min="70" max="95" value="85"/></div>
     </div>
-    <div class="aviso-warn" id="avisoSemEscola" hidden>ℹ️ Escolha uma escola no topo da página para verificar alunos.</div>
+    <div class="aviso-warn" id="avisoSemEscola" hidden>ℹ️ Escolha uma escola no cabeçalho da página para verificar alunos.</div>
     <div class="abas-stepper" id="abasStepper">
       <div class="aba-step active" id="tab1" data-act="aba" data-a="atas">
         <div class="aba-step-num">1</div>
         <div>
           <div class="aba-step-label">Aba 1 de 4</div>
-          <div class="aba-step-title">Duplicatas em Atas</div>
+          <div class="aba-step-title"><span class="t-completo">Duplicatas em Atas</span><span class="t-curto">Duplicatas</span></div>
         </div>
       </div>
       <div class="aba-step" id="tab2" data-act="aba" data-a="cross">
         <div class="aba-step-num">2</div>
         <div>
           <div class="aba-step-label">Aba 2 de 4</div>
-          <div class="aba-step-title">Ano-Ativo ↔ Atas</div>
+          <div class="aba-step-title"><span class="t-completo">Ano-Ativo ↔ Atas</span><span class="t-curto">Ano-Ativo</span></div>
         </div>
       </div>
       <div class="aba-step" id="tab3" data-act="aba" data-a="vinc">
         <div class="aba-step-num">3</div>
         <div>
           <div class="aba-step-label">Aba 3 de 4</div>
-          <div class="aba-step-title">Vínculos</div>
+          <div class="aba-step-title"><span class="t-completo">Vínculos</span><span class="t-curto">Vínculos</span></div>
         </div>
       </div>
       <div class="aba-step" id="tab4" data-act="aba" data-a="verif">
         <div class="aba-step-num">4</div>
         <div>
           <div class="aba-step-label">Aba 4 de 4</div>
-          <div class="aba-step-title">Verificados</div>
+          <div class="aba-step-title"><span class="t-completo">Verificados</span><span class="t-curto">Verificados</span></div>
         </div>
       </div>
     </div>
