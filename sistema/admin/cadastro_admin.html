@@ -50,8 +50,7 @@
 .row-actions { display: flex; gap: 8px; justify-content: center; }
 
 /* ── Formulário (layout) ── */
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media(max-width:860px){ .grid2{ grid-template-columns: 1fr; } }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .grid2 > .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .acoes-form { display: flex; gap: 10px; justify-content: flex-end; }
 .spacer { height: 14px; }
@@ -59,6 +58,36 @@
 /* ── Rodapé (componente próprio) ── */
 footer { max-width: 1060px; margin: 0 auto; padding: 18px 36px 32px; border-top: 1px solid var(--ui-border); font-size: 13px; color: var(--ui-muted); display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
 .rodape-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--ui-brand); flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsivo — breakpoints do guia: 768 / 480 (max-width)
+   Desktop (≥1280px) não muda.
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .container { padding: 24px 16px 48px; }
+  footer { padding: 18px 16px 32px; }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+
+  /* abas: sempre lado a lado, dividindo a largura; rolagem só como rede de segurança */
+  .card-head { flex-wrap: wrap; }
+  .card-head > .tabs { flex: 1 1 100%; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); }
+  .tab { padding: 8px 6px; text-align: center; }
+
+  /* balão do ⓘ ancorado no título */
+  .section-title { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide, .info-tip-bubble.align-right { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px) {
+  .container { padding: 16px 12px 40px; }
+  footer { padding: 16px 12px 32px; }
+  .note-box { padding: 14px; }
+  .tab { font-size: clamp(10.5px, 3.2vw, 13px); padding: 8px 4px; }
+  .acoes-form { display: grid; grid-template-columns: minmax(0, 1fr); }
+}
+@media (pointer: coarse) {
+  .tab { min-height: 40px; }
+}
 </style>
 </head>
 <body>
