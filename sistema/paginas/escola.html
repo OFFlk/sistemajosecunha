@@ -30,36 +30,268 @@
 
 <title>Informações da Escola</title>
 <style>
-/* ── Página: Informações da Escola — só layout e componentes próprios.
-   Aparência de card, campo, botão, ⓘ, aviso, toast vem do components.css. ── */
+/* ── Esta página é única no sistema: o visual do formulário (campos, título, botão) é dela
+   (antes no escola_form.css, agora aqui). Card, ⓘ, aviso e toast vêm do components.css. ── */
+
+/* ── Variáveis locais — mapeiam o tema ativo (theme-colors.js) ── */
+:root {
+  --f-brand:        var(--brand);
+  --f-brand-hover:  var(--brand-hover);
+  --f-brand-faded:  var(--brand-faded);
+  --f-brand-border: var(--brand-border);
+  --f-brand-text:   var(--brand-text);
+  --f-ring:         color-mix(in srgb, var(--brand) 30%, transparent);
+
+  --f-card-bg:      #ffffff;
+  --f-card-border:  #e2e8f0;
+  --f-card-shadow:  0 4px 16px rgba(0,0,0,.07);
+  --f-input-bg:     #f8fafc;
+  --f-input-border: #e2e8f0;
+  --f-label:        #475569;
+  --f-text:         #1e293b;
+  --f-placeholder:  #94a3b8;
+  --f-divider:      #e2e8f0;
+  --f-radius:       16px;
+  --f-radius-sm:    8px;
+}
+[data-theme="dark"] {
+  --f-brand:        var(--brand-d);
+  --f-brand-hover:  var(--brand-hover-d);
+  --f-brand-faded:  var(--brand-faded-d);
+  --f-brand-border: var(--brand-border-d);
+  --f-brand-text:   var(--brand-text-d);
+  --f-ring:         color-mix(in srgb, var(--brand-d) 30%, transparent);
+
+  --f-card-bg:      #1e293b;
+  --f-card-border:  #334155;
+  --f-card-shadow:  0 4px 16px rgba(0,0,0,.35);
+  --f-input-bg:     #0f172a;
+  --f-input-border: #334155;
+  --f-label:        #94a3b8;
+  --f-text:         #e2e8f0;
+  --f-placeholder:  #475569;
+  --f-divider:      #334155;
+}
 
 /* ── Layout da página ── */
-.wrap { max-width: 640px; margin: 20px auto; padding: 0 20px 32px;
-  /* desconta o header para não gerar rolagem à toa */
-  min-height: calc(100vh - var(--header-height, 74px) - 1rem); }
-@supports (height: 100dvh) { .wrap { min-height: calc(100dvh - var(--header-height, 74px) - 1rem); } }
+.wrap {
+  box-sizing: border-box;
+  max-width: 640px;
+  /* Desconta header + barra + folga para não ter scroll */
+  min-height: calc(100vh - var(--header-height, 74px) - 1rem);
+  margin: 1.25rem auto;
+  padding: 0 1.25rem 2rem;
+  font-family: 'Nunito', sans-serif;
+}
+@supports (height: 100dvh) {
+  .wrap { min-height: calc(100dvh - var(--header-height, 74px) - 1rem); }
+}
 
-/* ── Grade do formulário: 2 colunas; .span-2 ocupa a linha inteira ── */
-.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
-.form > .span-2 { grid-column: 1 / -1; }
+/* ── Card principal (conteúdo centralizado, como antes) ── */
+.card {
+  box-sizing: border-box;
+  background: var(--f-card-bg);
+  border: 1px solid var(--f-card-border);
+  border-radius: var(--f-radius);
+  box-shadow: var(--f-card-shadow);
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+}
+.card:hover,
+.card:focus-within {
+  transform: none !important;
+  border-color: var(--f-card-border) !important;
+  box-shadow: var(--f-card-shadow) !important;
+}
+.card h2 {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--f-brand-text);
+  margin: 0 0 1.5rem;
+  letter-spacing: -.01em;
+  border-bottom: 2px solid var(--f-brand-border);
+  padding-bottom: .875rem;
+}
 
-/* ── Input de arquivo (escudo): borda tracejada e botão interno ── */
-.field input[type="file"] { border-style: dashed; cursor: pointer; font-size: var(--input-fs, 14px); }
-.field input[type="file"]::file-selector-button {
-  font: inherit; font-weight: 700; color: var(--ui-chip-color); background: var(--ui-chip-bg);
-  border: 1.5px solid var(--ui-chip-border); border-radius: 6px; padding: 5px 14px; margin-right: 12px; cursor: pointer;
+/* ── Grade do formulário ── */
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.125rem 1.25rem;
+}
+/* Nome e Endereço ocupam a linha toda; campo de arquivo também */
+.form .campo:first-child,
+.form .campo:nth-child(2),
+.form .campo:has(input[type="file"]) {
+  grid-column: 1 / -1;
+}
+
+/* ── Campo (label + controle) ── */
+.campo { display: flex; flex-direction: column; gap: .375rem; }
+.campo label {
+  font-family: 'Nunito', sans-serif;
+  font-size: .8125rem;
+  font-weight: 700;
+  color: var(--f-label);
+  letter-spacing: .025em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* ── Inputs e selects ── */
+.campo input[type="text"],
+.campo input[type="email"],
+.campo input[type="number"],
+.campo select {
+  font-family: 'Nunito', sans-serif;
+  font-size: .9375rem;
+  font-weight: 600;
+  color: var(--f-text);
+  background: var(--f-input-bg);
+  border: 1.5px solid var(--f-input-border);
+  border-radius: var(--f-radius-sm);
+  padding: .6rem .875rem;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+}
+.campo input[type="text"]::placeholder,
+.campo input[type="email"]::placeholder,
+.campo input[type="number"]::placeholder {
+  color: var(--f-placeholder);
+  font-weight: 400;
+}
+.campo input[type="text"]:hover,
+.campo input[type="email"]:hover,
+.campo input[type="number"]:hover,
+.campo select:hover {
+  border-color: var(--f-brand-border);
+}
+.campo input[type="text"]:focus,
+.campo input[type="email"]:focus,
+.campo input[type="number"]:focus,
+.campo select:focus {
+  border-color: var(--f-brand);
+  background: var(--f-brand-faded);
+  box-shadow: 0 0 0 3px var(--f-ring);
+}
+
+/* Select — seta customizada */
+.campo select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
+[data-theme="dark"] .campo select { color-scheme: dark; }
+[data-theme="dark"] .campo select option { background-color: #0f172a; color: #e2e8f0; }
+
+/* ── Input de arquivo ── */
+.campo input[type="file"] {
+  font-family: 'Nunito', sans-serif;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--f-text);
+  background: var(--f-input-bg);
+  border: 1.5px dashed var(--f-input-border);
+  border-radius: var(--f-radius-sm);
+  padding: .4rem .5rem .4rem .4rem;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.campo input[type="file"]:hover {
+  border-color: var(--f-brand);
+  background: var(--f-brand-faded);
+}
+.campo input[type="file"]::file-selector-button,
+.campo input[type="file"]::-webkit-file-upload-button {
+  font-family: 'Nunito', sans-serif;
+  font-size: .8125rem;
+  font-weight: 700;
+  color: var(--f-brand-text);
+  background: var(--f-brand-faded);
+  border: 1.5px solid var(--f-brand-border);
+  border-radius: 6px;
+  padding: .35rem .85rem;
+  margin-right: .75rem;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, color .18s;
+}
+.campo input[type="file"]::file-selector-button:hover,
+.campo input[type="file"]::-webkit-file-upload-button:hover {
+  background: var(--f-brand-border);
+  border-color: var(--f-brand);
 }
 
 /* ── Preview do escudo ── */
-.preview { margin-top: 8px; display: flex; align-items: center; justify-content: center; }
+.preview { margin-top: .5rem; display: flex; align-items: center; justify-content: center; }
 .preview img {
-  max-width: 120px; max-height: 120px; padding: 4px; object-fit: contain;
-  border-radius: 8px; border: 2px solid var(--ui-chip-border); background: var(--ui-surface);
+  max-width: 120px;
+  max-height: 120px;
+  border-radius: var(--f-radius-sm);
+  border: 2px solid var(--f-brand-border);
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  object-fit: contain;
+  background: var(--f-input-bg);
+  padding: .25rem;
+  transition: border-color .2s;
 }
+.preview img:hover { border-color: var(--f-brand); }
 
 /* ── Área de ações ── */
-.acoes { display: flex; align-items: center; gap: 16px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--ui-border); }
+.acoes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--f-divider);
+}
 
+/* ── Botão primário ── */
+button.primary,
+.acoes .primary {
+  font-family: 'Nunito', sans-serif;
+  font-size: .9375rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: var(--f-brand);
+  border: none;
+  border-radius: var(--f-radius-sm);
+  padding: .65rem 1.75rem;
+  cursor: pointer;
+  letter-spacing: .01em;
+  box-shadow: 0 2px 8px var(--f-ring);
+  transition: background .18s, transform .12s, box-shadow .18s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button.primary:hover,
+.acoes .primary:hover {
+  background: var(--f-brand-hover);
+  box-shadow: 0 4px 14px var(--f-ring);
+  transform: translateY(-1px);
+}
+button.primary:active,
+.acoes .primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px var(--f-ring);
+}
+button.primary:focus-visible,
+.acoes .primary:focus-visible {
+  outline: 3px solid var(--f-ring);
+  outline-offset: 2px;
+}
+
+/* ── Ajustes próprios da página ── */
 /* cursor default em todo o card de formulário */
 main .card,
 main .card input,
@@ -67,7 +299,7 @@ main .card select,
 main .card textarea,
 main .card label,
 main .card .form,
-main .card .field,
+main .card .campo,
 main .card .acoes {
   cursor: default;
 }
@@ -80,8 +312,16 @@ button:disabled {
 /* imagem do escudo: pointer para indicar que é clicável */
 #escudoPreview{ cursor:pointer; }
 
+/* botão Salvar: texto pelo contraste da marca */
+main .card .acoes button.primary,
+main .card .acoes button.primary:hover,
+html[data-theme="dark"] main .card .acoes button.primary,
+html[data-theme="dark"] main .card .acoes button.primary:hover {
+  color: var(--ui-brand-fg);
+}
+
 /* aviso de bloqueio: primeiro item da página, isolado do card (padrão das outras páginas) */
-.aviso-topo{ width:100%; box-sizing:border-box; margin-bottom:16px; }
+.aviso-topo{ width:100%; flex:0 0 100%; grid-column:1 / -1; box-sizing:border-box; margin-bottom:16px; }
 
 /* card bloqueado (sem permissão ou sem escola ativa): todos os controles desabilitados */
 main .card.bloqueado{ opacity:.55; }
@@ -106,26 +346,39 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
   display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,.82); cursor:zoom-out;
 }
-.lightbox[hidden]{ display:none; }
 .lightbox img{
   max-width:90vw; max-height:90vh; border-radius:10px;
   box-shadow:0 8px 40px rgba(0,0,0,.6); user-select:none;
 }
+.lightbox[hidden]{ display:none; }
 @supports (height: 100dvh) { .lightbox img { max-height: 90dvh; } }
 
 /* ══════════════════════════════════════════════════════════════
    Responsivo — breakpoints do guia: 768 / 480 (max-width)
    ══════════════════════════════════════════════════════════════ */
-@media (max-width: 768px) {
-  /* balão do ⓘ ancorado no rótulo, ocupando a largura dele */
-  label { position: relative; }
+@media (max-width: 1024px) {
+  /* balão do ⓘ ancorado no rótulo, ocupando a largura dele (centralizado, o .wide sairia da tela) */
+  .campo label { position: relative; }
   .info-tip { position: static; }
   .info-tip-bubble, .info-tip-bubble.wide, .info-tip-bubble.align-right { left: 0; right: 0; width: auto; }
 }
+@media (max-width: 768px) {
+  /* campos sem zoom no iOS (repete os seletores originais) */
+  .campo input[type="text"],
+  .campo input[type="email"],
+  .campo input[type="number"],
+  .campo select { font-size: var(--input-fs, 16px); }
+}
 @media (max-width: 480px) {
-  .wrap { margin: 16px auto; padding: 0 12px 32px; }
-  .form { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .wrap { margin: 1rem auto; padding: 0 .75rem 2rem; }
+  .card { padding: 1.25rem 1rem 1rem; border-radius: 12px; }
+  .form { grid-template-columns: minmax(0, 1fr); gap: .875rem; }
+  .form .campo:first-child,
+  .form .campo:nth-child(2),
+  .form .campo:has(input[type="file"]) { grid-column: 1; }
   .acoes { display: grid; grid-template-columns: minmax(0, 1fr); }
+  button.primary,
+  .acoes .primary { width: 100%; text-align: center; }
 }
 </style>
 </head>
@@ -136,13 +389,11 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
 <main class="wrap">
   <div class="card">
 
-    <div class="card-head">
-      <div class="section-title">Dados Escolares</div>
-    </div>
+    <h2>Dados Escolares</h2>
 
     <div class="form">
 
-      <div class="field span-2">
+      <div class="campo">
         <label for="nomeEscola">Nome da escola *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -152,7 +403,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         <input type="text" id="nomeEscola" required>
       </div>
 
-      <div class="field span-2">
+      <div class="campo">
         <label for="enderecoEscola">Endereço *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -162,12 +413,12 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         <input type="text" id="enderecoEscola" required>
       </div>
 
-      <div class="field">
+      <div class="campo">
         <label for="cidadeEscola">Município/Cidade</label>
         <input type="text" id="cidadeEscola" placeholder="Ex.: Valente" required>
       </div>
 
-      <div class="field">
+      <div class="campo">
         <label for="ufEscola">UF</label>
         <select id="ufEscola" required>
           <option value=""></option>
@@ -181,7 +432,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         </select>
       </div>
 
-      <div class="field">
+      <div class="campo">
         <label for="inepEscola">Código INEP
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -191,7 +442,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         <input type="text" id="inepEscola" inputmode="numeric" maxlength="8" placeholder="Ex.: 12345678" required oninput="this.value=(this.value||'').replace(/\D+/g,'').slice(0,8)" pattern="\d{8}">
       </div>
 
-      <div class="field span-2">
+      <div class="campo">
         <label for="escudoArquivo">Escudo da escola
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -207,7 +458,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
     </div>
 
     <div class="acoes">
-      <button class="btn primary" type="button" onclick="salvarDados()">Salvar</button>
+      <button class="primary" type="button" onclick="salvarDados()">Salvar</button>
     </div>
 
   </div>
