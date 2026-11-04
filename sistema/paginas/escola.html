@@ -27,14 +27,38 @@
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/components.css">
-<!-- Esta página é única: mantém o cascade original (hub.css + escola_form.css) para o visual do formulário -->
-<link rel="stylesheet" href="/css/hub.css">
-<link rel="stylesheet" href="/css/escola_form.css">
 
 <title>Informações da Escola</title>
 <style>
-/* ── Esta página é única no sistema: o visual do formulário (campos, título, botão) é dela,
-   vindo do escola_form.css. Aqui ficam só os ajustes próprios da página. ── */
+/* ── Página: Informações da Escola — só layout e componentes próprios.
+   Aparência de card, campo, botão, ⓘ, aviso, toast vem do components.css. ── */
+
+/* ── Layout da página ── */
+.wrap { max-width: 640px; margin: 20px auto; padding: 0 20px 32px;
+  /* desconta o header para não gerar rolagem à toa */
+  min-height: calc(100vh - var(--header-height, 74px) - 1rem); }
+@supports (height: 100dvh) { .wrap { min-height: calc(100dvh - var(--header-height, 74px) - 1rem); } }
+
+/* ── Grade do formulário: 2 colunas; .span-2 ocupa a linha inteira ── */
+.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+.form > .span-2 { grid-column: 1 / -1; }
+
+/* ── Input de arquivo (escudo): borda tracejada e botão interno ── */
+.field input[type="file"] { border-style: dashed; cursor: pointer; font-size: var(--input-fs, 14px); }
+.field input[type="file"]::file-selector-button {
+  font: inherit; font-weight: 700; color: var(--ui-chip-color); background: var(--ui-chip-bg);
+  border: 1.5px solid var(--ui-chip-border); border-radius: 6px; padding: 5px 14px; margin-right: 12px; cursor: pointer;
+}
+
+/* ── Preview do escudo ── */
+.preview { margin-top: 8px; display: flex; align-items: center; justify-content: center; }
+.preview img {
+  max-width: 120px; max-height: 120px; padding: 4px; object-fit: contain;
+  border-radius: 8px; border: 2px solid var(--ui-chip-border); background: var(--ui-surface);
+}
+
+/* ── Área de ações ── */
+.acoes { display: flex; align-items: center; gap: 16px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--ui-border); }
 
 /* cursor default em todo o card de formulário */
 main .card,
@@ -43,7 +67,7 @@ main .card select,
 main .card textarea,
 main .card label,
 main .card .form,
-main .card .campo,
+main .card .field,
 main .card .acoes {
   cursor: default;
 }
@@ -56,16 +80,8 @@ button:disabled {
 /* imagem do escudo: pointer para indicar que é clicável */
 #escudoPreview{ cursor:pointer; }
 
-/* botão Salvar: texto pelo contraste da marca (o estilo base mora no escola_form.css) */
-main .card .acoes button.primary,
-main .card .acoes button.primary:hover,
-html[data-theme="dark"] main .card .acoes button.primary,
-html[data-theme="dark"] main .card .acoes button.primary:hover {
-  color: var(--ui-brand-fg);
-}
-
 /* aviso de bloqueio: primeiro item da página, isolado do card (padrão das outras páginas) */
-.aviso-topo{ width:100%; flex:0 0 100%; grid-column:1 / -1; box-sizing:border-box; margin-bottom:16px; }
+.aviso-topo{ width:100%; box-sizing:border-box; margin-bottom:16px; }
 
 /* card bloqueado (sem permissão ou sem escola ativa): todos os controles desabilitados */
 main .card.bloqueado{ opacity:.55; }
@@ -90,9 +106,26 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
   display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,.82); cursor:zoom-out;
 }
+.lightbox[hidden]{ display:none; }
 .lightbox img{
   max-width:90vw; max-height:90vh; border-radius:10px;
   box-shadow:0 8px 40px rgba(0,0,0,.6); user-select:none;
+}
+@supports (height: 100dvh) { .lightbox img { max-height: 90dvh; } }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsivo — breakpoints do guia: 768 / 480 (max-width)
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* balão do ⓘ ancorado no rótulo, ocupando a largura dele */
+  label { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide, .info-tip-bubble.align-right { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px) {
+  .wrap { margin: 16px auto; padding: 0 12px 32px; }
+  .form { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .acoes { display: grid; grid-template-columns: minmax(0, 1fr); }
 }
 </style>
 </head>
@@ -103,11 +136,13 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
 <main class="wrap">
   <div class="card">
 
-    <h2>Dados Escolares</h2>
+    <div class="card-head">
+      <div class="section-title">Dados Escolares</div>
+    </div>
 
     <div class="form">
 
-      <div class="campo">
+      <div class="field span-2">
         <label for="nomeEscola">Nome da escola *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -117,7 +152,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         <input type="text" id="nomeEscola" required>
       </div>
 
-      <div class="campo">
+      <div class="field span-2">
         <label for="enderecoEscola">Endereço *
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -127,12 +162,12 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         <input type="text" id="enderecoEscola" required>
       </div>
 
-      <div class="campo">
+      <div class="field">
         <label for="cidadeEscola">Município/Cidade</label>
         <input type="text" id="cidadeEscola" placeholder="Ex.: Valente" required>
       </div>
 
-      <div class="campo">
+      <div class="field">
         <label for="ufEscola">UF</label>
         <select id="ufEscola" required>
           <option value=""></option>
@@ -146,7 +181,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         </select>
       </div>
 
-      <div class="campo">
+      <div class="field">
         <label for="inepEscola">Código INEP
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -156,7 +191,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
         <input type="text" id="inepEscola" inputmode="numeric" maxlength="8" placeholder="Ex.: 12345678" required oninput="this.value=(this.value||'').replace(/\D+/g,'').slice(0,8)" pattern="\d{8}">
       </div>
 
-      <div class="campo">
+      <div class="field span-2">
         <label for="escudoArquivo">Escudo da escola
           <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">
             i
@@ -172,7 +207,7 @@ main .card.bloqueado #escudoPreview{ cursor:not-allowed; }
     </div>
 
     <div class="acoes">
-      <button class="primary" type="button" onclick="salvarDados()">Salvar</button>
+      <button class="btn primary" type="button" onclick="salvarDados()">Salvar</button>
     </div>
 
   </div>
@@ -240,7 +275,7 @@ function _aplicarGuardas() {
 
   // Admin global sem escola escolhida: nada de escola pode ser cadastrado aqui
   if (_semEscola()) {
-    _bloquearPagina('⚠️ Escolha uma escola no topo da página para cadastrar os dados da escola.', 'avisoSemEscola', 'Escolha uma escola');
+    _bloquearPagina('⚠️ Escolha uma escola no cabeçalho da página para cadastrar os dados da escola.', 'avisoSemEscola', 'Escolha uma escola');
   }
 }
 document.addEventListener('auth:ready', _aplicarGuardas);
