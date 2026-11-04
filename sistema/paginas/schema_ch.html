@@ -48,13 +48,9 @@
 .ch-cargas-grid .field{ min-width:0; }
 
 /* anos | séries lado a lado (divisórias usam os tokens do card de destaque) */
-.ch-aplic{ display:grid; grid-template-columns:1fr 1fr; gap:0 32px; margin-top:6px; }
+.ch-aplic{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 32px; margin-top:6px; }
 .ch-aplic-col{ display:flex; flex-direction:column; gap:12px; }
 .ch-aplic-col + .ch-aplic-col{ border-left:1px solid var(--dest-btn-bd); padding-left:32px; }
-@media(max-width:900px){
-  .ch-aplic{ grid-template-columns:1fr; gap:18px 0; }
-  .ch-aplic-col + .ch-aplic-col{ border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:18px; }
-}
 .ch-acoes{ margin-top:18px; padding-top:16px; border-top:1px solid var(--dest-btn-bd); }
 
 /* ===== Componentes próprios da página ===== */
@@ -88,6 +84,42 @@
 .ch-tabela .c-disc{ width:46px; }
 .ch-tabela .c-acoes{ width:230px; }
 .ch-tabela .toolbar{ flex-wrap:nowrap; gap:4px; justify-content:center; }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsivo — breakpoints do guia: 768 / 480 (max-width)
+   Desktop (≥1280px) não muda.
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width:1024px){
+  /* balão do ⓘ ancorado no rótulo/título, ocupando a largura dele (o .wide estouraria a tela) */
+  label, .section-title{ position:relative; }
+  .info-tip{ position:static; }
+  .info-tip-bubble, .info-tip-bubble.wide, .info-tip-bubble.align-right{ left:0; right:0; width:auto; }
+}
+@media (max-width:768px){
+  .wrap{ padding:24px 16px 48px; }
+
+  /* anos | séries: uma coluna, divisória vira linha de cima */
+  .ch-aplic{ grid-template-columns:minmax(0,1fr); gap:18px 0; }
+  .ch-aplic-col + .ch-aplic-col{ border-left:none; padding-left:0; border-top:1px solid var(--dest-btn-bd); padding-top:18px; }
+
+  /* linhas campo + botões e barra de ações: grade na ordem do HTML (2 por linha quando cabe) */
+  .ch-aplic-col > .row,
+  .toolbar.ch-acoes{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr)); align-items:end; }
+  .ch-aplic-col > .row .field{ min-width:0; max-width:none; }
+  .ch-aplic-col > .row .btn,
+  .toolbar.ch-acoes .btn{ white-space:normal; justify-content:center; text-align:center; }
+}
+@media (max-width:480px){
+  .wrap{ padding:16px 12px 40px; }
+  .ch-aplic-col > .row,
+  .toolbar.ch-acoes{ grid-template-columns:minmax(0,1fr); }
+  /* campos de carga horária: curtos, 2 por linha quando cabem */
+  .ch-cargas-grid{ grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr)); }
+}
+@media (pointer:coarse){
+  .simnao-btn{ min-height:40px; }
+  .ch-chip-x{ padding:4px 8px; }
+}
 </style>
 </head>
 <body>
@@ -96,7 +128,7 @@
 <div class="wrap">
 
   <!-- Admin global sem escola escolhida (guia 18.3): só avisa, no topo, isolado dos cards -->
-  <div class="aviso-warn ch-aviso" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no topo da página para cadastrar as regras de carga horária.</div>
+  <div class="aviso-warn ch-aviso" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no cabeçalho da página para cadastrar as regras de carga horária.</div>
 
   <!-- Cadastro de regras de CH: cada card é filho direto de .wrap (sem card-pai), todos com a mesma largura -->
   <div class="card card-destaque ch-card">
