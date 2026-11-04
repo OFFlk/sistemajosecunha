@@ -185,6 +185,12 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
   .item .right .btn { flex: 1; }
   .item.selecionavel .selo-selecionado { top: 10px; bottom: auto; }
   .ficha-grid { grid-template-columns: minmax(0, 1fr); }
+  /* Cabeçalho do painel: título em cima; "Todos" e Exportar na mesma linha; "N selecionado(s)" embaixo (sem flex-wrap decidindo) */
+  .panel-head { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .panel-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "todos export" "sel sel"; justify-content: stretch; column-gap: 8px; row-gap: 0; }
+  .check-all { grid-area: todos; }
+  #wrapExportFuncionarios { grid-area: export; }
+  .count-selecionados { grid-area: sel; justify-self: start; margin-top: 8px; }
 }
 </style>
 
