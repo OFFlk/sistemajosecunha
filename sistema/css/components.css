@@ -201,6 +201,18 @@ html[data-theme="dark"]{
 .help.err{ color:var(--ui-st-bad-fg); font-weight:700; }
 .help.ok { color:var(--ui-st-ok-fg);  font-weight:700; }
 
+/* linha de dica sob o campo, com contador de caracteres à direita (vinha do admin_escolas.css).
+     <div class="field-hint"><span class="subnote">Máx. 20 caracteres</span><span class="counter">0/20</span></div>
+   A página troca a classe do contador por JS:  el.className = 'counter' + (cheio ? ' full' : quase ? ' warn' : '')
+   O alinhamento à direita/margem de cada uso é da página. */
+.field-hint{
+  display:flex; align-items:center; gap:4px;
+  margin-top:5px; font-size:11px; color:var(--ui-muted);
+}
+.field-hint .counter{ margin-left:auto; font-weight:700; }
+.counter.warn{ color:#f59e0b; }
+.counter.full{ color:#ef4444; }
+
 /* área de upload (arrastar/soltar). .over = arrastando por cima (JS). O <input type=file> fica escondido
    dentro dela; o clique abre pelo <span> do texto. Aliases .docs-drop-* mantidos até migrar as páginas. */
 .drop-area, .docs-drop-area{
