@@ -42,13 +42,13 @@
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; min-width: 0; }
 .reauth { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .reauth .field { margin-bottom: 0; }
-.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row { display: flex; gap: 10px; align-items: center; }
 
 /* ── Seletor de cor (card recolhível: cabeçalho com pré-visualização) ── */
 .cor-preview { display: flex; align-items: center; gap: 6px; }
 .cor-swatch { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--ui-border); flex-shrink: 0; }
 .cor-label { font-size: 12px; font-weight: 700; color: var(--ui-muted); }
-.color-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding-top: 4px; }
+.color-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding-top: 4px; }
 .color-option { display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer; border-radius: 12px; padding: 10px 6px; border: 2px solid transparent; background: transparent; font-family: inherit; transition: border-color 0.18s, background 0.18s; }
 .color-option:hover { background: var(--ui-chip-bg); }
 .color-option.active { border-color: var(--ui-brand); background: var(--ui-chip-bg); }
@@ -59,7 +59,7 @@
 .color-option.active .color-label { color: var(--ui-brand-text); }
 
 /* ── Foto de perfil (bloco próprio da página, sobre o card de destaque) ── */
-.avatar-section { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.avatar-section { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 20px; }
 .avatar-ring { width: 80px; height: 80px; border-radius: 999px; border: 3px solid var(--dest-btn-bd); background: var(--ui-cell-bg); display: grid; place-items: center; font-size: 32px; overflow: hidden; flex: 0 0 auto; position: relative; cursor: pointer; transition: border-color 0.2s; }
 .avatar-ring:hover { border-color: var(--dest-fg); }
 .avatar-ring img { width: 100%; height: 100%; object-fit: cover; border-radius: 999px; }
@@ -68,6 +68,29 @@
 .avatar-info { flex: 1; min-width: 180px; }
 .upload-progress { height: 4px; border-radius: 999px; background: var(--dest-btn-bd); overflow: hidden; margin-top: 8px; }
 .upload-bar { height: 100%; background: var(--dest-fg); width: 0%; transition: width 0.3s; }
+
+/* ══ Responsivo (guia v3: 1024 / 768 / 480; desktop ≥1280px inalterado) ══
+   Em 1024px nada muda: é uma coluna única de 720px. */
+@media (max-width: 768px) {
+  /* Grupos de botões: partes iguais na linha (o botão oculto com [hidden] não ocupa coluna) */
+  .row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .row .btn { white-space: normal; }
+  /* Balão do ⓘ ancorado no título do bloco (correção do guia, seção 5) */
+  .section-title { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 16px 12px 40px; gap: 14px; }
+  /* Tokens de padding redeclarados acima vencem o compacto do base.css: refaz o valor compacto aqui */
+  .wrap > .card { --card-pad-y: 16px; --card-pad-x: 14px; }
+  .color-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Foto + ações: coluna, círculo centralizado, botões um por linha */
+  .avatar-section { grid-template-columns: minmax(0, 1fr); }
+  .avatar-ring { justify-self: center; }
+  .avatar-info { min-width: 0; }
+  .row { grid-auto-flow: row; grid-auto-columns: minmax(0, 1fr); }
+}
 </style>
 </head>
 <body>
