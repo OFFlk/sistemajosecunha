@@ -72,6 +72,22 @@
 .pending-screen .icon { font-size: 48px; }
 .pending-screen .section-title { font-size: 18px; margin: 0; }
 .pending-screen p { font-size: 14px; color: var(--ui-muted); line-height: 1.5; max-width: 340px; margin: 0; }
+
+/* ══ Responsivo (guia v3: 1024 / 768 / 480; desktop ≥1280px inalterado) ══
+   Em ≤1024px nada muda: é uma coluna única de 560px. */
+@media (max-width: 768px) {
+  /* Balão do ⓘ ancorado no título do bloco (correção do guia, seção 5) */
+  .section-title { position: relative; }
+  .info-tip { position: static; }
+  .info-tip-bubble, .info-tip-bubble.wide { left: 0; right: 0; width: auto; }
+}
+@media (max-width: 480px) {
+  .container { margin: 20px auto 40px; padding: 0 12px; }
+  /* Tokens de padding redeclarados acima vencem o compacto do base.css: refaz o valor compacto aqui */
+  .container > .card { --card-pad-y: 16px; --card-pad-x: 14px; }
+  .pending-screen { padding: 8px 0; }
+  .pending-screen .btn { width: 100%; justify-content: center; }
+}
 </style>
 </head>
 <body>
