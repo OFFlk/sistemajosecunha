@@ -17,7 +17,6 @@
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/header.css">
 <link rel="stylesheet" href="/css/components.css">
-<link rel="stylesheet" href="/css/admin_escolas.css">
 
 <script src="../loading-overlay.js"></script>
 <script src="../auth.firebase.js"></script>
@@ -26,6 +25,17 @@
 <style>
 /* Página: Escolas (Admin) — só layout e componentes próprios.
    Aparência de card, destaque, campo, botão, chip, tabela, tooltip, aviso, toast e modal vem do components.css. */
+
+/* ── Estrutura da página (vinha do admin_escolas.css) ── */
+.wrap { max-width: 1060px; margin: 0 auto; padding: 44px 36px 52px; position: relative; z-index: 1; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+
+/* ── Linha de campos do formulário (cadastro e "Solicitar edição") ──
+   align-items:start + margin-top no botão: o botão alinha com os inputs mesmo quando um campo
+   tem dica (.field-hint) embaixo e fica mais alto que os outros. 22px = altura do rótulo. */
+.form { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr auto; gap: 14px; align-items: start; }
+.form > .btn, .form > .acoes-req { margin-top: 22px; }
+@media (max-width: 860px){ .form { grid-template-columns: 1fr; } }
 
 /* ── Card de destaque: layout e contador (componente próprio, usa --dest-*) ── */
 .card-destaque > h2 { margin: 0 0 18px; }
