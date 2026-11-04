@@ -431,7 +431,7 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
     <div class="card pane-detalhe">
       <div class="panel-head">
         <div class="titulo-painel">
-          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares, como RG, certidão ou CEP); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
+          <h2>Alunos</h2><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Os alunos só aparecem depois que você faz uma pesquisa no card de pesquisa ou seleciona uma turma. Clicar em um espaço vazio do card de um aluno seleciona ou desmarca esse aluno. O filtro “Buscar aluno” também afeta esta lista.</span></span><span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide"><b>Todos:</b> seleciona ou desmarca todos os alunos.<br><b>Abrir tabela:</b> abre uma tabela com as informações dos alunos, um por linha.<br><b>Ordenar por:</b> ordena os alunos em ordem crescente pelo item escolhido no seletor; o botão ao lado (↑↓) alterna entre ordem crescente e decrescente.<br><b>Visualizar:</b> exibe os dados do aluno.<br><b>Exportar PDF:</b> <i>Lista de alunos</i> gera uma lista com os alunos selecionados; <i>Separado por turma</i> e <i>Separado por série</i> organizam essa lista por turma ou por série; <i>Fichas individuais</i> gera uma página com os dados de cada aluno; <i>CSV completo</i> gera uma planilha com todos os dados dos alunos selecionados.<br><b>Etiquetas do card:</b> ID e 📚 série do aluno; ✅ Completo (todos os dados preenchidos); ⚠️ Complementares pendentes (faltam só dados complementares: RG e certidão de nascimento ambos em branco, ou algum campo do endereço vazio); 🔴 Dados obrigatórios faltando (falta algum dado essencial do cadastro); ♿ necessidades especiais (deficiências e transtornos do aluno).</span></span><span class="count" id="countAlunos">0</span>
         </div>
         <div class="panel-actions">
           <label class="check-all"><input type="checkbox" id="chkAllAlunos" checked> Todos</label>
@@ -1650,9 +1650,15 @@ async function _atualizarListaAlunos(_tScope){
 
       // Badge de completude
       const camposNec = [a.nome, a.cpf, a.dataNascimento, a.mae, a.pai, a.naturalidadeCidade, a.naturalidadeUF, a.sexo, a._turno];
-      const camposComp = [a.rg, a.certidao, a.cep, a.obs];
-      const necFaltando  = camposNec.filter(v  => !v || !String(v).trim() || v === '--').length;
-      const compFaltando = camposComp.filter(v => !v || !String(v).trim()).length;
+      // obs, NEE e profissional de apoio são opcionais: NÃO entram na completude.
+      const _vazio = v => v === null || v === undefined || !String(v).trim() || String(v).trim() === '--';
+      const necFaltando = camposNec.filter(_vazio).length;
+      // Identificação auxiliar: basta RG OU certidão (ou ambos). Pendente só se nenhum dos dois.
+      const idAuxFaltando = (_vazio(a.rg) && _vazio(a.certidao)) ? 1 : 0;
+      // Endereço: qualquer campo em branco deixa pendente.
+      const camposEnd = [a.pais, a.zona, a.cep, a.logradouro, a.endUF, a.cidade];
+      const endFaltando = camposEnd.filter(_vazio).length;
+      const compFaltando = idAuxFaltando + endFaltando;
       const badgeCompletude = necFaltando > 0
         ? `<span class="badge bad">🔴 Dados obrigatórios faltando</span>`
         : compFaltando > 0
