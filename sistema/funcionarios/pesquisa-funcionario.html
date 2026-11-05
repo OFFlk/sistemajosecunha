@@ -72,7 +72,7 @@
 .btn-avancada { position: relative; flex-shrink: 0; white-space: nowrap; }
 .btn-avancada:hover { filter: brightness(1.07); }
 .cont-filtros { position: absolute; top: -7px; right: -7px; background: var(--ui-cell-bg); color: var(--ui-brand-text); border: 1px solid var(--ui-brand-border); border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1; padding: 3px 6px; }
-.pop-avancada { top: calc(100% + 6px); right: 0; left: auto; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
+.pop-avancada { max-height: 70vh; overflow-y: auto; top: calc(100% + 6px); right: 0; left: auto; z-index: 250; padding: 14px; min-width: 300px; max-width: 340px; }
 .pop-avancada .check { display: flex; gap: 6px; font-size: 13px; }
 .check.forte  { font-weight: 700; }
 .sub-filtro   { flex-direction: column; gap: 6px; margin: 8px 0 0 22px; }
@@ -269,6 +269,24 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
             <select class="input" id="selNascMes" aria-label="Mês de nascimento" style="flex:2;"><option value="">Mês</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
             <input class="input" id="inpNascAno" type="number" inputmode="numeric" min="1900" max="2100" placeholder="Ano" aria-label="Ano de nascimento" style="flex:1.4;">
           </div>
+        </div>
+
+        <div class="pop-div"></div>
+
+        <div>
+          <label class="lbl" for="selApoioAv">🤝 Profissional de apoio</label>
+          <select class="input w-100" id="selApoioAv">
+            <option value="">Todos</option>
+            <option value="sim">Sim</option>
+            <option value="nao">Não</option>
+          </select>
+          <label class="lbl mt-6" for="selEscolAv">🎓 Nível de escolaridade</label>
+          <select class="input w-100" id="selEscolAv">
+            <option value="">Todos</option>
+            <option value="FUND">Fundamental</option>
+            <option value="MEDIO">Médio</option>
+            <option value="SUPERIOR">Superior</option>
+          </select>
         </div>
 
         <div class="pop-foot">
@@ -808,6 +826,22 @@ function _semEscola(){
     if(d === true) return true;
     return !!(d && typeof d === 'object' && NEE_CHAVES.some(k => d[k] === true));
   }
+  // Profissional de apoio: aceita boolean, "sim"/"não", texto descritivo (qualquer valor preenchido = sim)
+  function ehProfApoio(f){
+    const v = f.profissionalApoio;
+    if(v === true) return true;
+    if(v === false || v == null) return false;
+    const t = normalize(String(v)).trim();
+    return !!t && !['nao','n','false','0','nenhum','nenhuma'].includes(t);
+  }
+  // Nível de escolaridade a partir do código (FUND_*, MEDIO_*, SUPERIOR_*); completo e incompleto entram juntos
+  function nivelEscolaridade(f){
+    const e = String(f.escolaridade || '').toUpperCase();
+    if(e.startsWith('FUND'))     return 'FUND';
+    if(e.startsWith('MEDIO'))    return 'MEDIO';
+    if(e.startsWith('SUPERIOR')) return 'SUPERIOR';
+    return '';
+  }
   function partesNasc(s){
     s = String(s || '').trim(); let m;
     if((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))        return { dia: +m[3], mes: +m[2], ano: +m[1] };
@@ -821,6 +855,8 @@ function _semEscola(){
       def: !!document.getElementById('chkFiltroDef')?.checked,
       defItens: Array.from(document.querySelectorAll('.filtroDefItem:checked')).map(c => c.value),
       sexo: document.getElementById('selSexoAv')?.value || '',
+      apoio: document.getElementById('selApoioAv')?.value || '',
+      escol: document.getElementById('selEscolAv')?.value || '',
       nasc: { dia: n('selNascDia'), mes: n('selNascMes'), ano: /^\d{4}$/.test(anoTxt) ? +anoTxt : 0 }
     };
   }
@@ -829,6 +865,8 @@ function _semEscola(){
     let n = 0;
     if(av.def) n++;
     if(av.sexo) n++;
+    if(av.apoio) n++;
+    if(av.escol) n++;
     if(av.nasc.dia || av.nasc.mes || av.nasc.ano) n++;
     const badge = document.getElementById('badgePesquisaAvancada');
     badge.style.display = n > 0 ? 'block' : 'none';
@@ -838,7 +876,7 @@ function _semEscola(){
     document.getElementById('chkFiltroDef').checked = false;
     document.getElementById('subFiltroDef').style.display = 'none';
     document.querySelectorAll('.filtroDefItem').forEach(c => c.checked = false);
-    ['selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => { document.getElementById(id).value = ''; });
+    ['selSexoAv','selNascDia','selNascMes','inpNascAno','selApoioAv','selEscolAv'].forEach(id => { document.getElementById(id).value = ''; });
     atualizarBadgeAvancada();
   }
 
@@ -872,6 +910,11 @@ function _semEscola(){
       if(cargaH && String(f.cargaHoraria||'').trim() !== cargaH) return false;
       // sexo (pesquisa avançada)
       if(av.sexo && String(f.sexo||'').toUpperCase() !== av.sexo) return false;
+      // profissional de apoio (pesquisa avançada)
+      if(av.apoio === 'sim' && !ehProfApoio(f)) return false;
+      if(av.apoio === 'nao' &&  ehProfApoio(f)) return false;
+      // nível de escolaridade (pesquisa avançada): fundamental / médio / superior
+      if(av.escol && nivelEscolaridade(f) !== av.escol) return false;
       // data de nascimento (dia / mês / ano — qualquer combinação)
       if(av.nasc.dia || av.nasc.mes || av.nasc.ano){
         const p = partesNasc(f.dataNascimento);
@@ -1086,7 +1129,7 @@ function _semEscola(){
     atualizarBadgeAvancada(); aplicarFiltros();
   });
   document.querySelectorAll('.filtroDefItem').forEach(c => c.addEventListener('change', aplicarFiltros));
-  ['selSexoAv','selNascDia','selNascMes','inpNascAno'].forEach(id => {
+  ['selSexoAv','selNascDia','selNascMes','inpNascAno','selApoioAv','selEscolAv'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => { atualizarBadgeAvancada(); aplicarFiltros(); });
   });
   document.getElementById('inpNascAno').addEventListener('input', () => { atualizarBadgeAvancada(); aplicarFiltros(); });
