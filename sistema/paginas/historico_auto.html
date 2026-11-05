@@ -35,10 +35,8 @@
 .wrap .card-destaque > .section-title{ margin-bottom:0; }
 .ha-aviso{ margin-bottom:14px; }
 .wrap .aviso-warn:last-child{ margin-bottom:0; }          /* aviso de estado no fim do card/painel não empurra o card */
-.cols{ display:grid; grid-template-columns:1.1fr .9fr; gap:12px; }
-@media(max-width:980px){ .cols{ grid-template-columns:1fr; } }
-.grid2{ display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:10px; }
-@media(max-width:760px){ .grid2{ grid-template-columns:1fr; } }
+.cols{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:12px; }
+.grid2{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:15px; }
 .row > .field{ flex:1; min-width:210px; }
 .row > .f-busca{ flex:2; min-width:280px; }
@@ -93,6 +91,69 @@
 
 /* link dentro de .aviso-warn: herda a cor do texto (mantido da página; candidato a global) */
 .aviso-warn a{ color:inherit; font-weight:700; text-decoration:underline; }
+
+/* ══════════════════════════════════════════════════════════════
+   Responsivo — breakpoints do guia: 1024 / 768 / 480 (max-width)
+   Desktop (≥1280px) não muda.
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width:1024px){
+  .cols{ grid-template-columns:minmax(0,1fr); }
+
+  /* balão do ⓘ ancorado no rótulo / título / cabeçalho do bloco, ocupando a largura dele */
+  label, .section-title, .card-head{ position:relative; }
+  .card-head > .section-title{ position:static; }
+  .info-tip{ position:static; }
+  .info-tip-bubble, .info-tip-bubble.wide, .info-tip-bubble.align-right{ left:0; right:0; width:auto; }
+  /* definições da exportação: 4 campos em 2 colunas */
+  #topFieldsRow{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+  #topFieldsRow > .field{ min-width:0; }
+}
+@media (max-width:768px){
+  .grid2{ grid-template-columns:minmax(0,1fr); }
+
+  /* linhas campo + botões e barras de botões: grade na ordem do HTML */
+  .row{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr)); align-items:end; }
+  .row > .field, .row > .f-busca{ min-width:0; }
+  .row > .f-busca{ grid-column:1 / -1; }
+  .row > .btn{ white-space:normal; justify-content:center; text-align:center; }
+  .toolbar{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr)); }
+  .toolbar > .btn{ justify-content:center; }
+  .card-head{ flex-wrap:wrap; }
+
+  /* linha do tempo (só leitura): rolagem horizontal dentro do contêiner, só por CSS */
+  #timeline{ overflow-x:auto; }
+  #timeline .tab-fixa{ min-width:560px; }
+
+  /* resumo por ano (editável): cada linha vira um card; rótulos de coluna vêm do CSS */
+  #resumoEditavel .tab-fixa, #resumoEditavel .tab-fixa tbody,
+  #resumoEditavel .tab-fixa tr, #resumoEditavel .tab-fixa td{ display:block; }
+  #resumoEditavel .tab-fixa thead{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  #resumoEditavel .tab-fixa tr{
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:12px; margin-bottom:10px;
+    border:1px solid var(--ui-border); border-radius:10px; background:var(--ui-table-cell-bg, transparent);
+  }
+  #resumoEditavel .tab-fixa td{ min-width:0; padding:0; border:0; background:transparent; text-align:left; }
+  #resumoEditavel .tab-fixa td::before{ display:block; margin-bottom:4px; font-size:12px; font-weight:700; color:var(--ui-muted); }
+  #resumoEditavel .tab-fixa td:nth-child(1), #resumoEditavel .tab-fixa td:nth-child(4),
+  #resumoEditavel .tab-fixa td:nth-child(7), #resumoEditavel .tab-fixa td:nth-child(8){ grid-column:1 / -1; }
+  #resumoEditavel .tab-fixa td:nth-child(2)::before{ content:"Etapa"; }
+  #resumoEditavel .tab-fixa td:nth-child(3)::before{ content:"Ano letivo"; }
+  #resumoEditavel .tab-fixa td:nth-child(4)::before{ content:"Escola"; }
+  #resumoEditavel .tab-fixa td:nth-child(5)::before{ content:"Município"; }
+  #resumoEditavel .tab-fixa td:nth-child(6)::before{ content:"UF"; }
+  #resumoEditavel .tab-fixa td:nth-child(7)::before{ content:"Resultado"; }
+  #resumoEditavel .tab-fixa td:nth-child(8)::before{ content:"Ações"; }
+}
+@media (max-width:480px){
+  .wrap{ padding:16px 12px 40px; }
+  .row, #topFieldsRow{ grid-template-columns:minmax(0,1fr); }
+  .toolbar, .resumo-topo{ display:grid; grid-template-columns:minmax(0,1fr); }
+  .toolbar > .btn, .resumo-topo > .btn{ justify-content:center; }
+  .card-head > .btn{ flex:1 1 100%; justify-content:center; }
+}
+@media (pointer:coarse){
+  .nat-opt{ padding:12px; }
+}
 </style>
 </head>
 <body>
@@ -110,7 +171,7 @@
 <div class="wrap">
 
   <!-- Admin global sem escola escolhida (guia 18.3): só avisa, no topo, isolado dos cards -->
-  <div class="aviso-warn ha-aviso" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no topo da página para pesquisar alunos e exportar históricos.</div>
+  <div class="aviso-warn ha-aviso" id="avisoSemEscola" hidden>⚠️ Escolha uma escola no cabeçalho da página para pesquisar alunos e exportar históricos.</div>
 
   <!-- 1) Pesquisa (card de destaque) -->
   <div class="card card-destaque">
