@@ -246,9 +246,9 @@ body:has(.modal-backdrop.open) { overflow: hidden; }   /* página não rola atr�
       </div>
 
       <div class="field stack f-busca">
-        <label for="inpBusca">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por nome ou CPF. A busca por nome precisa de no mínimo 3 letras e vale só para o início do nome: pesquisar “ana” mostra nomes que começam com Ana e ignora nomes com “ana” no meio, como Mariana. A busca por CPF só funciona com os 11 números preenchidos; usar ou não pontos e traço é irrelevante.</span></span></label>
+        <label for="inpBusca">Buscar aluno <span class="info-tip" tabindex="0" onclick="event.stopPropagation(); event.preventDefault(); document.querySelectorAll('.info-tip.open').forEach(o=>{ if(o!==this) o.classList.remove('open'); }); this.classList.toggle('open');">i<span class="info-tip-bubble wide">Busca por nome ou CPF. A busca por nome precisa de no mínimo 3 letras. Sem turma marcada, ela traz os nomes que começam com o termo e, nas turmas que já foram carregadas nesta página, também nomes com o termo em qualquer parte (“ana” acha Mariana; “ana maria” acha só quem tem “ana maria” nessa sequência). Com turma marcada, a busca vale só nas turmas marcadas. A busca por CPF só funciona com os 11 números preenchidos; usar ou não pontos e traço é irrelevante.</span></span></label>
         <div class="busca-row">
-          <input id="inpBusca" type="text" placeholder="Início do nome (mín. 3 letras) ou CPF"/>
+          <input id="inpBusca" type="text" placeholder="Nome (mín. 3 letras) ou CPF"/>
           <button class="btn primary nowrap" id="btnAtualizar">🔍 Pesquisar</button>
           <button class="btn secondary nowrap" id="btnLimparFiltros">🧹 Limpar filtros</button>
         </div>
@@ -1008,6 +1008,47 @@ function _criteriosMatricula(){
   }
   return c;
 }
+/* Busca por nome NO CACHE (zero leituras): complementa o prefixo do servidor com "contém" em qualquer parte do nome,
+   mas só nas turmas já lidas POR INTEIRO (_turmasCarregadas) — assim o resultado não depende de buscas anteriores. */
+function _normNomeLocal(s){ return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim(); }
+// Turmas marcadas no card Turmas (mesma regra da lista: dentro do escopo dos filtros de turma/série)
+function _turmasMarcadasParaBusca(){
+  const ids = turmaIdsSelecionadasNoDOM();
+  return turmasFiltradas().filter(t => ids.has(t.turmaId));
+}
+// Critérios da matrícula aplicados localmente (todos, exceto status: o escopo de status vem das turmas já carregadas)
+function _matCasaCriteriosLocal(m, crit){
+  for(const [f, v] of crit.and){
+    if(f === 'status') continue;
+    if(String(m[f] ?? '') !== String(v)) return false;
+  }
+  if(crit.series.length && !crit.series.includes(m.serie)) return false;
+  const sits = crit.situacoes.filter(Boolean);
+  if(sits.length && !sits.includes(String(m.situacao || '').toUpperCase())) return false;
+  if(crit.semSit && m.situacao) return false;
+  return true;
+}
+// soTurmas: Set de turmaId (turmas marcadas) ou null (todas as turmas já carregadas do ano)
+function _buscarNomeEmCache(ano, crit, soTurmas){
+  const anoStr = String(ano).trim(), st = _statusQuery();
+  const mp = _matsPorAno.get(anoStr);
+  if(!mp) return { lista: [], nTurmas: 0 };
+  const carregadas = new Set();
+  _turmasCarregadas.forEach(k => {
+    const i = k.lastIndexOf('|');
+    if(k.slice(i + 1) === st && (!soTurmas || soTurmas.has(k.slice(0, i)))) carregadas.add(k.slice(0, i));
+  });
+  if(!carregadas.size) return { lista: [], nTurmas: 0 };
+  const termo = _normNomeLocal(crit.nome);
+  const nomePorAluno = new Map(alunos.map(a => [a.alunoId, a.nome]));   // fallback p/ matrícula sem nome gravado
+  const lista = _dedupMats(Array.from(mp.values())).filter(m => {
+    if(!carregadas.has(m.turmaId)) return false;
+    if(st && m.status !== st) return false;                             // mesmo recorte da lista por turma
+    if(!_matCasaCriteriosLocal(m, crit)) return false;
+    return _normNomeLocal(m.nome || nomePorAluno.get(m.alunoId) || '').includes(termo);   // frase contígua, em qualquer parte
+  });
+  return { lista, nTurmas: carregadas.size };
+}
 let _pesquisando = false;
 // Botão Pesquisar (principal e da pesquisa avançada): todos os filtros preenchidos entram como E.
 async function pesquisar(){
@@ -1021,7 +1062,7 @@ async function pesquisar(){
   const ehCpf = !!termo && _ehCpfTermo(termo);
   if(termo && !ehCpf){
     crit.nome = _nomeBusca(termo);
-    if(!crit.nome){ _toastErro('Digite ao menos 3 letras do início do nome, ou o CPF completo.'); return false; }
+    if(!crit.nome){ _toastErro('Digite ao menos 3 letras do nome, ou o CPF completo.'); return false; }
     crit.temCriterio = true;
   }
   if(!termo && !crit.temCriterio && !temFlags){
@@ -1036,9 +1077,23 @@ async function pesquisar(){
       const f = await _idsAvancada();
       if(f) idsA = idsA ? new Set([...idsA].filter(x => f.has(x))) : f;
     }
-    let ids;
+    let ids, avisoCache = '';
     if(crit.temCriterio){                                  // critérios da MATRÍCULA: consulta no servidor
-      const lista = await _consultarMatsCriterios(ano, crit);
+      let lista;
+      const buscaLocal = !!crit.nome && !crit.readmissao;  // readmissão trabalha com matrículas encerradas: não usa o cache das turmas
+      const tMarc = buscaLocal ? _turmasMarcadasParaBusca() : [];
+      if(buscaLocal && tMarc.length){
+        // turma marcada = filtro: a busca vale só nelas, direto do cache (sem consulta de prefixo no servidor)
+        await _garantirMatsDasTurmas(tMarc);               // normalmente já lidas ao marcar; só lê o que faltar
+        lista = _buscarNomeEmCache(ano, crit, new Set(tMarc.map(t => t.turmaId))).lista;
+      } else {
+        lista = await _consultarMatsCriterios(ano, crit);  // prefixo do nome no servidor
+        if(buscaLocal){                                    // + "contém" no cache das turmas já carregadas
+          const r = _buscarNomeEmCache(ano, crit, null);
+          lista = lista.concat(r.lista);
+          if(r.nTurmas) avisoCache = `Nome buscado também em qualquer parte do nome nas ${r.nTurmas} turma(s) já carregada(s).`;
+        }
+      }
       const idsM = new Set(lista.map(m => m.alunoId));
       ids = idsA ? new Set([...idsM].filter(x => idsA.has(x))) : idsM;
     } else ids = idsA;
@@ -1046,6 +1101,7 @@ async function pesquisar(){
     if(crit.readmissao || !crit.temCriterio) await _completarMatsDosAlunos(Array.from(ids), ano);
     _busca = { ids }; _jaFoiPesquisado = true;
     await _atualizarListaAlunos();
+    if(avisoCache) _toastAviso(avisoCache);
     return true;
   }catch(e){
     console.error('pesquisar:', e);
@@ -2684,6 +2740,7 @@ document.getElementById("selModelo").addEventListener("change", _filtroAlunoMudo
 document.getElementById("chkReadmissao").addEventListener("change", (e)=>{
   const sel = document.getElementById("selSituacao");
   if(sel) sel.style.display = e.target.checked ? "" : "none";
+  inpBusca.value = "";   // marcar/desmarcar readmissão zera o termo (antes ficava escrito, mas era ignorado)
   _filtroAlunoMudou();   // com readmissão a lista por turma dá lugar ao aviso; ao desmarcar, volta às turmas
 });
 document.getElementById("selSituacao").addEventListener("change", _filtroAlunoMudou);
