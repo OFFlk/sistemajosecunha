@@ -2224,8 +2224,10 @@ function normSerie(s){
       }
 
       // Modelo integral
-      if(aluno.modeloEnsino || aluno.modelo){
-        const modelo = (aluno.modeloEnsino || aluno.modelo || '').toUpperCase();
+      // O modelo vive na MATRÍCULA (o doc do aluno pode não tê-lo): matrícula primeiro, aluno como fallback.
+      const _modeloSalvo = (matAluno && matAluno.modelo) || aluno.modeloEnsino || aluno.modelo || '';
+      if(_modeloSalvo){
+        const modelo = String(_modeloSalvo).toUpperCase();
         const modeloHidden = document.getElementById('modeloEnsino');
         if(modeloHidden) modeloHidden.value = modelo;
         const isIntegral = modelo === 'INTEGRAL';
@@ -2520,8 +2522,13 @@ function normSerie(s){
       window._profissionaisApoioPromise = (async function(){
         try{
           await window._bootPronto;
-          // query pontual: só quem é profissional de apoio, no ano da turma (nunca a coleção inteira)
-          const lista = ano ? await window.DB.funcionarios.whereEquals('profissionalApoio', true, { and: [['anoLetivo', String(ano)]] }) : [];
+          // query pontual na MATRÍCULA do funcionário (modelo pessoa × ano: profissionalApoio e anoLetivo só existem
+          // em funcionariosMatriculas, e anoLetivo é NÚMERO lá — comparar com string não retorna nada).
+          // Só traz quem é apoio naquele ano (nunca a coleção inteira).
+          const anoNum = Number(ano);
+          const lista = (ano && Number.isFinite(anoNum))
+            ? await window.DB.funcionariosMatriculas.whereEquals('profissionalApoio', true, { and: [['anoLetivo', anoNum]] })
+            : [];
           let extra = null;
           const manter = valorSalvo || sel.value;
           if(manter && !lista.some(f => (f.funcId || f._id) === manter)){
