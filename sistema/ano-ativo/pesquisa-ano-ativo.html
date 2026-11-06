@@ -1705,7 +1705,8 @@ async function _atualizarListaAlunos(_tScope){
       const modeloDesc = a._modelo === 'INTEGRAL' ? '📚 Integral' : (a._modelo === 'REGULAR' ? 'Regular' : '—');
 
       // Badge de completude
-      const camposNec = [a.nome, a.cpf, a.dataNascimento, a.mae, a.pai, a.naturalidadeCidade, a.naturalidadeUF, a.sexo, a._turno];
+      // O pai NÃO entra aqui: o cadastro já exige o nome ou "Pai não informado" (gravado como '--'); validar isso é papel do cadastro.
+      const camposNec = [a.nome, a.cpf, a.dataNascimento, a.mae, a.naturalidadeCidade, a.naturalidadeUF, a.sexo, a._turno];
       // obs, NEE e profissional de apoio são opcionais: NÃO entram na completude.
       const _vazio = v => v === null || v === undefined || !String(v).trim() || String(v).trim() === '--';
       const necFaltando = camposNec.filter(_vazio).length;
